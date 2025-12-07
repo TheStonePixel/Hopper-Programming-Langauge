@@ -1,0 +1,23 @@
+
+extern function putchar(int c) int
+
+
+function add(int a, int b) int {
+  return a + b
+}
+
+
+function main() int {
+  int x = 0
+  int y = 25
+
+
+  while(x < 26) {
+    putchar(65+x)
+    x = x + 1
+  }
+  putchar(10)
+  
+  return 0
+}
+

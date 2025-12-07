@@ -1,0 +1,62 @@
+
+program
+    : (functionDecl NEWLINE*)* EOF
+    ;
+
+functionDecl
+    : 'function' Identifier '(' paramList? ')' type block
+    ;
+
+// params: int x, int y
+paramList
+    : param (',' param)*
+    ;
+
+param
+    : type Identifier
+    ;
+
+type
+    : 'int'
+    | 'bool'
+    | 'float'
+    ;
+
+// blocks: statements separated by NEWLINEs
+block
+    : '{'
+      NEWLINE*                                // optional blank lines after '{'
+      ( statement (NEWLINE+ statement)*       // 1+ statements, separated by ≥1 NEWLINE
+        NEWLINE* )?                           // optional trailing blank lines
+      '}'
+    ;
+
+statement
+    : type Identifier ('=' expression)?       # VarDecl      // int x = 0
+    | Identifier '=' expression               # Assign       // x = x + 1
+    | 'if' '(' expression ')' block ('else' block)?  # IfStmt
+    | 'while' '(' expression ')' block               # WhileStmt
+    | 'return' expression?                           # ReturnStmt
+    ;
+
+// expressions unchanged
+expression      : logicalOr ;
+logicalOr       : logicalAnd ( '||' logicalAnd )* ;
+logicalAnd      : equality  ( '&&' equality  )* ;
+equality        : relational( ('==' | '!=') relational )* ;
+relational      : additive ( ('<' | '<=' | '>' | '>=') additive )* ;
+additive        : multiplicative ( ('+' | '-') multiplicative )* ;
+multiplicative  : unary ( ('*' | '/') unary )* ;
+unary           : ('!' | '-') unary | primary ;
+primary
+    : IntegerLiteral
+    | 'true' | 'false'
+    | Identifier
+    | '(' expression ')'
+    ;
+
+// lexer
+IntegerLiteral  : [0-9]+ ;
+Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
+NEWLINE         : '\r'? '\n' ;
+WS              : [ \t]+ -> skip ;
