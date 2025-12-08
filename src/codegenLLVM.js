@@ -1,19 +1,4 @@
 import fs from "fs";
-import {
-    Program,
-    FunctionDecl,
-    VarDecl,
-    Assign,
-    IfStmt,
-    WhileStmt,
-    ReturnStmt,
-    Block,
-    Binary,
-    Unary,
-    Var,
-    IntLiteral,
-    BoolLiteral,
-} from "./ast.js";
 import { buildAstFromSource } from "./astBuilder.js";
 
 function ensureBool(ir, val) {
@@ -308,11 +293,13 @@ function genModule(ast) {
     return out;
 }
 
+export { genBlock, genExpr, genFunction, genModule, genStmt };
+
 // --- CLI: node src/codegenLlvm.js example.hop > out.ll ---
 
-if (process.argv[1] && process.argv[1].endsWith("codegenLLVM.js")) {
-    const source = fs.readFileSync(process.argv[2], "utf8");
-    const ast = buildAstFromSource(source);
-    const ir = genModule(ast);
-    console.log(ir);
-}
+// if (process.argv[1] && process.argv[1].endsWith("codegenLLVM.js")) {
+//     const source = fs.readFileSync(process.argv[2], "utf8");
+//     const ast = buildAstFromSource(source);
+//     const ir = genModule(ast);
+//     console.log(ir);
+// }

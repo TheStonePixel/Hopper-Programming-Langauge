@@ -5,12 +5,14 @@
   "main": "index.js",
 "scripts": {
 "gen:grammar": "java -jar tools/antlr-4.13.1-complete.jar -Dlanguage=JavaScript -visitor -o src/generated grammar/Hopper.g4",
-
   "test:parse": "node src/parse.js examples/main.hop",
   "test:ast": "node src/astBuilder.js examples/main.hop",
   "build:example": "node src/codegenLLVM.js examples/main.hop > build/out.ll && llc -filetype=obj build/out.ll -o build/out.o && clang build/out.o -o build/hopper",
   "run:example": "./build/hopper; echo $?",
   "cycle": "npm run gen:grammar && npm run test:parse && npm run test:ast && npm run build:example && npm run run:example"
+  },
+  "bin": {
+    "hopper": "./app.js"
   },
   "keywords": [],
   "author": "",

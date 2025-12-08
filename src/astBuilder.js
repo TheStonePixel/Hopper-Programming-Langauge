@@ -23,7 +23,7 @@ import {
     BoolLiteral,
 } from "./ast.js";
 
-class AstBuilder extends HopperVisitor {
+export class AstBuilder extends HopperVisitor {
     visitProgram(ctx) {
         const fns = ctx.functionDecl().map(fn => this.visit(fn));
         return Program(fns);
@@ -239,8 +239,9 @@ export function buildAstFromSource(source) {
 }
 
 // CLI test: node src/astBuilder.js example.hop
-if (process.argv[1] && process.argv[1].endsWith("astBuilder.js")) {
-    const src = fs.readFileSync(process.argv[2], "utf8");
-    const ast = buildAstFromSource(src);
-    console.log(JSON.stringify(ast, null, 2));
-}
+// if (process.argv[1] && process.argv[1].endsWith("astBuilder.js")) {
+//     const sourceFile = process.argv[2];
+//     const src = fs.readFileSync(sourceFile, "utf8");
+//     const ast = buildAstFromSource(src);
+//     console.log(JSON.stringify(ast, null, 2));
+// }
