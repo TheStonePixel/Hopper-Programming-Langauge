@@ -25,15 +25,15 @@ In C, you write `short` or `int` and hope it's right. The compiler optimizes any
 ### Hopper's Approach: Constraints
 
 ```hopper
-int age [0 -> 125] = 0
+int age[0->125] = 0
+int counter = 0           // no constraint = assumes max int size
 ```
 
 This says:
-- `age` is an integer
-- Valid range is 0 to 125
-- Initial value is 0
+- `age` is an integer with valid range 0 to 125, initial value 0
+- `counter` is an unconstrained integer (defaults to platform int)
 
-The compiler reads this and decides:
+The compiler reads `age` and decides:
 - Range fits in 8 bits (max 255)
 - Never negative, so unsigned
 - Result: uses `u8` internally
@@ -41,9 +41,9 @@ The compiler reads this and decides:
 **Constraints must be compile-time constants.** No runtime dependencies, no watchers, no slowdown.
 
 ```hopper
-int x [0 -> 100] = 0       // OK: literal bounds
-int y [0 -> MAX_SIZE] = 0  // OK: const bounds
-int z [0 -> x] = 0         // NO: runtime dependency
+int x[0->100] = 0          // OK: literal bounds
+int y[0->MAX_SIZE] = 0     // OK: const bounds
+int z[0->x] = 0            // NO: runtime dependency
 ```
 
 ### Bounds Checking
@@ -60,10 +60,10 @@ Only two numeric types exist at the language level:
 - `float` - floating point with constraints
 
 ```hopper
-int count [0 -> *] = 0                    // unbounded positive
-int offset [-1000 -> 1000] = 0            // signed range
-float temperature [-40.0 -> 85.0] = 20.0  // sensor range
-float normalized [0.0 -> 1.0] = 0.0       // unit interval
+int count[0->*] = 0                    // unbounded positive
+int offset[-1000->1000] = 0            // signed range
+float temperature[-40.0->85.0] = 20.0  // sensor range
+float normalized[0.0->1.0] = 0.0       // unit interval
 ```
 
 ---
@@ -76,9 +76,9 @@ Deliberate terminology shift. Arrays imply indexing semantics. Continuous memory
 
 ```hopper
 // Syntax TBD - possibilities:
-int[100] buffer [0 -> 255]              // 100 ints, each 0-255
-continuous int pixels [0 -> 255] * 1920 * 1080
-memory int<1024> [0 -> 255]             // 1024 bytes of constrained ints
+int[100] buffer[0->255]                 // 100 ints, each 0-255
+continuous int pixels[0->255] * 1920 * 1080
+memory int<1024>[0->255]                // 1024 bytes of constrained ints
 ```
 
 ### Bitfields
@@ -204,14 +204,14 @@ extern function fopen(str path, str mode) ptr
 extern function fread(ptr buf, int size, int count, ptr stream) int
 
 struct Token {
-    int type [0 -> 255]
+    int type[0->255]
     str lexeme
-    int line [1 -> *]
+    int line[1->*]
 }
 
 function tokenize(str source) continuous Token {
-    continuous Token tokens [0 -> 10000]
-    int pos [0 -> *] = 0
+    continuous Token tokens[0->10000]
+    int pos[0->*] = 0
 
     while (pos < source.length) {
         // tokenization logic
