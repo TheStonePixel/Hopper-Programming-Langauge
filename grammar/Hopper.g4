@@ -24,6 +24,7 @@ type
     : 'int'
     | 'bool'
     | 'float'
+    | 'String'
     ;
 
 // blocks: statements separated by NEWLINEs
@@ -58,6 +59,8 @@ multiplicative  : unary ( ('*' | '/') unary )* ;
 unary           : ('!' | '-') unary | primary ;
 primary
     : IntegerLiteral
+    | StringLiteral
+    | CharLiteral                   // 'A' -> just an int (65)
     | 'true'
     | 'false'
     | Identifier '(' argList? ')'   // function call
@@ -73,6 +76,8 @@ argList
 // ===== LEXER RULES =====
 
 IntegerLiteral  : [0-9]+ ;
+StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
+CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
 
 // keep newlines as real tokens (for statement separation)

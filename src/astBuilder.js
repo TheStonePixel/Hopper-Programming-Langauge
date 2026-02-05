@@ -21,6 +21,8 @@ import {
     Var,
     IntLiteral,
     BoolLiteral,
+    StringLiteral,
+    CharLiteral,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
@@ -125,6 +127,38 @@ export class AstBuilder extends HopperVisitor {
             const token = ctx.IntegerLiteral();
             if (token) {
                 return IntLiteral(parseInt(token.getText(), 10));
+            }
+        }
+
+        // string literal: "..."
+        if (ctx.StringLiteral) {
+            const token = ctx.StringLiteral();
+            if (token) {
+                // Remove quotes and handle escape sequences
+                const raw = token.getText();
+                const value = raw.slice(1, -1).replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+                return StringLiteral(value);
+            }
+        }
+
+        // char literal: '.' -> just an int
+        if (ctx.CharLiteral) {
+            const token = ctx.CharLiteral();
+            if (token) {
+                const raw = token.getText();
+                let char = raw.slice(1, -1);
+                // Handle escape sequences
+                if (char.startsWith('\\')) {
+                    switch (char[1]) {
+                        case 'n': char = '\n'; break;
+                        case 't': char = '\t'; break;
+                        case 'r': char = '\r'; break;
+                        case '\\': char = '\\'; break;
+                        case "'": char = "'"; break;
+                        default: char = char[1];
+                    }
+                }
+                return CharLiteral(char.charCodeAt(0));
             }
         }
 

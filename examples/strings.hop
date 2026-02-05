@@ -1,0 +1,12 @@
+extern function puts(String s) int
+extern function putchar(int c) int
+
+function main() int {
+  puts("Hello, Hopper!")
+
+  int letter = 'A'
+  putchar(letter)
+  putchar('\n')
+
+  return 0
+}

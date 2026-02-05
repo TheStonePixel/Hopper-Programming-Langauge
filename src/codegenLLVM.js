@@ -16,6 +16,24 @@ function ensureBool(ir, val) {
 
 // --- simple helpers ---
 
+// Module-level string constants
+const stringConstants = new Map(); // value -> @.str.N name
+let stringCounter = 0;
+
+function addStringConstant(value) {
+    if (stringConstants.has(value)) {
+        return stringConstants.get(value);
+    }
+    const name = `@.str.${stringCounter++}`;
+    stringConstants.set(value, name);
+    return name;
+}
+
+function resetStringConstants() {
+    stringConstants.clear();
+    stringCounter = 0;
+}
+
 class IRBuilder {
     constructor() {
         this.lines = [];
@@ -49,6 +67,7 @@ function llvmType(t) {
     if (t === "bool") return "i1";
     if (t === "float") return "float";
     if (t === "void") return "void";
+    if (t === "String") return "i8*";
     throw new Error(`Unknown type: ${t}`);
 }
 
@@ -59,6 +78,19 @@ function genExpr(ir, expr) {
 
         case "BoolLiteral":
             return { value: expr.value ? "1" : "0", type: "bool" };
+
+        case "CharLiteral":
+            // Char is just an int
+            return { value: String(expr.value), type: "int" };
+
+        case "StringLiteral": {
+            // Add string to global constants and get pointer
+            const strName = addStringConstant(expr.value);
+            const len = expr.value.length + 1; // +1 for null terminator
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
+            return { value: tmp, type: "String" };
+        }
 
         case "Var": {
             const v = ir.getVar(expr.name);
@@ -277,18 +309,63 @@ function genFunction(fn) {
 
     return ir.lines.join("\n");
 }
+function escapeStringForLLVM(str) {
+    // Escape special characters for LLVM string constant
+    let result = '';
+    for (const char of str) {
+        const code = char.charCodeAt(0);
+        if (code === 10) {
+            result += '\\0A';  // newline
+        } else if (code === 13) {
+            result += '\\0D';  // carriage return
+        } else if (code === 9) {
+            result += '\\09';  // tab
+        } else if (code === 0) {
+            result += '\\00';  // null
+        } else if (code === 92) {
+            result += '\\5C';  // backslash
+        } else if (code === 34) {
+            result += '\\22';  // double quote
+        } else if (code < 32 || code > 126) {
+            result += '\\' + code.toString(16).padStart(2, '0').toUpperCase();
+        } else {
+            result += char;
+        }
+    }
+    return result;
+}
+
 function genModule(ast) {
+    // Reset string constants for fresh compilation
+    resetStringConstants();
+
     let out = "; Hopper module\n\n";
 
+    // First pass: generate all functions to collect string constants
+    const functionCode = [];
     for (const fn of ast.functions) {
         if (fn.isExtern) {
             const ret = llvmType(fn.returnType);
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
-            out += `declare ${ret} @${fn.name}(${params})\n`;
+            functionCode.push(`declare ${ret} @${fn.name}(${params})\n`);
         } else {
-            out += genFunction(fn) + "\n\n";
+            functionCode.push(genFunction(fn) + "\n\n");
         }
     }
+
+    // Emit string constants at the top
+    for (const [value, name] of stringConstants) {
+        const escaped = escapeStringForLLVM(value);
+        const len = value.length + 1; // +1 for null terminator
+        out += `${name} = private unnamed_addr constant [${len} x i8] c"${escaped}\\00"\n`;
+    }
+
+    if (stringConstants.size > 0) {
+        out += "\n";
+    }
+
+    // Then add all the function code
+    out += functionCode.join("");
 
     return out;
 }

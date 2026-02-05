@@ -64,3 +64,12 @@ export function IntLiteral(value) {
 export function BoolLiteral(value) {
     return { kind: "BoolLiteral", value };
 }
+
+export function StringLiteral(value) {
+    return { kind: "StringLiteral", value };
+}
+
+export function CharLiteral(value) {
+    // Store as int (ASCII/Unicode code point)
+    return { kind: "CharLiteral", value };
+}

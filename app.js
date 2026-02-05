@@ -34,17 +34,12 @@ switch (mode) {
     }
 
     case "--ast": {
-        const { parser } = parseSource(filecontent);
-        const tree = parser.program();
-        const builder = new AstBuilder();
         const ast = buildAstFromSource(filecontent);
         console.log(JSON.stringify(ast, null, 2));
         break;
     }
 
     case "--llvm": {
-        const { parser } = parseSource(filecontent);
-        const tree = parser.program();
         const ast = buildAstFromSource(filecontent);
         const ir = genModule(ast);
         console.log(ir);
