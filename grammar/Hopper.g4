@@ -3,12 +3,25 @@ grammar Hopper;
 // ===== PARSER RULES =====
 
 program
-    : NEWLINE* (functionDecl NEWLINE*)* EOF
+    : NEWLINE* (topLevelDecl NEWLINE*)* EOF
+    ;
+
+topLevelDecl
+    : functionDecl
+    | structDecl
     ;
 
 functionDecl
     : 'extern' 'function' Identifier '(' paramList? ')' type   # ExternFuncDecl
     | 'function' Identifier '(' paramList? ')' type block      # FuncDecl
+    ;
+
+structDecl
+    : 'struct' Identifier '{' NEWLINE* (structField (NEWLINE+ structField)* NEWLINE*)? '}'
+    ;
+
+structField
+    : type Identifier
     ;
 
 
@@ -25,6 +38,7 @@ type
     | 'bool'
     | 'float'
     | 'String'
+    | Identifier    // user-defined types (structs)
     ;
 
 // blocks: statements separated by NEWLINEs
@@ -38,11 +52,25 @@ block
 
 statement
     : type Identifier '=' expression                 # VarDecl
+    | type Identifier                                # VarDeclNoInit
     | Identifier '=' expression                      # Assign
+    | Identifier '.' Identifier '=' expression       # FieldAssign
     | expression                                     # ExprStmt
     | 'if' '(' expression ')' block ('else' block)?  # IfStmt
     | 'while' '(' expression ')' block               # WhileStmt
+    | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
+    | 'break'                                        # BreakStmt
+    | 'continue'                                     # ContinueStmt
     | 'return' expression                            # ReturnStmt
+    ;
+
+forInit
+    : type Identifier '=' expression    # ForInitDecl
+    | Identifier '=' expression         # ForInitAssign
+    ;
+
+forUpdate
+    : Identifier '=' expression
     ;
 
 
@@ -55,7 +83,7 @@ logicalAnd      : equality  ( '&&' equality  )* ;
 equality        : relational ( ('==' | '!=') relational )* ;
 relational      : additive ( ('<' | '<=' | '>' | '>=') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
-multiplicative  : unary ( ('*' | '/') unary )* ;
+multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
 unary           : ('!' | '-') unary | primary ;
 primary
     : IntegerLiteral
@@ -64,6 +92,7 @@ primary
     | 'true'
     | 'false'
     | Identifier '(' argList? ')'   // function call
+    | Identifier '.' Identifier     // field access
     | Identifier
     | '(' expression ')'
     ;

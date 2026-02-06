@@ -1,11 +1,19 @@
 // Simple Hopper v0 AST node builders
 
-export function Program(functions) {
-    return { kind: "Program", functions };
+export function Program(functions, structs = []) {
+    return { kind: "Program", functions, structs };
 }
 
 export function FunctionDecl(name, params, returnType, body, isExtern = false) {
     return { kind: "FunctionDecl", name, params, returnType, body, isExtern };
+}
+
+export function StructDecl(name, fields) {
+    return { kind: "StructDecl", name, fields };
+}
+
+export function StructField(name, type) {
+    return { kind: "StructField", name, type };
 }
 
 export function ExprStmt(expr) {
@@ -28,12 +36,28 @@ export function Assign(name, expr) {
     return { kind: "Assign", name, expr };
 }
 
+export function FieldAssign(object, field, expr) {
+    return { kind: "FieldAssign", object, field, expr };
+}
+
 export function IfStmt(cond, thenBlock, elseBlock) {
     return { kind: "IfStmt", cond, thenBlock, elseBlock };
 }
 
 export function WhileStmt(cond, body) {
     return { kind: "WhileStmt", cond, body };
+}
+
+export function ForStmt(init, cond, update, body) {
+    return { kind: "ForStmt", init, cond, update, body };
+}
+
+export function BreakStmt() {
+    return { kind: "BreakStmt" };
+}
+
+export function ContinueStmt() {
+    return { kind: "ContinueStmt" };
 }
 
 export function ReturnStmt(expr) {
@@ -55,6 +79,10 @@ export function Unary(op, expr) {
 
 export function Var(name) {
     return { kind: "Var", name };
+}
+
+export function FieldAccess(object, field) {
+    return { kind: "FieldAccess", object, field };
 }
 
 export function IntLiteral(value) {

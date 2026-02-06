@@ -20,6 +20,9 @@ function ensureBool(ir, val) {
 const stringConstants = new Map(); // value -> @.str.N name
 let stringCounter = 0;
 
+// Module-level struct definitions
+const structTypes = new Map(); // struct name -> { fields: [{ name, type }], llvmName }
+
 function addStringConstant(value) {
     if (stringConstants.has(value)) {
         return stringConstants.get(value);
@@ -34,12 +37,44 @@ function resetStringConstants() {
     stringCounter = 0;
 }
 
+function resetStructTypes() {
+    structTypes.clear();
+}
+
+function registerStruct(name, fields) {
+    structTypes.set(name, {
+        fields: fields,
+        llvmName: `%struct.${name}`
+    });
+}
+
+function getStructInfo(name) {
+    return structTypes.get(name);
+}
+
+function getFieldIndex(structName, fieldName) {
+    const info = structTypes.get(structName);
+    if (!info) throw new Error(`Unknown struct: ${structName}`);
+    const idx = info.fields.findIndex(f => f.name === fieldName);
+    if (idx < 0) throw new Error(`Unknown field ${fieldName} in struct ${structName}`);
+    return idx;
+}
+
+function getFieldType(structName, fieldName) {
+    const info = structTypes.get(structName);
+    if (!info) throw new Error(`Unknown struct: ${structName}`);
+    const field = info.fields.find(f => f.name === fieldName);
+    if (!field) throw new Error(`Unknown field ${fieldName} in struct ${structName}`);
+    return field.type;
+}
+
 class IRBuilder {
     constructor() {
         this.lines = [];
         this.tmp = 0;
         this.label = 0;
         this.vars = new Map(); // name -> { ptr, type }
+        this.loopStack = []; // stack of { breakLabel, continueLabel }
     }
 
     emit(line) {
@@ -59,6 +94,21 @@ class IRBuilder {
         if (!v) throw new Error(`Unknown variable: ${name}`);
         return v;
     }
+
+    pushLoop(breakLabel, continueLabel) {
+        this.loopStack.push({ breakLabel, continueLabel });
+    }
+
+    popLoop() {
+        this.loopStack.pop();
+    }
+
+    currentLoop() {
+        if (this.loopStack.length === 0) {
+            throw new Error("break/continue outside of loop");
+        }
+        return this.loopStack[this.loopStack.length - 1];
+    }
 }
 
 // Hopper types -> LLVM types
@@ -68,6 +118,10 @@ function llvmType(t) {
     if (t === "float") return "float";
     if (t === "void") return "void";
     if (t === "String") return "i8*";
+    // Check if it's a struct type
+    if (structTypes.has(t)) {
+        return `%struct.${t}`;
+    }
     throw new Error(`Unknown type: ${t}`);
 }
 
@@ -97,6 +151,24 @@ function genExpr(ir, expr) {
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${v.type}, ${v.type}* ${v.ptr}`);
             return { value: tmp, type: v.hType }; // keep Hopper type too
+        }
+
+        case "FieldAccess": {
+            // Get struct variable and access field
+            const v = ir.getVar(expr.object);
+            const structName = v.hType;
+            const fieldIdx = getFieldIndex(structName, expr.field);
+            const fieldType = getFieldType(structName, expr.field);
+            const llFieldType = llvmType(fieldType);
+
+            // GEP to get field pointer
+            const fieldPtr = ir.newTmp();
+            ir.emit(`${fieldPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
+
+            // Load field value
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = load ${llFieldType}, ${llFieldType}* ${fieldPtr}`);
+            return { value: tmp, type: fieldType };
         }
 
         case "Unary": {
@@ -138,6 +210,11 @@ function genExpr(ir, expr) {
                 case "/": {
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = sdiv ${lt} ${left.value}, ${right.value}`);
+                    return { value: tmp, type: left.type };
+                }
+                case "%": {
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = srem ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "<":
@@ -195,8 +272,14 @@ function genStmt(ir, stmt, retType) {
             const llType = llvmType(stmt.type);
             const ptr = ir.newTmp();
             ir.emit(`${ptr} = alloca ${llType}`);
-            const init = genExpr(ir, stmt.init);
-            ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
+
+            // For struct types, we might not have an init value
+            if (stmt.init) {
+                const init = genExpr(ir, stmt.init);
+                ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
+            }
+            // Note: struct fields are uninitialized by default (could zero-init later)
+
             ir.vars.set(stmt.name, { ptr, type: llType, hType: stmt.type });
             break;
         }
@@ -205,6 +288,24 @@ function genStmt(ir, stmt, retType) {
             const v = ir.getVar(stmt.name);
             const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${v.type} ${val.value}, ${v.type}* ${v.ptr}`);
+            break;
+        }
+
+        case "FieldAssign": {
+            // Assign to struct field: obj.field = value
+            const v = ir.getVar(stmt.object);
+            const structName = v.hType;
+            const fieldIdx = getFieldIndex(structName, stmt.field);
+            const fieldType = getFieldType(structName, stmt.field);
+            const llFieldType = llvmType(fieldType);
+
+            // GEP to get field pointer
+            const fieldPtr = ir.newTmp();
+            ir.emit(`${fieldPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
+
+            // Store value
+            const val = genExpr(ir, stmt.expr);
+            ir.emit(`store ${llFieldType} ${val.value}, ${llFieldType}* ${fieldPtr}`);
             break;
         }
 
@@ -249,9 +350,55 @@ function genStmt(ir, stmt, retType) {
             ir.emit(`br i1 ${condI1}, label %${bodyLabel}, label %${endLabel}`);
 
             ir.emit(`${bodyLabel}:`);
+            ir.pushLoop(endLabel, condLabel);
             genBlock(ir, stmt.body, retType);
+            ir.popLoop();
             ir.emit(`br label %${condLabel}`);
 
+            ir.emit(`${endLabel}:`);
+            break;
+        }
+
+        case "ForStmt": {
+            // for (init; cond; update) body
+            // Equivalent to: init; while(cond) { body; update; }
+            const condLabel = ir.newLabel("for.cond.");
+            const bodyLabel = ir.newLabel("for.body.");
+            const updateLabel = ir.newLabel("for.update.");
+            const endLabel = ir.newLabel("for.end.");
+
+            // Execute init (if present)
+            if (stmt.init) {
+                genStmt(ir, stmt.init, retType);
+            }
+
+            ir.emit(`br label %${condLabel}`);
+            ir.emit(`${condLabel}:`);
+
+            // Check condition (if present, else infinite loop)
+            if (stmt.cond) {
+                const condVal = genExpr(ir, stmt.cond);
+                const condI1 = ensureBool(ir, condVal);
+                ir.emit(`br i1 ${condI1}, label %${bodyLabel}, label %${endLabel}`);
+            } else {
+                ir.emit(`br label %${bodyLabel}`);
+            }
+
+            ir.emit(`${bodyLabel}:`);
+            // continue jumps to update (so update runs before next iteration)
+            ir.pushLoop(endLabel, updateLabel);
+            genBlock(ir, stmt.body, retType);
+            ir.popLoop();
+
+            ir.emit(`br label %${updateLabel}`);
+            ir.emit(`${updateLabel}:`);
+
+            // Execute update (if present)
+            if (stmt.update) {
+                genStmt(ir, stmt.update, retType);
+            }
+
+            ir.emit(`br label %${condLabel}`);
             ir.emit(`${endLabel}:`);
             break;
         }
@@ -262,6 +409,19 @@ function genStmt(ir, stmt, retType) {
             ir.emit(`ret ${llType} ${val.value}`);
             break;
         }
+
+        case "BreakStmt": {
+            const loop = ir.currentLoop();
+            ir.emit(`br label %${loop.breakLabel}`);
+            break;
+        }
+
+        case "ContinueStmt": {
+            const loop = ir.currentLoop();
+            ir.emit(`br label %${loop.continueLabel}`);
+            break;
+        }
+
         case "ExprStmt": {
             genExpr(ir, stmt.expr); // just for side effects
             break;
@@ -336,12 +496,29 @@ function escapeStringForLLVM(str) {
 }
 
 function genModule(ast) {
-    // Reset string constants for fresh compilation
+    // Reset for fresh compilation
     resetStringConstants();
+    resetStructTypes();
 
     let out = "; Hopper module\n\n";
 
-    // First pass: generate all functions to collect string constants
+    // First, register all struct types
+    for (const struct of ast.structs || []) {
+        const fields = struct.fields.map(f => ({ name: f.name, type: f.type }));
+        registerStruct(struct.name, fields);
+    }
+
+    // Emit struct type definitions
+    for (const struct of ast.structs || []) {
+        const fieldTypes = struct.fields.map(f => llvmType(f.type)).join(", ");
+        out += `%struct.${struct.name} = type { ${fieldTypes} }\n`;
+    }
+
+    if ((ast.structs || []).length > 0) {
+        out += "\n";
+    }
+
+    // Generate all functions to collect string constants
     const functionCode = [];
     for (const fn of ast.functions) {
         if (fn.isExtern) {
@@ -353,7 +530,7 @@ function genModule(ast) {
         }
     }
 
-    // Emit string constants at the top
+    // Emit string constants
     for (const [value, name] of stringConstants) {
         const escaped = escapeStringForLLVM(value);
         const len = value.length + 1; // +1 for null terminator

@@ -7,18 +7,25 @@ import HopperVisitor from "./generated/grammar/HopperVisitor.js";
 import {
     Program,
     FunctionDecl,
+    StructDecl,
+    StructField,
     Param,
     Call,
     VarDecl,
     Assign,
+    FieldAssign,
     IfStmt,
     WhileStmt,
+    ForStmt,
+    BreakStmt,
+    ContinueStmt,
     ReturnStmt,
     ExprStmt,
     Block,
     Binary,
     Unary,
     Var,
+    FieldAccess,
     IntLiteral,
     BoolLiteral,
     StringLiteral,
@@ -27,8 +34,34 @@ import {
 
 export class AstBuilder extends HopperVisitor {
     visitProgram(ctx) {
-        const fns = ctx.functionDecl().map(fn => this.visit(fn));
-        return Program(fns);
+        const functions = [];
+        const structs = [];
+
+        for (const decl of ctx.topLevelDecl()) {
+            const node = this.visit(decl);
+            if (node.kind === "FunctionDecl") {
+                functions.push(node);
+            } else if (node.kind === "StructDecl") {
+                structs.push(node);
+            }
+        }
+
+        return Program(functions, structs);
+    }
+
+    visitTopLevelDecl(ctx) {
+        // Visit the child (either functionDecl or structDecl)
+        return this.visit(ctx.children[0]);
+    }
+
+    visitStructDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const fields = ctx.structField().map(f => {
+            const fieldType = f.type().getText();
+            const fieldName = f.Identifier().getText();
+            return StructField(fieldName, fieldType);
+        });
+        return StructDecl(name, fields);
     }
 
     visitExprStmt(ctx) {
@@ -95,10 +128,23 @@ export class AstBuilder extends HopperVisitor {
         return VarDecl(name, type, initExpr);
     }
 
+    visitVarDeclNoInit(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        return VarDecl(name, type, null);
+    }
+
     visitAssign(ctx) {
         const name = ctx.Identifier().getText();
         const expr = this.visit(ctx.expression());
         return Assign(name, expr);
+    }
+
+    visitFieldAssign(ctx) {
+        const object = ctx.Identifier(0).getText();
+        const field = ctx.Identifier(1).getText();
+        const expr = this.visit(ctx.expression());
+        return FieldAssign(object, field, expr);
     }
 
     visitIfStmt(ctx) {
@@ -112,6 +158,56 @@ export class AstBuilder extends HopperVisitor {
         const cond = this.visit(ctx.expression());
         const body = this.visit(ctx.block());
         return WhileStmt(cond, body);
+    }
+
+    visitForStmt(ctx) {
+        // for (init; cond; update) block
+        const initCtx = ctx.forInit();
+        const condCtx = ctx.expression();
+        const updateCtx = ctx.forUpdate();
+        const bodyCtx = ctx.block();
+
+        let init = null;
+        if (initCtx) {
+            init = this.visit(initCtx);
+        }
+
+        let cond = null;
+        if (condCtx) {
+            cond = this.visit(condCtx);
+        }
+
+        let update = null;
+        if (updateCtx) {
+            // forUpdate is just Identifier '=' expression
+            const name = updateCtx.Identifier().getText();
+            const expr = this.visit(updateCtx.expression());
+            update = Assign(name, expr);
+        }
+
+        const body = this.visit(bodyCtx);
+        return ForStmt(init, cond, update, body);
+    }
+
+    visitForInitDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        const initExpr = this.visit(ctx.expression());
+        return VarDecl(name, type, initExpr);
+    }
+
+    visitForInitAssign(ctx) {
+        const name = ctx.Identifier().getText();
+        const expr = this.visit(ctx.expression());
+        return Assign(name, expr);
+    }
+
+    visitBreakStmt(ctx) {
+        return BreakStmt();
+    }
+
+    visitContinueStmt(ctx) {
+        return ContinueStmt();
     }
 
     visitReturnStmt(ctx) {
@@ -168,16 +264,36 @@ export class AstBuilder extends HopperVisitor {
         if (text === "false") return BoolLiteral(false);
 
         // function call: Identifier '(' argList? ')'
-        if (ctx.Identifier && ctx.Identifier() && ctx.getChildCount() > 1) {
-            const callee = ctx.Identifier().getText();
-            const argListCtx = ctx.argList ? ctx.argList() : ctx.argList?.(); // depending on ANTLR gen
-            const args = argListCtx ? argListCtx.expression().map(e => this.visit(e)) : [];
-            return Call(callee, args);
+        if (ctx.Identifier && ctx.argList !== undefined) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 1 && ctx.getChildCount() > 1) {
+                const argListCtx = ctx.argList ? ctx.argList() : null;
+                if (argListCtx !== undefined) {
+                    const callee = ids[0].getText();
+                    const args = argListCtx ? argListCtx.expression().map(e => this.visit(e)) : [];
+                    return Call(callee, args);
+                }
+            }
+        }
+
+        // field access: Identifier '.' Identifier
+        if (ctx.Identifier) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 2) {
+                const object = ids[0].getText();
+                const field = ids[1].getText();
+                return FieldAccess(object, field);
+            }
         }
 
         // plain variable: Identifier
-        if (ctx.Identifier && ctx.Identifier()) {
-            return Var(ctx.Identifier().getText());
+        if (ctx.Identifier) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 1) {
+                return Var(ids[0].getText());
+            } else if (ids && !Array.isArray(ids)) {
+                return Var(ids.getText());
+            }
         }
 
         // '(' expression ')'
@@ -211,7 +327,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitMultiplicative(ctx) {
         let node = this.visit(ctx.unary(0));
-        const ops = ctx.children.filter(c => ["*", "/"].includes(c.getText()));
+        const ops = ctx.children.filter(c => ["*", "/", "%"].includes(c.getText()));
         for (let i = 0; i < ops.length; i++) {
             const right = this.visit(ctx.unary(i + 1));
             node = Binary(ops[i].getText(), node, right);
