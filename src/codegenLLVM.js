@@ -118,11 +118,32 @@ function llvmType(t) {
     if (t === "float") return "float";
     if (t === "void") return "void";
     if (t === "String") return "i8*";
+    if (t === "address") return "i8*";  // generic pointer
     // Check if it's a struct type
     if (structTypes.has(t)) {
         return `%struct.${t}`;
     }
+    // Check for address-of type (e.g., "address:int")
+    if (t.startsWith("address:")) {
+        const pointedTo = t.substring(8);
+        return llvmType(pointedTo) + "*";
+    }
     throw new Error(`Unknown type: ${t}`);
+}
+
+// Get size of a type in bytes (for allocation)
+function sizeOfType(t) {
+    if (t === "int") return 4;
+    if (t === "bool") return 1;
+    if (t === "float") return 4;
+    if (t === "String") return 8;  // pointer size
+    if (t === "address") return 8; // pointer size
+    if (structTypes.has(t)) {
+        // Sum up field sizes (simplified - doesn't account for alignment)
+        const info = structTypes.get(t);
+        return info.fields.reduce((sum, f) => sum + sizeOfType(f.type), 0);
+    }
+    throw new Error(`Unknown type for sizeof: ${t}`);
 }
 
 function genExpr(ir, expr) {
@@ -169,6 +190,68 @@ function genExpr(ir, expr) {
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${llFieldType}, ${llFieldType}* ${fieldPtr}`);
             return { value: tmp, type: fieldType };
+        }
+
+        case "NullLiteral": {
+            // Return null pointer - type will be determined by context
+            return { value: "null", type: "address" };
+        }
+
+        case "AddressOf": {
+            // x::address - get address of variable (don't load, return pointer)
+            const v = ir.getVar(expr.name);
+            // Return the pointer itself, with type info about what it points to
+            return { value: v.ptr, type: `address:${v.hType}` };
+        }
+
+        case "Deref": {
+            // p::value - read through address
+            const v = ir.getVar(expr.name);
+            // v.hType should be "address:X" where X is the pointed-to type
+            if (!v.hType.startsWith("address:")) {
+                throw new Error(`Cannot dereference non-address type: ${v.hType}`);
+            }
+            const pointedToType = v.hType.substring(8); // strip "address:"
+            const llPointedTo = llvmType(pointedToType);
+
+            // Load the address value (stored as i8*)
+            const rawAddr = ir.newTmp();
+            ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
+
+            // Bitcast from i8* to typed pointer
+            const typedAddr = ir.newTmp();
+            ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
+
+            // Load through the typed pointer
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = load ${llPointedTo}, ${llPointedTo}* ${typedAddr}`);
+            return { value: tmp, type: pointedToType };
+        }
+
+        case "Allocate": {
+            // allocate int(10) - heap allocation
+            const allocType = expr.type;
+            const countVal = genExpr(ir, expr.count);
+            const typeSize = sizeOfType(allocType);
+            const llType = llvmType(allocType);
+
+            // Calculate total size: count * sizeof(type)
+            const sizeBytes = ir.newTmp();
+            ir.emit(`${sizeBytes} = mul i32 ${countVal.value}, ${typeSize}`);
+
+            // Extend to i64 for malloc
+            const size64 = ir.newTmp();
+            ir.emit(`${size64} = sext i32 ${sizeBytes} to i64`);
+
+            // Call malloc
+            const rawPtr = ir.newTmp();
+            ir.emit(`${rawPtr} = call i8* @malloc(i64 ${size64})`);
+
+            // Bitcast to proper pointer type
+            const typedPtr = ir.newTmp();
+            ir.emit(`${typedPtr} = bitcast i8* ${rawPtr} to ${llType}*`);
+
+            return { value: typedPtr, type: `address:${allocType}` };
         }
 
         case "Unary": {
@@ -269,25 +352,61 @@ function genExpr(ir, expr) {
 function genStmt(ir, stmt, retType) {
     switch (stmt.kind) {
         case "VarDecl": {
-            const llType = llvmType(stmt.type);
+            // Determine the actual Hopper type (may be refined by init expression)
+            let hType = stmt.type;
+            let init = null;
+
+            if (stmt.init) {
+                init = genExpr(ir, stmt.init);
+                // If declared as generic 'address' but init has specific type, use that
+                if (stmt.type === "address" && init.type.startsWith("address:")) {
+                    hType = init.type;
+                }
+            }
+
+            // For address types, always use i8* as storage to allow reassignment to different types
+            const isAddress = stmt.type === "address" || stmt.type.startsWith("address:");
+            const llType = isAddress ? "i8*" : llvmType(hType);
             const ptr = ir.newTmp();
             ir.emit(`${ptr} = alloca ${llType}`);
 
             // For struct types, we might not have an init value
-            if (stmt.init) {
-                const init = genExpr(ir, stmt.init);
-                ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
+            if (init) {
+                if (isAddress && init.type.startsWith("address:")) {
+                    // Bitcast typed pointer to i8* for storage
+                    const typedLlType = llvmType(init.type);
+                    const castPtr = ir.newTmp();
+                    ir.emit(`${castPtr} = bitcast ${typedLlType} ${init.value} to i8*`);
+                    ir.emit(`store i8* ${castPtr}, i8** ${ptr}`);
+                } else {
+                    ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
+                }
             }
             // Note: struct fields are uninitialized by default (could zero-init later)
 
-            ir.vars.set(stmt.name, { ptr, type: llType, hType: stmt.type });
+            ir.vars.set(stmt.name, { ptr, type: llType, hType: hType });
             break;
         }
 
         case "Assign": {
             const v = ir.getVar(stmt.name);
             const val = genExpr(ir, stmt.expr);
-            ir.emit(`store ${v.type} ${val.value}, ${v.type}* ${v.ptr}`);
+
+            // If assigning a specific address type to a generic address, refine the type
+            if (v.hType === "address" && val.type.startsWith("address:")) {
+                // Update variable's type info (hType only, llvm storage stays i8*)
+                v.hType = val.type;
+            }
+
+            // For address variables (stored as i8*), bitcast typed pointers
+            if (v.type === "i8*" && val.type.startsWith("address:")) {
+                const typedLlType = llvmType(val.type);
+                const castPtr = ir.newTmp();
+                ir.emit(`${castPtr} = bitcast ${typedLlType} ${val.value} to i8*`);
+                ir.emit(`store i8* ${castPtr}, i8** ${v.ptr}`);
+            } else {
+                ir.emit(`store ${v.type} ${val.value}, ${v.type}* ${v.ptr}`);
+            }
             break;
         }
 
@@ -306,6 +425,45 @@ function genStmt(ir, stmt, retType) {
             // Store value
             const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llFieldType} ${val.value}, ${llFieldType}* ${fieldPtr}`);
+            break;
+        }
+
+        case "DerefAssign": {
+            // p::value = x - write through address
+            const v = ir.getVar(stmt.name);
+            if (!v.hType.startsWith("address:")) {
+                throw new Error(`Cannot dereference non-address type: ${v.hType}`);
+            }
+            const pointedToType = v.hType.substring(8); // strip "address:"
+            const llPointedTo = llvmType(pointedToType);
+
+            // Load the address value (stored as i8*)
+            const rawAddr = ir.newTmp();
+            ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
+
+            // Bitcast from i8* to typed pointer
+            const typedAddr = ir.newTmp();
+            ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
+
+            // Evaluate the value to store
+            const val = genExpr(ir, stmt.expr);
+
+            // Store through the typed pointer
+            ir.emit(`store ${llPointedTo} ${val.value}, ${llPointedTo}* ${typedAddr}`);
+            break;
+        }
+
+        case "Deallocate": {
+            // deallocate p - free heap memory
+            const val = genExpr(ir, stmt.expr);
+
+            // Bitcast to i8* for free
+            const rawPtr = ir.newTmp();
+            const valType = llvmType(val.type);
+            ir.emit(`${rawPtr} = bitcast ${valType} ${val.value} to i8*`);
+
+            // Call free
+            ir.emit(`call void @free(i8* ${rawPtr})`);
             break;
         }
 
@@ -501,6 +659,11 @@ function genModule(ast) {
     resetStructTypes();
 
     let out = "; Hopper module\n\n";
+
+    // Declare malloc and free for heap allocation
+    out += "; Memory allocation functions\n";
+    out += "declare i8* @malloc(i64)\n";
+    out += "declare void @free(i8*)\n\n";
 
     // First, register all struct types
     for (const struct of ast.structs || []) {

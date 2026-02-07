@@ -30,6 +30,12 @@ import {
     BoolLiteral,
     StringLiteral,
     CharLiteral,
+    NullLiteral,
+    AddressOf,
+    Deref,
+    DerefAssign,
+    Allocate,
+    Deallocate,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
@@ -147,6 +153,18 @@ export class AstBuilder extends HopperVisitor {
         return FieldAssign(object, field, expr);
     }
 
+    visitDerefAssign(ctx) {
+        // Identifier '::' 'value' '=' expression
+        const name = ctx.Identifier().getText();
+        const expr = this.visit(ctx.expression());
+        return DerefAssign(name, expr);
+    }
+
+    visitDeallocateStmt(ctx) {
+        const expr = this.visit(ctx.expression());
+        return Deallocate(expr);
+    }
+
     visitIfStmt(ctx) {
         const cond = this.visit(ctx.expression());
         const thenBlock = this.visit(ctx.block(0));
@@ -258,10 +276,36 @@ export class AstBuilder extends HopperVisitor {
             }
         }
 
-        // true / false
+        // true / false / null
         const text = ctx.getText();
         if (text === "true") return BoolLiteral(true);
         if (text === "false") return BoolLiteral(false);
+        if (text === "null") return NullLiteral();
+
+        // Check for :: operator (address/value)
+        const children = ctx.children || [];
+        const childTexts = children.map(c => c.getText ? c.getText() : String(c));
+
+        // Identifier '::' 'address'
+        if (childTexts.includes('::') && childTexts.includes('address')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            return AddressOf(name);
+        }
+
+        // Identifier '::' 'value'
+        if (childTexts.includes('::') && childTexts.includes('value')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            return Deref(name);
+        }
+
+        // allocate type '(' expression ')'
+        if (childTexts[0] === 'allocate') {
+            const allocType = ctx.type().getText();
+            const countExpr = this.visit(ctx.expression());
+            return Allocate(allocType, countExpr);
+        }
 
         // function call: Identifier '(' argList? ')'
         if (ctx.Identifier && ctx.argList !== undefined) {

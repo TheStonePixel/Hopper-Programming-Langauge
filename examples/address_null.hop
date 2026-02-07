@@ -1,0 +1,17 @@
+// Test null address
+
+extern function putchar(int c) int
+
+function main() int {
+    // Test null assignment
+    address p = null
+
+    // Assign a real address
+    int x = 5
+    p = x::address
+
+    putchar('0' + p::value)
+    putchar('\n')
+
+    return 0
+}

@@ -101,3 +101,33 @@ export function CharLiteral(value) {
     // Store as int (ASCII/Unicode code point)
     return { kind: "CharLiteral", value };
 }
+
+export function NullLiteral() {
+    return { kind: "NullLiteral" };
+}
+
+// Address operations
+export function AddressOf(name) {
+    // x::address - get address of variable
+    return { kind: "AddressOf", name };
+}
+
+export function Deref(name) {
+    // p::value - read through address (only on identifiers, no chaining)
+    return { kind: "Deref", name };
+}
+
+export function DerefAssign(name, expr) {
+    // p::value = x - write through address
+    return { kind: "DerefAssign", name, expr };
+}
+
+export function Allocate(type, count) {
+    // allocate int(10) - heap allocation
+    return { kind: "Allocate", type, count };
+}
+
+export function Deallocate(expr) {
+    // deallocate p - free heap memory
+    return { kind: "Deallocate", expr };
+}

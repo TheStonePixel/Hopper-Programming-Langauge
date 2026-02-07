@@ -38,6 +38,7 @@ type
     | 'bool'
     | 'float'
     | 'String'
+    | 'address'     // pointer type (carries pointed-to type info at runtime)
     | Identifier    // user-defined types (structs)
     ;
 
@@ -55,6 +56,8 @@ statement
     | type Identifier                                # VarDeclNoInit
     | Identifier '=' expression                      # Assign
     | Identifier '.' Identifier '=' expression       # FieldAssign
+    | Identifier '::' 'value' '=' expression         # DerefAssign
+    | 'deallocate' expression                        # DeallocateStmt
     | expression                                     # ExprStmt
     | 'if' '(' expression ')' block ('else' block)?  # IfStmt
     | 'while' '(' expression ')' block               # WhileStmt
@@ -91,6 +94,10 @@ primary
     | CharLiteral                   // 'A' -> just an int (65)
     | 'true'
     | 'false'
+    | 'null'                        // null address
+    | Identifier '::' 'address'     // get address of variable
+    | Identifier '::' 'value'       // dereference address (read)
+    | 'allocate' type '(' expression ')'  // heap allocation
     | Identifier '(' argList? ')'   // function call
     | Identifier '.' Identifier     // field access
     | Identifier
