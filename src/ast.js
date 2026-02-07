@@ -131,3 +131,24 @@ export function Deallocate(expr) {
     // deallocate p - free heap memory
     return { kind: "Deallocate", expr };
 }
+
+// Array operations
+export function ArrayDecl(type, name, size) {
+    // int buffer[10] - fixed-size array declaration
+    return { kind: "ArrayDecl", type, name, size };
+}
+
+export function ArrayAccess(name, index) {
+    // buffer[i] - read array element
+    return { kind: "ArrayAccess", name, index };
+}
+
+export function ArrayAssign(name, index, expr) {
+    // buffer[i] = value - write array element
+    return { kind: "ArrayAssign", name, index, expr };
+}
+
+export function ArrayElementAddress(name, index) {
+    // buffer[i]::address - get address of array element
+    return { kind: "ArrayElementAddress", name, index };
+}

@@ -52,8 +52,10 @@ block
     ;
 
 statement
-    : type Identifier '=' expression                 # VarDecl
+    : type Identifier '[' IntegerLiteral ']'             # ArrayDecl
+    | type Identifier '=' expression                 # VarDecl
     | type Identifier                                # VarDeclNoInit
+    | Identifier '[' expression ']' '=' expression   # ArrayAssign
     | Identifier '=' expression                      # Assign
     | Identifier '.' Identifier '=' expression       # FieldAssign
     | Identifier '::' 'value' '=' expression         # DerefAssign
@@ -95,10 +97,12 @@ primary
     | 'true'
     | 'false'
     | 'null'                        // null address
+    | Identifier '[' expression ']' '::' 'address'  // get address of array element
     | Identifier '::' 'address'     // get address of variable
     | Identifier '::' 'value'       // dereference address (read)
     | 'allocate' type '(' expression ')'  // heap allocation
     | Identifier '(' argList? ')'   // function call
+    | Identifier '[' expression ']' // array element access
     | Identifier '.' Identifier     // field access
     | Identifier
     | '(' expression ')'

@@ -200,8 +200,63 @@ function genExpr(ir, expr) {
         case "AddressOf": {
             // x::address - get address of variable (don't load, return pointer)
             const v = ir.getVar(expr.name);
+            // For arrays, return pointer to first element
+            if (v.hType.startsWith("array:")) {
+                // hType is "array:int:10" -> element type is "int"
+                const parts = v.hType.split(":");
+                const elemType = parts[1];
+                const llElemType = llvmType(elemType);
+                // GEP to get pointer to first element
+                const elemPtr = ir.newTmp();
+                ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 0`);
+                return { value: elemPtr, type: `address:${elemType}` };
+            }
             // Return the pointer itself, with type info about what it points to
             return { value: v.ptr, type: `address:${v.hType}` };
+        }
+
+        case "ArrayAccess": {
+            // buffer[i] - read array element
+            const v = ir.getVar(expr.name);
+            // v.hType should be "array:elemType:size"
+            if (!v.hType.startsWith("array:")) {
+                throw new Error(`Cannot index non-array type: ${v.hType}`);
+            }
+            const parts = v.hType.split(":");
+            const elemType = parts[1];
+            const llElemType = llvmType(elemType);
+
+            // Evaluate index
+            const indexVal = genExpr(ir, expr.index);
+
+            // GEP to get element pointer
+            const elemPtr = ir.newTmp();
+            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${indexVal.value}`);
+
+            // Load element value
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = load ${llElemType}, ${llElemType}* ${elemPtr}`);
+            return { value: tmp, type: elemType };
+        }
+
+        case "ArrayElementAddress": {
+            // buffer[i]::address - get address of array element
+            const v = ir.getVar(expr.name);
+            if (!v.hType.startsWith("array:")) {
+                throw new Error(`Cannot get element address of non-array type: ${v.hType}`);
+            }
+            const parts = v.hType.split(":");
+            const elemType = parts[1];
+            const llElemType = llvmType(elemType);
+
+            // Evaluate index
+            const indexVal = genExpr(ir, expr.index);
+
+            // GEP to get element pointer
+            const elemPtr = ir.newTmp();
+            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${indexVal.value}`);
+
+            return { value: elemPtr, type: `address:${elemType}` };
         }
 
         case "Deref": {
@@ -276,11 +331,31 @@ function genExpr(ir, expr) {
             const lt = llvmType(left.type);
             switch (expr.op) {
                 case "+": {
+                    // Check for address arithmetic: address + int
+                    if (left.type.startsWith("address:") && (right.type === "int")) {
+                        const pointedToType = left.type.substring(8);
+                        const llPointedTo = llvmType(pointedToType);
+                        const tmp = ir.newTmp();
+                        // GEP advances by element size automatically
+                        ir.emit(`${tmp} = getelementptr ${llPointedTo}, ${llPointedTo}* ${left.value}, i32 ${right.value}`);
+                        return { value: tmp, type: left.type };
+                    }
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = add ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "-": {
+                    // Check for address arithmetic: address - int
+                    if (left.type.startsWith("address:") && (right.type === "int")) {
+                        const pointedToType = left.type.substring(8);
+                        const llPointedTo = llvmType(pointedToType);
+                        // Negate the offset for subtraction
+                        const negOffset = ir.newTmp();
+                        ir.emit(`${negOffset} = sub i32 0, ${right.value}`);
+                        const tmp = ir.newTmp();
+                        ir.emit(`${tmp} = getelementptr ${llPointedTo}, ${llPointedTo}* ${left.value}, i32 ${negOffset}`);
+                        return { value: tmp, type: left.type };
+                    }
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = sub ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
@@ -464,6 +539,48 @@ function genStmt(ir, stmt, retType) {
 
             // Call free
             ir.emit(`call void @free(i8* ${rawPtr})`);
+            break;
+        }
+
+        case "ArrayDecl": {
+            // int buffer[10] - fixed-size array declaration
+            const elemType = stmt.type;
+            const size = stmt.size;
+            const llElemType = llvmType(elemType);
+            const arrayType = `[${size} x ${llElemType}]`;
+
+            const ptr = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${arrayType}`);
+
+            // Store with Hopper type "array:elemType:size"
+            ir.vars.set(stmt.name, {
+                ptr,
+                type: arrayType,
+                hType: `array:${elemType}:${size}`
+            });
+            break;
+        }
+
+        case "ArrayAssign": {
+            // buffer[i] = value - write array element
+            const v = ir.getVar(stmt.name);
+            if (!v.hType.startsWith("array:")) {
+                throw new Error(`Cannot index non-array type: ${v.hType}`);
+            }
+            const parts = v.hType.split(":");
+            const elemType = parts[1];
+            const llElemType = llvmType(elemType);
+
+            // Evaluate index
+            const indexVal = genExpr(ir, stmt.index);
+
+            // GEP to get element pointer
+            const elemPtr = ir.newTmp();
+            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${indexVal.value}`);
+
+            // Evaluate value and store
+            const val = genExpr(ir, stmt.expr);
+            ir.emit(`store ${llElemType} ${val.value}, ${llElemType}* ${elemPtr}`);
             break;
         }
 

@@ -36,6 +36,10 @@ import {
     DerefAssign,
     Allocate,
     Deallocate,
+    ArrayDecl,
+    ArrayAccess,
+    ArrayAssign,
+    ArrayElementAddress,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
@@ -165,6 +169,23 @@ export class AstBuilder extends HopperVisitor {
         return Deallocate(expr);
     }
 
+    visitArrayDecl(ctx) {
+        // type Identifier '[' IntegerLiteral ']'
+        const type = ctx.type().getText();
+        const name = ctx.Identifier().getText();
+        const size = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return ArrayDecl(type, name, size);
+    }
+
+    visitArrayAssign(ctx) {
+        // Identifier '[' expression ']' '=' expression
+        const name = ctx.Identifier().getText();
+        const exprs = ctx.expression();
+        const index = this.visit(exprs[0]);
+        const value = this.visit(exprs[1]);
+        return ArrayAssign(name, index, value);
+    }
+
     visitIfStmt(ctx) {
         const cond = this.visit(ctx.expression());
         const thenBlock = this.visit(ctx.block(0));
@@ -286,6 +307,15 @@ export class AstBuilder extends HopperVisitor {
         const children = ctx.children || [];
         const childTexts = children.map(c => c.getText ? c.getText() : String(c));
 
+        // Identifier '[' expression ']' '::' 'address' - array element address
+        if (childTexts.includes('[') && childTexts.includes('::') && childTexts.includes('address')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            const exprs = ctx.expression();
+            const index = this.visit(Array.isArray(exprs) ? exprs[0] : exprs);
+            return ArrayElementAddress(name, index);
+        }
+
         // Identifier '::' 'address'
         if (childTexts.includes('::') && childTexts.includes('address')) {
             const ids = ctx.Identifier();
@@ -305,6 +335,15 @@ export class AstBuilder extends HopperVisitor {
             const allocType = ctx.type().getText();
             const countExpr = this.visit(ctx.expression());
             return Allocate(allocType, countExpr);
+        }
+
+        // Identifier '[' expression ']' - array access
+        if (childTexts.includes('[') && !childTexts.includes('::')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            const exprs = ctx.expression();
+            const index = this.visit(Array.isArray(exprs) ? exprs[0] : exprs);
+            return ArrayAccess(name, index);
         }
 
         // function call: Identifier '(' argList? ')'
