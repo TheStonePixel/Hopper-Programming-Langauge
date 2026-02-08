@@ -9,8 +9,10 @@ import {
     FunctionDecl,
     StructDecl,
     StructField,
+    StructMethod,
     Param,
     Call,
+    MethodCall,
     VarDecl,
     Assign,
     FieldAssign,
@@ -66,12 +68,35 @@ export class AstBuilder extends HopperVisitor {
 
     visitStructDecl(ctx) {
         const name = ctx.Identifier().getText();
-        const fields = ctx.structField().map(f => {
-            const fieldType = f.type().getText();
-            const fieldName = f.Identifier().getText();
-            return StructField(fieldName, fieldType);
-        });
-        return StructDecl(name, fields);
+        const fields = [];
+        const methods = [];
+
+        // Iterate through struct members (fields and methods)
+        const members = ctx.structMember ? ctx.structMember() : [];
+        for (const member of members) {
+            const fieldCtx = member.structField ? member.structField() : null;
+            const methodCtx = member.structMethod ? member.structMethod() : null;
+
+            if (fieldCtx) {
+                const fieldType = fieldCtx.type().getText();
+                const fieldName = fieldCtx.Identifier().getText();
+                fields.push(StructField(fieldName, fieldType));
+            } else if (methodCtx) {
+                const methodName = methodCtx.Identifier().getText();
+                const returnType = methodCtx.type().getText();
+                const params = methodCtx.paramList()
+                    ? methodCtx.paramList().param().map(p => {
+                          const type = p.type().getText();
+                          const pName = p.Identifier().getText();
+                          return Param(pName, type);
+                      })
+                    : [];
+                const body = this.visit(methodCtx.block());
+                methods.push(StructMethod(methodName, params, returnType, body));
+            }
+        }
+
+        return StructDecl(name, fields, methods);
     }
 
     visitExprStmt(ctx) {
@@ -346,6 +371,19 @@ export class AstBuilder extends HopperVisitor {
             return ArrayAccess(name, index);
         }
 
+        // Method call: Identifier '.' Identifier '(' argList? ')'
+        // Must check this BEFORE field access and function call
+        if (ctx.Identifier && childTexts.includes('.') && childTexts.includes('(')) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 2) {
+                const object = ids[0].getText();
+                const method = ids[1].getText();
+                const argListCtx = ctx.argList ? ctx.argList() : null;
+                const args = argListCtx ? argListCtx.expression().map(e => this.visit(e)) : [];
+                return MethodCall(object, method, args);
+            }
+        }
+
         // function call: Identifier '(' argList? ')'
         if (ctx.Identifier && ctx.argList !== undefined) {
             const ids = ctx.Identifier();
@@ -359,8 +397,8 @@ export class AstBuilder extends HopperVisitor {
             }
         }
 
-        // field access: Identifier '.' Identifier
-        if (ctx.Identifier) {
+        // field access: Identifier '.' Identifier (without parentheses)
+        if (ctx.Identifier && childTexts.includes('.') && !childTexts.includes('(')) {
             const ids = ctx.Identifier();
             if (Array.isArray(ids) && ids.length === 2) {
                 const object = ids[0].getText();

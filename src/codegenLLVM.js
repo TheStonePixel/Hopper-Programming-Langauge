@@ -417,6 +417,33 @@ function genExpr(ir, expr) {
             return { value: tmp, type: retType };
         }
 
+        case "MethodCall": {
+            // obj.method(args) -> StructName_method(obj::address, args)
+            const v = ir.getVar(expr.object);
+            const structName = v.hType;
+            const mangledName = `${structName}_${expr.method}`;
+
+            // Get address of the struct (self pointer)
+            const selfPtr = v.ptr; // Already a pointer to the struct
+
+            // Evaluate arguments
+            const args = Array.isArray(expr.args) ? expr.args : [];
+            const argVals = args.map(a => genExpr(ir, a));
+
+            // Build argument string: self pointer first, then other args
+            const selfArg = `%struct.${structName}* ${selfPtr}`;
+            const otherArgs = argVals.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
+            const argStr = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+
+            // For now, assume all methods return int
+            const retType = "int";
+            const llRetType = llvmType(retType);
+
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call ${llRetType} @${mangledName}(${argStr})`);
+            return { value: tmp, type: retType };
+        }
+
         default:
             throw new Error(`Unsupported expr kind: ${expr.kind}`);
     }
@@ -744,6 +771,51 @@ function genFunction(fn) {
 
     return ir.lines.join("\n");
 }
+
+function genMethod(structName, method) {
+    const ir = new IRBuilder();
+    const retLlType = llvmType(method.returnType);
+    const mangledName = `${structName}_${method.name}`;
+
+    // Build parameter signature: self pointer first, then declared params
+    const selfType = `%struct.${structName}*`;
+    const paramParts = [`${selfType} %self`];
+    method.params.forEach((p, i) => {
+        paramParts.push(`${llvmType(p.type)} %p${i}`);
+    });
+    const paramSig = paramParts.join(", ");
+
+    ir.emit(`define ${retLlType} @${mangledName}(${paramSig}) {`);
+    ir.emit("entry:");
+
+    // Store self pointer - it's already a pointer, so just record it directly
+    // (no need to alloca since we receive it as a pointer already)
+    ir.vars.set("self", {
+        ptr: "%self",
+        type: `%struct.${structName}`,
+        hType: structName,
+        isSelf: true  // Mark as self pointer for special handling
+    });
+
+    // Map other params into local vars
+    method.params.forEach((p, i) => {
+        const llType = llvmType(p.type);
+        const paramReg = `%p${i}`;
+        const ptr = ir.newTmp();
+        ir.emit(`${ptr} = alloca ${llType}`);
+        ir.emit(`store ${llType} ${paramReg}, ${llType}* ${ptr}`);
+        ir.vars.set(p.name, { ptr, type: llType, hType: p.type });
+    });
+
+    // body
+    genBlock(ir, method.body, method.returnType);
+
+    // fallback return
+    ir.emit(`ret ${retLlType} 0`);
+    ir.emit("}");
+
+    return ir.lines.join("\n");
+}
 function escapeStringForLLVM(str) {
     // Escape special characters for LLVM string constant
     let result = '';
@@ -807,6 +879,13 @@ function genModule(ast) {
             functionCode.push(`declare ${ret} @${fn.name}(${params})\n`);
         } else {
             functionCode.push(genFunction(fn) + "\n\n");
+        }
+    }
+
+    // Generate struct methods as standalone functions
+    for (const struct of ast.structs || []) {
+        for (const method of struct.methods || []) {
+            functionCode.push(genMethod(struct.name, method) + "\n\n");
         }
     }
 

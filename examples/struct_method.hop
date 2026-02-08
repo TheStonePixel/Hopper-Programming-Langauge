@@ -1,0 +1,31 @@
+// Test struct methods
+
+extern function putchar(int c) int
+
+struct Counter {
+    int count
+
+    function increment() int {
+        self.count = self.count + 1
+        return 0
+    }
+
+    function get() int {
+        return self.count
+    }
+}
+
+function main() int {
+    Counter c
+    c.count = 0
+
+    c.increment()
+    c.increment()
+    c.increment()
+
+    int val = c.get()
+    putchar('0' + val)  // Should print 3
+    putchar('\n')
+
+    return 0
+}

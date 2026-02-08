@@ -8,12 +8,17 @@ export function FunctionDecl(name, params, returnType, body, isExtern = false) {
     return { kind: "FunctionDecl", name, params, returnType, body, isExtern };
 }
 
-export function StructDecl(name, fields) {
-    return { kind: "StructDecl", name, fields };
+export function StructDecl(name, fields, methods = []) {
+    return { kind: "StructDecl", name, fields, methods };
 }
 
 export function StructField(name, type) {
     return { kind: "StructField", name, type };
+}
+
+export function StructMethod(name, params, returnType, body) {
+    // Method inside a struct - will get implicit self parameter
+    return { kind: "StructMethod", name, params, returnType, body };
 }
 
 export function ExprStmt(expr) {
@@ -83,6 +88,11 @@ export function Var(name) {
 
 export function FieldAccess(object, field) {
     return { kind: "FieldAccess", object, field };
+}
+
+export function MethodCall(object, method, args = []) {
+    // obj.method(args) - transformed to StructName_method(obj::address, args)
+    return { kind: "MethodCall", object, method, args };
 }
 
 export function IntLiteral(value) {

@@ -17,11 +17,20 @@ functionDecl
     ;
 
 structDecl
-    : 'struct' Identifier '{' NEWLINE* (structField (NEWLINE+ structField)* NEWLINE*)? '}'
+    : 'struct' Identifier '{' NEWLINE* (structMember (NEWLINE+ structMember)* NEWLINE*)? '}'
+    ;
+
+structMember
+    : structField
+    | structMethod
     ;
 
 structField
     : type Identifier
+    ;
+
+structMethod
+    : 'function' Identifier '(' paramList? ')' type block
     ;
 
 
@@ -101,9 +110,10 @@ primary
     | Identifier '::' 'address'     // get address of variable
     | Identifier '::' 'value'       // dereference address (read)
     | 'allocate' type '(' expression ')'  // heap allocation
-    | Identifier '(' argList? ')'   // function call
-    | Identifier '[' expression ']' // array element access
-    | Identifier '.' Identifier     // field access
+    | Identifier '(' argList? ')'                   // function call
+    | Identifier '.' Identifier '(' argList? ')'    // method call
+    | Identifier '[' expression ']'                 // array element access
+    | Identifier '.' Identifier                     // field access
     | Identifier
     | '(' expression ')'
     ;
