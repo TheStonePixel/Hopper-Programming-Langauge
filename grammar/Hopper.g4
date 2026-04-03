@@ -3,12 +3,34 @@ grammar Hopper;
 // ===== PARSER RULES =====
 
 program
-    : NEWLINE* (functionDecl NEWLINE*)* EOF
+    : NEWLINE* (topLevelDecl NEWLINE*)* EOF
+    ;
+
+topLevelDecl
+    : functionDecl
+    | structDecl
     ;
 
 functionDecl
     : 'extern' 'function' Identifier '(' paramList? ')' type   # ExternFuncDecl
     | 'function' Identifier '(' paramList? ')' type block      # FuncDecl
+    ;
+
+structDecl
+    : 'struct' Identifier '{' NEWLINE* (structMember (NEWLINE+ structMember)* NEWLINE*)? '}'
+    ;
+
+structMember
+    : structField
+    | structMethod
+    ;
+
+structField
+    : type Identifier
+    ;
+
+structMethod
+    : 'function' Identifier '(' paramList? ')' type block
     ;
 
 
@@ -24,6 +46,9 @@ type
     : 'int'
     | 'bool'
     | 'float'
+    | 'String'
+    | 'address'     // pointer type (carries pointed-to type info at runtime)
+    | Identifier    // user-defined types (structs)
     ;
 
 // blocks: statements separated by NEWLINEs
@@ -36,12 +61,30 @@ block
     ;
 
 statement
-    : type Identifier '=' expression                 # VarDecl
+    : type Identifier '[' IntegerLiteral ']'             # ArrayDecl
+    | type Identifier '=' expression                 # VarDecl
+    | type Identifier                                # VarDeclNoInit
+    | Identifier '[' expression ']' '=' expression   # ArrayAssign
     | Identifier '=' expression                      # Assign
+    | Identifier '.' Identifier '=' expression       # FieldAssign
+    | Identifier '::' 'value' '=' expression         # DerefAssign
+    | 'deallocate' expression                        # DeallocateStmt
     | expression                                     # ExprStmt
     | 'if' '(' expression ')' block ('else' block)?  # IfStmt
     | 'while' '(' expression ')' block               # WhileStmt
+    | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
+    | 'break'                                        # BreakStmt
+    | 'continue'                                     # ContinueStmt
     | 'return' expression                            # ReturnStmt
+    ;
+
+forInit
+    : type Identifier '=' expression    # ForInitDecl
+    | Identifier '=' expression         # ForInitAssign
+    ;
+
+forUpdate
+    : Identifier '=' expression
     ;
 
 
@@ -54,13 +97,23 @@ logicalAnd      : equality  ( '&&' equality  )* ;
 equality        : relational ( ('==' | '!=') relational )* ;
 relational      : additive ( ('<' | '<=' | '>' | '>=') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
-multiplicative  : unary ( ('*' | '/') unary )* ;
+multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
 unary           : ('!' | '-') unary | primary ;
 primary
     : IntegerLiteral
+    | StringLiteral
+    | CharLiteral                   // 'A' -> just an int (65)
     | 'true'
     | 'false'
-    | Identifier '(' argList? ')'   // function call
+    | 'null'                        // null address
+    | Identifier '[' expression ']' '::' 'address'  // get address of array element
+    | Identifier '::' 'address'     // get address of variable
+    | Identifier '::' 'value'       // dereference address (read)
+    | 'allocate' type '(' expression ')'  // heap allocation
+    | Identifier '(' argList? ')'                   // function call
+    | Identifier '.' Identifier '(' argList? ')'    // method call
+    | Identifier '[' expression ']'                 // array element access
+    | Identifier '.' Identifier                     // field access
     | Identifier
     | '(' expression ')'
     ;
@@ -73,6 +126,8 @@ argList
 // ===== LEXER RULES =====
 
 IntegerLiteral  : [0-9]+ ;
+StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
+CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
 
 // keep newlines as real tokens (for statement separation)

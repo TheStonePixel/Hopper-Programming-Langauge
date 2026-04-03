@@ -1,0 +1,52 @@
+// Test address system: x::address and p::value
+
+extern function putchar(int c) int
+
+function printDigit(int n) int {
+    putchar('0' + n)
+    return 0
+}
+
+function main() int {
+    // Test 1: Get address of stack variable and read through it
+    int x = 5
+    address p = x::address
+    int val = p::value
+    putchar('1')
+    putchar(':')
+    printDigit(val)
+    putchar('\n')
+
+    // Test 2: Write through address
+    p::value = 7
+    putchar('2')
+    putchar(':')
+    printDigit(x)
+    putchar('\n')
+
+    // Test 3: Reassign address to different variable
+    int y = 9
+    p = y::address
+    putchar('3')
+    putchar(':')
+    printDigit(p::value)
+    putchar('\n')
+
+    // Test 4: Heap allocation
+    address heap = allocate int(1)
+    heap::value = 3
+    putchar('4')
+    putchar(':')
+    printDigit(heap::value)
+    putchar('\n')
+
+    // Test 5: Deallocate
+    deallocate heap
+    putchar('5')
+    putchar(':')
+    putchar('O')
+    putchar('K')
+    putchar('\n')
+
+    return 0
+}

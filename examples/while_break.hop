@@ -1,0 +1,27 @@
+extern function putchar(int c) int
+
+function main() int {
+  // Test break in while loop
+  int i = 0
+  while (i < 10) {
+    if (i == 5) {
+      break
+    }
+    putchar('0' + i)
+    i = i + 1
+  }
+  putchar('\n')
+
+  // Test continue in while loop
+  int j = 0
+  while (j < 10) {
+    j = j + 1
+    if (j == 5) {
+      continue
+    }
+    putchar('0' + j)
+  }
+  putchar('\n')
+
+  return 0
+}

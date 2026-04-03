@@ -1,0 +1,48 @@
+// Test fixed-size arrays
+
+extern function putchar(int c) int
+
+function main() int {
+    // Declare array
+    int buffer[5]
+
+    // Write to elements
+    buffer[0] = 1
+    buffer[1] = 2
+    buffer[2] = 3
+    buffer[3] = 4
+    buffer[4] = 5
+
+    // Read and print
+    putchar('0' + buffer[0])
+    putchar('0' + buffer[1])
+    putchar('0' + buffer[2])
+    putchar('0' + buffer[3])
+    putchar('0' + buffer[4])
+    putchar('\n')
+
+    // Test with loop
+    for (int i = 0; i < 5; i = i + 1) {
+        buffer[i] = buffer[i] * 2
+    }
+
+    // Print doubled values
+    for (int i = 0; i < 5; i = i + 1) {
+        putchar('0' + buffer[i])
+    }
+    putchar('\n')
+
+    // Test getting address of array (first element)
+    address p = buffer::address
+    p::value = 9
+    putchar('0' + buffer[0])
+    putchar('\n')
+
+    // Test getting address of specific element
+    address q = buffer[2]::address
+    q::value = 7
+    putchar('0' + buffer[2])
+    putchar('\n')
+
+    return 0
+}

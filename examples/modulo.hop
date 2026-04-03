@@ -1,0 +1,8 @@
+extern function putchar(int c) int
+
+function main() int {
+  int x = 17 % 5
+  putchar(48 + x)
+  putchar('\n')
+  return 0
+}

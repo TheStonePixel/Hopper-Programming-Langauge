@@ -1,0 +1,26 @@
+extern function putchar(int c) int
+
+struct Point {
+  int x
+  int y
+}
+
+function main() int {
+  Point p
+  p.x = 3
+  p.y = 4
+
+  // Print x (should be 3)
+  putchar('0' + p.x)
+  putchar('\n')
+
+  // Print y (should be 4)
+  putchar('0' + p.y)
+  putchar('\n')
+
+  // Print x + y (should be 7)
+  putchar('0' + p.x + p.y)
+  putchar('\n')
+
+  return 0
+}

@@ -1,0 +1,42 @@
+// Test address arithmetic
+
+extern function putchar(int c) int
+
+function main() int {
+    int buffer[5]
+    buffer[0] = 1
+    buffer[1] = 2
+    buffer[2] = 3
+    buffer[3] = 4
+    buffer[4] = 5
+
+    // Get address of first element
+    address p = buffer::address
+
+    // Traverse using address arithmetic
+    putchar('0' + p::value)     // buffer[0] = 1
+    p = p + 1
+    putchar('0' + p::value)     // buffer[1] = 2
+    p = p + 1
+    putchar('0' + p::value)     // buffer[2] = 3
+    p = p + 1
+    putchar('0' + p::value)     // buffer[3] = 4
+    p = p + 1
+    putchar('0' + p::value)     // buffer[4] = 5
+    putchar('\n')
+
+    // Write through arithmetic
+    p = buffer::address
+    p = p + 2
+    p::value = 9                // buffer[2] = 9
+    putchar('0' + buffer[2])    // should print 9
+    putchar('\n')
+
+    // Test subtraction
+    p = buffer::address + 4     // point to buffer[4]
+    p = p - 2                   // now buffer[2]
+    putchar('0' + p::value)     // should print 9
+    putchar('\n')
+
+    return 0
+}

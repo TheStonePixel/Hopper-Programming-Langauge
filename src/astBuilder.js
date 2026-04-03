@@ -7,26 +7,96 @@ import HopperVisitor from "./generated/grammar/HopperVisitor.js";
 import {
     Program,
     FunctionDecl,
+    StructDecl,
+    StructField,
+    StructMethod,
     Param,
     Call,
+    MethodCall,
     VarDecl,
     Assign,
+    FieldAssign,
     IfStmt,
     WhileStmt,
+    ForStmt,
+    BreakStmt,
+    ContinueStmt,
     ReturnStmt,
     ExprStmt,
     Block,
     Binary,
     Unary,
     Var,
+    FieldAccess,
     IntLiteral,
     BoolLiteral,
+    StringLiteral,
+    CharLiteral,
+    NullLiteral,
+    AddressOf,
+    Deref,
+    DerefAssign,
+    Allocate,
+    Deallocate,
+    ArrayDecl,
+    ArrayAccess,
+    ArrayAssign,
+    ArrayElementAddress,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
     visitProgram(ctx) {
-        const fns = ctx.functionDecl().map(fn => this.visit(fn));
-        return Program(fns);
+        const functions = [];
+        const structs = [];
+
+        for (const decl of ctx.topLevelDecl()) {
+            const node = this.visit(decl);
+            if (node.kind === "FunctionDecl") {
+                functions.push(node);
+            } else if (node.kind === "StructDecl") {
+                structs.push(node);
+            }
+        }
+
+        return Program(functions, structs);
+    }
+
+    visitTopLevelDecl(ctx) {
+        // Visit the child (either functionDecl or structDecl)
+        return this.visit(ctx.children[0]);
+    }
+
+    visitStructDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const fields = [];
+        const methods = [];
+
+        // Iterate through struct members (fields and methods)
+        const members = ctx.structMember ? ctx.structMember() : [];
+        for (const member of members) {
+            const fieldCtx = member.structField ? member.structField() : null;
+            const methodCtx = member.structMethod ? member.structMethod() : null;
+
+            if (fieldCtx) {
+                const fieldType = fieldCtx.type().getText();
+                const fieldName = fieldCtx.Identifier().getText();
+                fields.push(StructField(fieldName, fieldType));
+            } else if (methodCtx) {
+                const methodName = methodCtx.Identifier().getText();
+                const returnType = methodCtx.type().getText();
+                const params = methodCtx.paramList()
+                    ? methodCtx.paramList().param().map(p => {
+                          const type = p.type().getText();
+                          const pName = p.Identifier().getText();
+                          return Param(pName, type);
+                      })
+                    : [];
+                const body = this.visit(methodCtx.block());
+                methods.push(StructMethod(methodName, params, returnType, body));
+            }
+        }
+
+        return StructDecl(name, fields, methods);
     }
 
     visitExprStmt(ctx) {
@@ -93,10 +163,52 @@ export class AstBuilder extends HopperVisitor {
         return VarDecl(name, type, initExpr);
     }
 
+    visitVarDeclNoInit(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        return VarDecl(name, type, null);
+    }
+
     visitAssign(ctx) {
         const name = ctx.Identifier().getText();
         const expr = this.visit(ctx.expression());
         return Assign(name, expr);
+    }
+
+    visitFieldAssign(ctx) {
+        const object = ctx.Identifier(0).getText();
+        const field = ctx.Identifier(1).getText();
+        const expr = this.visit(ctx.expression());
+        return FieldAssign(object, field, expr);
+    }
+
+    visitDerefAssign(ctx) {
+        // Identifier '::' 'value' '=' expression
+        const name = ctx.Identifier().getText();
+        const expr = this.visit(ctx.expression());
+        return DerefAssign(name, expr);
+    }
+
+    visitDeallocateStmt(ctx) {
+        const expr = this.visit(ctx.expression());
+        return Deallocate(expr);
+    }
+
+    visitArrayDecl(ctx) {
+        // type Identifier '[' IntegerLiteral ']'
+        const type = ctx.type().getText();
+        const name = ctx.Identifier().getText();
+        const size = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return ArrayDecl(type, name, size);
+    }
+
+    visitArrayAssign(ctx) {
+        // Identifier '[' expression ']' '=' expression
+        const name = ctx.Identifier().getText();
+        const exprs = ctx.expression();
+        const index = this.visit(exprs[0]);
+        const value = this.visit(exprs[1]);
+        return ArrayAssign(name, index, value);
     }
 
     visitIfStmt(ctx) {
@@ -110,6 +222,56 @@ export class AstBuilder extends HopperVisitor {
         const cond = this.visit(ctx.expression());
         const body = this.visit(ctx.block());
         return WhileStmt(cond, body);
+    }
+
+    visitForStmt(ctx) {
+        // for (init; cond; update) block
+        const initCtx = ctx.forInit();
+        const condCtx = ctx.expression();
+        const updateCtx = ctx.forUpdate();
+        const bodyCtx = ctx.block();
+
+        let init = null;
+        if (initCtx) {
+            init = this.visit(initCtx);
+        }
+
+        let cond = null;
+        if (condCtx) {
+            cond = this.visit(condCtx);
+        }
+
+        let update = null;
+        if (updateCtx) {
+            // forUpdate is just Identifier '=' expression
+            const name = updateCtx.Identifier().getText();
+            const expr = this.visit(updateCtx.expression());
+            update = Assign(name, expr);
+        }
+
+        const body = this.visit(bodyCtx);
+        return ForStmt(init, cond, update, body);
+    }
+
+    visitForInitDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        const initExpr = this.visit(ctx.expression());
+        return VarDecl(name, type, initExpr);
+    }
+
+    visitForInitAssign(ctx) {
+        const name = ctx.Identifier().getText();
+        const expr = this.visit(ctx.expression());
+        return Assign(name, expr);
+    }
+
+    visitBreakStmt(ctx) {
+        return BreakStmt();
+    }
+
+    visitContinueStmt(ctx) {
+        return ContinueStmt();
     }
 
     visitReturnStmt(ctx) {
@@ -128,22 +290,131 @@ export class AstBuilder extends HopperVisitor {
             }
         }
 
-        // true / false
+        // string literal: "..."
+        if (ctx.StringLiteral) {
+            const token = ctx.StringLiteral();
+            if (token) {
+                // Remove quotes and handle escape sequences
+                const raw = token.getText();
+                const value = raw.slice(1, -1).replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+                return StringLiteral(value);
+            }
+        }
+
+        // char literal: '.' -> just an int
+        if (ctx.CharLiteral) {
+            const token = ctx.CharLiteral();
+            if (token) {
+                const raw = token.getText();
+                let char = raw.slice(1, -1);
+                // Handle escape sequences
+                if (char.startsWith('\\')) {
+                    switch (char[1]) {
+                        case 'n': char = '\n'; break;
+                        case 't': char = '\t'; break;
+                        case 'r': char = '\r'; break;
+                        case '\\': char = '\\'; break;
+                        case "'": char = "'"; break;
+                        default: char = char[1];
+                    }
+                }
+                return CharLiteral(char.charCodeAt(0));
+            }
+        }
+
+        // true / false / null
         const text = ctx.getText();
         if (text === "true") return BoolLiteral(true);
         if (text === "false") return BoolLiteral(false);
+        if (text === "null") return NullLiteral();
+
+        // Check for :: operator (address/value)
+        const children = ctx.children || [];
+        const childTexts = children.map(c => c.getText ? c.getText() : String(c));
+
+        // Identifier '[' expression ']' '::' 'address' - array element address
+        if (childTexts.includes('[') && childTexts.includes('::') && childTexts.includes('address')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            const exprs = ctx.expression();
+            const index = this.visit(Array.isArray(exprs) ? exprs[0] : exprs);
+            return ArrayElementAddress(name, index);
+        }
+
+        // Identifier '::' 'address'
+        if (childTexts.includes('::') && childTexts.includes('address')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            return AddressOf(name);
+        }
+
+        // Identifier '::' 'value'
+        if (childTexts.includes('::') && childTexts.includes('value')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            return Deref(name);
+        }
+
+        // allocate type '(' expression ')'
+        if (childTexts[0] === 'allocate') {
+            const allocType = ctx.type().getText();
+            const countExpr = this.visit(ctx.expression());
+            return Allocate(allocType, countExpr);
+        }
+
+        // Identifier '[' expression ']' - array access
+        if (childTexts.includes('[') && !childTexts.includes('::')) {
+            const ids = ctx.Identifier();
+            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+            const exprs = ctx.expression();
+            const index = this.visit(Array.isArray(exprs) ? exprs[0] : exprs);
+            return ArrayAccess(name, index);
+        }
+
+        // Method call: Identifier '.' Identifier '(' argList? ')'
+        // Must check this BEFORE field access and function call
+        if (ctx.Identifier && childTexts.includes('.') && childTexts.includes('(')) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 2) {
+                const object = ids[0].getText();
+                const method = ids[1].getText();
+                const argListCtx = ctx.argList ? ctx.argList() : null;
+                const args = argListCtx ? argListCtx.expression().map(e => this.visit(e)) : [];
+                return MethodCall(object, method, args);
+            }
+        }
 
         // function call: Identifier '(' argList? ')'
-        if (ctx.Identifier && ctx.Identifier() && ctx.getChildCount() > 1) {
-            const callee = ctx.Identifier().getText();
-            const argListCtx = ctx.argList ? ctx.argList() : ctx.argList?.(); // depending on ANTLR gen
-            const args = argListCtx ? argListCtx.expression().map(e => this.visit(e)) : [];
-            return Call(callee, args);
+        if (ctx.Identifier && ctx.argList !== undefined) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 1 && ctx.getChildCount() > 1) {
+                const argListCtx = ctx.argList ? ctx.argList() : null;
+                if (argListCtx !== undefined) {
+                    const callee = ids[0].getText();
+                    const args = argListCtx ? argListCtx.expression().map(e => this.visit(e)) : [];
+                    return Call(callee, args);
+                }
+            }
+        }
+
+        // field access: Identifier '.' Identifier (without parentheses)
+        if (ctx.Identifier && childTexts.includes('.') && !childTexts.includes('(')) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 2) {
+                const object = ids[0].getText();
+                const field = ids[1].getText();
+                return FieldAccess(object, field);
+            }
         }
 
         // plain variable: Identifier
-        if (ctx.Identifier && ctx.Identifier()) {
-            return Var(ctx.Identifier().getText());
+        if (ctx.Identifier) {
+            const ids = ctx.Identifier();
+            if (Array.isArray(ids) && ids.length === 1) {
+                return Var(ids[0].getText());
+            } else if (ids && !Array.isArray(ids)) {
+                return Var(ids.getText());
+            }
         }
 
         // '(' expression ')'
@@ -177,7 +448,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitMultiplicative(ctx) {
         let node = this.visit(ctx.unary(0));
-        const ops = ctx.children.filter(c => ["*", "/"].includes(c.getText()));
+        const ops = ctx.children.filter(c => ["*", "/", "%"].includes(c.getText()));
         for (let i = 0; i < ops.length; i++) {
             const right = this.visit(ctx.unary(i + 1));
             node = Binary(ops[i].getText(), node, right);

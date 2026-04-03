@@ -1,0 +1,41 @@
+// Test struct methods with parameters
+
+extern function putchar(int c) int
+
+struct Point {
+    int x
+    int y
+
+    function setX(int newX) int {
+        self.x = newX
+        return 0
+    }
+
+    function setY(int newY) int {
+        self.y = newY
+        return 0
+    }
+
+    function getX() int {
+        return self.x
+    }
+
+    function getY() int {
+        return self.y
+    }
+}
+
+function main() int {
+    Point p
+    p.x = 0
+    p.y = 0
+
+    p.setX(3)
+    p.setY(7)
+
+    putchar('0' + p.getX())  // Should print 3
+    putchar('0' + p.getY())  // Should print 7
+    putchar('\n')
+
+    return 0
+}
