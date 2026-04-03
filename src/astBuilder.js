@@ -1,5 +1,11 @@
 import antlr4 from "antlr4";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const STDLIB_DIR = path.resolve(__dirname, "..", "stdlib");
 
 import HopperLexer from "./generated/grammar/HopperLexer.js";
 import HopperParser from "./generated/grammar/HopperParser.js";
@@ -497,16 +503,55 @@ export class AstBuilder extends HopperVisitor {
     }
 }
 
+// Resolve an import path to an absolute file path.
+// "stdlib/io" → <project>/stdlib/io.hop
+// "./utils"   → relative to baseDir
+function resolveImportPath(importPath, baseDir) {
+    const withExt = importPath.endsWith(".hop") ? importPath : importPath + ".hop";
+    if (importPath.startsWith("stdlib/")) {
+        return path.resolve(STDLIB_DIR, withExt.slice("stdlib/".length));
+    }
+    return path.resolve(baseDir || process.cwd(), withExt);
+}
+
 // Helper: source string → AST
-export function buildAstFromSource(source) {
-    const chars = new antlr4.InputStream(source);
+// options.baseDir  - directory of the source file (for resolving relative imports)
+// options.visited  - Set of absolute paths already imported (circular import guard)
+export function buildAstFromSource(source, { baseDir = null, visited = new Set() } = {}) {
+    // Pre-process: extract and strip import lines before ANTLR sees them
+    const importPaths = [];
+    const strippedSource = source.replace(/^[ \t]*import\s+"([^"]+)"[ \t]*$/gm, (_, p) => {
+        importPaths.push(p);
+        return "";
+    });
+
+    const chars = new antlr4.InputStream(strippedSource);
     const lexer = new HopperLexer(chars);
     const tokens = new antlr4.CommonTokenStream(lexer);
     const parser = new HopperParser(tokens);
     parser.buildParseTrees = true;
     const tree = parser.program();
     const builder = new AstBuilder();
-    return builder.visit(tree);
+    const ast = builder.visit(tree);
+
+    // Resolve each import, merge its declarations in front of ours
+    for (const importPath of importPaths) {
+        const resolved = resolveImportPath(importPath, baseDir);
+        if (visited.has(resolved)) continue;
+        visited.add(resolved);
+
+        const importedSource = fs.readFileSync(resolved, "utf8");
+        const importedAst = buildAstFromSource(importedSource, {
+            baseDir: path.dirname(resolved),
+            visited,
+        });
+
+        // Prepend so imported declarations are defined before the importing file's code
+        ast.functions.unshift(...importedAst.functions);
+        ast.structs.unshift(...importedAst.structs);
+    }
+
+    return ast;
 }
 
 // CLI test: node src/astBuilder.js example.hop

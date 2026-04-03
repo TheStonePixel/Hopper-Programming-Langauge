@@ -9,6 +9,11 @@ program
 topLevelDecl
     : functionDecl
     | structDecl
+    | importDecl
+    ;
+
+importDecl
+    : 'import' StringLiteral
     ;
 
 functionDecl

@@ -45,7 +45,7 @@ function compile(filename, outputPath) {
     const baseName = getBaseName(filename);
 
     // Generate LLVM IR
-    const ast = buildAstFromSource(filecontent);
+    const ast = buildAstFromSource(filecontent, { baseDir: path.dirname(path.resolve(filename)) });
     const ir = genModule(ast);
 
     // Write IR to build directory
@@ -73,13 +73,13 @@ switch (mode) {
     }
 
     case "--ast": {
-        const ast = buildAstFromSource(filecontent);
+        const ast = buildAstFromSource(filecontent, { baseDir: path.dirname(path.resolve(filename)) });
         console.log(JSON.stringify(ast, null, 2));
         break;
     }
 
     case "--llvm": {
-        const ast = buildAstFromSource(filecontent);
+        const ast = buildAstFromSource(filecontent, { baseDir: path.dirname(path.resolve(filename)) });
         const ir = genModule(ast);
         console.log(ir);
 

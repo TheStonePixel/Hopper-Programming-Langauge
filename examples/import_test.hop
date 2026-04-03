@@ -1,0 +1,6 @@
+import "stdlib/io"
+
+function main() int {
+    println("hello from hopper")
+    return 0
+}
