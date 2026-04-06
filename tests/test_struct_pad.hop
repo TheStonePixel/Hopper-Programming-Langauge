@@ -1,0 +1,25 @@
+// Tests struct with pad fields — layout is fixed, fields read/write correctly
+// EXPECT: version: 2
+// EXPECT: size: 1024
+// EXPECT: checksum: 42
+
+extern function printf(String fmt, int val) int
+
+struct Header {
+    int version
+    pad 4
+    int size
+    pad 8
+    int checksum
+}
+
+function main() int {
+    Header h
+    h.version  = 2
+    h.size     = 1024
+    h.checksum = 42
+    printf("version: %ld\n",  h.version)
+    printf("size: %ld\n",     h.size)
+    printf("checksum: %ld\n", h.checksum)
+    return 0
+}

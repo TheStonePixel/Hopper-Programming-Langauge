@@ -1,0 +1,21 @@
+// Tests double precision floating point arithmetic and fneg
+// EXPECT: pi: 3.140000
+// EXPECT: tau: 6.280000
+// EXPECT: half: 1.570000
+// EXPECT: neg: -3.140000
+
+extern function printf(String fmt, float val) int
+
+function main() int {
+    float pi   = 3.14
+    float two  = 2.0
+    float tau  = pi * two
+    float half = pi / two
+    float neg  = -pi
+
+    printf("pi: %f\n",   pi)
+    printf("tau: %f\n",  tau)
+    printf("half: %f\n", half)
+    printf("neg: %f\n",  neg)
+    return 0
+}

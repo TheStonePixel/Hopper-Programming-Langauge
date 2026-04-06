@@ -1,0 +1,28 @@
+// Tests const declarations used in expressions and control flow
+// EXPECT: SUM: 150
+// EXPECT: MASKED: 100
+// EXPECT: SHIFTED: 25
+// EXPECT: ABOVE_MIN: 1
+
+extern function printf(String fmt, int val) int
+
+const MAX = 100
+const MIN = 50
+const MASK = 0xFF
+
+function main() int {
+    int sum     = MAX + MIN
+    int masked  = MAX & MASK
+    int shifted = MAX >> 2
+    int above   = 0
+
+    if (sum > MIN) {
+        above = 1
+    }
+
+    printf("SUM: %ld\n",       sum)
+    printf("MASKED: %ld\n",    masked)
+    printf("SHIFTED: %ld\n",   shifted)
+    printf("ABOVE_MIN: %ld\n", above)
+    return 0
+}

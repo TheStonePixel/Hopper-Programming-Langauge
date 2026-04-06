@@ -84,6 +84,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#fieldName.
+	visitFieldName(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#operatorSymbol.
 	visitOperatorSymbol(ctx) {
 	  return this.visitChildren(ctx);

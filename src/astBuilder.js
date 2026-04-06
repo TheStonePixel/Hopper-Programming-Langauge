@@ -117,7 +117,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitStructField(ctx) {
         const type = ctx.type().getText();
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         return StructField(name, type);
     }
 
@@ -148,7 +148,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitClassField(ctx) {
         const type = ctx.type().getText();
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         return ClassField(name, type);
     }
 
@@ -218,7 +218,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitFieldAssign(ctx) {
         const object = ctx.Identifier(0).getText();
-        const field  = ctx.Identifier(1).getText();
+        const field  = ctx.fieldName().getText();
         const expr   = this.visit(ctx.expression());
         return FieldAssign(object, field, expr);
     }
@@ -458,11 +458,12 @@ export class AstBuilder extends HopperVisitor {
             }
         }
 
-        // field access: obj.field
+        // field access: obj.field (field may be a fieldName — allows 'value', 'address')
         if (ctx.Identifier && childTexts.includes('.') && !childTexts.includes('(')) {
             const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 2)
-                return FieldAccess(ids[0].getText(), ids[1].getText());
+            if (Array.isArray(ids) && ids.length >= 1 && ctx.fieldName && ctx.fieldName()) {
+                return FieldAccess(ids[0].getText(), ctx.fieldName().getText());
+            }
         }
 
         // plain variable

@@ -1,0 +1,43 @@
+// Tests class methods, self field access, and method return values
+// Access rule: class fields are only accessible through methods (self inside class)
+// EXPECT: start: 10
+// EXPECT: after inc: 11
+// EXPECT: after inc: 12
+// EXPECT: doubled: 24
+
+extern function printf(String fmt, int val) int
+
+class Counter {
+    int value
+
+    function init(int start) int {
+        self.value = start
+        return 0
+    }
+
+    function increment() int {
+        self.value = self.value + 1
+        return self.value
+    }
+
+    function get() int {
+        return self.value
+    }
+
+    function doubled() int {
+        return self.value * 2
+    }
+}
+
+function main() int {
+    Counter c
+    c.init(10)
+    printf("start: %ld\n",    c.get())
+    int v1 = c.increment()
+    printf("after inc: %ld\n", v1)
+    int v2 = c.increment()
+    printf("after inc: %ld\n", v2)
+    int d = c.doubled()
+    printf("doubled: %ld\n",   d)
+    return 0
+}

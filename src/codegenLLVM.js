@@ -137,8 +137,11 @@ function genExpr(ir, expr) {
         case "HexLiteral":
             return { value: String(expr.value), type: "int" };
 
-        case "FloatLiteral":
-            return { value: String(expr.value), type: "float" };
+        case "FloatLiteral": {
+            // JS drops trailing .0 from whole numbers — LLVM requires a decimal point
+            const fstr = Number.isInteger(expr.value) ? `${expr.value}.0` : String(expr.value);
+            return { value: fstr, type: "float" };
+        }
 
         case "BoolLiteral":
             return { value: expr.value ? "1" : "0", type: "bool" };

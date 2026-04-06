@@ -1,0 +1,25 @@
+// Tests bitwise operators and hex literals
+// EXPECT: AND: 15
+// EXPECT: OR: 255
+// EXPECT: XOR: 240
+// EXPECT: NOT: -256
+// EXPECT: SHL: 16
+// EXPECT: SHR: 16
+
+extern function printf(String fmt, int val) int
+
+function main() int {
+    int a = 0xFF & 0x0F
+    int b = 0xF0 | 0x0F
+    int c = 0xFF ^ 0x0F
+    int d = ~0xFF
+    int e = 1 << 4
+    int f = 256 >> 4
+    printf("AND: %ld\n", a)
+    printf("OR: %ld\n", b)
+    printf("XOR: %ld\n", c)
+    printf("NOT: %ld\n", d)
+    printf("SHL: %ld\n", e)
+    printf("SHR: %ld\n", f)
+    return 0
+}

@@ -33,7 +33,7 @@ structDecl
     ;
 
 structMember
-    : type Identifier       # StructField
+    : type fieldName        # StructField
     | 'pad' IntegerLiteral  # StructPad
     ;
 
@@ -43,9 +43,16 @@ classDecl
     ;
 
 classMember
-    : type Identifier                                           # ClassField
+    : type fieldName                                            # ClassField
     | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
     | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
+    ;
+
+// fieldName allows keywords that are only special in :: context to be used as field names
+fieldName
+    : Identifier
+    | 'value'
+    | 'address'
     ;
 
 operatorSymbol
@@ -88,7 +95,7 @@ statement
     | type Identifier                                    # VarDeclNoInit
     | Identifier '[' expression ']' '=' expression       # ArrayAssign
     | Identifier '=' expression                          # Assign
-    | Identifier '.' Identifier '=' expression           # FieldAssign
+    | Identifier '.' fieldName '=' expression             # FieldAssign
     | Identifier '::' 'value' '=' expression             # DerefAssign
     | expression                                         # ExprStmt
     | 'if' '(' expression ')' block ('else' block)?      # IfStmt
@@ -139,7 +146,7 @@ primary
     | Identifier '(' argList? ')'                       // function call
     | Identifier '.' Identifier '(' argList? ')'        // method call
     | Identifier '[' expression ']'                     // array element access
-    | Identifier '.' Identifier                         // field access
+    | Identifier '.' fieldName                          // field access
     | Identifier
     | '(' expression ')'
     ;

@@ -122,6 +122,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#fieldName.
+	enterFieldName(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#fieldName.
+	exitFieldName(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#operatorSymbol.
 	enterOperatorSymbol(ctx) {
 	}
