@@ -9,6 +9,8 @@ program
 topLevelDecl
     : functionDecl
     | structDecl
+    | classDecl
+    | constDecl
     | importDecl
     ;
 
@@ -16,71 +18,85 @@ importDecl
     : 'import' StringLiteral
     ;
 
+constDecl
+    : 'const' Identifier '=' literal
+    ;
+
 functionDecl
     : 'extern' 'function' Identifier '(' paramList? ')' type   # ExternFuncDecl
     | 'function' Identifier '(' paramList? ')' type block      # FuncDecl
     ;
 
+// struct = memory layout only, no methods, no default values
 structDecl
     : 'struct' Identifier '{' NEWLINE* (structMember (NEWLINE+ structMember)* NEWLINE*)? '}'
     ;
 
 structMember
-    : structField
-    | structMethod
+    : type Identifier       # StructField
+    | 'pad' IntegerLiteral  # StructPad
     ;
 
-structField
-    : type Identifier
+// class = data + behavior, compiler-optimized layout
+classDecl
+    : 'class' Identifier '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
     ;
 
-structMethod
-    : 'function' Identifier '(' paramList? ')' type block
+classMember
+    : type Identifier                                           # ClassField
+    | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
+    | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
     ;
 
+operatorSymbol
+    : '+' | '-' | '*' | '/' | '%'
+    | '==' | '!=' | '<' | '<=' | '>' | '>='
+    | '&' | '|' | '^' | '<<' | '>>'
+    | '[' ']'
+    ;
 
 paramList
     : param (',' param)*
     ;
 
 param
-    : type Identifier                 // int x, int y
+    : type Identifier
     ;
 
 type
     : 'int'
     | 'bool'
     | 'float'
+    | 'byte'
     | 'String'
-    | 'address'     // pointer type (carries pointed-to type info at runtime)
-    | Identifier    // user-defined types (structs)
+    | 'address'
+    | Identifier    // user-defined types (structs, classes)
     ;
 
 // blocks: statements separated by NEWLINEs
 block
     : '{'
-      NEWLINE*                                // optional blank lines after '{'
-      ( statement (NEWLINE+ statement)*       // 1+ statements, separated by ≥1 NEWLINE
-        NEWLINE* )?                           // optional trailing blank lines
+      NEWLINE*
+      ( statement (NEWLINE+ statement)*
+        NEWLINE* )?
       '}'
     ;
 
 statement
     : type Identifier '[' IntegerLiteral ']'             # ArrayDecl
-    | type Identifier '=' expression                 # VarDecl
-    | type Identifier                                # VarDeclNoInit
-    | Identifier '[' expression ']' '=' expression   # ArrayAssign
-    | Identifier '=' expression                      # Assign
-    | Identifier '.' Identifier '=' expression       # FieldAssign
-    | Identifier '::' 'value' '=' expression         # DerefAssign
-    | 'deallocate' expression                        # DeallocateStmt
-    | expression                                     # ExprStmt
-    | 'if' '(' expression ')' block ('else' block)?  # IfStmt
-    | 'while' '(' expression ')' block               # WhileStmt
+    | type Identifier '=' expression                     # VarDecl
+    | type Identifier                                    # VarDeclNoInit
+    | Identifier '[' expression ']' '=' expression       # ArrayAssign
+    | Identifier '=' expression                          # Assign
+    | Identifier '.' Identifier '=' expression           # FieldAssign
+    | Identifier '::' 'value' '=' expression             # DerefAssign
+    | expression                                         # ExprStmt
+    | 'if' '(' expression ')' block ('else' block)?      # IfStmt
+    | 'while' '(' expression ')' block                   # WhileStmt
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
-    | 'break'                                        # BreakStmt
-    | 'continue'                                     # ContinueStmt
-    | 'return' expression                            # ReturnStmt
+    | 'break'                                            # BreakStmt
+    | 'continue'                                         # ContinueStmt
+    | 'return' expression                                # ReturnStmt
     ;
 
 forInit
@@ -98,27 +114,32 @@ forUpdate
 
 expression      : logicalOr ;
 logicalOr       : logicalAnd ( '||' logicalAnd )* ;
-logicalAnd      : equality  ( '&&' equality  )* ;
+logicalAnd      : bitwiseOr  ( '&&' bitwiseOr  )* ;
+bitwiseOr       : bitwiseXor ( '|'  bitwiseXor )* ;
+bitwiseXor      : bitwiseAnd ( '^'  bitwiseAnd )* ;
+bitwiseAnd      : equality   ( '&'  equality   )* ;
 equality        : relational ( ('==' | '!=') relational )* ;
-relational      : additive ( ('<' | '<=' | '>' | '>=') additive )* ;
+relational      : shift ( ('<' | '<=' | '>' | '>=') shift )* ;
+shift           : additive ( ('<<' | '>>') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
 multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
-unary           : ('!' | '-') unary | primary ;
+unary           : ('!' | '-' | '~') unary | primary ;
 primary
     : IntegerLiteral
+    | HexLiteral
+    | FloatLiteral
     | StringLiteral
-    | CharLiteral                   // 'A' -> just an int (65)
+    | CharLiteral
     | 'true'
     | 'false'
-    | 'null'                        // null address
-    | Identifier '[' expression ']' '::' 'address'  // get address of array element
-    | Identifier '::' 'address'     // get address of variable
-    | Identifier '::' 'value'       // dereference address (read)
-    | 'allocate' type '(' expression ')'  // heap allocation
-    | Identifier '(' argList? ')'                   // function call
-    | Identifier '.' Identifier '(' argList? ')'    // method call
-    | Identifier '[' expression ']'                 // array element access
-    | Identifier '.' Identifier                     // field access
+    | 'null'
+    | Identifier '[' expression ']' '::' 'address'      // address of array element
+    | Identifier '::' 'address'                         // address of variable
+    | Identifier '::' 'value'                           // dereference address
+    | Identifier '(' argList? ')'                       // function call
+    | Identifier '.' Identifier '(' argList? ')'        // method call
+    | Identifier '[' expression ']'                     // array element access
+    | Identifier '.' Identifier                         // field access
     | Identifier
     | '(' expression ')'
     ;
@@ -127,10 +148,21 @@ argList
     : expression (',' expression)*
     ;
 
+literal
+    : IntegerLiteral
+    | HexLiteral
+    | FloatLiteral
+    | StringLiteral
+    | 'true'
+    | 'false'
+    ;
+
 
 // ===== LEXER RULES =====
 
 IntegerLiteral  : [0-9]+ ;
+HexLiteral      : '0x' [0-9a-fA-F]+ ;
+FloatLiteral    : [0-9]+ '.' [0-9]+ ;
 StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
 CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
@@ -138,7 +170,7 @@ Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
 // keep newlines as real tokens (for statement separation)
 NEWLINE         : '\r'? '\n' ;
 
-// // comment to end of line, but DO NOT eat the newline
+// comment to end of line, does not eat the newline
 LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 
 // spaces and tabs only

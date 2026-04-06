@@ -1,24 +1,47 @@
-// Simple Hopper v0 AST node builders
+// Hopper AST node builders
 
-export function Program(functions, structs = []) {
-    return { kind: "Program", functions, structs };
+export function Program(functions, structs = [], classes = [], consts = []) {
+    return { kind: "Program", functions, structs, classes, consts };
 }
 
 export function FunctionDecl(name, params, returnType, body, isExtern = false) {
     return { kind: "FunctionDecl", name, params, returnType, body, isExtern };
 }
 
-export function StructDecl(name, fields, methods = []) {
-    return { kind: "StructDecl", name, fields, methods };
+// struct = memory layout only, no methods, no default values
+export function StructDecl(name, fields) {
+    return { kind: "StructDecl", name, fields };
 }
 
 export function StructField(name, type) {
     return { kind: "StructField", name, type };
 }
 
-export function StructMethod(name, params, returnType, body) {
-    // Method inside a struct - will get implicit self parameter
-    return { kind: "StructMethod", name, params, returnType, body };
+// pad N inside a struct — explicit reserved bytes
+export function StructPad(size) {
+    return { kind: "StructPad", isPad: true, size };
+}
+
+// class = data + behavior, compiler-optimized layout
+export function ClassDecl(name, fields, methods, operators) {
+    return { kind: "ClassDecl", name, fields, methods, operators };
+}
+
+export function ClassField(name, type) {
+    return { kind: "ClassField", name, type };
+}
+
+export function ClassMethod(name, params, returnType, body) {
+    return { kind: "ClassMethod", name, params, returnType, body };
+}
+
+export function ClassOperator(op, param, returnType, body) {
+    return { kind: "ClassOperator", op, param, returnType, body };
+}
+
+// top-level constant: const NAME = literal
+export function ConstDecl(name, value, type) {
+    return { kind: "ConstDecl", name, value, type };
 }
 
 export function ExprStmt(expr) {
@@ -91,12 +114,21 @@ export function FieldAccess(object, field) {
 }
 
 export function MethodCall(object, method, args = []) {
-    // obj.method(args) - transformed to StructName_method(obj::address, args)
     return { kind: "MethodCall", object, method, args };
 }
 
 export function IntLiteral(value) {
     return { kind: "IntLiteral", value };
+}
+
+export function HexLiteral(value) {
+    // value stored as a JS number (already parsed from hex string)
+    return { kind: "HexLiteral", value };
+}
+
+export function FloatLiteral(value) {
+    // value stored as a JS number
+    return { kind: "FloatLiteral", value };
 }
 
 export function BoolLiteral(value) {
@@ -108,7 +140,7 @@ export function StringLiteral(value) {
 }
 
 export function CharLiteral(value) {
-    // Store as int (ASCII/Unicode code point)
+    // Stored as int (ASCII code point)
     return { kind: "CharLiteral", value };
 }
 
@@ -118,47 +150,30 @@ export function NullLiteral() {
 
 // Address operations
 export function AddressOf(name) {
-    // x::address - get address of variable
     return { kind: "AddressOf", name };
 }
 
 export function Deref(name) {
-    // p::value - read through address (only on identifiers, no chaining)
     return { kind: "Deref", name };
 }
 
 export function DerefAssign(name, expr) {
-    // p::value = x - write through address
     return { kind: "DerefAssign", name, expr };
-}
-
-export function Allocate(type, count) {
-    // allocate int(10) - heap allocation
-    return { kind: "Allocate", type, count };
-}
-
-export function Deallocate(expr) {
-    // deallocate p - free heap memory
-    return { kind: "Deallocate", expr };
 }
 
 // Array operations
 export function ArrayDecl(type, name, size) {
-    // int buffer[10] - fixed-size array declaration
     return { kind: "ArrayDecl", type, name, size };
 }
 
 export function ArrayAccess(name, index) {
-    // buffer[i] - read array element
     return { kind: "ArrayAccess", name, index };
 }
 
 export function ArrayAssign(name, index, expr) {
-    // buffer[i] = value - write array element
     return { kind: "ArrayAssign", name, index, expr };
 }
 
 export function ArrayElementAddress(name, index) {
-    // buffer[i]::address - get address of array element
     return { kind: "ArrayElementAddress", name, index };
 }

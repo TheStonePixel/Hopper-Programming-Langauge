@@ -1,446 +1,389 @@
-import fs from "fs";
 import { buildAstFromSource } from "./astBuilder.js";
 
-function ensureBool(ir, val) {
-    // val: { value, type }
-    if (val.type === "bool") {
-        // already i1 from icmp
-        return val.value;
-    }
-    // treat non-zero int as true
-    const llType = llvmType(val.type); // e.g. "i32"
-    const tmp = ir.newTmp();
-    ir.emit(`${tmp} = icmp ne ${llType} ${val.value}, 0`);
-    return tmp; // this is i1
-}
+// ── module-level registries ────────────────────────────────────────────────
 
-// --- simple helpers ---
-
-// Module-level string constants
-const stringConstants = new Map(); // value -> @.str.N name
+const stringConstants = new Map();   // raw value  → @.str.N
+const structTypes     = new Map();   // name       → { fields: [{name,type,isPad,size}] }
+const classTypes      = new Map();   // name       → { fields: [{name,type}], methods, operators }
+const moduleConstants = new Map();   // const name → { value, type }
 let stringCounter = 0;
 
-// Module-level struct definitions
-const structTypes = new Map(); // struct name -> { fields: [{ name, type }], llvmName }
-
-function addStringConstant(value) {
-    if (stringConstants.has(value)) {
-        return stringConstants.get(value);
-    }
-    const name = `@.str.${stringCounter++}`;
-    stringConstants.set(value, name);
-    return name;
-}
-
-function resetStringConstants() {
+function resetAll() {
     stringConstants.clear();
+    structTypes.clear();
+    classTypes.clear();
+    moduleConstants.clear();
     stringCounter = 0;
 }
 
-function resetStructTypes() {
-    structTypes.clear();
+function addStringConstant(value) {
+    if (!stringConstants.has(value)) stringConstants.set(value, `@.str.${stringCounter++}`);
+    return stringConstants.get(value);
 }
 
 function registerStruct(name, fields) {
-    structTypes.set(name, {
-        fields: fields,
-        llvmName: `%struct.${name}`
-    });
+    structTypes.set(name, { fields });
 }
 
-function getStructInfo(name) {
-    return structTypes.get(name);
+function registerClass(name, fields, methods, operators) {
+    classTypes.set(name, { fields, methods, operators });
 }
 
-function getFieldIndex(structName, fieldName) {
-    const info = structTypes.get(structName);
-    if (!info) throw new Error(`Unknown struct: ${structName}`);
-    const idx = info.fields.findIndex(f => f.name === fieldName);
-    if (idx < 0) throw new Error(`Unknown field ${fieldName} in struct ${structName}`);
-    return idx;
-}
+// ── type helpers ───────────────────────────────────────────────────────────
 
-function getFieldType(structName, fieldName) {
-    const info = structTypes.get(structName);
-    if (!info) throw new Error(`Unknown struct: ${structName}`);
-    const field = info.fields.find(f => f.name === fieldName);
-    if (!field) throw new Error(`Unknown field ${fieldName} in struct ${structName}`);
-    return field.type;
-}
-
-class IRBuilder {
-    constructor() {
-        this.lines = [];
-        this.tmp = 0;
-        this.label = 0;
-        this.vars = new Map(); // name -> { ptr, type }
-        this.loopStack = []; // stack of { breakLabel, continueLabel }
-    }
-
-    emit(line) {
-        this.lines.push(line);
-    }
-
-    newTmp() {
-        return `%t${this.tmp++}`;
-    }
-
-    newLabel(prefix) {
-        return `${prefix}${this.label++}`;
-    }
-
-    getVar(name) {
-        const v = this.vars.get(name);
-        if (!v) throw new Error(`Unknown variable: ${name}`);
-        return v;
-    }
-
-    pushLoop(breakLabel, continueLabel) {
-        this.loopStack.push({ breakLabel, continueLabel });
-    }
-
-    popLoop() {
-        this.loopStack.pop();
-    }
-
-    currentLoop() {
-        if (this.loopStack.length === 0) {
-            throw new Error("break/continue outside of loop");
-        }
-        return this.loopStack[this.loopStack.length - 1];
-    }
-}
-
-// Hopper types -> LLVM types
 function llvmType(t) {
-    if (t === "int") return "i32";
-    if (t === "bool") return "i1";
-    if (t === "float") return "float";
-    if (t === "void") return "void";
-    if (t === "String") return "i8*";
-    if (t === "address") return "i8*";  // generic pointer
-    // Check if it's a struct type
-    if (structTypes.has(t)) {
-        return `%struct.${t}`;
-    }
-    // Check for address-of type (e.g., "address:int")
-    if (t.startsWith("address:")) {
-        const pointedTo = t.substring(8);
-        return llvmType(pointedTo) + "*";
-    }
+    if (t === "int")     return "i64";
+    if (t === "bool")    return "i1";
+    if (t === "byte")    return "i8";
+    if (t === "float")   return "double";
+    if (t === "String")  return "i8*";
+    if (t === "address") return "i8*";
+    if (structTypes.has(t)) return `%struct.${t}`;
+    if (classTypes.has(t))  return `%class.${t}`;
+    if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
     throw new Error(`Unknown type: ${t}`);
 }
 
-// Get size of a type in bytes (for allocation)
+function isFloatType(t) { return t === "float"; }
+function isIntType(t)   { return t === "int" || t === "byte" || t === "bool"; }
+
 function sizeOfType(t) {
-    if (t === "int") return 4;
-    if (t === "bool") return 1;
-    if (t === "float") return 4;
-    if (t === "String") return 8;  // pointer size
-    if (t === "address") return 8; // pointer size
+    if (t === "int")     return 8;
+    if (t === "byte")    return 1;
+    if (t === "bool")    return 1;
+    if (t === "float")   return 8;
+    if (t === "String")  return 8;
+    if (t === "address") return 8;
     if (structTypes.has(t)) {
-        // Sum up field sizes (simplified - doesn't account for alignment)
-        const info = structTypes.get(t);
-        return info.fields.reduce((sum, f) => sum + sizeOfType(f.type), 0);
+        return structTypes.get(t).fields.reduce((s, f) =>
+            s + (f.isPad ? f.size : sizeOfType(f.type)), 0);
     }
     throw new Error(`Unknown type for sizeof: ${t}`);
 }
 
+// ── field lookup (struct and class) ───────────────────────────────────────
+
+function getTypeInfo(typeName) {
+    if (structTypes.has(typeName)) return { kind: "struct", info: structTypes.get(typeName) };
+    if (classTypes.has(typeName))  return { kind: "class",  info: classTypes.get(typeName) };
+    return null;
+}
+
+function getFieldIndex(typeName, fieldName) {
+    const ti = getTypeInfo(typeName);
+    if (!ti) throw new Error(`Unknown type: ${typeName}`);
+    let idx = 0;
+    for (const f of ti.info.fields) {
+        if (f.isPad) { idx++; continue; }
+        if (f.name === fieldName) return idx;
+        idx++;
+    }
+    throw new Error(`Unknown field '${fieldName}' in ${ti.kind} '${typeName}'`);
+}
+
+function getFieldType(typeName, fieldName) {
+    const ti = getTypeInfo(typeName);
+    if (!ti) throw new Error(`Unknown type: ${typeName}`);
+    const f = ti.info.fields.find(f => !f.isPad && f.name === fieldName);
+    if (!f) throw new Error(`Unknown field '${fieldName}' in ${ti.kind} '${typeName}'`);
+    return f.type;
+}
+
+// ── IRBuilder ──────────────────────────────────────────────────────────────
+
+class IRBuilder {
+    constructor() {
+        this.lines     = [];
+        this.tmp       = 0;
+        this.label     = 0;
+        this.vars      = new Map();
+        this.loopStack = [];
+    }
+
+    emit(line)              { this.lines.push(line); }
+    newTmp()                { return `%t${this.tmp++}`; }
+    newLabel(prefix)        { return `${prefix}${this.label++}`; }
+    getVar(name) {
+        if (moduleConstants.has(name)) return null; // signal: use constant
+        const v = this.vars.get(name);
+        if (!v) throw new Error(`Unknown variable: ${name}`);
+        return v;
+    }
+    pushLoop(b, c)  { this.loopStack.push({ breakLabel: b, continueLabel: c }); }
+    popLoop()       { this.loopStack.pop(); }
+    currentLoop()   {
+        if (!this.loopStack.length) throw new Error("break/continue outside loop");
+        return this.loopStack[this.loopStack.length - 1];
+    }
+}
+
+// ── bool coercion ──────────────────────────────────────────────────────────
+
+function ensureBool(ir, val) {
+    if (val.type === "bool") return val.value;
+    const tmp = ir.newTmp();
+    ir.emit(`${tmp} = icmp ne ${llvmType(val.type)} ${val.value}, 0`);
+    return tmp;
+}
+
+// ── expression codegen ────────────────────────────────────────────────────
+
 function genExpr(ir, expr) {
     switch (expr.kind) {
+
         case "IntLiteral":
             return { value: String(expr.value), type: "int" };
+
+        case "HexLiteral":
+            return { value: String(expr.value), type: "int" };
+
+        case "FloatLiteral":
+            return { value: String(expr.value), type: "float" };
 
         case "BoolLiteral":
             return { value: expr.value ? "1" : "0", type: "bool" };
 
         case "CharLiteral":
-            // Char is just an int
             return { value: String(expr.value), type: "int" };
 
         case "StringLiteral": {
-            // Add string to global constants and get pointer
             const strName = addStringConstant(expr.value);
-            const len = expr.value.length + 1; // +1 for null terminator
+            const len = expr.value.length + 1;
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
             return { value: tmp, type: "String" };
         }
 
+        case "NullLiteral":
+            return { value: "null", type: "address" };
+
         case "Var": {
-            const v = ir.getVar(expr.name);
+            // Check module-level constants first
+            const c = moduleConstants.get(expr.name);
+            if (c) return { value: String(c.value), type: c.type };
+
+            const v = ir.vars.get(expr.name);
+            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${v.type}, ${v.type}* ${v.ptr}`);
-            return { value: tmp, type: v.hType }; // keep Hopper type too
+            return { value: tmp, type: v.hType };
         }
 
         case "FieldAccess": {
-            // Get struct variable and access field
-            const v = ir.getVar(expr.object);
-            const structName = v.hType;
-            const fieldIdx = getFieldIndex(structName, expr.field);
-            const fieldType = getFieldType(structName, expr.field);
+            const v = ir.vars.get(expr.object);
+            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+
+            // Class field access is only allowed via self inside a class method
+            if (classTypes.has(v.hType) && !v.isSelf) {
+                throw new Error(
+                    `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
+                );
+            }
+
+            const typeName    = v.hType;
+            const fieldIdx    = getFieldIndex(typeName, expr.field);
+            const fieldType   = getFieldType(typeName, expr.field);
             const llFieldType = llvmType(fieldType);
+            const llSelfType  = llvmType(typeName);
 
-            // GEP to get field pointer
             const fieldPtr = ir.newTmp();
-            ir.emit(`${fieldPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
-
-            // Load field value
+            ir.emit(`${fieldPtr} = getelementptr ${llSelfType}, ${llSelfType}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${llFieldType}, ${llFieldType}* ${fieldPtr}`);
             return { value: tmp, type: fieldType };
         }
 
-        case "NullLiteral": {
-            // Return null pointer - type will be determined by context
-            return { value: "null", type: "address" };
-        }
-
         case "AddressOf": {
-            // x::address - get address of variable (don't load, return pointer)
-            const v = ir.getVar(expr.name);
-            // For arrays, return pointer to first element
+            const v = ir.vars.get(expr.name);
+            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
             if (v.hType.startsWith("array:")) {
-                // hType is "array:int:10" -> element type is "int"
-                const parts = v.hType.split(":");
-                const elemType = parts[1];
-                const llElemType = llvmType(elemType);
-                // GEP to get pointer to first element
-                const elemPtr = ir.newTmp();
+                const elemType = v.hType.split(":")[1];
+                const elemPtr  = ir.newTmp();
                 ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 0`);
                 return { value: elemPtr, type: `address:${elemType}` };
             }
-            // Return the pointer itself, with type info about what it points to
             return { value: v.ptr, type: `address:${v.hType}` };
         }
 
         case "ArrayAccess": {
-            // buffer[i] - read array element
-            const v = ir.getVar(expr.name);
-            // v.hType should be "array:elemType:size"
-            if (!v.hType.startsWith("array:")) {
+            const v = ir.vars.get(expr.name);
+            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot index non-array type: ${v.hType}`);
-            }
-            const parts = v.hType.split(":");
-            const elemType = parts[1];
-            const llElemType = llvmType(elemType);
-
-            // Evaluate index
-            const indexVal = genExpr(ir, expr.index);
-
-            // GEP to get element pointer
-            const elemPtr = ir.newTmp();
-            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${indexVal.value}`);
-
-            // Load element value
+            const elemType    = v.hType.split(":")[1];
+            const llElemType  = llvmType(elemType);
+            const indexVal    = genExpr(ir, expr.index);
+            const elemPtr     = ir.newTmp();
+            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i64 ${indexVal.value}`);
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${llElemType}, ${llElemType}* ${elemPtr}`);
             return { value: tmp, type: elemType };
         }
 
         case "ArrayElementAddress": {
-            // buffer[i]::address - get address of array element
-            const v = ir.getVar(expr.name);
-            if (!v.hType.startsWith("array:")) {
+            const v = ir.vars.get(expr.name);
+            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot get element address of non-array type: ${v.hType}`);
-            }
-            const parts = v.hType.split(":");
-            const elemType = parts[1];
-            const llElemType = llvmType(elemType);
-
-            // Evaluate index
-            const indexVal = genExpr(ir, expr.index);
-
-            // GEP to get element pointer
-            const elemPtr = ir.newTmp();
-            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${indexVal.value}`);
-
+            const elemType   = v.hType.split(":")[1];
+            const indexVal   = genExpr(ir, expr.index);
+            const elemPtr    = ir.newTmp();
+            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i64 ${indexVal.value}`);
             return { value: elemPtr, type: `address:${elemType}` };
         }
 
         case "Deref": {
-            // p::value - read through address
-            const v = ir.getVar(expr.name);
-            // v.hType should be "address:X" where X is the pointed-to type
-            if (!v.hType.startsWith("address:")) {
+            const v = ir.vars.get(expr.name);
+            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v.hType.startsWith("address:"))
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            }
-            const pointedToType = v.hType.substring(8); // strip "address:"
-            const llPointedTo = llvmType(pointedToType);
-
-            // Load the address value (stored as i8*)
-            const rawAddr = ir.newTmp();
+            const pointedTo   = v.hType.substring(8);
+            const llPointedTo = llvmType(pointedTo);
+            const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
-
-            // Bitcast from i8* to typed pointer
-            const typedAddr = ir.newTmp();
+            const typedAddr   = ir.newTmp();
             ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
-
-            // Load through the typed pointer
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${llPointedTo}, ${llPointedTo}* ${typedAddr}`);
-            return { value: tmp, type: pointedToType };
-        }
-
-        case "Allocate": {
-            // allocate int(10) - heap allocation
-            const allocType = expr.type;
-            const countVal = genExpr(ir, expr.count);
-            const typeSize = sizeOfType(allocType);
-            const llType = llvmType(allocType);
-
-            // Calculate total size: count * sizeof(type)
-            const sizeBytes = ir.newTmp();
-            ir.emit(`${sizeBytes} = mul i32 ${countVal.value}, ${typeSize}`);
-
-            // Extend to i64 for malloc
-            const size64 = ir.newTmp();
-            ir.emit(`${size64} = sext i32 ${sizeBytes} to i64`);
-
-            // Call malloc
-            const rawPtr = ir.newTmp();
-            ir.emit(`${rawPtr} = call i8* @malloc(i64 ${size64})`);
-
-            // Bitcast to proper pointer type
-            const typedPtr = ir.newTmp();
-            ir.emit(`${typedPtr} = bitcast i8* ${rawPtr} to ${llType}*`);
-
-            return { value: typedPtr, type: `address:${allocType}` };
+            return { value: tmp, type: pointedTo };
         }
 
         case "Unary": {
             const inner = genExpr(ir, expr.expr);
+            const lt    = llvmType(inner.type);
             if (expr.op === "-") {
                 const tmp = ir.newTmp();
-                ir.emit(`${tmp} = sub ${llvmType(inner.type)} 0, ${inner.value}`);
+                if (isFloatType(inner.type))
+                    ir.emit(`${tmp} = fneg ${lt} ${inner.value}`);
+                else
+                    ir.emit(`${tmp} = sub ${lt} 0, ${inner.value}`);
                 return { value: tmp, type: inner.type };
             }
             if (expr.op === "!") {
-                // assume bool, use xor with 1
                 const tmp = ir.newTmp();
                 ir.emit(`${tmp} = xor i1 ${inner.value}, 1`);
                 return { value: tmp, type: "bool" };
+            }
+            if (expr.op === "~") {
+                const tmp = ir.newTmp();
+                ir.emit(`${tmp} = xor ${lt} ${inner.value}, -1`);
+                return { value: tmp, type: inner.type };
             }
             throw new Error(`Unsupported unary op: ${expr.op}`);
         }
 
         case "Binary": {
-            const left = genExpr(ir, expr.left);
+            const left  = genExpr(ir, expr.left);
             const right = genExpr(ir, expr.right);
-            const lt = llvmType(left.type);
+            const lt    = llvmType(left.type);
+            const isF   = isFloatType(left.type);
+
             switch (expr.op) {
                 case "+": {
-                    // Check for address arithmetic: address + int
-                    if (left.type.startsWith("address:") && (right.type === "int")) {
-                        const pointedToType = left.type.substring(8);
-                        const llPointedTo = llvmType(pointedToType);
+                    // Address arithmetic
+                    if (left.type.startsWith("address:") && right.type === "int") {
+                        const pointedTo = left.type.substring(8);
                         const tmp = ir.newTmp();
-                        // GEP advances by element size automatically
-                        ir.emit(`${tmp} = getelementptr ${llPointedTo}, ${llPointedTo}* ${left.value}, i32 ${right.value}`);
+                        ir.emit(`${tmp} = getelementptr ${llvmType(pointedTo)}, ${llvmType(pointedTo)}* ${left.value}, i64 ${right.value}`);
                         return { value: tmp, type: left.type };
                     }
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = add ${lt} ${left.value}, ${right.value}`);
+                    ir.emit(`${tmp} = ${isF ? "fadd" : "add"} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "-": {
-                    // Check for address arithmetic: address - int
-                    if (left.type.startsWith("address:") && (right.type === "int")) {
-                        const pointedToType = left.type.substring(8);
-                        const llPointedTo = llvmType(pointedToType);
-                        // Negate the offset for subtraction
-                        const negOffset = ir.newTmp();
-                        ir.emit(`${negOffset} = sub i32 0, ${right.value}`);
+                    if (left.type.startsWith("address:") && right.type === "int") {
+                        const pointedTo = left.type.substring(8);
+                        const neg = ir.newTmp();
+                        ir.emit(`${neg} = sub i64 0, ${right.value}`);
                         const tmp = ir.newTmp();
-                        ir.emit(`${tmp} = getelementptr ${llPointedTo}, ${llPointedTo}* ${left.value}, i32 ${negOffset}`);
+                        ir.emit(`${tmp} = getelementptr ${llvmType(pointedTo)}, ${llvmType(pointedTo)}* ${left.value}, i64 ${neg}`);
                         return { value: tmp, type: left.type };
                     }
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = sub ${lt} ${left.value}, ${right.value}`);
+                    ir.emit(`${tmp} = ${isF ? "fsub" : "sub"} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "*": {
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = mul ${lt} ${left.value}, ${right.value}`);
+                    ir.emit(`${tmp} = ${isF ? "fmul" : "mul"} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "/": {
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = sdiv ${lt} ${left.value}, ${right.value}`);
+                    ir.emit(`${tmp} = ${isF ? "fdiv" : "sdiv"} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "%": {
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = srem ${lt} ${left.value}, ${right.value}`);
+                    ir.emit(`${tmp} = ${isF ? "frem" : "srem"} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
-                case "<":
-                case "<=":
-                case ">":
-                case ">=": {
-                    const tmp = ir.newTmp();
-                    const pred = {
-                        "<": "slt",
-                        "<=": "sle",
-                        ">": "sgt",
-                        ">=": "sge",
-                    }[expr.op];
-                    ir.emit(`${tmp} = icmp ${pred} ${lt} ${left.value}, ${right.value}`);
+                case "<": case "<=": case ">": case ">=": {
+                    const tmp  = ir.newTmp();
+                    const pred = isF
+                        ? { "<": "olt", "<=": "ole", ">": "ogt", ">=": "oge" }[expr.op]
+                        : { "<": "slt", "<=": "sle", ">": "sgt", ">=": "sge" }[expr.op];
+                    ir.emit(`${tmp} = ${isF ? "fcmp" : "icmp"} ${pred} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: "bool" };
                 }
-                case "==":
-                case "!=": {
-                    const tmp = ir.newTmp();
-                    const pred = expr.op === "==" ? "eq" : "ne";
-                    ir.emit(`${tmp} = icmp ${pred} ${lt} ${left.value}, ${right.value}`);
+                case "==": case "!=": {
+                    const tmp  = ir.newTmp();
+                    const pred = isF
+                        ? (expr.op === "==" ? "oeq" : "one")
+                        : (expr.op === "==" ? "eq"  : "ne");
+                    ir.emit(`${tmp} = ${isF ? "fcmp" : "icmp"} ${pred} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: "bool" };
                 }
+                case "&&": {
+                    const l   = ensureBool(ir, left);
+                    const r   = ensureBool(ir, right);
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = and i1 ${l}, ${r}`);
+                    return { value: tmp, type: "bool" };
+                }
+                case "||": {
+                    const l   = ensureBool(ir, left);
+                    const r   = ensureBool(ir, right);
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = or i1 ${l}, ${r}`);
+                    return { value: tmp, type: "bool" };
+                }
+                // Bitwise
+                case "&": { const tmp = ir.newTmp(); ir.emit(`${tmp} = and ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
+                case "|": { const tmp = ir.newTmp(); ir.emit(`${tmp} = or  ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
+                case "^": { const tmp = ir.newTmp(); ir.emit(`${tmp} = xor ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
+                case "<<":{ const tmp = ir.newTmp(); ir.emit(`${tmp} = shl ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
+                case ">>":{ const tmp = ir.newTmp(); ir.emit(`${tmp} = lshr ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
+
                 default:
                     throw new Error(`Unsupported binary op: ${expr.op}`);
             }
         }
 
         case "Call": {
-            const callee = expr.callee;
-            const args = Array.isArray(expr.args) ? expr.args : [];
-            const argVals = args.map(a => genExpr(ir, a));
-
-            // for now, assume all functions return int
-            const retType = "int";
-            const llRetType = llvmType(retType);
-
-            const argStr = argVals.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
-
-            const tmp = ir.newTmp();
-            ir.emit(`${tmp} = call ${llRetType} @${callee}(${argStr})`);
+            const args    = (expr.args || []).map(a => genExpr(ir, a));
+            const argStr  = args.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
+            const retType = "int"; // TODO: look up actual return type from function table
+            const tmp     = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(retType)} @${expr.callee}(${argStr})`);
             return { value: tmp, type: retType };
         }
 
         case "MethodCall": {
-            // obj.method(args) -> StructName_method(obj::address, args)
-            const v = ir.getVar(expr.object);
-            const structName = v.hType;
-            const mangledName = `${structName}_${expr.method}`;
-
-            // Get address of the struct (self pointer)
-            const selfPtr = v.ptr; // Already a pointer to the struct
-
-            // Evaluate arguments
-            const args = Array.isArray(expr.args) ? expr.args : [];
-            const argVals = args.map(a => genExpr(ir, a));
-
-            // Build argument string: self pointer first, then other args
-            const selfArg = `%struct.${structName}* ${selfPtr}`;
-            const otherArgs = argVals.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
-            const argStr = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
-
-            // For now, assume all methods return int
-            const retType = "int";
-            const llRetType = llvmType(retType);
-
-            const tmp = ir.newTmp();
-            ir.emit(`${tmp} = call ${llRetType} @${mangledName}(${argStr})`);
+            const v = ir.vars.get(expr.object);
+            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            const typeName   = v.hType;
+            const isClass    = classTypes.has(typeName);
+            const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
+            const mangled    = `${typeName}_${expr.method}`;
+            const args       = (expr.args || []).map(a => genExpr(ir, a));
+            const selfArg    = `${llTypeName}* ${v.ptr}`;
+            const otherArgs  = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+            const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+            const retType    = "int"; // TODO: look up actual return type
+            const tmp        = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(retType)} @${mangled}(${argStr})`);
             return { value: tmp, type: retType };
         }
 
@@ -449,62 +392,48 @@ function genExpr(ir, expr) {
     }
 }
 
-// --- statements ---
+// ── statement codegen ─────────────────────────────────────────────────────
 
 function genStmt(ir, stmt, retType) {
     switch (stmt.kind) {
+
         case "VarDecl": {
-            // Determine the actual Hopper type (may be refined by init expression)
             let hType = stmt.type;
-            let init = null;
+            let init  = null;
 
             if (stmt.init) {
                 init = genExpr(ir, stmt.init);
-                // If declared as generic 'address' but init has specific type, use that
-                if (stmt.type === "address" && init.type.startsWith("address:")) {
+                if (stmt.type === "address" && init.type.startsWith("address:"))
                     hType = init.type;
-                }
             }
 
-            // For address types, always use i8* as storage to allow reassignment to different types
             const isAddress = stmt.type === "address" || stmt.type.startsWith("address:");
-            const llType = isAddress ? "i8*" : llvmType(hType);
-            const ptr = ir.newTmp();
+            const llType    = isAddress ? "i8*" : llvmType(hType);
+            const ptr       = ir.newTmp();
             ir.emit(`${ptr} = alloca ${llType}`);
 
-            // For struct types, we might not have an init value
             if (init) {
                 if (isAddress && init.type.startsWith("address:")) {
-                    // Bitcast typed pointer to i8* for storage
-                    const typedLlType = llvmType(init.type);
                     const castPtr = ir.newTmp();
-                    ir.emit(`${castPtr} = bitcast ${typedLlType} ${init.value} to i8*`);
+                    ir.emit(`${castPtr} = bitcast ${llvmType(init.type)} ${init.value} to i8*`);
                     ir.emit(`store i8* ${castPtr}, i8** ${ptr}`);
                 } else {
                     ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
                 }
             }
-            // Note: struct fields are uninitialized by default (could zero-init later)
 
-            ir.vars.set(stmt.name, { ptr, type: llType, hType: hType });
+            ir.vars.set(stmt.name, { ptr, type: llType, hType });
             break;
         }
 
         case "Assign": {
-            const v = ir.getVar(stmt.name);
+            const v   = ir.vars.get(stmt.name);
+            if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
             const val = genExpr(ir, stmt.expr);
-
-            // If assigning a specific address type to a generic address, refine the type
-            if (v.hType === "address" && val.type.startsWith("address:")) {
-                // Update variable's type info (hType only, llvm storage stays i8*)
-                v.hType = val.type;
-            }
-
-            // For address variables (stored as i8*), bitcast typed pointers
+            if (v.hType === "address" && val.type.startsWith("address:")) v.hType = val.type;
             if (v.type === "i8*" && val.type.startsWith("address:")) {
-                const typedLlType = llvmType(val.type);
                 const castPtr = ir.newTmp();
-                ir.emit(`${castPtr} = bitcast ${typedLlType} ${val.value} to i8*`);
+                ir.emit(`${castPtr} = bitcast ${llvmType(val.type)} ${val.value} to i8*`);
                 ir.emit(`store i8* ${castPtr}, i8** ${v.ptr}`);
             } else {
                 ir.emit(`store ${v.type} ${val.value}, ${v.type}* ${v.ptr}`);
@@ -513,221 +442,145 @@ function genStmt(ir, stmt, retType) {
         }
 
         case "FieldAssign": {
-            // Assign to struct field: obj.field = value
-            const v = ir.getVar(stmt.object);
-            const structName = v.hType;
-            const fieldIdx = getFieldIndex(structName, stmt.field);
-            const fieldType = getFieldType(structName, stmt.field);
+            const v = ir.vars.get(stmt.object);
+            if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
+
+            // Class field assignment is only allowed via self inside a class method
+            if (classTypes.has(v.hType) && !v.isSelf) {
+                throw new Error(
+                    `Access failure: cannot assign field '${stmt.field}' of class '${v.hType}' directly. Use a mutator method.`
+                );
+            }
+
+            const typeName    = v.hType;
+            const fieldIdx    = getFieldIndex(typeName, stmt.field);
+            const fieldType   = getFieldType(typeName, stmt.field);
             const llFieldType = llvmType(fieldType);
+            const llSelfType  = llvmType(typeName);
 
-            // GEP to get field pointer
             const fieldPtr = ir.newTmp();
-            ir.emit(`${fieldPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
-
-            // Store value
+            ir.emit(`${fieldPtr} = getelementptr ${llSelfType}, ${llSelfType}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
             const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llFieldType} ${val.value}, ${llFieldType}* ${fieldPtr}`);
             break;
         }
 
         case "DerefAssign": {
-            // p::value = x - write through address
-            const v = ir.getVar(stmt.name);
-            if (!v.hType.startsWith("address:")) {
+            const v = ir.vars.get(stmt.name);
+            if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+            if (!v.hType.startsWith("address:"))
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            }
-            const pointedToType = v.hType.substring(8); // strip "address:"
-            const llPointedTo = llvmType(pointedToType);
-
-            // Load the address value (stored as i8*)
-            const rawAddr = ir.newTmp();
+            const pointedTo   = v.hType.substring(8);
+            const llPointedTo = llvmType(pointedTo);
+            const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
-
-            // Bitcast from i8* to typed pointer
-            const typedAddr = ir.newTmp();
+            const typedAddr   = ir.newTmp();
             ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
-
-            // Evaluate the value to store
             const val = genExpr(ir, stmt.expr);
-
-            // Store through the typed pointer
             ir.emit(`store ${llPointedTo} ${val.value}, ${llPointedTo}* ${typedAddr}`);
             break;
         }
 
-        case "Deallocate": {
-            // deallocate p - free heap memory
-            const val = genExpr(ir, stmt.expr);
-
-            // Bitcast to i8* for free
-            const rawPtr = ir.newTmp();
-            const valType = llvmType(val.type);
-            ir.emit(`${rawPtr} = bitcast ${valType} ${val.value} to i8*`);
-
-            // Call free
-            ir.emit(`call void @free(i8* ${rawPtr})`);
-            break;
-        }
-
         case "ArrayDecl": {
-            // int buffer[10] - fixed-size array declaration
-            const elemType = stmt.type;
-            const size = stmt.size;
-            const llElemType = llvmType(elemType);
-            const arrayType = `[${size} x ${llElemType}]`;
-
-            const ptr = ir.newTmp();
+            const llElemType = llvmType(stmt.type);
+            const arrayType  = `[${stmt.size} x ${llElemType}]`;
+            const ptr        = ir.newTmp();
             ir.emit(`${ptr} = alloca ${arrayType}`);
-
-            // Store with Hopper type "array:elemType:size"
-            ir.vars.set(stmt.name, {
-                ptr,
-                type: arrayType,
-                hType: `array:${elemType}:${size}`
-            });
+            ir.vars.set(stmt.name, { ptr, type: arrayType, hType: `array:${stmt.type}:${stmt.size}` });
             break;
         }
 
         case "ArrayAssign": {
-            // buffer[i] = value - write array element
-            const v = ir.getVar(stmt.name);
-            if (!v.hType.startsWith("array:")) {
+            const v = ir.vars.get(stmt.name);
+            if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+            if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot index non-array type: ${v.hType}`);
-            }
-            const parts = v.hType.split(":");
-            const elemType = parts[1];
+            const elemType   = v.hType.split(":")[1];
             const llElemType = llvmType(elemType);
-
-            // Evaluate index
-            const indexVal = genExpr(ir, stmt.index);
-
-            // GEP to get element pointer
-            const elemPtr = ir.newTmp();
-            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 ${indexVal.value}`);
-
-            // Evaluate value and store
+            const indexVal   = genExpr(ir, stmt.index);
+            const elemPtr    = ir.newTmp();
+            ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i64 ${indexVal.value}`);
             const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llElemType} ${val.value}, ${llElemType}* ${elemPtr}`);
             break;
         }
 
         case "IfStmt": {
-            const condVal = genExpr(ir, stmt.cond);
-            const condI1 = ensureBool(ir, condVal);
+            const condVal  = genExpr(ir, stmt.cond);
+            const condI1   = ensureBool(ir, condVal);
+            const thenLbl  = ir.newLabel("if.then.");
+            const elseLbl  = stmt.elseBlock ? ir.newLabel("if.else.") : null;
+            const endLbl   = ir.newLabel("if.end.");
 
-            const thenLabel = ir.newLabel("if.then.");
-            const elseLabel = stmt.elseBlock ? ir.newLabel("if.else.") : null;
-            const endLabel = ir.newLabel("if.end.");
-
-            if (elseLabel) {
-                ir.emit(`br i1 ${condI1}, label %${thenLabel}, label %${elseLabel}`);
-            } else {
-                ir.emit(`br i1 ${condI1}, label %${thenLabel}, label %${endLabel}`);
-            }
-
-            ir.emit(`${thenLabel}:`);
+            ir.emit(`br i1 ${condI1}, label %${thenLbl}, label %${elseLbl ?? endLbl}`);
+            ir.emit(`${thenLbl}:`);
             genBlock(ir, stmt.thenBlock, retType);
-            ir.emit(`br label %${endLabel}`);
+            ir.emit(`br label %${endLbl}`);
 
-            if (elseLabel) {
-                ir.emit(`${elseLabel}:`);
+            if (elseLbl) {
+                ir.emit(`${elseLbl}:`);
                 genBlock(ir, stmt.elseBlock, retType);
-                ir.emit(`br label %${endLabel}`);
+                ir.emit(`br label %${endLbl}`);
             }
-
-            ir.emit(`${endLabel}:`);
+            ir.emit(`${endLbl}:`);
             break;
         }
 
         case "WhileStmt": {
-            const condLabel = ir.newLabel("while.cond.");
-            const bodyLabel = ir.newLabel("while.body.");
-            const endLabel = ir.newLabel("while.end.");
-
-            ir.emit(`br label %${condLabel}`);
-            ir.emit(`${condLabel}:`);
-
-            const condVal = genExpr(ir, stmt.cond);
-            const condI1 = ensureBool(ir, condVal);
-            ir.emit(`br i1 ${condI1}, label %${bodyLabel}, label %${endLabel}`);
-
-            ir.emit(`${bodyLabel}:`);
-            ir.pushLoop(endLabel, condLabel);
+            const condLbl = ir.newLabel("while.cond.");
+            const bodyLbl = ir.newLabel("while.body.");
+            const endLbl  = ir.newLabel("while.end.");
+            ir.emit(`br label %${condLbl}`);
+            ir.emit(`${condLbl}:`);
+            const condI1 = ensureBool(ir, genExpr(ir, stmt.cond));
+            ir.emit(`br i1 ${condI1}, label %${bodyLbl}, label %${endLbl}`);
+            ir.emit(`${bodyLbl}:`);
+            ir.pushLoop(endLbl, condLbl);
             genBlock(ir, stmt.body, retType);
             ir.popLoop();
-            ir.emit(`br label %${condLabel}`);
-
-            ir.emit(`${endLabel}:`);
+            ir.emit(`br label %${condLbl}`);
+            ir.emit(`${endLbl}:`);
             break;
         }
 
         case "ForStmt": {
-            // for (init; cond; update) body
-            // Equivalent to: init; while(cond) { body; update; }
-            const condLabel = ir.newLabel("for.cond.");
-            const bodyLabel = ir.newLabel("for.body.");
-            const updateLabel = ir.newLabel("for.update.");
-            const endLabel = ir.newLabel("for.end.");
+            const condLbl   = ir.newLabel("for.cond.");
+            const bodyLbl   = ir.newLabel("for.body.");
+            const updateLbl = ir.newLabel("for.update.");
+            const endLbl    = ir.newLabel("for.end.");
 
-            // Execute init (if present)
-            if (stmt.init) {
-                genStmt(ir, stmt.init, retType);
-            }
+            if (stmt.init) genStmt(ir, stmt.init, retType);
+            ir.emit(`br label %${condLbl}`);
+            ir.emit(`${condLbl}:`);
 
-            ir.emit(`br label %${condLabel}`);
-            ir.emit(`${condLabel}:`);
-
-            // Check condition (if present, else infinite loop)
             if (stmt.cond) {
-                const condVal = genExpr(ir, stmt.cond);
-                const condI1 = ensureBool(ir, condVal);
-                ir.emit(`br i1 ${condI1}, label %${bodyLabel}, label %${endLabel}`);
+                const condI1 = ensureBool(ir, genExpr(ir, stmt.cond));
+                ir.emit(`br i1 ${condI1}, label %${bodyLbl}, label %${endLbl}`);
             } else {
-                ir.emit(`br label %${bodyLabel}`);
+                ir.emit(`br label %${bodyLbl}`);
             }
 
-            ir.emit(`${bodyLabel}:`);
-            // continue jumps to update (so update runs before next iteration)
-            ir.pushLoop(endLabel, updateLabel);
+            ir.emit(`${bodyLbl}:`);
+            ir.pushLoop(endLbl, updateLbl);
             genBlock(ir, stmt.body, retType);
             ir.popLoop();
-
-            ir.emit(`br label %${updateLabel}`);
-            ir.emit(`${updateLabel}:`);
-
-            // Execute update (if present)
-            if (stmt.update) {
-                genStmt(ir, stmt.update, retType);
-            }
-
-            ir.emit(`br label %${condLabel}`);
-            ir.emit(`${endLabel}:`);
+            ir.emit(`br label %${updateLbl}`);
+            ir.emit(`${updateLbl}:`);
+            if (stmt.update) genStmt(ir, stmt.update, retType);
+            ir.emit(`br label %${condLbl}`);
+            ir.emit(`${endLbl}:`);
             break;
         }
 
         case "ReturnStmt": {
             const val = genExpr(ir, stmt.expr);
-            const llType = llvmType(retType);
-            ir.emit(`ret ${llType} ${val.value}`);
+            ir.emit(`ret ${llvmType(retType)} ${val.value}`);
             break;
         }
 
-        case "BreakStmt": {
-            const loop = ir.currentLoop();
-            ir.emit(`br label %${loop.breakLabel}`);
-            break;
-        }
-
-        case "ContinueStmt": {
-            const loop = ir.currentLoop();
-            ir.emit(`br label %${loop.continueLabel}`);
-            break;
-        }
-
-        case "ExprStmt": {
-            genExpr(ir, stmt.expr); // just for side effects
-            break;
-        }
+        case "BreakStmt":    ir.emit(`br label %${ir.currentLoop().breakLabel}`);    break;
+        case "ContinueStmt": ir.emit(`br label %${ir.currentLoop().continueLabel}`); break;
+        case "ExprStmt":     genExpr(ir, stmt.expr);                                  break;
 
         default:
             throw new Error(`Unsupported stmt kind: ${stmt.kind}`);
@@ -735,184 +588,171 @@ function genStmt(ir, stmt, retType) {
 }
 
 function genBlock(ir, block, retType) {
-    for (const s of block.statements) {
-        genStmt(ir, s, retType);
-    }
+    for (const s of block.statements) genStmt(ir, s, retType);
 }
 
-// --- functions / module ---
+// ── function / method codegen ─────────────────────────────────────────────
 
 function genFunction(fn) {
-    const ir = new IRBuilder();
-    const retLlType = llvmType(fn.returnType);
-
-    // build the function signature: assume all params are int/bool for now
-    const paramSig = fn.params.map((p, i) => `${llvmType(p.type)} %p${i}`).join(", ");
+    const ir         = new IRBuilder();
+    const retLlType  = llvmType(fn.returnType);
+    const paramSig   = fn.params.map((p, i) => `${llvmType(p.type)} %p${i}`).join(", ");
 
     ir.emit(`define ${retLlType} @${fn.name}(${paramSig}) {`);
     ir.emit("entry:");
 
-    // map params into local vars: alloca + store + record in ir.vars
     fn.params.forEach((p, i) => {
-        const llType = llvmType(p.type);
-        const paramReg = `%p${i}`;
+        const lt  = llvmType(p.type);
         const ptr = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${llType}`);
-        ir.emit(`store ${llType} ${paramReg}, ${llType}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: llType, hType: p.type });
+        ir.emit(`${ptr} = alloca ${lt}`);
+        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+        ir.vars.set(p.name, { ptr, type: lt, hType: p.type });
     });
 
-    // body
     genBlock(ir, fn.body, fn.returnType);
-
-    // fallback return if control hits end (crude but fine for now)
     ir.emit(`ret ${retLlType} 0`);
     ir.emit("}");
-
     return ir.lines.join("\n");
 }
 
-function genMethod(structName, method) {
-    const ir = new IRBuilder();
-    const retLlType = llvmType(method.returnType);
-    const mangledName = `${structName}_${method.name}`;
+// Generates a method for either a class or struct (both use the same pattern)
+function genMethod(typeName, method, isClass = true) {
+    const ir         = new IRBuilder();
+    const retLlType  = llvmType(method.returnType);
+    const mangled    = `${typeName}_${method.name}`;
+    const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
 
-    // Build parameter signature: self pointer first, then declared params
-    const selfType = `%struct.${structName}*`;
-    const paramParts = [`${selfType} %self`];
-    method.params.forEach((p, i) => {
-        paramParts.push(`${llvmType(p.type)} %p${i}`);
-    });
-    const paramSig = paramParts.join(", ");
-
-    ir.emit(`define ${retLlType} @${mangledName}(${paramSig}) {`);
+    const paramParts = [`${llTypeName}* %self`];
+    method.params.forEach((p, i) => paramParts.push(`${llvmType(p.type)} %p${i}`));
+    ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")}) {`);
     ir.emit("entry:");
 
-    // Store self pointer - it's already a pointer, so just record it directly
-    // (no need to alloca since we receive it as a pointer already)
+    // self — allow field access inside this method
     ir.vars.set("self", {
-        ptr: "%self",
-        type: `%struct.${structName}`,
-        hType: structName,
-        isSelf: true  // Mark as self pointer for special handling
+        ptr:    "%self",
+        type:   llTypeName,
+        hType:  typeName,
+        isSelf: true
     });
 
-    // Map other params into local vars
     method.params.forEach((p, i) => {
-        const llType = llvmType(p.type);
-        const paramReg = `%p${i}`;
+        const lt  = llvmType(p.type);
         const ptr = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${llType}`);
-        ir.emit(`store ${llType} ${paramReg}, ${llType}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: llType, hType: p.type });
+        ir.emit(`${ptr} = alloca ${lt}`);
+        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+        ir.vars.set(p.name, { ptr, type: lt, hType: p.type });
     });
 
-    // body
     genBlock(ir, method.body, method.returnType);
-
-    // fallback return
     ir.emit(`ret ${retLlType} 0`);
     ir.emit("}");
-
     return ir.lines.join("\n");
 }
-function escapeStringForLLVM(str) {
-    // Escape special characters for LLVM string constant
-    let result = '';
-    for (const char of str) {
-        const code = char.charCodeAt(0);
-        if (code === 10) {
-            result += '\\0A';  // newline
-        } else if (code === 13) {
-            result += '\\0D';  // carriage return
-        } else if (code === 9) {
-            result += '\\09';  // tab
-        } else if (code === 0) {
-            result += '\\00';  // null
-        } else if (code === 92) {
-            result += '\\5C';  // backslash
-        } else if (code === 34) {
-            result += '\\22';  // double quote
-        } else if (code < 32 || code > 126) {
-            result += '\\' + code.toString(16).padStart(2, '0').toUpperCase();
-        } else {
-            result += char;
-        }
-    }
-    return result;
+
+// Generates an operator overload method (same as a regular method, different name mangling)
+function genOperator(className, op) {
+    const nameSafe = op
+        .replace('+','plus').replace('-','minus').replace('*','mul')
+        .replace('/','div').replace('%','mod').replace('==','eq')
+        .replace('!=','ne').replace('<','lt').replace('>','gt')
+        .replace('<=','le').replace('>=','ge').replace('&','band')
+        .replace('|','bor').replace('^','bxor').replace('<<','shl')
+        .replace('>>','shr').replace('[]','idx');
+
+    const pseudoMethod = {
+        name:       `op_${nameSafe}`,
+        params:     [op.param],
+        returnType: op.returnType,
+        body:       op.body
+    };
+    return genMethod(className, pseudoMethod, true);
 }
 
+// ── LLVM string escaping ──────────────────────────────────────────────────
+
+function escapeStringForLLVM(str) {
+    let out = '';
+    for (const ch of str) {
+        const c = ch.charCodeAt(0);
+        if      (c === 10) out += '\\0A';
+        else if (c === 13) out += '\\0D';
+        else if (c ===  9) out += '\\09';
+        else if (c ===  0) out += '\\00';
+        else if (c === 92) out += '\\5C';
+        else if (c === 34) out += '\\22';
+        else if (c < 32 || c > 126) out += '\\' + c.toString(16).padStart(2,'0').toUpperCase();
+        else out += ch;
+    }
+    return out;
+}
+
+// ── module codegen ────────────────────────────────────────────────────────
+
 function genModule(ast) {
-    // Reset for fresh compilation
-    resetStringConstants();
-    resetStructTypes();
+    resetAll();
+
+    // Populate module constants so they resolve in genExpr
+    for (const c of ast.consts || []) {
+        moduleConstants.set(c.name, { value: c.value, type: c.type });
+    }
+
+    // Register all struct and class types first (so llvmType resolves them)
+    for (const s of ast.structs || []) registerStruct(s.name, s.fields);
+    for (const c of ast.classes || []) registerClass(c.name, c.fields, c.methods, c.operators);
 
     let out = "; Hopper module\n\n";
 
-    // Declare malloc and free for heap allocation
-    out += "; Memory allocation functions\n";
-    out += "declare i8* @malloc(i64)\n";
-    out += "declare void @free(i8*)\n\n";
-
-    // First, register all struct types
-    for (const struct of ast.structs || []) {
-        const fields = struct.fields.map(f => ({ name: f.name, type: f.type }));
-        registerStruct(struct.name, fields);
-    }
-
     // Emit struct type definitions
-    for (const struct of ast.structs || []) {
-        const fieldTypes = struct.fields.map(f => llvmType(f.type)).join(", ");
-        out += `%struct.${struct.name} = type { ${fieldTypes} }\n`;
+    for (const s of ast.structs || []) {
+        const fieldTypes = s.fields.map(f =>
+            f.isPad ? `[${f.size} x i8]` : llvmType(f.type)
+        ).join(", ");
+        out += `%struct.${s.name} = type { ${fieldTypes} }\n`;
     }
 
-    if ((ast.structs || []).length > 0) {
-        out += "\n";
+    // Emit class type definitions (declaration order for now; reordering is a future opt)
+    for (const c of ast.classes || []) {
+        const fieldTypes = c.fields.map(f => llvmType(f.type)).join(", ");
+        out += `%class.${c.name} = type { ${fieldTypes} }\n`;
     }
 
-    // Generate all functions to collect string constants
-    const functionCode = [];
+    if ((ast.structs || []).length + (ast.classes || []).length > 0) out += "\n";
+
+    // Emit module-level constants as LLVM globals
+    for (const [name, c] of moduleConstants) {
+        out += `@const.${name} = private constant ${llvmType(c.type)} ${c.value}\n`;
+    }
+    if (moduleConstants.size > 0) out += "\n";
+
+    // Collect all code (string constants pool after functions are generated)
+    const fnCode = [];
+
     for (const fn of ast.functions) {
         if (fn.isExtern) {
-            const ret = llvmType(fn.returnType);
+            const ret    = llvmType(fn.returnType);
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
-            functionCode.push(`declare ${ret} @${fn.name}(${params})\n`);
+            fnCode.push(`declare ${ret} @${fn.name}(${params})\n`);
         } else {
-            functionCode.push(genFunction(fn) + "\n\n");
+            fnCode.push(genFunction(fn) + "\n\n");
         }
     }
 
-    // Generate struct methods as standalone functions
-    for (const struct of ast.structs || []) {
-        for (const method of struct.methods || []) {
-            functionCode.push(genMethod(struct.name, method) + "\n\n");
-        }
+    // Class methods and operator overloads
+    for (const cls of ast.classes || []) {
+        for (const m of cls.methods || [])   fnCode.push(genMethod(cls.name, m, true)   + "\n\n");
+        for (const op of cls.operators || []) fnCode.push(genOperator(cls.name, op)      + "\n\n");
     }
 
     // Emit string constants
     for (const [value, name] of stringConstants) {
         const escaped = escapeStringForLLVM(value);
-        const len = value.length + 1; // +1 for null terminator
+        const len     = value.length + 1;
         out += `${name} = private unnamed_addr constant [${len} x i8] c"${escaped}\\00"\n`;
     }
+    if (stringConstants.size > 0) out += "\n";
 
-    if (stringConstants.size > 0) {
-        out += "\n";
-    }
-
-    // Then add all the function code
-    out += functionCode.join("");
-
+    out += fnCode.join("");
     return out;
 }
 
 export { genBlock, genExpr, genFunction, genModule, genStmt };
-
-// --- CLI: node src/codegenLlvm.js example.hop > out.ll ---
-
-// if (process.argv[1] && process.argv[1].endsWith("codegenLLVM.js")) {
-//     const source = fs.readFileSync(process.argv[2], "utf8");
-//     const ast = buildAstFromSource(source);
-//     const ir = genModule(ast);
-//     console.log(ir);
-// }
