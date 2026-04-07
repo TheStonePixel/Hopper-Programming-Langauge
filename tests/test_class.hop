@@ -5,7 +5,7 @@
 // EXPECT: after inc: 12
 // EXPECT: doubled: 24
 
-extern function printf(String fmt, int val) int
+extern function printf(String fmt, ...) int
 
 class Counter {
     int value

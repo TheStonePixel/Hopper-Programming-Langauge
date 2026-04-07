@@ -1,0 +1,25 @@
+// Tests context-inferred cast: float→int and int→float
+// EXPECT: pi_truncated: 3
+// EXPECT: float_val: 7.000000
+// EXPECT: back_to_int: 7
+
+extern function printf(String fmt, ...) int
+
+function main() int {
+    // float → int truncation (fptosi): 3.14 → 3
+    float pi = 3.14
+    int int_val = cast pi
+    printf("pi_truncated: %ld\n", int_val)
+
+    // int → float (sitofp): 7 → 7.0
+    int seven = 7
+    float float_val = cast seven
+    printf("float_val: %f\n", float_val)
+
+    // float → int truncation (fptosi): 7.9 → 7
+    float f2 = 7.9
+    int back_to_int = cast f2
+    printf("back_to_int: %ld\n", back_to_int)
+
+    return 0
+}

@@ -1,11 +1,11 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = []) {
-    return { kind: "Program", functions, structs, classes, consts };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases };
 }
 
-export function FunctionDecl(name, params, returnType, body, isExtern = false) {
-    return { kind: "FunctionDecl", name, params, returnType, body, isExtern };
+export function FunctionDecl(name, params, returnType, body, isExtern = false, isVariadic = false) {
+    return { kind: "FunctionDecl", name, params, returnType, body, isExtern, isVariadic };
 }
 
 // struct = memory layout only, no methods, no default values
@@ -23,8 +23,8 @@ export function StructPad(size) {
 }
 
 // class = data + behavior, compiler-optimized layout
-export function ClassDecl(name, fields, methods, operators) {
-    return { kind: "ClassDecl", name, fields, methods, operators };
+export function ClassDecl(name, fields, methods, operators, constructor = null, destructor = null) {
+    return { kind: "ClassDecl", name, fields, methods, operators, constructor, destructor };
 }
 
 export function ClassField(name, type) {
@@ -39,9 +39,22 @@ export function ClassOperator(op, param, returnType, body) {
     return { kind: "ClassOperator", op, param, returnType, body };
 }
 
+export function ClassConstructor(params, body) {
+    return { kind: "ClassConstructor", params, body };
+}
+
+export function ClassDestructor(body) {
+    return { kind: "ClassDestructor", body };
+}
+
 // top-level constant: const NAME = literal
 export function ConstDecl(name, value, type) {
     return { kind: "ConstDecl", name, value, type };
+}
+
+// alias declaration: alias Name = type
+export function AliasDecl(name, targetType) {
+    return { kind: "AliasDecl", name, targetType };
 }
 
 export function ExprStmt(expr) {
@@ -92,6 +105,10 @@ export function ReturnStmt(expr) {
     return { kind: "ReturnStmt", expr };
 }
 
+export function DeferStmt(expr) {
+    return { kind: "DeferStmt", expr };
+}
+
 export function Block(statements) {
     return { kind: "Block", statements };
 }
@@ -103,6 +120,10 @@ export function Binary(op, left, right) {
 
 export function Unary(op, expr) {
     return { kind: "Unary", op, expr };
+}
+
+export function CastExpr(expr) {
+    return { kind: "CastExpr", expr };
 }
 
 export function Var(name) {

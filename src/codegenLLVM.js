@@ -2,10 +2,12 @@ import { buildAstFromSource } from "./astBuilder.js";
 
 // ── module-level registries ────────────────────────────────────────────────
 
-const stringConstants = new Map();   // raw value  → @.str.N
-const structTypes     = new Map();   // name       → { fields: [{name,type,isPad,size}] }
-const classTypes      = new Map();   // name       → { fields: [{name,type}], methods, operators }
-const moduleConstants = new Map();   // const name → { value, type }
+const stringConstants    = new Map();   // raw value  → @.str.N
+const structTypes        = new Map();   // name       → { fields: [{name,type,isPad,size}] }
+const classTypes         = new Map();   // name       → { fields: [{name,type}], methods, operators }
+const moduleConstants    = new Map();   // const name → { value, type }
+const typeAliases        = new Map();   // alias name → target type string
+const functionReturnTypes = new Map();  // function name → returnType (null = void)
 let stringCounter = 0;
 
 function resetAll() {
@@ -13,6 +15,8 @@ function resetAll() {
     structTypes.clear();
     classTypes.clear();
     moduleConstants.clear();
+    typeAliases.clear();
+    functionReturnTypes.clear();
     stringCounter = 0;
 }
 
@@ -32,12 +36,15 @@ function registerClass(name, fields, methods, operators) {
 // ── type helpers ───────────────────────────────────────────────────────────
 
 function llvmType(t) {
-    if (t === "int")     return "i64";
-    if (t === "bool")    return "i1";
-    if (t === "byte")    return "i8";
-    if (t === "float")   return "double";
-    if (t === "String")  return "i8*";
-    if (t === "address") return "i8*";
+    if (typeAliases.has(t)) return llvmType(typeAliases.get(t)); // resolve alias
+    if (t === "int")          return "i64";
+    if (t === "bool")         return "i1";
+    if (t === "byte")         return "i8";
+    if (t === "float")        return "double";
+    if (t === "String")       return "i8*";
+    if (t === "address")      return "i8*";
+    if (t === "unsignedint")  return "i64";
+    if (t === "unsignedbyte") return "i8";
     if (structTypes.has(t)) return `%struct.${t}`;
     if (classTypes.has(t))  return `%class.${t}`;
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
@@ -45,7 +52,8 @@ function llvmType(t) {
 }
 
 function isFloatType(t) { return t === "float"; }
-function isIntType(t)   { return t === "int" || t === "byte" || t === "bool"; }
+function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "unsignedint" || t === "unsignedbyte"; }
+function isUnsigned(t)  { return t === "unsignedint" || t === "unsignedbyte"; }
 
 function sizeOfType(t) {
     if (t === "int")     return 8;
@@ -93,11 +101,13 @@ function getFieldType(typeName, fieldName) {
 
 class IRBuilder {
     constructor() {
-        this.lines     = [];
-        this.tmp       = 0;
-        this.label     = 0;
-        this.vars      = new Map();
-        this.loopStack = [];
+        this.lines      = [];
+        this.tmp        = 0;
+        this.label      = 0;
+        this.vars       = new Map();
+        this.loopStack  = [];
+        // defer stack is function-scoped (not block-scoped) for this initial implementation
+        this.deferStack = [];
     }
 
     emit(line)              { this.lines.push(line); }
@@ -124,6 +134,70 @@ function ensureBool(ir, val) {
     const tmp = ir.newTmp();
     ir.emit(`${tmp} = icmp ne ${llvmType(val.type)} ${val.value}, 0`);
     return tmp;
+}
+
+// ── cast helper ────────────────────────────────────────────────────────────
+
+function emitCast(ir, srcVal, srcType, targetType) {
+    if (srcType === targetType) return { value: srcVal, type: targetType };
+
+    const tmp = ir.newTmp();
+    const unsigned = isUnsigned(targetType);
+
+    // float → int
+    if (isFloatType(srcType) && (targetType === "int" || targetType === "unsignedint")) {
+        ir.emit(`${tmp} = fptosi double ${srcVal} to i64`);
+        return { value: tmp, type: targetType };
+    }
+    // float → byte
+    if (isFloatType(srcType) && (targetType === "byte" || targetType === "unsignedbyte")) {
+        ir.emit(`${tmp} = fptosi double ${srcVal} to i8`);
+        return { value: tmp, type: targetType };
+    }
+    // int → float
+    if ((srcType === "int" || srcType === "unsignedint") && isFloatType(targetType)) {
+        ir.emit(`${tmp} = sitofp i64 ${srcVal} to double`);
+        return { value: tmp, type: targetType };
+    }
+    // byte → float
+    if ((srcType === "byte" || srcType === "unsignedbyte") && isFloatType(targetType)) {
+        ir.emit(`${tmp} = sitofp i8 ${srcVal} to double`);
+        return { value: tmp, type: targetType };
+    }
+    // int → byte
+    if ((srcType === "int" || srcType === "unsignedint") && (targetType === "byte" || targetType === "unsignedbyte")) {
+        ir.emit(`${tmp} = trunc i64 ${srcVal} to i8`);
+        return { value: tmp, type: targetType };
+    }
+    // byte → int
+    if ((srcType === "byte" || srcType === "unsignedbyte") && (targetType === "int" || targetType === "unsignedint")) {
+        if (unsigned || isUnsigned(srcType)) {
+            ir.emit(`${tmp} = zext i8 ${srcVal} to i64`);
+        } else {
+            ir.emit(`${tmp} = sext i8 ${srcVal} to i64`);
+        }
+        return { value: tmp, type: targetType };
+    }
+    // bool → int
+    if (srcType === "bool" && (targetType === "int" || targetType === "unsignedint")) {
+        ir.emit(`${tmp} = zext i1 ${srcVal} to i64`);
+        return { value: tmp, type: targetType };
+    }
+    // int → bool
+    if ((srcType === "int" || srcType === "unsignedint") && targetType === "bool") {
+        ir.emit(`${tmp} = icmp ne i64 ${srcVal}, 0`);
+        return { value: tmp, type: targetType };
+    }
+
+    throw new Error(`Cannot cast from '${srcType}' to '${targetType}'`);
+}
+
+// ── deferred expression emitter ────────────────────────────────────────────
+
+function emitDeferred(ir) {
+    for (const expr of [...ir.deferStack].reverse()) {
+        genExpr(ir, expr);
+    }
 }
 
 // ── expression codegen ────────────────────────────────────────────────────
@@ -314,19 +388,23 @@ function genExpr(ir, expr) {
                 }
                 case "/": {
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = ${isF ? "fdiv" : "sdiv"} ${lt} ${left.value}, ${right.value}`);
+                    const op = isF ? "fdiv" : (isUnsigned(left.type) ? "udiv" : "sdiv");
+                    ir.emit(`${tmp} = ${op} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "%": {
                     const tmp = ir.newTmp();
-                    ir.emit(`${tmp} = ${isF ? "frem" : "srem"} ${lt} ${left.value}, ${right.value}`);
+                    const op = isF ? "frem" : (isUnsigned(left.type) ? "urem" : "srem");
+                    ir.emit(`${tmp} = ${op} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: left.type };
                 }
                 case "<": case "<=": case ">": case ">=": {
                     const tmp  = ir.newTmp();
                     const pred = isF
                         ? { "<": "olt", "<=": "ole", ">": "ogt", ">=": "oge" }[expr.op]
-                        : { "<": "slt", "<=": "sle", ">": "sgt", ">=": "sge" }[expr.op];
+                        : isUnsigned(left.type)
+                            ? { "<": "ult", "<=": "ule", ">": "ugt", ">=": "uge" }[expr.op]
+                            : { "<": "slt", "<=": "sle", ">": "sgt", ">=": "sge" }[expr.op];
                     ir.emit(`${tmp} = ${isF ? "fcmp" : "icmp"} ${pred} ${lt} ${left.value}, ${right.value}`);
                     return { value: tmp, type: "bool" };
                 }
@@ -365,11 +443,25 @@ function genExpr(ir, expr) {
         }
 
         case "Call": {
-            const args    = (expr.args || []).map(a => genExpr(ir, a));
-            const argStr  = args.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
-            const retType = "int"; // TODO: look up actual return type from function table
-            const tmp     = ir.newTmp();
-            ir.emit(`${tmp} = call ${llvmType(retType)} @${expr.callee}(${argStr})`);
+            const args     = (expr.args || []).map(a => genExpr(ir, a));
+            const argStr   = args.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
+            const fnInfo   = functionReturnTypes.get(expr.callee);
+            const retType  = fnInfo ? fnInfo.returnType : "int";
+            const isVararg = fnInfo && fnInfo.isVariadic;
+            if (retType === null) {
+                ir.emit(`call void @${expr.callee}(${argStr})`);
+                return { value: "0", type: "int" };
+            }
+            const retLl = llvmType(retType);
+            const tmp = ir.newTmp();
+            if (isVararg) {
+                // Variadic call needs explicit function type so llc emits correct ABI (%al for SSE args)
+                const declParams = (fnInfo.params || []).map(p => llvmType(p.type)).join(", ");
+                const fnType = `${retLl} (${declParams ? declParams + ", " : ""}...)`;
+                ir.emit(`${tmp} = call ${fnType} @${expr.callee}(${argStr})`);
+            } else {
+                ir.emit(`${tmp} = call ${retLl} @${expr.callee}(${argStr})`);
+            }
             return { value: tmp, type: retType };
         }
 
@@ -384,11 +476,19 @@ function genExpr(ir, expr) {
             const selfArg    = `${llTypeName}* ${v.ptr}`;
             const otherArgs  = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
             const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
-            const retType    = "int"; // TODO: look up actual return type
-            const tmp        = ir.newTmp();
+            const mInfo      = functionReturnTypes.get(mangled);
+            const retType    = mInfo ? mInfo.returnType : "int";
+            if (retType === null) {
+                ir.emit(`call void @${mangled}(${argStr})`);
+                return { value: "0", type: "int" };
+            }
+            const tmp = ir.newTmp();
             ir.emit(`${tmp} = call ${llvmType(retType)} @${mangled}(${argStr})`);
             return { value: tmp, type: retType };
         }
+
+        case "CastExpr":
+            throw new Error("cast requires an assignment context");
 
         default:
             throw new Error(`Unsupported expr kind: ${expr.kind}`);
@@ -401,13 +501,41 @@ function genStmt(ir, stmt, retType) {
     switch (stmt.kind) {
 
         case "VarDecl": {
+            // Constructor call sugar: MyClass x = MyClass(args)
+            if (stmt.init && stmt.init.kind === "Call" && stmt.init.callee === stmt.type
+                && classTypes.has(stmt.type)) {
+                const typeName  = stmt.type;
+                const llType    = llvmType(typeName);
+                const ptr       = ir.newTmp();
+                ir.emit(`${ptr} = alloca ${llType}`);
+                ir.vars.set(stmt.name, { ptr, type: llType, hType: typeName });
+
+                // Call constructor if it exists
+                const ctorName = `${typeName}_constructor`;
+                if (functionReturnTypes.has(ctorName)) {
+                    const args    = (stmt.init.args || []).map(a => genExpr(ir, a));
+                    const selfArg = `${llType}* ${ptr}`;
+                    const otherArgs = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+                    const argStr  = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+                    ir.emit(`call void @${ctorName}(${argStr})`);
+                }
+                break;
+            }
+
             let hType = stmt.type;
             let init  = null;
 
             if (stmt.init) {
-                init = genExpr(ir, stmt.init);
-                if (stmt.type === "address" && init.type.startsWith("address:"))
-                    hType = init.type;
+                if (stmt.init.kind === "CastExpr") {
+                    // Cast: evaluate inner expr then convert to target type
+                    const inner = genExpr(ir, stmt.init.expr);
+                    init = emitCast(ir, inner.value, inner.type, stmt.type);
+                    hType = stmt.type;
+                } else {
+                    init = genExpr(ir, stmt.init);
+                    if (stmt.type === "address" && init.type.startsWith("address:"))
+                        hType = init.type;
+                }
             }
 
             const isAddress = stmt.type === "address" || stmt.type.startsWith("address:");
@@ -432,7 +560,13 @@ function genStmt(ir, stmt, retType) {
         case "Assign": {
             const v   = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
-            const val = genExpr(ir, stmt.expr);
+            let val;
+            if (stmt.expr.kind === "CastExpr") {
+                const inner = genExpr(ir, stmt.expr.expr);
+                val = emitCast(ir, inner.value, inner.type, v.hType);
+            } else {
+                val = genExpr(ir, stmt.expr);
+            }
             if (v.hType === "address" && val.type.startsWith("address:")) v.hType = val.type;
             if (v.type === "i8*" && val.type.startsWith("address:")) {
                 const castPtr = ir.newTmp();
@@ -576,8 +710,24 @@ function genStmt(ir, stmt, retType) {
         }
 
         case "ReturnStmt": {
-            const val = genExpr(ir, stmt.expr);
-            ir.emit(`ret ${llvmType(retType)} ${val.value}`);
+            emitDeferred(ir);
+            if (stmt.expr) {
+                if (stmt.expr.kind === "CastExpr") {
+                    const inner = genExpr(ir, stmt.expr.expr);
+                    const casted = emitCast(ir, inner.value, inner.type, retType);
+                    ir.emit(`ret ${llvmType(retType)} ${casted.value}`);
+                } else {
+                    const val = genExpr(ir, stmt.expr);
+                    ir.emit(`ret ${llvmType(retType)} ${val.value}`);
+                }
+            } else {
+                ir.emit(`ret void`);
+            }
+            break;
+        }
+
+        case "DeferStmt": {
+            ir.deferStack.push(stmt.expr);
             break;
         }
 
@@ -598,7 +748,8 @@ function genBlock(ir, block, retType) {
 
 function genFunction(fn) {
     const ir         = new IRBuilder();
-    const retLlType  = llvmType(fn.returnType);
+    const isVoid     = fn.returnType === null;
+    const retLlType  = isVoid ? "void" : llvmType(fn.returnType);
     const paramSig   = fn.params.map((p, i) => `${llvmType(p.type)} %p${i}`).join(", ");
 
     ir.emit(`define ${retLlType} @${fn.name}(${paramSig}) {`);
@@ -613,7 +764,12 @@ function genFunction(fn) {
     });
 
     genBlock(ir, fn.body, fn.returnType);
-    ir.emit(`ret ${retLlType} 0`);
+    emitDeferred(ir);
+    if (isVoid) {
+        ir.emit(`ret void`);
+    } else {
+        ir.emit(`ret ${retLlType} 0`);
+    }
     ir.emit("}");
     return ir.lines.join("\n");
 }
@@ -621,7 +777,8 @@ function genFunction(fn) {
 // Generates a method for either a class or struct (both use the same pattern)
 function genMethod(typeName, method, isClass = true) {
     const ir         = new IRBuilder();
-    const retLlType  = llvmType(method.returnType);
+    const isVoid     = method.returnType === null;
+    const retLlType  = isVoid ? "void" : llvmType(method.returnType);
     const mangled    = `${typeName}_${method.name}`;
     const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
 
@@ -647,7 +804,12 @@ function genMethod(typeName, method, isClass = true) {
     });
 
     genBlock(ir, method.body, method.returnType);
-    ir.emit(`ret ${retLlType} 0`);
+    emitDeferred(ir);
+    if (isVoid) {
+        ir.emit(`ret void`);
+    } else {
+        ir.emit(`ret ${retLlType} 0`);
+    }
     ir.emit("}");
     return ir.lines.join("\n");
 }
@@ -694,6 +856,11 @@ function escapeStringForLLVM(str) {
 function genModule(ast) {
     resetAll();
 
+    // Populate type aliases first so llvmType can resolve them
+    for (const a of ast.aliases || []) {
+        typeAliases.set(a.name, a.targetType);
+    }
+
     // Populate module constants so they resolve in genExpr
     for (const c of ast.consts || []) {
         moduleConstants.set(c.name, { value: c.value, type: c.type });
@@ -702,6 +869,32 @@ function genModule(ast) {
     // Register all struct and class types first (so llvmType resolves them)
     for (const s of ast.structs || []) registerStruct(s.name, s.fields);
     for (const c of ast.classes || []) registerClass(c.name, c.fields, c.methods, c.operators);
+
+    // Populate functionReturnTypes for all functions and methods before codegen
+    for (const fn of ast.functions || []) {
+        functionReturnTypes.set(fn.name, { returnType: fn.returnType, isVariadic: fn.isVariadic || false, params: fn.params });
+    }
+    for (const cls of ast.classes || []) {
+        for (const m of cls.methods || []) {
+            functionReturnTypes.set(`${cls.name}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
+        }
+        for (const op of cls.operators || []) {
+            const nameSafe = op.op
+                .replace('+','plus').replace('-','minus').replace('*','mul')
+                .replace('/','div').replace('%','mod').replace('==','eq')
+                .replace('!=','ne').replace('<','lt').replace('>','gt')
+                .replace('<=','le').replace('>=','ge').replace('&','band')
+                .replace('|','bor').replace('^','bxor').replace('<<','shl')
+                .replace('>>','shr').replace('[]','idx');
+            functionReturnTypes.set(`${cls.name}_op_${nameSafe}`, { returnType: op.returnType, isVariadic: false, params: [op.param] });
+        }
+        if (cls.constructor) {
+            functionReturnTypes.set(`${cls.name}_constructor`, { returnType: null, isVariadic: false, params: cls.constructor.params });
+        }
+        if (cls.destructor) {
+            functionReturnTypes.set(`${cls.name}_destructor`, { returnType: null, isVariadic: false, params: [] });
+        }
+    }
 
     let out = "; Hopper module\n\n";
 
@@ -732,18 +925,41 @@ function genModule(ast) {
 
     for (const fn of ast.functions) {
         if (fn.isExtern) {
-            const ret    = llvmType(fn.returnType);
+            const ret    = fn.returnType === null ? "void" : llvmType(fn.returnType);
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
-            fnCode.push(`declare ${ret} @${fn.name}(${params})\n`);
+            const vararg = fn.isVariadic ? (params ? ", ..." : "...") : "";
+            fnCode.push(`declare ${ret} @${fn.name}(${params}${vararg})\n`);
         } else {
             fnCode.push(genFunction(fn) + "\n\n");
         }
     }
 
-    // Class methods and operator overloads
+    // Class methods, operator overloads, constructors, destructors
     for (const cls of ast.classes || []) {
         for (const m of cls.methods || [])   fnCode.push(genMethod(cls.name, m, true)   + "\n\n");
         for (const op of cls.operators || []) fnCode.push(genOperator(cls.name, op)      + "\n\n");
+
+        // Constructor
+        if (cls.constructor) {
+            const ctorMethod = {
+                name:       "constructor",
+                params:     cls.constructor.params,
+                returnType: null,
+                body:       cls.constructor.body
+            };
+            fnCode.push(genMethod(cls.name, ctorMethod, true) + "\n\n");
+        }
+
+        // Destructor
+        if (cls.destructor) {
+            const dtorMethod = {
+                name:       "destructor",
+                params:     [],
+                returnType: null,
+                body:       cls.destructor.body
+            };
+            fnCode.push(genMethod(cls.name, dtorMethod, true) + "\n\n");
+        }
     }
 
     // Emit string constants

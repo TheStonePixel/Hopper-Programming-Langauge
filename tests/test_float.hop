@@ -4,7 +4,7 @@
 // EXPECT: half: 1.570000
 // EXPECT: neg: -3.140000
 
-extern function printf(String fmt, float val) int
+extern function printf(String fmt, ...) int
 
 function main() int {
     float pi   = 3.14

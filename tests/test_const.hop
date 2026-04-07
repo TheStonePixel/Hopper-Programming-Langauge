@@ -4,7 +4,7 @@
 // EXPECT: SHIFTED: 25
 // EXPECT: ABOVE_MIN: 1
 
-extern function printf(String fmt, int val) int
+extern function printf(String fmt, ...) int
 
 const MAX = 100
 const MIN = 50

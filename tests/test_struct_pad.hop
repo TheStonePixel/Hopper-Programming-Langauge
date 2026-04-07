@@ -3,7 +3,7 @@
 // EXPECT: size: 1024
 // EXPECT: checksum: 42
 
-extern function printf(String fmt, int val) int
+extern function printf(String fmt, ...) int
 
 struct Header {
     int version

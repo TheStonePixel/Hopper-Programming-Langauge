@@ -6,7 +6,7 @@
 // EXPECT: SHL: 16
 // EXPECT: SHR: 16
 
-extern function printf(String fmt, int val) int
+extern function printf(String fmt, ...) int
 
 function main() int {
     int a = 0xFF & 0x0F

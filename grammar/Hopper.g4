@@ -12,6 +12,7 @@ topLevelDecl
     | classDecl
     | constDecl
     | importDecl
+    | aliasDecl
     ;
 
 importDecl
@@ -22,9 +23,15 @@ constDecl
     : 'const' Identifier '=' literal
     ;
 
+aliasDecl
+    : 'alias' Identifier '=' type
+    ;
+
 functionDecl
-    : 'extern' 'function' Identifier '(' paramList? ')' type   # ExternFuncDecl
-    | 'function' Identifier '(' paramList? ')' type block      # FuncDecl
+    : 'extern' 'function' Identifier '(' externParamList? ')' type   # ExternFuncDecl
+    | 'extern' 'function' Identifier '(' externParamList? ')'        # ExternProcDecl
+    | 'function' Identifier '(' paramList? ')' type block            # FuncDecl
+    | 'function' Identifier '(' paramList? ')' block                 # ProcDecl
     ;
 
 // struct = memory layout only, no methods, no default values
@@ -45,7 +52,10 @@ classDecl
 classMember
     : type fieldName                                            # ClassField
     | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
+    | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
     | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
+    | 'constructor' '(' paramList? ')' block                   # ClassConstructor
+    | 'destructor' '(' ')' block                               # ClassDestructor
     ;
 
 // fieldName allows keywords that are only special in :: context to be used as field names
@@ -62,8 +72,15 @@ operatorSymbol
     | '[' ']'
     ;
 
+// paramList for regular functions — no variadic
 paramList
     : param (',' param)*
+    ;
+
+// externParamList allows optional trailing '...' for variadic C functions (e.g. printf)
+externParamList
+    : param (',' param)* (',' '...')?
+    | '...'
     ;
 
 param
@@ -77,6 +94,8 @@ type
     | 'byte'
     | 'String'
     | 'address'
+    | 'unsigned' 'int'
+    | 'unsigned' 'byte'
     | Identifier    // user-defined types (structs, classes)
     ;
 
@@ -103,7 +122,8 @@ statement
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
     | 'break'                                            # BreakStmt
     | 'continue'                                         # ContinueStmt
-    | 'return' expression                                # ReturnStmt
+    | 'return' expression?                               # ReturnStmt
+    | 'defer' expression                                 # DeferStmt
     ;
 
 forInit
@@ -130,7 +150,7 @@ relational      : shift ( ('<' | '<=' | '>' | '>=') shift )* ;
 shift           : additive ( ('<<' | '>>') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
 multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
-unary           : ('!' | '-' | '~') unary | primary ;
+unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
 primary
     : IntegerLiteral
     | HexLiteral

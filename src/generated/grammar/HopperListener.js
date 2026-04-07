@@ -41,6 +41,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#aliasDecl.
+	enterAliasDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#aliasDecl.
+	exitAliasDecl(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#ExternFuncDecl.
 	enterExternFuncDecl(ctx) {
 	}
@@ -50,12 +59,30 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#ExternProcDecl.
+	enterExternProcDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ExternProcDecl.
+	exitExternProcDecl(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#FuncDecl.
 	enterFuncDecl(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#FuncDecl.
 	exitFuncDecl(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ProcDecl.
+	enterProcDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ProcDecl.
+	exitProcDecl(ctx) {
 	}
 
 
@@ -113,12 +140,39 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#ClassProcMethod.
+	enterClassProcMethod(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ClassProcMethod.
+	exitClassProcMethod(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#ClassOperator.
 	enterClassOperator(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#ClassOperator.
 	exitClassOperator(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ClassConstructor.
+	enterClassConstructor(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ClassConstructor.
+	exitClassConstructor(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ClassDestructor.
+	enterClassDestructor(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ClassDestructor.
+	exitClassDestructor(ctx) {
 	}
 
 
@@ -146,6 +200,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 
 	// Exit a parse tree produced by HopperParser#paramList.
 	exitParamList(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#externParamList.
+	enterExternParamList(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#externParamList.
+	exitExternParamList(ctx) {
 	}
 
 
@@ -299,6 +362,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 
 	// Exit a parse tree produced by HopperParser#ReturnStmt.
 	exitReturnStmt(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#DeferStmt.
+	enterDeferStmt(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#DeferStmt.
+	exitDeferStmt(ctx) {
 	}
 
 

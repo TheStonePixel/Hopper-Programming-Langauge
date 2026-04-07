@@ -20,7 +20,10 @@ import {
     ClassField,
     ClassMethod,
     ClassOperator,
+    ClassConstructor,
+    ClassDestructor,
     ConstDecl,
+    AliasDecl,
     Param,
     Call,
     MethodCall,
@@ -33,10 +36,12 @@ import {
     BreakStmt,
     ContinueStmt,
     ReturnStmt,
+    DeferStmt,
     ExprStmt,
     Block,
     Binary,
     Unary,
+    CastExpr,
     Var,
     FieldAccess,
     IntLiteral,
@@ -61,6 +66,7 @@ export class AstBuilder extends HopperVisitor {
         const structs = [];
         const classes = [];
         const consts = [];
+        const aliases = [];
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
@@ -69,13 +75,20 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "StructDecl")   structs.push(node);
             else if (node.kind === "ClassDecl")    classes.push(node);
             else if (node.kind === "ConstDecl")    consts.push(node);
+            else if (node.kind === "AliasDecl")    aliases.push(node);
         }
 
-        return Program(functions, structs, classes, consts);
+        return Program(functions, structs, classes, consts, aliases);
     }
 
     visitTopLevelDecl(ctx) {
         return this.visit(ctx.children[0]);
+    }
+
+    // ── alias ──────────────────────────────────────────────────────────────
+
+    visitAliasDecl(ctx) {
+        return AliasDecl(ctx.Identifier().getText(), ctx.type().getText());
     }
 
     // ── const ──────────────────────────────────────────────────────────────
@@ -133,17 +146,21 @@ export class AstBuilder extends HopperVisitor {
         const fields = [];
         const methods = [];
         const operators = [];
+        let constructor = null;
+        let destructor = null;
 
         const members = ctx.classMember ? ctx.classMember() : [];
         for (const m of members) {
             const node = this.visit(m);
             if (!node) continue;
-            if (node.kind === "ClassField")    fields.push(node);
+            if (node.kind === "ClassField")         fields.push(node);
             else if (node.kind === "ClassMethod")   methods.push(node);
             else if (node.kind === "ClassOperator") operators.push(node);
+            else if (node.kind === "ClassConstructor") constructor = node;
+            else if (node.kind === "ClassDestructor")  destructor = node;
         }
 
-        return ClassDecl(name, fields, methods, operators);
+        return ClassDecl(name, fields, methods, operators, constructor, destructor);
     }
 
     visitClassField(ctx) {
@@ -171,6 +188,28 @@ export class AstBuilder extends HopperVisitor {
         return ClassOperator(op, param, returnType, body);
     }
 
+    visitClassProcMethod(ctx) {
+        const name = ctx.Identifier().getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            : [];
+        const body = this.visit(ctx.block());
+        return ClassMethod(name, params, null, body);
+    }
+
+    visitClassConstructor(ctx) {
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            : [];
+        const body = this.visit(ctx.block());
+        return ClassConstructor(params, body);
+    }
+
+    visitClassDestructor(ctx) {
+        const body = this.visit(ctx.block());
+        return ClassDestructor(body);
+    }
+
     // ── functions ──────────────────────────────────────────────────────────
 
     visitFuncDecl(ctx) {
@@ -186,10 +225,27 @@ export class AstBuilder extends HopperVisitor {
     visitExternFuncDecl(ctx) {
         const name = ctx.Identifier().getText();
         const returnType = ctx.type().getText();
+        const epl = ctx.externParamList();
+        const params = epl ? epl.param().map(p => Param(p.Identifier().getText(), p.type().getText())) : [];
+        const isVariadic = epl ? epl.getText().endsWith("...") : false;
+        return FunctionDecl(name, params, returnType, null, true, isVariadic);
+    }
+
+    visitProcDecl(ctx) {
+        const name = ctx.Identifier().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
             : [];
-        return FunctionDecl(name, params, returnType, null, true);
+        const body = this.visit(ctx.block());
+        return FunctionDecl(name, params, null, body, false);
+    }
+
+    visitExternProcDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const epl = ctx.externParamList();
+        const params = epl ? epl.param().map(p => Param(p.Identifier().getText(), p.type().getText())) : [];
+        const isVariadic = epl ? epl.getText().endsWith("...") : false;
+        return FunctionDecl(name, params, null, null, true, isVariadic);
     }
 
     // ── block / statements ─────────────────────────────────────────────────
@@ -272,7 +328,11 @@ export class AstBuilder extends HopperVisitor {
 
     visitBreakStmt()    { return BreakStmt(); }
     visitContinueStmt() { return ContinueStmt(); }
-    visitReturnStmt(ctx) { return ReturnStmt(this.visit(ctx.expression())); }
+    visitReturnStmt(ctx) {
+        const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
+        return ReturnStmt(expr);
+    }
+    visitDeferStmt(ctx)  { return DeferStmt(this.visit(ctx.expression())); }
     visitExprStmt(ctx)   { return ExprStmt(this.visit(ctx.expression())); }
 
     // ── expressions ────────────────────────────────────────────────────────
@@ -356,7 +416,8 @@ export class AstBuilder extends HopperVisitor {
 
     visitUnary(ctx) {
         if (ctx.primary()) return this.visit(ctx.primary());
-        const op = ctx.children[0].getText(); // '!', '-', or '~'
+        const op = ctx.children[0].getText(); // '!', '-', '~', or 'cast'
+        if (op === "cast") return CastExpr(this.visit(ctx.unary()));
         return Unary(op, this.visit(ctx.unary()));
     }
 
@@ -522,6 +583,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         ast.structs.unshift(...importedAst.structs);
         ast.classes.unshift(...importedAst.classes);
         ast.consts.unshift(...importedAst.consts);
+        ast.aliases.unshift(...importedAst.aliases);
     }
 
     return ast;

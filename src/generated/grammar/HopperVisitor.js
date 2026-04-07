@@ -30,14 +30,32 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#aliasDecl.
+	visitAliasDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#ExternFuncDecl.
 	visitExternFuncDecl(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
+	// Visit a parse tree produced by HopperParser#ExternProcDecl.
+	visitExternProcDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#FuncDecl.
 	visitFuncDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#ProcDecl.
+	visitProcDecl(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
@@ -78,8 +96,26 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#ClassProcMethod.
+	visitClassProcMethod(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#ClassOperator.
 	visitClassOperator(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#ClassConstructor.
+	visitClassConstructor(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#ClassDestructor.
+	visitClassDestructor(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
@@ -98,6 +134,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 
 	// Visit a parse tree produced by HopperParser#paramList.
 	visitParamList(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#externParamList.
+	visitExternParamList(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
@@ -200,6 +242,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 
 	// Visit a parse tree produced by HopperParser#ReturnStmt.
 	visitReturnStmt(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#DeferStmt.
+	visitDeferStmt(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
