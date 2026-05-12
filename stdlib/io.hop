@@ -1,0 +1,16 @@
+// Hopper I/O — Linux syscalls only, no libc
+
+extern function write(int fd, String buf, int count) int
+extern function read(int fd, String buf, int count) int
+
+const STDOUT = 1
+const STDERR = 2
+const STDIN  = 0
+
+function print(String s, int len) {
+    write(STDOUT, s, len)
+}
+
+function eprint(String s, int len) {
+    write(STDERR, s, len)
+}
