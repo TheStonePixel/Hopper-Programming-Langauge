@@ -1,0 +1,10 @@
+// EXPECT: hopper addr
+
+import "stdlib/io"
+
+function startup() int {
+    print("hopper addr\n", 12)
+    return 0
+}
+
+entry main = startup::address

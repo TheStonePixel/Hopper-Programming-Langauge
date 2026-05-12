@@ -1,0 +1,7 @@
+// EXPECT: hopper
+
+import "stdlib/io"
+
+entry main {
+    print("hopper\n", 7)
+}

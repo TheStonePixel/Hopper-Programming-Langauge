@@ -1,7 +1,14 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry };
+}
+
+// entry — the program entry point (not a function, a jump target)
+// body: Block for inline form, null for address form
+// address: expression for address form, null for inline form
+export function EntryDecl(name, body = null, address = null) {
+    return { kind: "EntryDecl", name, body, address };
 }
 
 export function FunctionDecl(name, params, returnType, body, isExtern = false, isVariadic = false) {

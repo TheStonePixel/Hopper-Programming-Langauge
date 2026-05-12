@@ -1044,6 +1044,47 @@ function genOperator(className, op) {
     return genMethod(className, pseudoMethod, true);
 }
 
+// ── entry point codegen ───────────────────────────────────────────────────
+
+function genEntry(entry) {
+    const ir = new IRBuilder();
+
+    if (entry.body) {
+        // inline form: entry main { ... }
+        ir.emit(`define i64 @${entry.name}() {`);
+        ir.emit("entry:");
+        genBlock(ir, entry.body, "int");
+        emitDeferred(ir);
+        ir.emit("ret i64 0");
+        ir.emit("}");
+    } else if (entry.address) {
+        // address form: entry main = startup::address
+        // emit a thin wrapper that calls the target function
+        const target = entry.address.kind === "AddressOf" ? entry.address.name : null;
+        if (!target) throw new Error(`entry address must be a function reference (e.g. startup::address)`);
+
+        const fnInfo = functionReturnTypes.get(target);
+        const retType = fnInfo ? fnInfo.returnType : null;
+
+        ir.emit(`define i64 @${entry.name}() {`);
+        ir.emit("entry:");
+        if (retType === null) {
+            ir.emit(`call void @${target}()`);
+            ir.emit("ret i64 0");
+        } else if (retType === "int") {
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call i64 @${target}()`);
+            ir.emit(`ret i64 ${tmp}`);
+        } else {
+            ir.emit(`call ${llvmType(retType)} @${target}()`);
+            ir.emit("ret i64 0");
+        }
+        ir.emit("}");
+    }
+
+    return ir.lines.join("\n");
+}
+
 // ── LLVM string escaping ──────────────────────────────────────────────────
 
 function escapeStringForLLVM(str) {
@@ -1157,7 +1198,10 @@ function genModule(ast) {
         }
     }
 
-    // Emit string constants
+    // Generate entry before emitting string constants so it contributes to the pool
+    if (ast.entry) fnCode.push(genEntry(ast.entry) + "\n\n");
+
+    // Emit string constants (collected during all code generation above)
     for (const [value, name] of stringConstants) {
         const escaped = escapeStringForLLVM(value);
         const len     = value.length + 1;

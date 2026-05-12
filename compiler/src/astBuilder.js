@@ -25,6 +25,7 @@ import {
     ConstDecl,
     AliasDecl,
     TemplateDecl,
+    EntryDecl,
     Param,
     Call,
     MethodCall,
@@ -69,6 +70,7 @@ export class AstBuilder extends HopperVisitor {
         const consts = [];
         const aliases = [];
         const templates = [];
+        let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
@@ -79,9 +81,10 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "ConstDecl")    consts.push(node);
             else if (node.kind === "AliasDecl")    aliases.push(node);
             else if (node.kind === "TemplateDecl") templates.push(node);
+            else if (node.kind === "EntryDecl")    entry = node;
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates);
+        return Program(functions, structs, classes, consts, aliases, templates, entry);
     }
 
     visitTopLevelDecl(ctx) {
@@ -238,6 +241,20 @@ export class AstBuilder extends HopperVisitor {
         }
 
         return TemplateDecl(name, typeParams, fields, methods, operators, constructor, destructor);
+    }
+
+    // ── entry ──────────────────────────────────────────────────────────────
+
+    visitEntryBlock(ctx) {
+        const name = ctx.Identifier().getText();
+        const body = this.visit(ctx.block());
+        return EntryDecl(name, body, null);
+    }
+
+    visitEntryAddr(ctx) {
+        const name = ctx.Identifier().getText();
+        const addr = this.visit(ctx.expression());
+        return EntryDecl(name, null, addr);
     }
 
     // ── functions ──────────────────────────────────────────────────────────
@@ -615,6 +632,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         ast.consts.unshift(...importedAst.consts);
         ast.aliases.unshift(...importedAst.aliases);
         ast.templates.unshift(...importedAst.templates);
+        // entry is never inherited from imports — only the main file sets it
     }
 
     return ast;

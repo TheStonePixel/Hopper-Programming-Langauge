@@ -32,6 +32,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#EntryBlock.
+	enterEntryBlock(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#EntryBlock.
+	exitEntryBlock(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#EntryAddr.
+	enterEntryAddr(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#EntryAddr.
+	exitEntryAddr(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#constDecl.
 	enterConstDecl(ctx) {
 	}

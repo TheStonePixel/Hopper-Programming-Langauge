@@ -14,10 +14,19 @@ topLevelDecl
     | constDecl
     | importDecl
     | aliasDecl
+    | entryDecl
     ;
 
 importDecl
     : 'import' StringLiteral
+    ;
+
+// entry — the program entry point, not a function
+// inline:  entry main { ... }
+// address: entry main = startup::address
+entryDecl
+    : 'entry' Identifier block           # EntryBlock
+    | 'entry' Identifier '=' expression  # EntryAddr
     ;
 
 constDecl
