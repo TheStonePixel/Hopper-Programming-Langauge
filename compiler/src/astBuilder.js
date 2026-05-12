@@ -24,6 +24,7 @@ import {
     ClassDestructor,
     ConstDecl,
     AliasDecl,
+    TemplateDecl,
     Param,
     Call,
     MethodCall,
@@ -67,18 +68,20 @@ export class AstBuilder extends HopperVisitor {
         const classes = [];
         const consts = [];
         const aliases = [];
+        const templates = [];
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
             if (!node) continue;
-            if (node.kind === "FunctionDecl")  functions.push(node);
+            if (node.kind === "FunctionDecl")      functions.push(node);
             else if (node.kind === "StructDecl")   structs.push(node);
             else if (node.kind === "ClassDecl")    classes.push(node);
             else if (node.kind === "ConstDecl")    consts.push(node);
             else if (node.kind === "AliasDecl")    aliases.push(node);
+            else if (node.kind === "TemplateDecl") templates.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases);
+        return Program(functions, structs, classes, consts, aliases, templates);
     }
 
     visitTopLevelDecl(ctx) {
@@ -208,6 +211,33 @@ export class AstBuilder extends HopperVisitor {
     visitClassDestructor(ctx) {
         const body = this.visit(ctx.block());
         return ClassDestructor(body);
+    }
+
+    // ── template ───────────────────────────────────────────────────────────
+
+    visitTemplateDecl(ctx) {
+        const ids = ctx.Identifier();
+        const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+        const typeParams = Array.isArray(ids) ? ids.slice(1).map(id => id.getText()) : [];
+
+        const fields = [];
+        const methods = [];
+        const operators = [];
+        let constructor = null;
+        let destructor = null;
+
+        const members = ctx.classMember ? ctx.classMember() : [];
+        for (const m of members) {
+            const node = this.visit(m);
+            if (!node) continue;
+            if (node.kind === "ClassField")            fields.push(node);
+            else if (node.kind === "ClassMethod")      methods.push(node);
+            else if (node.kind === "ClassOperator")    operators.push(node);
+            else if (node.kind === "ClassConstructor") constructor = node;
+            else if (node.kind === "ClassDestructor")  destructor = node;
+        }
+
+        return TemplateDecl(name, typeParams, fields, methods, operators, constructor, destructor);
     }
 
     // ── functions ──────────────────────────────────────────────────────────
@@ -584,6 +614,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         ast.classes.unshift(...importedAst.classes);
         ast.consts.unshift(...importedAst.consts);
         ast.aliases.unshift(...importedAst.aliases);
+        ast.templates.unshift(...importedAst.templates);
     }
 
     return ast;

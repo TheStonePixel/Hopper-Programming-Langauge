@@ -7,8 +7,10 @@ const structTypes        = new Map();   // name       → { fields: [{name,type,
 const classTypes         = new Map();   // name       → { fields: [{name,type}], methods, operators }
 const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
-const functionReturnTypes = new Map();  // function name → returnType (null = void)
-let stringCounter = 0;
+const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
+const templateDefs       = new Map();   // template name → TemplateDecl
+let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
+let   stringCounter = 0;
 
 function resetAll() {
     stringConstants.clear();
@@ -17,6 +19,8 @@ function resetAll() {
     moduleConstants.clear();
     typeAliases.clear();
     functionReturnTypes.clear();
+    templateDefs.clear();
+    instantiatedClasses = [];
     stringCounter = 0;
 }
 
@@ -33,10 +37,226 @@ function registerClass(name, fields, methods, operators) {
     classTypes.set(name, { fields, methods, operators });
 }
 
+// ── template helpers ───────────────────────────────────────────────────────
+
+// "List<int>" → "List_int",  "Map<String,int>" → "Map_String_int"
+function mangleTemplate(t) {
+    return t.replace(/[<>]/g, '_').replace(/,\s*/g, '_').replace(/_+/g, '_').replace(/_$/, '');
+}
+
+// If t is a template type, return its mangled LLVM-safe name; otherwise return t unchanged.
+function normalizeType(t) {
+    if (t && t.includes('<')) return mangleTemplate(t);
+    return t;
+}
+
+// Split "String,int" into ["String","int"], respecting nested angle brackets.
+function splitTypeArgs(s) {
+    const args = [];
+    let depth = 0;
+    let cur   = '';
+    for (const ch of s) {
+        if      (ch === '<') { depth++; cur += ch; }
+        else if (ch === '>') { depth--; cur += ch; }
+        else if (ch === ',' && depth === 0) { args.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+    }
+    if (cur.trim()) args.push(cur.trim());
+    return args;
+}
+
+// Substitute type parameters in a type string. subst is a Map<paramName, concreteType>.
+function substTypeStr(t, subst) {
+    if (!t) return t;
+    if (subst.has(t)) return subst.get(t);
+    if (!t.includes('<')) return t;
+    // Recurse into template args: "List<T>" with {T→int} → "List<int>"
+    const lt      = t.indexOf('<');
+    const base    = t.substring(0, lt);
+    const argsStr = t.substring(lt + 1, t.length - 1);
+    const args    = splitTypeArgs(argsStr);
+    return `${base}<${args.map(a => substTypeStr(a, subst)).join(',')}>`;
+}
+
+// Deep-clone a block/statement tree, substituting type params wherever types appear.
+function substBlock(block, subst) {
+    if (!block) return null;
+    return { ...block, statements: block.statements.map(s => substStmt(s, subst)) };
+}
+
+function substStmt(s, subst) {
+    if (!s) return null;
+    switch (s.kind) {
+        case "VarDecl":     return { ...s, type: substTypeStr(s.type, subst) };
+        case "ArrayDecl":   return { ...s, type: substTypeStr(s.type, subst) };
+        case "IfStmt":      return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
+        case "WhileStmt":   return { ...s, body: substBlock(s.body, subst) };
+        case "ForStmt":     return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        default: return s;
+    }
+}
+
+function substParam(p, subst) {
+    return { ...p, type: substTypeStr(p.type, subst) };
+}
+
+function monomorphize(tmpl, typeArgs) {
+    const subst = new Map();
+    tmpl.typeParams.forEach((tp, i) => subst.set(tp, typeArgs[i]));
+    const mangledName = mangleTemplate(`${tmpl.name}<${typeArgs.join(',')}>`);
+
+    function substMethod(m) {
+        return {
+            ...m,
+            params:     m.params.map(p => substParam(p, subst)),
+            returnType: m.returnType ? substTypeStr(m.returnType, subst) : null,
+            body:       substBlock(m.body, subst),
+        };
+    }
+
+    function substOperator(op) {
+        return {
+            ...op,
+            param:      substParam(op.param, subst),
+            returnType: substTypeStr(op.returnType, subst),
+            body:       substBlock(op.body, subst),
+        };
+    }
+
+    return {
+        kind:        "ClassDecl",
+        name:        mangledName,
+        fields:      tmpl.fields.map(f => ({ ...f, type: substTypeStr(f.type, subst) })),
+        methods:     tmpl.methods.map(substMethod),
+        operators:   tmpl.operators.map(substOperator),
+        constructor: tmpl.constructor ? {
+            ...tmpl.constructor,
+            params: tmpl.constructor.params.map(p => substParam(p, subst)),
+            body:   substBlock(tmpl.constructor.body, subst),
+        } : null,
+        destructor: tmpl.destructor ? {
+            ...tmpl.destructor,
+            body: substBlock(tmpl.destructor.body, subst),
+        } : null,
+    };
+}
+
+// Instantiate a template type string like "Box<int>" — idempotent.
+function instantiateTemplate(typeStr) {
+    const mangled = mangleTemplate(typeStr);
+    if (classTypes.has(mangled)) return; // already instantiated
+
+    const match = typeStr.match(/^([a-zA-Z_][a-zA-Z0-9_]*)<(.+)>$/);
+    if (!match) return;
+    const [, baseName, argsStr] = match;
+
+    if (!templateDefs.has(baseName)) throw new Error(`Unknown template: '${baseName}' (used as '${typeStr}')`);
+
+    const typeArgs     = splitTypeArgs(argsStr);
+    const tmpl         = templateDefs.get(baseName);
+    const concreteClass = monomorphize(tmpl, typeArgs);
+
+    // Register before recursing to prevent infinite loops
+    registerClass(concreteClass.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+    instantiatedClasses.push(concreteClass);
+
+    // Register return types for all methods so call sites can resolve them
+    for (const m of concreteClass.methods || []) {
+        functionReturnTypes.set(`${concreteClass.name}_${m.name}`, {
+            returnType: m.returnType, isVariadic: false, params: m.params
+        });
+    }
+    for (const op of concreteClass.operators || []) {
+        const ns = operatorNameSafe(op.op);
+        functionReturnTypes.set(`${concreteClass.name}_op_${ns}`, {
+            returnType: op.returnType, isVariadic: false, params: [op.param]
+        });
+    }
+    if (concreteClass.constructor) {
+        functionReturnTypes.set(`${concreteClass.name}_constructor`, {
+            returnType: null, isVariadic: false, params: concreteClass.constructor.params
+        });
+    }
+    if (concreteClass.destructor) {
+        functionReturnTypes.set(`${concreteClass.name}_destructor`, {
+            returnType: null, isVariadic: false, params: []
+        });
+    }
+
+    // Recursively instantiate template types referenced by this class's fields/methods
+    for (const f of concreteClass.fields) {
+        if (f.type && f.type.includes('<')) instantiateTemplate(f.type);
+    }
+    for (const m of concreteClass.methods || []) {
+        if (m.returnType && m.returnType.includes('<')) instantiateTemplate(m.returnType);
+        for (const p of m.params) if (p.type && p.type.includes('<')) instantiateTemplate(p.type);
+    }
+}
+
+// Walk the entire AST and collect all template type strings (e.g. "Box<int>").
+function collectTypeUsages(ast) {
+    const usages = new Set();
+
+    function checkType(t) {
+        if (t && t.includes('<')) usages.add(t);
+    }
+
+    function scanStmt(s) {
+        if (!s) return;
+        switch (s.kind) {
+            case "VarDecl":   checkType(s.type); break;
+            case "ArrayDecl": checkType(s.type); break;
+            case "IfStmt":    scanBlock(s.thenBlock); scanBlock(s.elseBlock); break;
+            case "WhileStmt": scanBlock(s.body); break;
+            case "ForStmt":   scanStmt(s.init); scanBlock(s.body); break;
+        }
+    }
+
+    function scanBlock(b) {
+        if (!b) return;
+        b.statements.forEach(scanStmt);
+    }
+
+    function scanFn(fn) {
+        fn.params.forEach(p => checkType(p.type));
+        checkType(fn.returnType);
+        if (fn.body) scanBlock(fn.body);
+    }
+
+    for (const fn of ast.functions || []) scanFn(fn);
+    for (const cls of ast.classes || []) {
+        cls.fields.forEach(f => checkType(f.type));
+        (cls.methods || []).forEach(m => {
+            m.params.forEach(p => checkType(p.type));
+            checkType(m.returnType);
+            scanBlock(m.body);
+        });
+        if (cls.constructor) {
+            cls.constructor.params.forEach(p => checkType(p.type));
+            scanBlock(cls.constructor.body);
+        }
+    }
+    for (const s of ast.structs || []) s.fields.forEach(f => checkType(f.type));
+
+    return usages;
+}
+
+// ── operator name mangling ─────────────────────────────────────────────────
+
+function operatorNameSafe(op) {
+    return op
+        .replace('[]','idx').replace('<<','shl').replace('>>','shr')
+        .replace('<=','le').replace('>=','ge').replace('==','eq').replace('!=','ne')
+        .replace('+','plus').replace('-','minus').replace('*','mul')
+        .replace('/','div').replace('%','mod').replace('<','lt').replace('>','gt')
+        .replace('&','band').replace('|','bor').replace('^','bxor');
+}
+
 // ── type helpers ───────────────────────────────────────────────────────────
 
 function llvmType(t) {
-    if (typeAliases.has(t)) return llvmType(typeAliases.get(t)); // resolve alias
+    if (!t) return "void";
+    if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
     if (t === "byte")         return "i8";
@@ -45,9 +265,14 @@ function llvmType(t) {
     if (t === "address")      return "i8*";
     if (t === "unsignedint")  return "i64";
     if (t === "unsignedbyte") return "i8";
-    if (structTypes.has(t)) return `%struct.${t}`;
-    if (classTypes.has(t))  return `%class.${t}`;
+    if (structTypes.has(t))   return `%struct.${t}`;
+    if (classTypes.has(t))    return `%class.${t}`;
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
+    if (t.includes('<')) {
+        const m = mangleTemplate(t);
+        if (classTypes.has(m)) return `%class.${m}`;
+        throw new Error(`Template type '${t}' has not been instantiated`);
+    }
     throw new Error(`Unknown type: ${t}`);
 }
 
@@ -72,8 +297,9 @@ function sizeOfType(t) {
 // ── field lookup (struct and class) ───────────────────────────────────────
 
 function getTypeInfo(typeName) {
-    if (structTypes.has(typeName)) return { kind: "struct", info: structTypes.get(typeName) };
-    if (classTypes.has(typeName))  return { kind: "class",  info: classTypes.get(typeName) };
+    const n = normalizeType(typeName);
+    if (structTypes.has(n)) return { kind: "struct", info: structTypes.get(n) };
+    if (classTypes.has(n))  return { kind: "class",  info: classTypes.get(n) };
     return null;
 }
 
@@ -106,7 +332,6 @@ class IRBuilder {
         this.label      = 0;
         this.vars       = new Map();
         this.loopStack  = [];
-        // defer stack is function-scoped (not block-scoped) for this initial implementation
         this.deferStack = [];
     }
 
@@ -114,7 +339,7 @@ class IRBuilder {
     newTmp()                { return `%t${this.tmp++}`; }
     newLabel(prefix)        { return `${prefix}${this.label++}`; }
     getVar(name) {
-        if (moduleConstants.has(name)) return null; // signal: use constant
+        if (moduleConstants.has(name)) return null;
         const v = this.vars.get(name);
         if (!v) throw new Error(`Unknown variable: ${name}`);
         return v;
@@ -144,32 +369,26 @@ function emitCast(ir, srcVal, srcType, targetType) {
     const tmp = ir.newTmp();
     const unsigned = isUnsigned(targetType);
 
-    // float → int
     if (isFloatType(srcType) && (targetType === "int" || targetType === "unsignedint")) {
         ir.emit(`${tmp} = fptosi double ${srcVal} to i64`);
         return { value: tmp, type: targetType };
     }
-    // float → byte
     if (isFloatType(srcType) && (targetType === "byte" || targetType === "unsignedbyte")) {
         ir.emit(`${tmp} = fptosi double ${srcVal} to i8`);
         return { value: tmp, type: targetType };
     }
-    // int → float
     if ((srcType === "int" || srcType === "unsignedint") && isFloatType(targetType)) {
         ir.emit(`${tmp} = sitofp i64 ${srcVal} to double`);
         return { value: tmp, type: targetType };
     }
-    // byte → float
     if ((srcType === "byte" || srcType === "unsignedbyte") && isFloatType(targetType)) {
         ir.emit(`${tmp} = sitofp i8 ${srcVal} to double`);
         return { value: tmp, type: targetType };
     }
-    // int → byte
     if ((srcType === "int" || srcType === "unsignedint") && (targetType === "byte" || targetType === "unsignedbyte")) {
         ir.emit(`${tmp} = trunc i64 ${srcVal} to i8`);
         return { value: tmp, type: targetType };
     }
-    // byte → int
     if ((srcType === "byte" || srcType === "unsignedbyte") && (targetType === "int" || targetType === "unsignedint")) {
         if (unsigned || isUnsigned(srcType)) {
             ir.emit(`${tmp} = zext i8 ${srcVal} to i64`);
@@ -178,12 +397,10 @@ function emitCast(ir, srcVal, srcType, targetType) {
         }
         return { value: tmp, type: targetType };
     }
-    // bool → int
     if (srcType === "bool" && (targetType === "int" || targetType === "unsignedint")) {
         ir.emit(`${tmp} = zext i1 ${srcVal} to i64`);
         return { value: tmp, type: targetType };
     }
-    // int → bool
     if ((srcType === "int" || srcType === "unsignedint") && targetType === "bool") {
         ir.emit(`${tmp} = icmp ne i64 ${srcVal}, 0`);
         return { value: tmp, type: targetType };
@@ -212,7 +429,6 @@ function genExpr(ir, expr) {
             return { value: String(expr.value), type: "int" };
 
         case "FloatLiteral": {
-            // JS drops trailing .0 from whole numbers — LLVM requires a decimal point
             const fstr = Number.isInteger(expr.value) ? `${expr.value}.0` : String(expr.value);
             return { value: fstr, type: "float" };
         }
@@ -235,7 +451,6 @@ function genExpr(ir, expr) {
             return { value: "null", type: "address" };
 
         case "Var": {
-            // Check module-level constants first
             const c = moduleConstants.get(expr.name);
             if (c) return { value: String(c.value), type: c.type };
 
@@ -250,7 +465,6 @@ function genExpr(ir, expr) {
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
 
-            // Class field access is only allowed via self inside a class method
             if (classTypes.has(v.hType) && !v.isSelf) {
                 throw new Error(
                     `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
@@ -357,7 +571,6 @@ function genExpr(ir, expr) {
 
             switch (expr.op) {
                 case "+": {
-                    // Address arithmetic
                     if (left.type.startsWith("address:") && right.type === "int") {
                         const pointedTo = left.type.substring(8);
                         const tmp = ir.newTmp();
@@ -430,7 +643,6 @@ function genExpr(ir, expr) {
                     ir.emit(`${tmp} = or i1 ${l}, ${r}`);
                     return { value: tmp, type: "bool" };
                 }
-                // Bitwise
                 case "&": { const tmp = ir.newTmp(); ir.emit(`${tmp} = and ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
                 case "|": { const tmp = ir.newTmp(); ir.emit(`${tmp} = or  ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
                 case "^": { const tmp = ir.newTmp(); ir.emit(`${tmp} = xor ${lt} ${left.value}, ${right.value}`); return { value: tmp, type: left.type }; }
@@ -455,7 +667,6 @@ function genExpr(ir, expr) {
             const retLl = llvmType(retType);
             const tmp = ir.newTmp();
             if (isVararg) {
-                // Variadic call needs explicit function type so llc emits correct ABI (%al for SSE args)
                 const declParams = (fnInfo.params || []).map(p => llvmType(p.type)).join(", ");
                 const fnType = `${retLl} (${declParams ? declParams + ", " : ""}...)`;
                 ir.emit(`${tmp} = call ${fnType} @${expr.callee}(${argStr})`);
@@ -501,36 +712,42 @@ function genStmt(ir, stmt, retType) {
     switch (stmt.kind) {
 
         case "VarDecl": {
-            // Constructor call sugar: MyClass x = MyClass(args)
-            if (stmt.init && stmt.init.kind === "Call" && stmt.init.callee === stmt.type
-                && classTypes.has(stmt.type)) {
-                const typeName  = stmt.type;
-                const llType    = llvmType(typeName);
-                const ptr       = ir.newTmp();
+            const normType         = normalizeType(stmt.type);
+            const baseTemplateName = stmt.type.includes('<') ? stmt.type.split('<')[0] : null;
+
+            // Constructor call sugar:
+            //   MyClass x = MyClass(args)      — exact class name match
+            //   Box<int> b = Box(args)          — base template name match
+            const isConstructorCall = stmt.init && stmt.init.kind === "Call"
+                && (stmt.init.callee === stmt.type || stmt.init.callee === normType || stmt.init.callee === baseTemplateName)
+                && classTypes.has(normType);
+
+            if (isConstructorCall) {
+                const typeName = normType;
+                const llType   = llvmType(typeName);
+                const ptr      = ir.newTmp();
                 ir.emit(`${ptr} = alloca ${llType}`);
                 ir.vars.set(stmt.name, { ptr, type: llType, hType: typeName });
 
-                // Call constructor if it exists
                 const ctorName = `${typeName}_constructor`;
                 if (functionReturnTypes.has(ctorName)) {
-                    const args    = (stmt.init.args || []).map(a => genExpr(ir, a));
-                    const selfArg = `${llType}* ${ptr}`;
+                    const args      = (stmt.init.args || []).map(a => genExpr(ir, a));
+                    const selfArg   = `${llType}* ${ptr}`;
                     const otherArgs = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
-                    const argStr  = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+                    const argStr    = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
                     ir.emit(`call void @${ctorName}(${argStr})`);
                 }
                 break;
             }
 
-            let hType = stmt.type;
+            let hType = normType;
             let init  = null;
 
             if (stmt.init) {
                 if (stmt.init.kind === "CastExpr") {
-                    // Cast: evaluate inner expr then convert to target type
                     const inner = genExpr(ir, stmt.init.expr);
                     init = emitCast(ir, inner.value, inner.type, stmt.type);
-                    hType = stmt.type;
+                    hType = normType;
                 } else {
                     init = genExpr(ir, stmt.init);
                     if (stmt.type === "address" && init.type.startsWith("address:"))
@@ -582,7 +799,6 @@ function genStmt(ir, stmt, retType) {
             const v = ir.vars.get(stmt.object);
             if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
 
-            // Class field assignment is only allowed via self inside a class method
             if (classTypes.has(v.hType) && !v.isSelf) {
                 throw new Error(
                     `Access failure: cannot assign field '${stmt.field}' of class '${v.hType}' directly. Use a mutator method.`
@@ -750,17 +966,18 @@ function genFunction(fn) {
     const ir         = new IRBuilder();
     const isVoid     = fn.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(fn.returnType);
-    const paramSig   = fn.params.map((p, i) => `${llvmType(p.type)} %p${i}`).join(", ");
+    const paramSig   = fn.params.map((p, i) => `${llvmType(normalizeType(p.type))} %p${i}`).join(", ");
 
     ir.emit(`define ${retLlType} @${fn.name}(${paramSig}) {`);
     ir.emit("entry:");
 
     fn.params.forEach((p, i) => {
-        const lt  = llvmType(p.type);
-        const ptr = ir.newTmp();
+        const normT = normalizeType(p.type);
+        const lt    = llvmType(normT);
+        const ptr   = ir.newTmp();
         ir.emit(`${ptr} = alloca ${lt}`);
         ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: p.type });
+        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
     });
 
     genBlock(ir, fn.body, fn.returnType);
@@ -768,26 +985,27 @@ function genFunction(fn) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} 0`);
+        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : "0"}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
 }
 
-// Generates a method for either a class or struct (both use the same pattern)
 function genMethod(typeName, method, isClass = true) {
     const ir         = new IRBuilder();
     const isVoid     = method.returnType === null;
-    const retLlType  = isVoid ? "void" : llvmType(method.returnType);
+    const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
     const mangled    = `${typeName}_${method.name}`;
     const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
 
     const paramParts = [`${llTypeName}* %self`];
-    method.params.forEach((p, i) => paramParts.push(`${llvmType(p.type)} %p${i}`));
+    method.params.forEach((p, i) => {
+        const normT = normalizeType(p.type);
+        paramParts.push(`${llvmType(normT)} %p${i}`);
+    });
     ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")}) {`);
     ir.emit("entry:");
 
-    // self — allow field access inside this method
     ir.vars.set("self", {
         ptr:    "%self",
         type:   llTypeName,
@@ -796,11 +1014,12 @@ function genMethod(typeName, method, isClass = true) {
     });
 
     method.params.forEach((p, i) => {
-        const lt  = llvmType(p.type);
-        const ptr = ir.newTmp();
+        const normT = normalizeType(p.type);
+        const lt    = llvmType(normT);
+        const ptr   = ir.newTmp();
         ir.emit(`${ptr} = alloca ${lt}`);
         ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: p.type });
+        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
     });
 
     genBlock(ir, method.body, method.returnType);
@@ -808,22 +1027,14 @@ function genMethod(typeName, method, isClass = true) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} 0`);
+        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : "0"}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
 }
 
-// Generates an operator overload method (same as a regular method, different name mangling)
 function genOperator(className, op) {
-    const nameSafe = op
-        .replace('+','plus').replace('-','minus').replace('*','mul')
-        .replace('/','div').replace('%','mod').replace('==','eq')
-        .replace('!=','ne').replace('<','lt').replace('>','gt')
-        .replace('<=','le').replace('>=','ge').replace('&','band')
-        .replace('|','bor').replace('^','bxor').replace('<<','shl')
-        .replace('>>','shr').replace('[]','idx');
-
+    const nameSafe = operatorNameSafe(op.op);
     const pseudoMethod = {
         name:       `op_${nameSafe}`,
         params:     [op.param],
@@ -853,40 +1064,53 @@ function escapeStringForLLVM(str) {
 
 // ── module codegen ────────────────────────────────────────────────────────
 
+function emitClassIR(cls, out, fnCode) {
+    const fieldTypes = cls.fields.map(f => llvmType(normalizeType(f.type))).join(", ");
+    out.push(`%class.${cls.name} = type { ${fieldTypes} }\n`);
+
+    for (const m of cls.methods || [])   fnCode.push(genMethod(cls.name, m, true)   + "\n\n");
+    for (const op of cls.operators || []) fnCode.push(genOperator(cls.name, op)      + "\n\n");
+
+    if (cls.constructor) {
+        const ctorMethod = { name: "constructor", params: cls.constructor.params, returnType: null, body: cls.constructor.body };
+        fnCode.push(genMethod(cls.name, ctorMethod, true) + "\n\n");
+    }
+    if (cls.destructor) {
+        const dtorMethod = { name: "destructor", params: [], returnType: null, body: cls.destructor.body };
+        fnCode.push(genMethod(cls.name, dtorMethod, true) + "\n\n");
+    }
+}
+
 function genModule(ast) {
     resetAll();
 
-    // Populate type aliases first so llvmType can resolve them
-    for (const a of ast.aliases || []) {
-        typeAliases.set(a.name, a.targetType);
-    }
+    // Aliases and constants
+    for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
+    for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
 
-    // Populate module constants so they resolve in genExpr
-    for (const c of ast.consts || []) {
-        moduleConstants.set(c.name, { value: c.value, type: c.type });
-    }
+    // Register template definitions
+    for (const t of ast.templates || []) templateDefs.set(t.name, t);
 
-    // Register all struct and class types first (so llvmType resolves them)
-    for (const s of ast.structs || []) registerStruct(s.name, s.fields);
-    for (const c of ast.classes || []) registerClass(c.name, c.fields, c.methods, c.operators);
+    // Register regular struct and class types first (monomorphization may reference them)
+    for (const s of ast.structs  || []) registerStruct(s.name, s.fields);
+    for (const c of ast.classes  || []) registerClass(c.name, c.fields, c.methods, c.operators);
 
-    // Populate functionReturnTypes for all functions and methods before codegen
+    // Scan all type usages and instantiate every template type found
+    for (const typeStr of collectTypeUsages(ast)) instantiateTemplate(typeStr);
+
+    // Register return types for all regular functions
     for (const fn of ast.functions || []) {
         functionReturnTypes.set(fn.name, { returnType: fn.returnType, isVariadic: fn.isVariadic || false, params: fn.params });
     }
+
+    // Register return types for regular class methods (template instances already registered inside instantiateTemplate)
     for (const cls of ast.classes || []) {
         for (const m of cls.methods || []) {
             functionReturnTypes.set(`${cls.name}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
         }
         for (const op of cls.operators || []) {
-            const nameSafe = op.op
-                .replace('+','plus').replace('-','minus').replace('*','mul')
-                .replace('/','div').replace('%','mod').replace('==','eq')
-                .replace('!=','ne').replace('<','lt').replace('>','gt')
-                .replace('<=','le').replace('>=','ge').replace('&','band')
-                .replace('|','bor').replace('^','bxor').replace('<<','shl')
-                .replace('>>','shr').replace('[]','idx');
-            functionReturnTypes.set(`${cls.name}_op_${nameSafe}`, { returnType: op.returnType, isVariadic: false, params: [op.param] });
+            const ns = operatorNameSafe(op.op);
+            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: [op.param] });
         }
         if (cls.constructor) {
             functionReturnTypes.set(`${cls.name}_constructor`, { returnType: null, isVariadic: false, params: cls.constructor.params });
@@ -896,28 +1120,31 @@ function genModule(ast) {
         }
     }
 
-    let out = "; Hopper module\n\n";
+    let out     = "; Hopper module\n\n";
+    const typeDefs = [];
+    const fnCode   = [];
 
     // Emit struct type definitions
     for (const s of ast.structs || []) {
         const fieldTypes = s.fields.map(f =>
             f.isPad ? `[${f.size} x i8]` : llvmType(f.type)
         ).join(", ");
-        out += `%struct.${s.name} = type { ${fieldTypes} }\n`;
+        typeDefs.push(`%struct.${s.name} = type { ${fieldTypes} }\n`);
     }
 
-    // Emit class type definitions (declaration order for now; reordering is a future opt)
+    // Emit regular class type definitions + methods
     for (const c of ast.classes || []) {
-        const fieldTypes = c.fields.map(f => llvmType(f.type)).join(", ");
-        out += `%class.${c.name} = type { ${fieldTypes} }\n`;
+        emitClassIR(c, typeDefs, fnCode);
     }
 
-    if ((ast.structs || []).length + (ast.classes || []).length > 0) out += "\n";
+    // Emit monomorphized template instances + methods
+    for (const c of instantiatedClasses) {
+        emitClassIR(c, typeDefs, fnCode);
+    }
+
+    if (typeDefs.length > 0) out += typeDefs.join("") + "\n";
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
-
-    // Collect all code (string constants pool after functions are generated)
-    const fnCode = [];
 
     for (const fn of ast.functions) {
         if (fn.isExtern) {
@@ -927,34 +1154,6 @@ function genModule(ast) {
             fnCode.push(`declare ${ret} @${fn.name}(${params}${vararg})\n`);
         } else {
             fnCode.push(genFunction(fn) + "\n\n");
-        }
-    }
-
-    // Class methods, operator overloads, constructors, destructors
-    for (const cls of ast.classes || []) {
-        for (const m of cls.methods || [])   fnCode.push(genMethod(cls.name, m, true)   + "\n\n");
-        for (const op of cls.operators || []) fnCode.push(genOperator(cls.name, op)      + "\n\n");
-
-        // Constructor
-        if (cls.constructor) {
-            const ctorMethod = {
-                name:       "constructor",
-                params:     cls.constructor.params,
-                returnType: null,
-                body:       cls.constructor.body
-            };
-            fnCode.push(genMethod(cls.name, ctorMethod, true) + "\n\n");
-        }
-
-        // Destructor
-        if (cls.destructor) {
-            const dtorMethod = {
-                name:       "destructor",
-                params:     [],
-                returnType: null,
-                body:       cls.destructor.body
-            };
-            fnCode.push(genMethod(cls.name, dtorMethod, true) + "\n\n");
         }
     }
 

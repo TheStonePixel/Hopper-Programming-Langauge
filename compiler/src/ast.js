@@ -1,7 +1,7 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates };
 }
 
 export function FunctionDecl(name, params, returnType, body, isExtern = false, isVariadic = false) {
@@ -50,6 +50,11 @@ export function ClassDestructor(body) {
 // top-level constant: const NAME = literal
 export function ConstDecl(name, value, type) {
     return { kind: "ConstDecl", name, value, type };
+}
+
+// template = parameterized class, monomorphized per instantiation
+export function TemplateDecl(name, typeParams, fields, methods, operators, constructor = null, destructor = null) {
+    return { kind: "TemplateDecl", name, typeParams, fields, methods, operators, constructor, destructor };
 }
 
 // alias declaration: alias Name = type

@@ -113,6 +113,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#templateDecl.
+	enterTemplateDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#templateDecl.
+	exitTemplateDecl(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#classDecl.
 	enterClassDecl(ctx) {
 	}

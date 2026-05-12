@@ -10,6 +10,7 @@ topLevelDecl
     : functionDecl
     | structDecl
     | classDecl
+    | templateDecl
     | constDecl
     | importDecl
     | aliasDecl
@@ -42,6 +43,11 @@ structDecl
 structMember
     : type fieldName        # StructField
     | 'pad' IntegerLiteral  # StructPad
+    ;
+
+// template = parameterized class, monomorphized at use sites
+templateDecl
+    : 'template' Identifier '<' Identifier (',' Identifier)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
     ;
 
 // class = data + behavior, compiler-optimized layout
@@ -96,6 +102,7 @@ type
     | 'address'
     | 'unsigned' 'int'
     | 'unsigned' 'byte'
+    | Identifier '<' type (',' type)* '>'   // template instantiation: List<int>, Map<String,int>
     | Identifier    // user-defined types (structs, classes)
     ;
 
