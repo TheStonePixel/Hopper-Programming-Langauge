@@ -914,11 +914,7 @@ function genModule(ast) {
 
     if ((ast.structs || []).length + (ast.classes || []).length > 0) out += "\n";
 
-    // Emit module-level constants as LLVM globals
-    for (const [name, c] of moduleConstants) {
-        out += `@const.${name} = private constant ${llvmType(c.type)} ${c.value}\n`;
-    }
-    if (moduleConstants.size > 0) out += "\n";
+    // Constants are compile-time substitutions only — no LLVM globals emitted
 
     // Collect all code (string constants pool after functions are generated)
     const fnCode = [];
