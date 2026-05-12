@@ -20,8 +20,8 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, "..");
-const TESTS_DIR  = path.join(ROOT, "tests");
+const ROOT       = path.resolve(__dirname, "..", "..");
+const TESTS_DIR  = path.join(ROOT, "core", "tests");
 const BUILD_DIR  = path.join(ROOT, "build", "tests");
 
 // ── ANSI colours ─────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ function runTest(testFile) {
     // Compile
     const build = spawnSync(
         "node",
-        ["hopper", "-c", testFile, "-o", exePath],
+        ["compiler/hopper", "-c", testFile, "-o", exePath],
         { cwd: ROOT, encoding: "utf8" }
     );
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STDLIB_DIR = path.resolve(__dirname, "..", "stdlib");
+const STDLIB_DIR = path.resolve(__dirname, "..", "..", "core", "stdlib");
 
 import HopperLexer from "./generated/grammar/HopperLexer.js";
 import HopperParser from "./generated/grammar/HopperParser.js";

@@ -5,15 +5,10 @@
   "main": "index.js",
 "scripts": {
     "gen:grammar": "java -jar tools/antlr-4.13.1-complete.jar -Dlanguage=JavaScript -visitor -o src/generated grammar/Hopper.g4",
-    "test": "node tools/test.js",
-    "test:one": "node tools/test.js",
-    "test:parse": "node src/parse.js examples/main.hop",
-    "test:ast": "node src/astBuilder.js examples/main.hop",
-    "build:example": "node app.js build examples/main.hop",
-    "run:example": "./build/main; echo $?"
+    "test": "node tools/test.js"
   },
   "bin": {
-    "hopper": "./app.js"
+    "hopper": "./hopper"
   },
   "keywords": [],
   "author": "",
