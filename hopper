@@ -32,11 +32,11 @@ function option(name) {
     return val;
 }
 
-const doCompile = flag("-compile");
-const doRun     = flag("-run");
-const doIR      = flag("-ir");
-const doAST     = flag("-ast");
-const doParse   = flag("-parse");
+const doCompile = flag("-c")    || flag("--compile");
+const doRun     = flag("-r")    || flag("--run");
+const doIR      = flag("--ir");
+const doAST     = flag("--ast");
+const doParse   = flag("--parse");
 const output    = option("-o");
 
 // remaining args are files
@@ -47,11 +47,11 @@ function usage() {
         "",
         "  Hopper Compiler",
         "",
-        "  ./hopper -compile <files...> [-o output]   compile to executable",
-        "  ./hopper -run <file>                        compile and run",
-        "  ./hopper -ir <file>                         print LLVM IR",
-        "  ./hopper -ast <file>                        print AST as JSON",
-        "  ./hopper -parse <file>                      print parse tree",
+        "  ./hopper -c, --compile <files...> [-o out]   compile to executable",
+        "  ./hopper -r, --run <file>                    compile and run",
+        "  ./hopper --ir <file>                         print LLVM IR",
+        "  ./hopper --ast <file>                        print AST as JSON",
+        "  ./hopper --parse <file>                      print parse tree",
         "",
     ].join("\n"));
     process.exit(1);
