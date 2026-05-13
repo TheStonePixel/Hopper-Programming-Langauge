@@ -61,7 +61,7 @@ function runTest(testFile) {
     // Compile
     const build = spawnSync(
         "node",
-        ["compiler/hopper", "-c", testFile, "-o", exePath],
+        ["kindling/hopper", "-c", testFile, "-o", exePath],
         { cwd: ROOT, encoding: "utf8" }
     );
 
