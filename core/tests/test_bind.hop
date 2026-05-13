@@ -3,12 +3,12 @@
 
 import "stdlib/io"
 
-bind 0x00000004 to reset::address
+bind 0x00000004 = reset::address
 function reset() {
     print("reset fired\n", 12)
 }
 
-bind 0x0000003c to timer::address
+bind 0x0000003c = timer::address
 function timer() {
     print("timer fired\n", 12)
 }

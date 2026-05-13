@@ -22,10 +22,12 @@ importDecl
     : 'import' StringLiteral
     ;
 
-// bind — maps a physical hardware address to a function address (linker directive)
-// bind 0x00000004 to reset::address
+// bind — two forms:
+// vector: bind 0x00000004 = reset::address   (linker directive: place fn ptr at hw address)
+// mmio:   bind int a = 0x40021000            (name a hardware register for volatile access)
 bindDecl
-    : 'bind' HexLiteral 'to' Identifier '::' 'address'
+    : 'bind' HexLiteral '=' Identifier '::' 'address'  # BindVector
+    | 'bind' type Identifier '=' HexLiteral             # BindMMIO
     ;
 
 // entry — the program entry point, not a function

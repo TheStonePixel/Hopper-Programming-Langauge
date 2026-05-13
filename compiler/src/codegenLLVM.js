@@ -9,6 +9,7 @@ const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
 const templateDefs       = new Map();   // template name → TemplateDecl
+const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
 
@@ -20,6 +21,7 @@ function resetAll() {
     typeAliases.clear();
     functionReturnTypes.clear();
     templateDefs.clear();
+    mmioBindings.clear();
     instantiatedClasses = [];
     stringCounter = 0;
 }
@@ -454,6 +456,15 @@ function genExpr(ir, expr) {
             const c = moduleConstants.get(expr.name);
             if (c) return { value: String(c.value), type: c.type };
 
+            const mmio = mmioBindings.get(expr.name);
+            if (mmio) {
+                const ptr = ir.newTmp();
+                const tmp = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmio.addr} to ${mmio.llType}*`);
+                ir.emit(`${tmp} = load volatile ${mmio.llType}, ${mmio.llType}* ${ptr}`);
+                return { value: tmp, type: mmio.hType };
+            }
+
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
             const tmp = ir.newTmp();
@@ -775,6 +786,15 @@ function genStmt(ir, stmt, retType) {
         }
 
         case "Assign": {
+            const mmio = mmioBindings.get(stmt.name);
+            if (mmio) {
+                const val = genExpr(ir, stmt.expr);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmio.addr} to ${mmio.llType}*`);
+                ir.emit(`store volatile ${mmio.llType} ${val.value}, ${mmio.llType}* ${ptr}`);
+                break;
+            }
+
             const v   = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
             let val;
@@ -1047,14 +1067,15 @@ function genOperator(className, op) {
 // ── bind directive codegen ────────────────────────────────────────────────
 
 function genBind(bind) {
-    // Emit a function-pointer global in a named section so the linker can
-    // place it at the hardware address.  Section name encodes the address so
-    // a Hopper linker script can place ".hopbind.0x00000004" at 0x00000004.
-    const fnInfo = functionReturnTypes.get(bind.functionName);
-    const ret    = fnInfo ? (fnInfo.returnType === null ? "void" : llvmType(fnInfo.returnType)) : "void";
-    const varName = `@__bind_${bind.hardwareAddress}`;
-    const section = `.hopbind.${bind.hardwareAddress}`;
-    return `${varName} = global ptr @${bind.functionName}, section "${section}", align 4`;
+    if (bind.form === "vector") {
+        // Emit a function-pointer global in a named section so the linker can
+        // place it at the hardware address.
+        const varName = `@__bind_${bind.hardwareAddress}`;
+        const section = `.hopbind.${bind.hardwareAddress}`;
+        return `${varName} = global ptr @${bind.functionName}, section "${section}", align 4`;
+    }
+    // MMIO bindings are tracked in mmioBindings and accessed inline — no global emitted
+    return null;
 }
 
 // ── entry point codegen ───────────────────────────────────────────────────
@@ -1200,8 +1221,18 @@ function genModule(ast) {
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 
-    // Emit bind globals (function-pointer globals for vector table placement)
-    const bindGlobals = (ast.binds || []).map(b => genBind(b));
+    // Register MMIO bindings for volatile load/store codegen
+    for (const b of ast.binds || []) {
+        if (b.form === "mmio") {
+            const hType  = normalizeType(b.mmioType);
+            const llType = llvmType(hType);
+            const addr   = String(parseInt(b.hardwareAddress, 16));
+            mmioBindings.set(b.mmioName, { hType, llType, addr });
+        }
+    }
+
+    // Emit vector bind globals (function-pointer globals for vector table placement)
+    const bindGlobals = (ast.binds || []).map(b => genBind(b)).filter(Boolean);
     if (bindGlobals.length > 0) out += bindGlobals.join("\n") + "\n\n";
 
     for (const fn of ast.functions) {

@@ -4,10 +4,11 @@ export function Program(functions, structs = [], classes = [], consts = [], alia
     return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds };
 }
 
-// bind — linker directive mapping a hardware address to a function address
-// bind 0x00000004 to reset::address
-export function BindDecl(hardwareAddress, functionName) {
-    return { kind: "BindDecl", hardwareAddress, functionName };
+// bind — two forms:
+// vector: bind 0x00000004 = reset::address   → linker section global
+// mmio:   bind int a = 0x40021000            → volatile load/store alias
+export function BindDecl(form, hardwareAddress, functionName = null, mmioType = null, mmioName = null) {
+    return { kind: "BindDecl", form, hardwareAddress, functionName, mmioType, mmioName };
 }
 
 // entry — the program entry point (not a function, a jump target)

@@ -262,10 +262,17 @@ export class AstBuilder extends HopperVisitor {
 
     // ── bind ───────────────────────────────────────────────────────────────
 
-    visitBindDecl(ctx) {
+    visitBindVector(ctx) {
         const hardwareAddress = ctx.HexLiteral().getText();
         const functionName    = ctx.Identifier().getText();
-        return BindDecl(hardwareAddress, functionName);
+        return BindDecl("vector", hardwareAddress, functionName);
+    }
+
+    visitBindMMIO(ctx) {
+        const mmioType        = ctx.type().getText();
+        const mmioName        = ctx.Identifier().getText();
+        const hardwareAddress = ctx.HexLiteral().getText();
+        return BindDecl("mmio", hardwareAddress, null, mmioType, mmioName);
     }
 
     // ── functions ──────────────────────────────────────────────────────────
