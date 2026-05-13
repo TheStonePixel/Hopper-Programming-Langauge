@@ -2,7 +2,7 @@
 // EXPECT: 42
 // EXPECT: 3.14
 
-import "stdlib/io"
+import io from stdlib
 extern function printf(String fmt, ...) int
 
 template Box<T> {

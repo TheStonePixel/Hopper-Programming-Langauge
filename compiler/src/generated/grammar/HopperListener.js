@@ -23,12 +23,21 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#importDecl.
-	enterImportDecl(ctx) {
+	// Enter a parse tree produced by HopperParser#ImportFrom.
+	enterImportFrom(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#importDecl.
-	exitImportDecl(ctx) {
+	// Exit a parse tree produced by HopperParser#ImportFrom.
+	exitImportFrom(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ImportModule.
+	enterImportModule(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ImportModule.
+	exitImportModule(ctx) {
 	}
 
 

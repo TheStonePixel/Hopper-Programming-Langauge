@@ -1,7 +1,7 @@
 // EXPECT: reset fired
 // EXPECT: timer fired
 
-import "stdlib/io"
+import io from stdlib
 
 bind 0x00000004 = reset::address
 function reset() {

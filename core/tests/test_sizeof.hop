@@ -2,7 +2,7 @@
 // EXPECT: 1
 // EXPECT: 16
 
-import "stdlib/io"
+import io from stdlib
 
 extern function printf(String fmt, ...) int
 

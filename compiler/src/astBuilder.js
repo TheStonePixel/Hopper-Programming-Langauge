@@ -5,8 +5,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STDLIB_DIR  = path.resolve(__dirname, "..", "..", "core", "stdlib");
-const DS_DIR      = path.resolve(__dirname, "..", "..", "core", "datastructures");
+const BUILTIN_DIR = path.resolve(__dirname, "..", "..", "core");
 
 import HopperLexer from "./generated/grammar/HopperLexer.js";
 import HopperParser from "./generated/grammar/HopperParser.js";
@@ -619,22 +618,53 @@ export class AstBuilder extends HopperVisitor {
 
 // ── import resolution ──────────────────────────────────────────────────────
 
-function resolveImportPath(importPath, baseDir) {
-    const withExt = importPath.endsWith(".hop") ? importPath : importPath + ".hop";
-    if (importPath.startsWith("stdlib/"))
-        return path.resolve(STDLIB_DIR, withExt.slice("stdlib/".length));
-    if (importPath.startsWith("datastructures/"))
-        return path.resolve(DS_DIR, withExt.slice("datastructures/".length));
-    return path.resolve(baseDir || process.cwd(), withExt);
+// Find modules/ directory by walking up from baseDir, then fall back to built-ins.
+function resolveModuleFiles(moduleName, names, baseDir) {
+    // Walk up from baseDir looking for modules/<moduleName>/
+    let dir = baseDir || process.cwd();
+    while (true) {
+        const candidate = path.join(dir, "modules", moduleName);
+        if (fs.existsSync(candidate)) {
+            return filesToLoad(candidate, names);
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    // Fall back to built-in core modules
+    const builtin = path.join(BUILTIN_DIR, moduleName);
+    if (fs.existsSync(builtin)) {
+        return filesToLoad(builtin, names);
+    }
+    throw new Error(`Module '${moduleName}' not found`);
+}
+
+function filesToLoad(moduleDir, names) {
+    if (names) {
+        // named import: load only requested files
+        return names.map(n => path.join(moduleDir, n + ".hop"));
+    } else {
+        // whole module: load all .hop files
+        return fs.readdirSync(moduleDir)
+            .filter(f => f.endsWith(".hop"))
+            .map(f => path.join(moduleDir, f));
+    }
 }
 
 export function buildAstFromSource(source, { baseDir = null, visited = new Set() } = {}) {
-    // Strip import lines before ANTLR sees them
-    const importPaths = [];
-    const strippedSource = source.replace(/^[ \t]*import\s+"([^"]+)"[ \t]*$/gm, (_, p) => {
-        importPaths.push(p);
-        return "";
-    });
+    // Strip import lines before ANTLR sees them, collect import requests
+    const imports = [];
+    const strippedSource = source.replace(
+        /^[ \t]*import\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)\s+from\s+([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*$|^[ \t]*import\s+([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*$/gm,
+        (_, names, fromModule, wholeModule) => {
+            if (fromModule) {
+                imports.push({ module: fromModule, names: names.split(",").map(n => n.trim()) });
+            } else {
+                imports.push({ module: wholeModule, names: null });
+            }
+            return "";
+        }
+    );
 
     const chars  = new antlr4.InputStream(strippedSource);
     const lexer  = new HopperLexer(chars);
@@ -644,25 +674,27 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     const tree = parser.program();
     const ast  = new AstBuilder().visit(tree);
 
-    for (const importPath of importPaths) {
-        const resolved = resolveImportPath(importPath, baseDir);
-        if (visited.has(resolved)) continue;
-        visited.add(resolved);
+    for (const { module: moduleName, names } of imports) {
+        const files = resolveModuleFiles(moduleName, names, baseDir);
+        for (const resolved of files) {
+            if (visited.has(resolved)) continue;
+            visited.add(resolved);
 
-        const importedAst = buildAstFromSource(fs.readFileSync(resolved, "utf8"), {
-            baseDir: path.dirname(resolved),
-            visited,
-        });
+            const importedAst = buildAstFromSource(fs.readFileSync(resolved, "utf8"), {
+                baseDir: path.dirname(resolved),
+                visited,
+            });
 
-        ast.functions.unshift(...importedAst.functions);
-        ast.structs.unshift(...importedAst.structs);
-        ast.classes.unshift(...importedAst.classes);
-        ast.consts.unshift(...importedAst.consts);
-        ast.aliases.unshift(...importedAst.aliases);
-        ast.templates.unshift(...importedAst.templates);
-        ast.binds.unshift(...importedAst.binds);
-        ast.stricts.unshift(...importedAst.stricts);
-        // entry is never inherited from imports — only the main file sets it
+            ast.functions.unshift(...importedAst.functions);
+            ast.structs.unshift(...importedAst.structs);
+            ast.classes.unshift(...importedAst.classes);
+            ast.consts.unshift(...importedAst.consts);
+            ast.aliases.unshift(...importedAst.aliases);
+            ast.templates.unshift(...importedAst.templates);
+            ast.binds.unshift(...importedAst.binds);
+            ast.stricts.unshift(...importedAst.stricts);
+            // entry is never inherited from imports — only the main file sets it
+        }
     }
 
     return ast;

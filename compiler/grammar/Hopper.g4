@@ -20,7 +20,8 @@ topLevelDecl
     ;
 
 importDecl
-    : 'import' StringLiteral
+    : 'import' Identifier (',' Identifier)* 'from' Identifier   # ImportFrom
+    | 'import' Identifier                                         # ImportModule
     ;
 
 // bind — linker directive: place function pointer at hardware address

@@ -1,6 +1,6 @@
 // EXPECT: hopper
 
-import "stdlib/io"
+import io from stdlib
 
 entry main {
     print("hopper\n", 7)

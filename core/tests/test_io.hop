@@ -2,7 +2,7 @@
 // EXPECT: hello from hopper
 // EXPECT: second line
 
-import "stdlib/io"
+import io from stdlib
 
 function main() int {
     print("hello from hopper\n", 18)
