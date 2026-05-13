@@ -519,6 +519,19 @@ function genExpr(ir, expr) {
         case "ArrayAccess": {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+
+            // string[] (argv) indexing — i8** pointer, each element is i8*
+            if (v.hType === "string[]") {
+                const base     = ir.newTmp();
+                const indexVal = genExpr(ir, expr.index);
+                ir.emit(`${base} = load i8**, i8*** ${v.ptr}`);
+                const elemPtr  = ir.newTmp();
+                ir.emit(`${elemPtr} = getelementptr i8*, i8** ${base}, i64 ${indexVal.value}`);
+                const tmp = ir.newTmp();
+                ir.emit(`${tmp} = load i8*, i8** ${elemPtr}`);
+                return { value: tmp, type: "string" };
+            }
+
             if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot index non-array type: ${v.hType}`);
             const elemType    = v.hType.split(":")[1];
