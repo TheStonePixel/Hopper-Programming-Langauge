@@ -3,7 +3,7 @@
 // EXPECT: 4096
 
 import io from linux
-import heap from datastructures
+import heap from ds
 
 extern function printf(String fmt, ...) int
 
