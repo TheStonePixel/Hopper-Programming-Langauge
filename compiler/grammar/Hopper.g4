@@ -92,6 +92,7 @@ fieldName
     : Identifier
     | 'value'
     | 'address'
+    | 'size'
     ;
 
 operatorSymbol
@@ -191,8 +192,9 @@ primary
     | 'false'
     | 'null'
     | Identifier '[' expression ']' '::' 'address'      // address of array element
-    | Identifier '::' 'address'                         // address of variable
+    | Identifier '::' 'address'                         // address of variable/function
     | Identifier '::' 'value'                           // dereference address
+    | Identifier '::' 'size'                            // byte size of variable or type
     | Identifier '(' argList? ')'                       // function call
     | Identifier '.' Identifier '(' argList? ')'        // method call
     | Identifier '[' expression ']'                     // array element access

@@ -452,6 +452,13 @@ function genExpr(ir, expr) {
         case "NullLiteral":
             return { value: "null", type: "address" };
 
+        case "SizeOf": {
+            // Resolve name as a variable first, then fall back to type name
+            const v = ir.vars.get(expr.name);
+            const hType = v ? v.hType : expr.name;
+            return { value: String(typeSize(hType)), type: "int" };
+        }
+
         case "Var": {
             const c = moduleConstants.get(expr.name);
             if (c) return { value: String(c.value), type: c.type };
@@ -1062,6 +1069,28 @@ function genOperator(className, op) {
         body:       op.body
     };
     return genMethod(className, pseudoMethod, true);
+}
+
+// ── compile-time type size ────────────────────────────────────────────────
+
+function typeSize(hType) {
+    const t = normalizeType(hType);
+    if (t === "int")          return 8;
+    if (t === "float")        return 8;
+    if (t === "bool")         return 1;
+    if (t === "byte")         return 1;
+    if (t === "address")      return 8;
+    if (t === "String")       return 8;
+    if (t === "unsignedint")  return 8;
+    if (t === "unsignedbyte") return 1;
+    if (structTypes.has(t)) {
+        return structTypes.get(t).fields.reduce((acc, f) =>
+            acc + (f.isPad ? f.size : typeSize(f.type)), 0);
+    }
+    if (classTypes.has(t)) {
+        return classTypes.get(t).fields.reduce((acc, f) => acc + typeSize(f.type), 0);
+    }
+    throw new Error(`Cannot compute ::size of unknown type: ${t}`);
 }
 
 // ── bind directive codegen ────────────────────────────────────────────────

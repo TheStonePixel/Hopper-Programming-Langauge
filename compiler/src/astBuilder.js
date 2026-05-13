@@ -55,6 +55,7 @@ import {
     StringLiteral,
     CharLiteral,
     NullLiteral,
+    SizeOf,
     AddressOf,
     Deref,
     DerefAssign,
@@ -545,6 +546,12 @@ export class AstBuilder extends HopperVisitor {
             const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
             const exprs = ctx.expression();
             return ArrayElementAddress(name, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
+        }
+
+        // x::size
+        if (childTexts.includes('::') && childTexts.includes('size')) {
+            const ids = ctx.Identifier();
+            return SizeOf(Array.isArray(ids) ? ids[0].getText() : ids.getText());
         }
 
         // x::address

@@ -193,6 +193,11 @@ export function NullLiteral() {
     return { kind: "NullLiteral" };
 }
 
+// Compile-time size: a::size
+export function SizeOf(name) {
+    return { kind: "SizeOf", name };
+}
+
 // Address operations
 export function AddressOf(name) {
     return { kind: "AddressOf", name };

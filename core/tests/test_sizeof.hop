@@ -1,0 +1,23 @@
+// EXPECT: 8
+// EXPECT: 1
+// EXPECT: 16
+
+import "stdlib/io"
+
+extern function printf(String fmt, ...) int
+
+struct Point {
+    int x
+    int y
+}
+
+entry main {
+    int a = 0
+    printf("%d\n", a::size)
+
+    byte b = 0
+    printf("%d\n", b::size)
+
+    Point p
+    printf("%d\n", p::size)
+}
