@@ -151,16 +151,25 @@
         <p class="section-desc">Hopper is designed as three layers — each built on the one below, each written in Hopper itself.</p>
         <div class="layer-stack">
           <div class="layer top">
-            <div class="layer-name">Hopper Shell</div>
-            <div class="layer-desc">Interpreted layer for scripting, tooling, and rapid development</div>
+            <div class="layer-info">
+              <div class="layer-name">Hopper Shell</div>
+              <div class="layer-analogy">like early Python / JS</div>
+            </div>
+            <div class="layer-desc">An embedded scripting layer that binds to application functionality. Drop it into any Hopper+ application and expose logic, automate workflows, or let end users extend behavior — without recompiling.</div>
           </div>
           <div class="layer mid">
-            <div class="layer-name">Hopper+</div>
-            <div class="layer-desc">High-level abstractions, standard library, heap allocator, OS interfaces</div>
+            <div class="layer-info">
+              <div class="layer-name">Hopper+</div>
+              <div class="layer-analogy">like C# / Java</div>
+            </div>
+            <div class="layer-desc">The application tier. Standard library, heap allocator, OS interfaces, and high-level abstractions. Built entirely on Hopper — no foreign runtime required.</div>
           </div>
           <div class="layer bottom">
-            <div class="layer-name">Hopper</div>
-            <div class="layer-desc">Bare metal core — hardware access, no OS, no runtime, just the machine</div>
+            <div class="layer-info">
+              <div class="layer-name">Hopper</div>
+              <div class="layer-analogy">like Assembly / C</div>
+            </div>
+            <div class="layer-desc">The machine tier. Hardware access, bare metal execution, OS kernels, compilers, firmware. No dependencies. Just you and the hardware.</div>
           </div>
         </div>
       </div>
@@ -188,7 +197,7 @@
           <div class="step">
             <span class="step-label">Later</span>
             <h3>Hopper+</h3>
-            <p>High-level standard library, constraint-guided typing, pattern matching, package system.</p>
+            <p>Application-tier language built on Hopper. Standard library, memory management, OS interfaces. Write desktop apps, servers, and tools — no foreign runtime underneath.</p>
           </div>
           <div class="step goal">
             <span class="step-label">Goal</span>
@@ -430,31 +439,40 @@ code {
 }
 
 .layer {
-  padding: 1.25rem 1.75rem;
+  padding: 1.5rem 1.75rem;
   border-radius: 6px;
   display: flex;
-  align-items: baseline;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .layer.top    { background: #161b22; border: 1px solid #21262d; }
 .layer.mid    { background: #111820; border: 1px solid #1c2230; }
 .layer.bottom { background: #0d1117; border: 1px solid #161b22; }
 
+.layer-info {
+  min-width: 140px;
+}
+
 .layer-name {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #ccc;
-  min-width: 130px;
 }
 
 .layer.bottom .layer-name { color: #569cd6; }
 .layer.mid    .layer-name { color: #4ec9b0; }
-.layer.top    .layer-name { color: #888; }
+.layer.top    .layer-name { color: #aaa; }
+
+.layer-analogy {
+  font-size: 0.72rem;
+  color: #444;
+  margin-top: 0.2rem;
+}
 
 .layer-desc {
-  font-size: 0.825rem;
+  font-size: 0.85rem;
   color: #555;
+  line-height: 1.7;
 }
 
 /* ── Roadmap ── */
