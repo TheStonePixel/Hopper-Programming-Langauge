@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const BUILTIN_DIR = path.resolve(__dirname, "..", "..", "core");
 
 import HopperLexer from "./generated/grammar/HopperLexer.js";
 import HopperParser from "./generated/grammar/HopperParser.js";
@@ -652,11 +651,6 @@ function resolveModuleFiles(moduleName, names, baseDir) {
         const parent = path.dirname(dir);
         if (parent === dir) break;
         dir = parent;
-    }
-    // Fall back to built-in core modules
-    const builtin = path.join(BUILTIN_DIR, moduleName);
-    if (fs.existsSync(builtin)) {
-        return filesToLoad(builtin, names);
     }
     throw new Error(`Module '${moduleName}' not found`);
 }
