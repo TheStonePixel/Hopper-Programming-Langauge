@@ -1,0 +1,11 @@
+// Tests volatile MMIO declaration — hardware register alias with volatile load/store
+// Cannot run on host (address 0x40021000 is not mapped), verify IR only.
+// COMPILE_ONLY
+
+volatile int uart_dr = 0x40021000
+volatile int uart_sr = 0x40021004
+
+entry main {
+    uart_dr = 65
+    int status = uart_sr
+}

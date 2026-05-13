@@ -1,14 +1,19 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], volatiles = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, volatiles };
 }
 
-// bind — two forms:
-// vector: bind 0x00000004 = reset::address   → linker section global
-// mmio:   bind int a = 0x40021000            → volatile load/store alias
-export function BindDecl(form, hardwareAddress, functionName = null, mmioType = null, mmioName = null) {
-    return { kind: "BindDecl", form, hardwareAddress, functionName, mmioType, mmioName };
+// bind — linker directive: place function pointer at hardware address
+// bind 0x00000004 = reset::address
+export function BindDecl(hardwareAddress, functionName) {
+    return { kind: "BindDecl", hardwareAddress, functionName };
+}
+
+// volatile — named alias for a memory-mapped hardware register
+// volatile int uart_dr = 0x40021000
+export function VolatileDecl(type, name, hardwareAddress) {
+    return { kind: "VolatileDecl", type, name, hardwareAddress };
 }
 
 // entry — the program entry point (not a function, a jump target)

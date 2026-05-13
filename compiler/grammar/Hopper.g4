@@ -16,18 +16,23 @@ topLevelDecl
     | aliasDecl
     | entryDecl
     | bindDecl
+    | volatileDecl
     ;
 
 importDecl
     : 'import' StringLiteral
     ;
 
-// bind — two forms:
-// vector: bind 0x00000004 = reset::address   (linker directive: place fn ptr at hw address)
-// mmio:   bind int a = 0x40021000            (name a hardware register for volatile access)
+// bind — linker directive: place function pointer at hardware address
+// bind 0x00000004 = reset::address
 bindDecl
-    : 'bind' HexLiteral '=' Identifier '::' 'address'  # BindVector
-    | 'bind' type Identifier '=' HexLiteral             # BindMMIO
+    : 'bind' HexLiteral '=' Identifier '::' 'address'
+    ;
+
+// volatile — named alias for a memory-mapped hardware register
+// volatile int uart_dr = 0x40021000
+volatileDecl
+    : 'volatile' type Identifier '=' HexLiteral
     ;
 
 // entry — the program entry point, not a function

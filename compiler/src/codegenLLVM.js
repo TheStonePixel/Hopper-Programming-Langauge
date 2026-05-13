@@ -1067,15 +1067,11 @@ function genOperator(className, op) {
 // ── bind directive codegen ────────────────────────────────────────────────
 
 function genBind(bind) {
-    if (bind.form === "vector") {
-        // Emit a function-pointer global in a named section so the linker can
-        // place it at the hardware address.
-        const varName = `@__bind_${bind.hardwareAddress}`;
-        const section = `.hopbind.${bind.hardwareAddress}`;
-        return `${varName} = global ptr @${bind.functionName}, section "${section}", align 4`;
-    }
-    // MMIO bindings are tracked in mmioBindings and accessed inline — no global emitted
-    return null;
+    // Emit a function-pointer global in a named section so the linker can
+    // place it at the hardware address.
+    const varName = `@__bind_${bind.hardwareAddress}`;
+    const section = `.hopbind.${bind.hardwareAddress}`;
+    return `${varName} = global ptr @${bind.functionName}, section "${section}", align 4`;
 }
 
 // ── entry point codegen ───────────────────────────────────────────────────
@@ -1221,18 +1217,16 @@ function genModule(ast) {
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 
-    // Register MMIO bindings for volatile load/store codegen
-    for (const b of ast.binds || []) {
-        if (b.form === "mmio") {
-            const hType  = normalizeType(b.mmioType);
-            const llType = llvmType(hType);
-            const addr   = String(parseInt(b.hardwareAddress, 16));
-            mmioBindings.set(b.mmioName, { hType, llType, addr });
-        }
+    // Register volatile MMIO bindings for load/store codegen
+    for (const v of ast.volatiles || []) {
+        const hType  = normalizeType(v.type);
+        const llType = llvmType(hType);
+        const addr   = String(parseInt(v.hardwareAddress, 16));
+        mmioBindings.set(v.name, { hType, llType, addr });
     }
 
     // Emit vector bind globals (function-pointer globals for vector table placement)
-    const bindGlobals = (ast.binds || []).map(b => genBind(b)).filter(Boolean);
+    const bindGlobals = (ast.binds || []).map(b => genBind(b));
     if (bindGlobals.length > 0) out += bindGlobals.join("\n") + "\n\n";
 
     for (const fn of ast.functions) {

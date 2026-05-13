@@ -27,6 +27,7 @@ import {
     TemplateDecl,
     EntryDecl,
     BindDecl,
+    VolatileDecl,
     Param,
     Call,
     MethodCall,
@@ -72,22 +73,24 @@ export class AstBuilder extends HopperVisitor {
         const aliases = [];
         const templates = [];
         const binds = [];
+        const volatiles = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
             if (!node) continue;
-            if (node.kind === "FunctionDecl")      functions.push(node);
-            else if (node.kind === "StructDecl")   structs.push(node);
-            else if (node.kind === "ClassDecl")    classes.push(node);
-            else if (node.kind === "ConstDecl")    consts.push(node);
-            else if (node.kind === "AliasDecl")    aliases.push(node);
-            else if (node.kind === "TemplateDecl") templates.push(node);
-            else if (node.kind === "EntryDecl")    entry = node;
-            else if (node.kind === "BindDecl")     binds.push(node);
+            if (node.kind === "FunctionDecl")       functions.push(node);
+            else if (node.kind === "StructDecl")    structs.push(node);
+            else if (node.kind === "ClassDecl")     classes.push(node);
+            else if (node.kind === "ConstDecl")     consts.push(node);
+            else if (node.kind === "AliasDecl")     aliases.push(node);
+            else if (node.kind === "TemplateDecl")  templates.push(node);
+            else if (node.kind === "EntryDecl")     entry = node;
+            else if (node.kind === "BindDecl")      binds.push(node);
+            else if (node.kind === "VolatileDecl")  volatiles.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, volatiles);
     }
 
     visitTopLevelDecl(ctx) {
@@ -262,17 +265,19 @@ export class AstBuilder extends HopperVisitor {
 
     // ── bind ───────────────────────────────────────────────────────────────
 
-    visitBindVector(ctx) {
+    visitBindDecl(ctx) {
         const hardwareAddress = ctx.HexLiteral().getText();
         const functionName    = ctx.Identifier().getText();
-        return BindDecl("vector", hardwareAddress, functionName);
+        return BindDecl(hardwareAddress, functionName);
     }
 
-    visitBindMMIO(ctx) {
-        const mmioType        = ctx.type().getText();
-        const mmioName        = ctx.Identifier().getText();
+    // ── volatile ───────────────────────────────────────────────────────────
+
+    visitVolatileDecl(ctx) {
+        const type            = ctx.type().getText();
+        const name            = ctx.Identifier().getText();
         const hardwareAddress = ctx.HexLiteral().getText();
-        return BindDecl("mmio", hardwareAddress, null, mmioType, mmioName);
+        return VolatileDecl(type, name, hardwareAddress);
     }
 
     // ── functions ──────────────────────────────────────────────────────────
@@ -651,6 +656,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         ast.aliases.unshift(...importedAst.aliases);
         ast.templates.unshift(...importedAst.templates);
         ast.binds.unshift(...importedAst.binds);
+        ast.volatiles.unshift(...importedAst.volatiles);
         // entry is never inherited from imports — only the main file sets it
     }
 
