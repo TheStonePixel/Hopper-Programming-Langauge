@@ -48,7 +48,7 @@
           </div>
           <div class="what-card">
             <h3>A clean foundation</h3>
-            <p>No global variables. No undefined behavior by design. No legacy syntax inherited from 1972. Every feature earns its place. The language is shaped by principles, not history.</p>
+            <p>No global variables. No footguns. No syntax inherited from 1972 that exists only because removing it would break everything. Hopper is simple because it was designed to be — not simplified after the fact.</p>
           </div>
         </div>
       </div>
@@ -127,19 +127,19 @@
         <div class="grid">
           <div class="card">
             <h3>No global variables</h3>
-            <p>Program-lifetime state lives in a Runtime class on the stack. <code>bind</code> and <code>volatile</code> are hardware descriptions, not variables — they cost no RAM.</p>
+            <p>One of the most common sources of bugs and complexity in systems code — gone. State is explicit, scoped, and owned. Libraries handle what they need. Nothing hides.</p>
           </div>
           <div class="card">
             <h3>No OS required</h3>
-            <p>Hopper is designed for freestanding, bare-metal execution. An OS can run on top of Hopper — it is not a dependency of it.</p>
+            <p>Hopper runs on the machine, not on top of an abstraction. Write firmware, bootloaders, and operating systems — Hopper doesn't depend on any of them.</p>
           </div>
           <div class="card">
-            <h3>Declarative hardware</h3>
-            <p>You don't tell the toolchain how to operate. You describe what exists. <code>bind</code>, <code>volatile</code>, and <code>entry</code> are declarations, not directives.</p>
+            <h3>Hardware is just code</h3>
+            <p>Vector tables, memory-mapped registers, and interrupt handlers are expressed in Hopper — not in a separate language bolted on the side. One syntax for everything.</p>
           </div>
           <div class="card">
             <h3>No legacy baggage</h3>
-            <p>Every feature earns its place. The language is shaped by what systems programming should be — not by what it was in 1972.</p>
+            <p>Every feature earns its place. Hopper is shaped by what systems programming should be — not by decisions made in 1972 that nobody can change because everything depends on them.</p>
           </div>
         </div>
       </div>
