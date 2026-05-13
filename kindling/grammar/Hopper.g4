@@ -40,8 +40,9 @@ strictDecl
 // inline:  entry main { ... }
 // address: entry main = startup::address
 entryDecl
-    : 'entry' Identifier block           # EntryBlock
-    | 'entry' Identifier '=' expression  # EntryAddr
+    : 'entry' Identifier '(' paramList ')' block  # EntryBlockParams
+    | 'entry' Identifier block                     # EntryBlock
+    | 'entry' Identifier '=' expression            # EntryAddr
     ;
 
 constDecl
@@ -131,6 +132,7 @@ type
     | 'bool'
     | 'float'
     | 'byte'
+    | 'string' '[' ']'  // array of strings — argv type, maps to i8**
     | 'string'
     | 'String'
     | 'address'

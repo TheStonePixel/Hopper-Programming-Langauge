@@ -1,0 +1,7 @@
+// EXPECT: 1
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, string[] argv) {
+    printf("%d\n", argc)
+}

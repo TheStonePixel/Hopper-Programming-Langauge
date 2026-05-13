@@ -252,16 +252,26 @@ export class AstBuilder extends HopperVisitor {
 
     // ── entry ──────────────────────────────────────────────────────────────
 
+    visitEntryBlockParams(ctx) {
+        const name   = ctx.Identifier().getText();
+        const params = ctx.paramList().param().map(p => ({
+            type: p.type().getText(),
+            name: p.paramName().getText(),
+        }));
+        const body = this.visit(ctx.block());
+        return EntryDecl(name, body, null, params);
+    }
+
     visitEntryBlock(ctx) {
         const name = ctx.Identifier().getText();
         const body = this.visit(ctx.block());
-        return EntryDecl(name, body, null);
+        return EntryDecl(name, body, null, []);
     }
 
     visitEntryAddr(ctx) {
         const name = ctx.Identifier().getText();
         const addr = this.visit(ctx.expression());
-        return EntryDecl(name, null, addr);
+        return EntryDecl(name, null, addr, []);
     }
 
     // ── bind ───────────────────────────────────────────────────────────────

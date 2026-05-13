@@ -265,6 +265,7 @@ function llvmType(t) {
     if (t === "bool")         return "i1";
     if (t === "byte")         return "i8";
     if (t === "float")        return "double";
+    if (t === "string[]")     return "i8**";
     if (t === "string")       return "i8*";
     if (t === "String")       return "i8*";
     if (t === "address")      return "i8*";
@@ -1209,6 +1210,7 @@ function typeSize(hType) {
     if (t === "bool")         return 1;
     if (t === "byte")         return 1;
     if (t === "address")      return 8;
+    if (t === "string[]")     return 8;
     if (t === "string")       return 8;
     if (t === "String")       return 8;
     if (t === "unsignedint")  return 8;
@@ -1239,9 +1241,35 @@ function genEntry(entry) {
     const ir = new IRBuilder();
 
     if (entry.body) {
-        // inline form: entry main { ... }
-        ir.emit(`define i64 @${entry.name}() {`);
-        ir.emit("entry:");
+        const params = entry.params || [];
+        if (params.length > 0) {
+            // entry with params: entry main(int argc, string[] argv)
+            // Use i32 for argc to match C ABI, i8** for string[]
+            const llParams = params.map(p => {
+                const t = p.type === "int" ? "i32" : llvmType(p.type);
+                return `${t} %_param_${p.name}`;
+            }).join(", ");
+            ir.emit(`define i64 @${entry.name}(${llParams}) {`);
+            ir.emit("entry:");
+            // Alloca and store each param so it's addressable as a local var
+            for (const p of params) {
+                const llT = p.type === "int" ? "i64" : llvmType(p.type);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = alloca ${llT}`);
+                if (p.type === "int") {
+                    // sext i32 argc → i64
+                    const ext = ir.newTmp();
+                    ir.emit(`${ext} = sext i32 %_param_${p.name} to i64`);
+                    ir.emit(`store i64 ${ext}, i64* ${ptr}`);
+                } else {
+                    ir.emit(`store ${llvmType(p.type)} %_param_${p.name}, ${llvmType(p.type)}* ${ptr}`);
+                }
+                ir.vars.set(p.name, { ptr, type: llT, hType: p.type });
+            }
+        } else {
+            ir.emit(`define i64 @${entry.name}() {`);
+            ir.emit("entry:");
+        }
         genBlock(ir, entry.body, "int");
         emitDeferred(ir);
         ir.emit("ret i64 0");

@@ -19,8 +19,8 @@ export function StrictDecl(type, name, hardwareAddress) {
 // entry — the program entry point (not a function, a jump target)
 // body: Block for inline form, null for address form
 // address: expression for address form, null for inline form
-export function EntryDecl(name, body = null, address = null) {
-    return { kind: "EntryDecl", name, body, address };
+export function EntryDecl(name, body = null, address = null, params = []) {
+    return { kind: "EntryDecl", name, body, address, params };
 }
 
 export function FunctionDecl(name, params, returnType, body, isExtern = false, isVariadic = false) {
