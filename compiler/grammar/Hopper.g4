@@ -15,10 +15,17 @@ topLevelDecl
     | importDecl
     | aliasDecl
     | entryDecl
+    | bindDecl
     ;
 
 importDecl
     : 'import' StringLiteral
+    ;
+
+// bind — maps a physical hardware address to a function address (linker directive)
+// bind 0x00000004 to reset::address
+bindDecl
+    : 'bind' HexLiteral 'to' Identifier '::' 'address'
     ;
 
 // entry — the program entry point, not a function

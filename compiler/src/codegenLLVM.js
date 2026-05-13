@@ -1044,6 +1044,19 @@ function genOperator(className, op) {
     return genMethod(className, pseudoMethod, true);
 }
 
+// ── bind directive codegen ────────────────────────────────────────────────
+
+function genBind(bind) {
+    // Emit a function-pointer global in a named section so the linker can
+    // place it at the hardware address.  Section name encodes the address so
+    // a Hopper linker script can place ".hopbind.0x00000004" at 0x00000004.
+    const fnInfo = functionReturnTypes.get(bind.functionName);
+    const ret    = fnInfo ? (fnInfo.returnType === null ? "void" : llvmType(fnInfo.returnType)) : "void";
+    const varName = `@__bind_${bind.hardwareAddress}`;
+    const section = `.hopbind.${bind.hardwareAddress}`;
+    return `${varName} = global ptr @${bind.functionName}, section "${section}", align 4`;
+}
+
 // ── entry point codegen ───────────────────────────────────────────────────
 
 function genEntry(entry) {
@@ -1186,6 +1199,10 @@ function genModule(ast) {
     if (typeDefs.length > 0) out += typeDefs.join("") + "\n";
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
+
+    // Emit bind globals (function-pointer globals for vector table placement)
+    const bindGlobals = (ast.binds || []).map(b => genBind(b));
+    if (bindGlobals.length > 0) out += bindGlobals.join("\n") + "\n\n";
 
     for (const fn of ast.functions) {
         if (fn.isExtern) {

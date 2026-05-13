@@ -1,7 +1,13 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds };
+}
+
+// bind — linker directive mapping a hardware address to a function address
+// bind 0x00000004 to reset::address
+export function BindDecl(hardwareAddress, functionName) {
+    return { kind: "BindDecl", hardwareAddress, functionName };
 }
 
 // entry — the program entry point (not a function, a jump target)

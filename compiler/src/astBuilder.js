@@ -26,6 +26,7 @@ import {
     AliasDecl,
     TemplateDecl,
     EntryDecl,
+    BindDecl,
     Param,
     Call,
     MethodCall,
@@ -70,6 +71,7 @@ export class AstBuilder extends HopperVisitor {
         const consts = [];
         const aliases = [];
         const templates = [];
+        const binds = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
@@ -82,9 +84,10 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "AliasDecl")    aliases.push(node);
             else if (node.kind === "TemplateDecl") templates.push(node);
             else if (node.kind === "EntryDecl")    entry = node;
+            else if (node.kind === "BindDecl")     binds.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds);
     }
 
     visitTopLevelDecl(ctx) {
@@ -255,6 +258,14 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const addr = this.visit(ctx.expression());
         return EntryDecl(name, null, addr);
+    }
+
+    // ── bind ───────────────────────────────────────────────────────────────
+
+    visitBindDecl(ctx) {
+        const hardwareAddress = ctx.HexLiteral().getText();
+        const functionName    = ctx.Identifier().getText();
+        return BindDecl(hardwareAddress, functionName);
     }
 
     // ── functions ──────────────────────────────────────────────────────────
@@ -632,6 +643,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         ast.consts.unshift(...importedAst.consts);
         ast.aliases.unshift(...importedAst.aliases);
         ast.templates.unshift(...importedAst.templates);
+        ast.binds.unshift(...importedAst.binds);
         // entry is never inherited from imports — only the main file sets it
     }
 
