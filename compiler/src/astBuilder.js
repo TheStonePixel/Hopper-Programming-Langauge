@@ -5,7 +5,8 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STDLIB_DIR = path.resolve(__dirname, "..", "..", "core", "stdlib");
+const STDLIB_DIR  = path.resolve(__dirname, "..", "..", "core", "stdlib");
+const DS_DIR      = path.resolve(__dirname, "..", "..", "core", "datastructures");
 
 import HopperLexer from "./generated/grammar/HopperLexer.js";
 import HopperParser from "./generated/grammar/HopperParser.js";
@@ -186,7 +187,7 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const returnType = ctx.type().getText();
         const params = ctx.paramList()
-            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
         const body = this.visit(ctx.block());
         return ClassMethod(name, params, returnType, body);
@@ -195,7 +196,7 @@ export class AstBuilder extends HopperVisitor {
     visitClassOperator(ctx) {
         const op = ctx.operatorSymbol().getText();
         const p = ctx.param();
-        const param = Param(p.Identifier().getText(), p.type().getText());
+        const param = Param(p.paramName().getText(), p.type().getText());
         const returnType = ctx.type().getText();
         const body = this.visit(ctx.block());
         return ClassOperator(op, param, returnType, body);
@@ -204,7 +205,7 @@ export class AstBuilder extends HopperVisitor {
     visitClassProcMethod(ctx) {
         const name = ctx.Identifier().getText();
         const params = ctx.paramList()
-            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
         const body = this.visit(ctx.block());
         return ClassMethod(name, params, null, body);
@@ -212,7 +213,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitClassConstructor(ctx) {
         const params = ctx.paramList()
-            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
         const body = this.visit(ctx.block());
         return ClassConstructor(params, body);
@@ -287,7 +288,7 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const returnType = ctx.type().getText();
         const params = ctx.paramList()
-            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
         const body = this.visit(ctx.block());
         return FunctionDecl(name, params, returnType, body, false);
@@ -297,7 +298,7 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const returnType = ctx.type().getText();
         const epl = ctx.externParamList();
-        const params = epl ? epl.param().map(p => Param(p.Identifier().getText(), p.type().getText())) : [];
+        const params = epl ? epl.param().map(p => Param(p.paramName().getText(), p.type().getText())) : [];
         const isVariadic = epl ? epl.getText().endsWith("...") : false;
         return FunctionDecl(name, params, returnType, null, true, isVariadic);
     }
@@ -305,7 +306,7 @@ export class AstBuilder extends HopperVisitor {
     visitProcDecl(ctx) {
         const name = ctx.Identifier().getText();
         const params = ctx.paramList()
-            ? ctx.paramList().param().map(p => Param(p.Identifier().getText(), p.type().getText()))
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
         const body = this.visit(ctx.block());
         return FunctionDecl(name, params, null, body, false);
@@ -314,7 +315,7 @@ export class AstBuilder extends HopperVisitor {
     visitExternProcDecl(ctx) {
         const name = ctx.Identifier().getText();
         const epl = ctx.externParamList();
-        const params = epl ? epl.param().map(p => Param(p.Identifier().getText(), p.type().getText())) : [];
+        const params = epl ? epl.param().map(p => Param(p.paramName().getText(), p.type().getText())) : [];
         const isVariadic = epl ? epl.getText().endsWith("...") : false;
         return FunctionDecl(name, params, null, null, true, isVariadic);
     }
@@ -533,9 +534,11 @@ export class AstBuilder extends HopperVisitor {
         }
 
         const text = ctx.getText();
-        if (text === "true")  return BoolLiteral(true);
-        if (text === "false") return BoolLiteral(false);
-        if (text === "null")  return NullLiteral();
+        if (text === "true")    return BoolLiteral(true);
+        if (text === "false")   return BoolLiteral(false);
+        if (text === "null")    return NullLiteral();
+        // contextual keywords used as variable references
+        if (text === "size" || text === "value" || text === "address") return Var(text);
 
         const children   = ctx.children || [];
         const childTexts = children.map(c => c.getText ? c.getText() : String(c));
@@ -627,6 +630,8 @@ function resolveImportPath(importPath, baseDir) {
     const withExt = importPath.endsWith(".hop") ? importPath : importPath + ".hop";
     if (importPath.startsWith("stdlib/"))
         return path.resolve(STDLIB_DIR, withExt.slice("stdlib/".length));
+    if (importPath.startsWith("datastructures/"))
+        return path.resolve(DS_DIR, withExt.slice("datastructures/".length));
     return path.resolve(baseDir || process.cwd(), withExt);
 }
 

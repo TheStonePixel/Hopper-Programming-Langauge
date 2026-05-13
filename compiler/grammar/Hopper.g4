@@ -114,7 +114,15 @@ externParamList
     ;
 
 param
-    : type Identifier
+    : type paramName
+    ;
+
+// paramName mirrors fieldName — allows contextual keywords as parameter names
+paramName
+    : Identifier
+    | 'value'
+    | 'address'
+    | 'size'
     ;
 
 type
@@ -200,6 +208,9 @@ primary
     | Identifier '[' expression ']'                     // array element access
     | Identifier '.' fieldName                          // field access
     | Identifier
+    | 'value'                                               // contextual keyword as variable ref
+    | 'address'                                             // contextual keyword as variable ref
+    | 'size'                                                // contextual keyword as variable ref
     | '(' expression ')'
     ;
 

@@ -589,6 +589,11 @@ function genExpr(ir, expr) {
 
             switch (expr.op) {
                 case "+": {
+                    if (left.type === "address" && right.type === "int") {
+                        const tmp = ir.newTmp();
+                        ir.emit(`${tmp} = getelementptr i8, i8* ${left.value}, i64 ${right.value}`);
+                        return { value: tmp, type: "address" };
+                    }
                     if (left.type.startsWith("address:") && right.type === "int") {
                         const pointedTo = left.type.substring(8);
                         const tmp = ir.newTmp();
@@ -600,6 +605,13 @@ function genExpr(ir, expr) {
                     return { value: tmp, type: left.type };
                 }
                 case "-": {
+                    if (left.type === "address" && right.type === "int") {
+                        const neg = ir.newTmp();
+                        ir.emit(`${neg} = sub i64 0, ${right.value}`);
+                        const tmp = ir.newTmp();
+                        ir.emit(`${tmp} = getelementptr i8, i8* ${left.value}, i64 ${neg}`);
+                        return { value: tmp, type: "address" };
+                    }
                     if (left.type.startsWith("address:") && right.type === "int") {
                         const pointedTo = left.type.substring(8);
                         const neg = ir.newTmp();
@@ -1012,7 +1024,7 @@ function genFunction(fn) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : "0"}`);
+        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
@@ -1054,7 +1066,7 @@ function genMethod(typeName, method, isClass = true) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : "0"}`);
+        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
