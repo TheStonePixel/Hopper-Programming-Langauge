@@ -166,6 +166,22 @@ statement
     | 'continue'                                         # ContinueStmt
     | 'return' expression?                               # ReturnStmt
     | 'defer' expression                                 # DeferStmt
+    | 'asm' asmBlock                                     # AsmStmt
+    ;
+
+asmBlock
+    : '{' NEWLINE* (asmLine (NEWLINE+ asmLine)* NEWLINE*)? '}'
+    ;
+
+asmLine
+    : Identifier '=' asmOperand    # AsmLineAssign
+    | Identifier                   # AsmLineOp
+    ;
+
+asmOperand
+    : IntegerLiteral
+    | HexLiteral
+    | Identifier
     ;
 
 forInit

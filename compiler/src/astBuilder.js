@@ -63,6 +63,7 @@ import {
     ArrayAccess,
     ArrayAssign,
     ArrayElementAddress,
+    AsmStmt,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
@@ -367,6 +368,27 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const size = parseInt(ctx.IntegerLiteral().getText(), 10);
         return ArrayDecl(type, name, size);
+    }
+
+    visitAsmStmt(ctx) {
+        const lines = ctx.asmBlock().asmLine().map(l => this.visit(l));
+        return AsmStmt(lines);
+    }
+
+    visitAsmLineAssign(ctx) {
+        const dest = ctx.Identifier().getText();
+        const src  = this.visitAsmOperand(ctx.asmOperand());
+        return { kind: "AsmLineAssign", dest, src };
+    }
+
+    visitAsmLineOp(ctx) {
+        return { kind: "AsmLineOp", op: ctx.Identifier().getText() };
+    }
+
+    visitAsmOperand(ctx) {
+        if (ctx.IntegerLiteral()) return IntLiteral(parseInt(ctx.IntegerLiteral().getText(), 10));
+        if (ctx.HexLiteral())     return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
+        return Var(ctx.Identifier().getText());
     }
 
     visitArrayAssign(ctx) {

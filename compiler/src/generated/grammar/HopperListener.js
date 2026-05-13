@@ -446,6 +446,51 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#AsmStmt.
+	enterAsmStmt(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AsmStmt.
+	exitAsmStmt(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#asmBlock.
+	enterAsmBlock(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#asmBlock.
+	exitAsmBlock(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#AsmLineAssign.
+	enterAsmLineAssign(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AsmLineAssign.
+	exitAsmLineAssign(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#AsmLineOp.
+	enterAsmLineOp(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AsmLineOp.
+	exitAsmLineOp(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#asmOperand.
+	enterAsmOperand(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#asmOperand.
+	exitAsmOperand(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#ForInitDecl.
 	enterForInitDecl(ctx) {
 	}

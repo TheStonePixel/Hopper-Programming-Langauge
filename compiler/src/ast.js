@@ -216,6 +216,13 @@ export function ArrayDeclInit(type, name, size, elements) {
     return { kind: "ArrayDeclInit", type, name, size, elements };
 }
 
+export function AsmStmt(lines) {
+    return { kind: "AsmStmt", lines };
+}
+// AsmStmt line kinds:
+// { kind: "AsmLineAssign", dest: string, src: AstNode } — reg=value (input) or var=reg (output)
+// { kind: "AsmLineOp", op: string }                     — instruction (syscall, hlt, etc.)
+
 export function ArrayAccess(name, index) {
     return { kind: "ArrayAccess", name, index };
 }

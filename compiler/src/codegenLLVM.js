@@ -686,6 +686,35 @@ function genExpr(ir, expr) {
         }
 
         case "Call": {
+            // syscall(num, arg1, ...) builtin — maps directly to Linux syscall instruction
+            if (expr.callee === "syscall") {
+                const syscallRegs = ['rax','rdi','rsi','rdx','r10','r8','r9'];
+                const args = (expr.args || []).map(a => genExpr(ir, a));
+                const inputArgs = args.map((a, i) => {
+                    let v = a.value, t = llvmType(a.type);
+                    if (t.endsWith("*")) {
+                        const tmp2 = ir.newTmp();
+                        ir.emit(`${tmp2} = ptrtoint ${t} ${v} to i64`);
+                        v = tmp2; t = "i64";
+                    }
+                    if (t === "i8" || t === "i1") {
+                        const tmp2 = ir.newTmp();
+                        ir.emit(`${tmp2} = zext ${t} ${v} to i64`);
+                        v = tmp2; t = "i64";
+                    }
+                    return { reg: syscallRegs[i], llType: t, value: v };
+                });
+                const outC  = `={rax}`;
+                // first input (syscall number) uses tied constraint "0" = same reg as output 0 (rax)
+                const inC   = inputArgs.map((a, i) => i === 0 ? "0" : `{${a.reg}}`).join(",");
+                const clob  = `~{rcx},~{r11},~{memory}`;
+                const constraints = `${outC},${inC},${clob}`;
+                const argStr = inputArgs.map(a => `${a.llType} ${a.value}`).join(", ");
+                const tmp = ir.newTmp();
+                ir.emit(`${tmp} = call i64 asm sideeffect "syscall", "${constraints}"(${argStr})`);
+                return { value: tmp, type: "int" };
+            }
+
             const args     = (expr.args || []).map(a => genExpr(ir, a));
             const argStr   = args.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
             const fnInfo   = functionReturnTypes.get(expr.callee);
@@ -895,6 +924,77 @@ function genStmt(ir, stmt, retType) {
                 const elemPtr = ir.newTmp();
                 ir.emit(`${elemPtr} = getelementptr ${arrayType}, ${arrayType}* ${ptr}, i32 0, i32 ${i}`);
                 ir.emit(`store ${llElemType} ${val.value}, ${llElemType}* ${elemPtr}`);
+            }
+            break;
+        }
+
+        case "AsmStmt": {
+            const X86_REGS = new Set([
+                'rax','rbx','rcx','rdx','rsi','rdi','rsp','rbp',
+                'r8','r9','r10','r11','r12','r13','r14','r15',
+                'eax','ebx','ecx','edx','esi','edi','esp','ebp',
+                'ax','bx','cx','dx','si','di','al','bl','cl','dl',
+                'xmm0','xmm1','xmm2','xmm3','xmm4','xmm5','xmm6','xmm7',
+            ]);
+            const inputs  = [];  // { reg, llType, value }
+            const outputs = [];  // { name, reg }
+            const ops     = [];  // instruction strings
+
+            for (const line of stmt.lines) {
+                if (line.kind === "AsmLineOp") {
+                    ops.push(line.op);
+                } else if (line.kind === "AsmLineAssign") {
+                    if (X86_REGS.has(line.dest)) {
+                        // reg = value/var — input
+                        const val = genExpr(ir, line.src);
+                        let llVal = val.value;
+                        let llT   = llvmType(val.type);
+                        if (llT.endsWith("*")) {
+                            // ptrtoint pointer → i64 for register
+                            const tmp2 = ir.newTmp();
+                            ir.emit(`${tmp2} = ptrtoint ${llT} ${llVal} to i64`);
+                            llVal = tmp2; llT = "i64";
+                        }
+                        if (llT === "i8" || llT === "i1") {
+                            const tmp2 = ir.newTmp();
+                            ir.emit(`${tmp2} = zext ${llT} ${llVal} to i64`);
+                            llVal = tmp2; llT = "i64";
+                        }
+                        inputs.push({ reg: line.dest, llType: llT, value: llVal });
+                    } else {
+                        // var = reg — output
+                        outputs.push({ name: line.dest, reg: line.src.name });
+                    }
+                }
+            }
+
+            const asmStr         = ops.join("\\0A");
+            const outConstraints = outputs.map(o => `={${o.reg}}`);
+            const inConstraints  = inputs.map(i => `{${i.reg}}`);
+            // If rax is an input but not an output, mark it as clobbered so LLVM
+            // doesn't assume it's still live after the instruction.
+            const raxClobber = (outputs.length === 0 && inputs.some(i => i.reg === 'rax')) ? ['~{rax}'] : [];
+            const clobbers   = [...raxClobber, '~{rcx}','~{r11}','~{memory}'];
+            const constraints    = [...outConstraints, ...inConstraints, ...clobbers].join(",");
+            const inputArgs      = inputs.map(i => `${i.llType} ${i.value}`).join(", ");
+
+            if (outputs.length === 0) {
+                ir.emit(`call void asm sideeffect "${asmStr}", "${constraints}"(${inputArgs})`);
+            } else if (outputs.length === 1) {
+                const outTmp = ir.newTmp();
+                ir.emit(`${outTmp} = call i64 asm sideeffect "${asmStr}", "${constraints}"(${inputArgs})`);
+                const outVar = ir.vars.get(outputs[0].name);
+                if (outVar) ir.emit(`store i64 ${outTmp}, i64* ${outVar.ptr}`);
+            } else {
+                const structT = `{ ${outputs.map(() => 'i64').join(', ')} }`;
+                const outTmp  = ir.newTmp();
+                ir.emit(`${outTmp} = call ${structT} asm sideeffect "${asmStr}", "${constraints}"(${inputArgs})`);
+                outputs.forEach((out, i) => {
+                    const ex = ir.newTmp();
+                    ir.emit(`${ex} = extractvalue ${structT} ${outTmp}, ${i}`);
+                    const outVar = ir.vars.get(out.name);
+                    if (outVar) ir.emit(`store i64 ${ex}, i64* ${outVar.ptr}`);
+                });
             }
             break;
         }
