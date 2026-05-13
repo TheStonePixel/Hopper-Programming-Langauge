@@ -1,0 +1,6 @@
+
+entry main(int argc, string[] argv) {
+
+
+	return argc
+}
