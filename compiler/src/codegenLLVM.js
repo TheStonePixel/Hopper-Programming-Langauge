@@ -263,6 +263,7 @@ function llvmType(t) {
     if (t === "bool")         return "i1";
     if (t === "byte")         return "i8";
     if (t === "float")        return "double";
+    if (t === "string")       return "i8*";
     if (t === "String")       return "i8*";
     if (t === "address")      return "i8*";
     if (t === "unsignedint")  return "i64";
@@ -287,6 +288,7 @@ function sizeOfType(t) {
     if (t === "byte")    return 1;
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
+    if (t === "string")  return 8;
     if (t === "String")  return 8;
     if (t === "address") return 8;
     if (structTypes.has(t)) {
@@ -438,15 +440,12 @@ function genExpr(ir, expr) {
         case "BoolLiteral":
             return { value: expr.value ? "1" : "0", type: "bool" };
 
-        case "CharLiteral":
-            return { value: String(expr.value), type: "int" };
-
         case "StringLiteral": {
             const strName = addStringConstant(expr.value);
             const len = expr.value.length + 1;
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
-            return { value: tmp, type: "String" };
+            return { value: tmp, type: "string" };
         }
 
         case "NullLiteral":
@@ -1092,6 +1091,7 @@ function typeSize(hType) {
     if (t === "bool")         return 1;
     if (t === "byte")         return 1;
     if (t === "address")      return 8;
+    if (t === "string")       return 8;
     if (t === "String")       return 8;
     if (t === "unsignedint")  return 8;
     if (t === "unsignedbyte") return 1;

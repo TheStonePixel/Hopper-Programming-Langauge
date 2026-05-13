@@ -184,10 +184,6 @@ export function StringLiteral(value) {
     return { kind: "StringLiteral", value };
 }
 
-export function CharLiteral(value) {
-    // Stored as int (ASCII code point)
-    return { kind: "CharLiteral", value };
-}
 
 export function NullLiteral() {
     return { kind: "NullLiteral" };

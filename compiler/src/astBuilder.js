@@ -54,7 +54,6 @@ import {
     FloatLiteral,
     BoolLiteral,
     StringLiteral,
-    CharLiteral,
     NullLiteral,
     SizeOf,
     AddressOf,
@@ -126,7 +125,7 @@ export class AstBuilder extends HopperVisitor {
             const raw = text.slice(1, -1)
                 .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
                 .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
-            return { value: raw, type: "String" };
+            return { value: raw, type: "string" };
         }
         if (text === "true")  return { value: true,  type: "bool" };
         if (text === "false") return { value: false, type: "bool" };
@@ -517,21 +516,6 @@ export class AstBuilder extends HopperVisitor {
             return StringLiteral(raw);
         }
 
-        // Char literal
-        if (ctx.CharLiteral && ctx.CharLiteral()) {
-            let char = ctx.CharLiteral().getText().slice(1, -1);
-            if (char.startsWith('\\')) {
-                switch (char[1]) {
-                    case 'n':  char = '\n'; break;
-                    case 't':  char = '\t'; break;
-                    case 'r':  char = '\r'; break;
-                    case '\\': char = '\\'; break;
-                    case "'":  char = "'";  break;
-                    default:   char = char[1];
-                }
-            }
-            return CharLiteral(char.charCodeAt(0));
-        }
 
         const text = ctx.getText();
         if (text === "true")    return BoolLiteral(true);
