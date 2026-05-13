@@ -148,30 +148,37 @@
     <section class="layers">
       <div class="container">
         <span class="label">The Vision</span>
-        <p class="section-desc">Hopper is designed as three layers — each built on the one below, each written in Hopper itself.</p>
+        <p class="vision-statement">One language. Three altitudes. Each tier built on the one below it — in Hopper itself.</p>
+        <p class="vision-sub">
+          Hopper builds the runtime. That runtime becomes the foundation Hopper+ runs on.
+          Hopper+ builds the Shell. The same grammar and type system runs at every level —
+          <code>int</code> is <code>int</code> everywhere. The language doesn't fracture as you move up the stack.
+          You don't learn a new language. You just have more of it available.
+        </p>
         <div class="layer-stack">
-          <div class="layer top">
+          <div class="layer top future">
             <div class="layer-info">
               <div class="layer-name">Hopper Shell</div>
               <div class="layer-analogy">like early Python / JS</div>
             </div>
-            <div class="layer-desc">An embedded scripting layer that binds to application functionality. Drop it into any Hopper+ application and expose logic, automate workflows, or let end users extend behavior — without recompiling.</div>
+            <div class="layer-desc">An embedded scripting layer that binds to application functionality. Drop it into any Hopper+ application and let users extend behavior without recompiling. Built on Hopper+.</div>
           </div>
-          <div class="layer mid">
+          <div class="layer mid future">
             <div class="layer-info">
               <div class="layer-name">Hopper+</div>
               <div class="layer-analogy">like C# / Java</div>
             </div>
-            <div class="layer-desc">The application tier. Standard library, heap allocator, OS interfaces, and high-level abstractions. Built entirely on Hopper — no foreign runtime required.</div>
+            <div class="layer-desc">The application tier. Shares ~90% of Hopper's syntax and type system. Hardware primitives removed, high-level abstractions added. Built entirely on Hopper — no foreign runtime.</div>
           </div>
           <div class="layer bottom">
             <div class="layer-info">
               <div class="layer-name">Hopper</div>
               <div class="layer-analogy">like Assembly / C</div>
             </div>
-            <div class="layer-desc">The machine tier. Hardware access, bare metal execution, OS kernels, compilers, firmware. No dependencies. Just you and the hardware.</div>
+            <div class="layer-desc">The machine tier. Hardware access, bare metal execution, OS kernels, compilers, firmware. No dependencies. The foundation everything else is built on.</div>
           </div>
         </div>
+        <p class="future-note">Hopper+ and Hopper Shell are long-term goals — not a roadmap, a direction.</p>
       </div>
     </section>
 
@@ -194,15 +201,10 @@
             <h3>Bare Metal Targets</h3>
             <p>AVR (Arduino Uno), ARM Cortex-M (STM32, RP2040), bare metal stdlib using <code>volatile</code> and <code>bind</code>.</p>
           </div>
-          <div class="step">
-            <span class="step-label">Later</span>
-            <h3>Hopper+</h3>
-            <p>Application-tier language built on Hopper. Standard library, memory management, OS interfaces. Write desktop apps, servers, and tools — no foreign runtime underneath.</p>
-          </div>
           <div class="step goal">
             <span class="step-label">Goal</span>
-            <h3>One Command</h3>
-            <p>Write an Arduino program in Hopper. One command. No C toolchain. The linker written in Hopper itself.</p>
+            <h3>Self-hosting toolchain</h3>
+            <p>Write an Arduino program in Hopper. One command. No C toolchain. The compiler, linker, and stdlib all written in Hopper itself.</p>
           </div>
         </div>
       </div>
@@ -431,11 +433,41 @@ code {
   border-bottom: 1px solid #1a1a1a;
 }
 
+.vision-statement {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #ddd;
+  margin-bottom: 1rem;
+}
+
+.vision-sub {
+  font-size: 0.9rem;
+  color: #777;
+  max-width: 640px;
+  line-height: 1.8;
+  margin-bottom: 2.5rem;
+}
+
+.vision-sub code {
+  font-size: 0.82rem;
+  color: #569cd6;
+  background: #1a1a1a;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.future-note {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: #444;
+  font-style: italic;
+}
+
 .layer-stack {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: 560px;
+  max-width: 660px;
 }
 
 .layer {
@@ -448,6 +480,7 @@ code {
 .layer.top    { background: #161b22; border: 1px solid #21262d; }
 .layer.mid    { background: #111820; border: 1px solid #1c2230; }
 .layer.bottom { background: #0d1117; border: 1px solid #161b22; }
+.layer.future { opacity: 0.5; }
 
 .layer-info {
   min-width: 140px;
