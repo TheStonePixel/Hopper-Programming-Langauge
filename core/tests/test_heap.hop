@@ -2,7 +2,7 @@
 // EXPECT: 1
 // EXPECT: 4096
 
-import io from stdlib
+import io from linux
 import heap from datastructures
 
 extern function printf(String fmt, ...) int

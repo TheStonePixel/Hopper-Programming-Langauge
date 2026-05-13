@@ -1,6 +1,6 @@
 // EXPECT: hopper addr
 
-import io from stdlib
+import io from linux
 
 function startup() int {
     print("hopper addr\n", 12)
