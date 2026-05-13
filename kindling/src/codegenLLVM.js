@@ -1230,7 +1230,7 @@ function genBind(bind) {
     // place it at the hardware address.
     const varName = `@__bind_${bind.hardwareAddress}`;
     const section = `.hopbind.${bind.hardwareAddress}`;
-    return `${varName} = global ptr @${bind.functionName}, section "${section}", align 4`;
+    return `${varName} = global i8* bitcast (void ()* @${bind.functionName} to i8*), section "${section}", align 4`;
 }
 
 // ── entry point codegen ───────────────────────────────────────────────────
