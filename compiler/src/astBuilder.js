@@ -60,6 +60,7 @@ import {
     Deref,
     DerefAssign,
     ArrayDecl,
+    ArrayDeclInit,
     ArrayAccess,
     ArrayAssign,
     ArrayElementAddress,
@@ -352,6 +353,14 @@ export class AstBuilder extends HopperVisitor {
 
     visitDerefAssign(ctx) {
         return DerefAssign(ctx.Identifier().getText(), this.visit(ctx.expression()));
+    }
+
+    visitArrayDeclInit(ctx) {
+        const type     = ctx.type().getText();
+        const name     = ctx.Identifier().getText();
+        const size     = parseInt(ctx.IntegerLiteral().getText(), 10);
+        const elements = ctx.argList().expression().map(e => this.visit(e));
+        return ArrayDeclInit(type, name, size, elements);
     }
 
     visitArrayDecl(ctx) {

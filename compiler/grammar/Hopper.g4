@@ -149,7 +149,8 @@ block
     ;
 
 statement
-    : type Identifier '[' IntegerLiteral ']'             # ArrayDecl
+    : type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
+    | type Identifier '[' IntegerLiteral ']'             # ArrayDecl
     | type Identifier '=' expression                     # VarDecl
     | type Identifier                                    # VarDeclNoInit
     | Identifier '[' expression ']' '=' expression       # ArrayAssign

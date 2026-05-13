@@ -212,6 +212,10 @@ export function ArrayDecl(type, name, size) {
     return { kind: "ArrayDecl", type, name, size };
 }
 
+export function ArrayDeclInit(type, name, size, elements) {
+    return { kind: "ArrayDeclInit", type, name, size, elements };
+}
+
 export function ArrayAccess(name, index) {
     return { kind: "ArrayAccess", name, index };
 }

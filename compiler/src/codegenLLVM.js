@@ -89,8 +89,9 @@ function substBlock(block, subst) {
 function substStmt(s, subst) {
     if (!s) return null;
     switch (s.kind) {
-        case "VarDecl":     return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDecl":   return { ...s, type: substTypeStr(s.type, subst) };
+        case "VarDecl":       return { ...s, type: substTypeStr(s.type, subst) };
+        case "ArrayDecl":     return { ...s, type: substTypeStr(s.type, subst) };
+        case "ArrayDeclInit": return { ...s, type: substTypeStr(s.type, subst) };
         case "IfStmt":      return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
         case "WhileStmt":   return { ...s, body: substBlock(s.body, subst) };
         case "ForStmt":     return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
@@ -206,8 +207,9 @@ function collectTypeUsages(ast) {
     function scanStmt(s) {
         if (!s) return;
         switch (s.kind) {
-            case "VarDecl":   checkType(s.type); break;
-            case "ArrayDecl": checkType(s.type); break;
+            case "VarDecl":       checkType(s.type); break;
+            case "ArrayDecl":     checkType(s.type); break;
+            case "ArrayDeclInit": checkType(s.type); break;
             case "IfStmt":    scanBlock(s.thenBlock); scanBlock(s.elseBlock); break;
             case "WhileStmt": scanBlock(s.body); break;
             case "ForStmt":   scanStmt(s.init); scanBlock(s.body); break;
@@ -878,6 +880,22 @@ function genStmt(ir, stmt, retType) {
             const ptr        = ir.newTmp();
             ir.emit(`${ptr} = alloca ${arrayType}`);
             ir.vars.set(stmt.name, { ptr, type: arrayType, hType: `array:${stmt.type}:${stmt.size}` });
+            break;
+        }
+
+        case "ArrayDeclInit": {
+            const llElemType = llvmType(stmt.type);
+            const size       = stmt.size;
+            const arrayType  = `[${size} x ${llElemType}]`;
+            const ptr        = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${arrayType}`);
+            ir.vars.set(stmt.name, { ptr, type: arrayType, hType: `array:${stmt.type}:${size}` });
+            for (let i = 0; i < stmt.elements.length; i++) {
+                const val     = genExpr(ir, stmt.elements[i]);
+                const elemPtr = ir.newTmp();
+                ir.emit(`${elemPtr} = getelementptr ${arrayType}, ${arrayType}* ${ptr}, i32 0, i32 ${i}`);
+                ir.emit(`store ${llElemType} ${val.value}, ${llElemType}* ${elemPtr}`);
+            }
             break;
         }
 
