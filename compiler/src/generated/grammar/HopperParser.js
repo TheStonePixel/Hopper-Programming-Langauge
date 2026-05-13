@@ -246,7 +246,7 @@ export default class HopperParser extends antlr4.Parser {
 
     static grammarFileName = "Hopper.g4";
     static literalNames = [ null, "'import'", "'bind'", "'='", "'::'", "'address'", 
-                            "'volatile'", "'entry'", "'const'", "'alias'", 
+                            "'strict'", "'entry'", "'const'", "'alias'", 
                             "'extern'", "'function'", "'('", "')'", "'struct'", 
                             "'{'", "'}'", "'pad'", "'template'", "'<'", 
                             "','", "'>'", "'class'", "'operator'", "'constructor'", 
@@ -271,7 +271,7 @@ export default class HopperParser extends antlr4.Parser {
                              "FloatLiteral", "StringLiteral", "CharLiteral", 
                              "Identifier", "NEWLINE", "LINE_COMMENT", "WS" ];
     static ruleNames = [ "program", "topLevelDecl", "importDecl", "bindDecl", 
-                         "volatileDecl", "entryDecl", "constDecl", "aliasDecl", 
+                         "strictDecl", "entryDecl", "constDecl", "aliasDecl", 
                          "functionDecl", "structDecl", "structMember", "templateDecl", 
                          "classDecl", "classMember", "fieldName", "operatorSymbol", 
                          "paramList", "externParamList", "param", "type", 
@@ -401,7 +401,7 @@ export default class HopperParser extends antlr4.Parser {
 	        case 6:
 	            this.enterOuterAlt(localctx, 10);
 	            this.state = 107;
-	            this.volatileDecl();
+	            this.strictDecl();
 	            break;
 	        default:
 	            throw new antlr4.error.NoViableAltException(this);
@@ -480,9 +480,9 @@ export default class HopperParser extends antlr4.Parser {
 
 
 
-	volatileDecl() {
-	    let localctx = new VolatileDeclContext(this, this._ctx, this.state);
-	    this.enterRule(localctx, 8, HopperParser.RULE_volatileDecl);
+	strictDecl() {
+	    let localctx = new StrictDeclContext(this, this._ctx, this.state);
+	    this.enterRule(localctx, 8, HopperParser.RULE_strictDecl);
 	    try {
 	        this.enterOuterAlt(localctx, 1);
 	        this.state = 120;
@@ -2788,7 +2788,7 @@ HopperParser.RULE_program = 0;
 HopperParser.RULE_topLevelDecl = 1;
 HopperParser.RULE_importDecl = 2;
 HopperParser.RULE_bindDecl = 3;
-HopperParser.RULE_volatileDecl = 4;
+HopperParser.RULE_strictDecl = 4;
 HopperParser.RULE_entryDecl = 5;
 HopperParser.RULE_constDecl = 6;
 HopperParser.RULE_aliasDecl = 7;
@@ -2940,8 +2940,8 @@ class TopLevelDeclContext extends antlr4.ParserRuleContext {
 	    return this.getTypedRuleContext(BindDeclContext,0);
 	};
 
-	volatileDecl() {
-	    return this.getTypedRuleContext(VolatileDeclContext,0);
+	strictDecl() {
+	    return this.getTypedRuleContext(StrictDeclContext,0);
 	};
 
 	enterRule(listener) {
@@ -3059,7 +3059,7 @@ class BindDeclContext extends antlr4.ParserRuleContext {
 
 
 
-class VolatileDeclContext extends antlr4.ParserRuleContext {
+class StrictDeclContext extends antlr4.ParserRuleContext {
 
     constructor(parser, parent, invokingState) {
         if(parent===undefined) {
@@ -3070,7 +3070,7 @@ class VolatileDeclContext extends antlr4.ParserRuleContext {
         }
         super(parent, invokingState);
         this.parser = parser;
-        this.ruleIndex = HopperParser.RULE_volatileDecl;
+        this.ruleIndex = HopperParser.RULE_strictDecl;
     }
 
 	type() {
@@ -3087,19 +3087,19 @@ class VolatileDeclContext extends antlr4.ParserRuleContext {
 
 	enterRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.enterVolatileDecl(this);
+	        listener.enterStrictDecl(this);
 		}
 	}
 
 	exitRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.exitVolatileDecl(this);
+	        listener.exitStrictDecl(this);
 		}
 	}
 
 	accept(visitor) {
 	    if ( visitor instanceof HopperVisitor ) {
-	        return visitor.visitVolatileDecl(this);
+	        return visitor.visitStrictDecl(this);
 	    } else {
 	        return visitor.visitChildren(this);
 	    }
@@ -6004,7 +6004,7 @@ HopperParser.ProgramContext = ProgramContext;
 HopperParser.TopLevelDeclContext = TopLevelDeclContext; 
 HopperParser.ImportDeclContext = ImportDeclContext; 
 HopperParser.BindDeclContext = BindDeclContext; 
-HopperParser.VolatileDeclContext = VolatileDeclContext; 
+HopperParser.StrictDeclContext = StrictDeclContext; 
 HopperParser.EntryDeclContext = EntryDeclContext; 
 HopperParser.ConstDeclContext = ConstDeclContext; 
 HopperParser.AliasDeclContext = AliasDeclContext; 

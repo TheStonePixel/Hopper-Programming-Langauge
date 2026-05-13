@@ -62,9 +62,9 @@
 <span class="kw">bind</span> <span class="hex">0x00000004</span> <span class="op">=</span> reset<span class="op">::</span>address
 <span class="kw">bind</span> <span class="hex">0x0000003c</span> <span class="op">=</span> timer<span class="op">::</span>address
 
-<span class="comment">// hardware registers — volatile load/store aliases</span>
-<span class="kw">volatile</span> <span class="type">int</span> uart_dr <span class="op">=</span> <span class="hex">0x40021000</span>
-<span class="kw">volatile</span> <span class="type">int</span> uart_sr <span class="op">=</span> <span class="hex">0x40021004</span>
+<span class="comment">// hardware registers — strict load/store aliases</span>
+<span class="kw">strict</span> <span class="type">int</span> uart_dr <span class="op">=</span> <span class="hex">0x40021000</span>
+<span class="kw">strict</span> <span class="type">int</span> uart_sr <span class="op">=</span> <span class="hex">0x40021004</span>
 
 <span class="comment">// classes and templates work anywhere — even bare metal</span>
 <span class="kw">template</span> Buffer<span class="op">&lt;</span>T<span class="op">&gt;</span> {
@@ -189,7 +189,7 @@
           <div class="step done">
             <span class="step-label">Now</span>
             <h3>Language Core</h3>
-            <p>Functions, classes, templates, structs, <code>entry</code>, <code>bind</code>, <code>volatile</code>, LLVM IR codegen. 13/13 tests passing.</p>
+            <p>Functions, classes, templates, structs, <code>entry</code>, <code>bind</code>, <code>strict</code>, LLVM IR codegen. 13/13 tests passing.</p>
           </div>
           <div class="step">
             <span class="step-label">Next</span>
@@ -199,7 +199,7 @@
           <div class="step">
             <span class="step-label">Then</span>
             <h3>Bare Metal Targets</h3>
-            <p>AVR (Arduino Uno), ARM Cortex-M (STM32, RP2040), bare metal stdlib using <code>volatile</code> and <code>bind</code>.</p>
+            <p>AVR (Arduino Uno), ARM Cortex-M (STM32, RP2040), bare metal stdlib using <code>strict</code> and <code>bind</code>.</p>
           </div>
           <div class="step goal">
             <span class="step-label">Goal</span>

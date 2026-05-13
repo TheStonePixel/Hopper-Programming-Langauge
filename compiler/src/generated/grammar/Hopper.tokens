@@ -79,7 +79,7 @@ WS=76
 '='=3
 '::'=4
 'address'=5
-'volatile'=6
+'strict'=6
 'entry'=7
 'const'=8
 'alias'=9

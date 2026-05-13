@@ -5,7 +5,7 @@ null
 '='
 '::'
 'address'
-'volatile'
+'strict'
 'entry'
 'const'
 'alias'
@@ -161,7 +161,7 @@ program
 topLevelDecl
 importDecl
 bindDecl
-volatileDecl
+strictDecl
 entryDecl
 constDecl
 aliasDecl

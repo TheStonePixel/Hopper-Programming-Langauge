@@ -27,7 +27,7 @@ import {
     TemplateDecl,
     EntryDecl,
     BindDecl,
-    VolatileDecl,
+    StrictDecl,
     Param,
     Call,
     MethodCall,
@@ -73,7 +73,7 @@ export class AstBuilder extends HopperVisitor {
         const aliases = [];
         const templates = [];
         const binds = [];
-        const volatiles = [];
+        const stricts = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
@@ -87,10 +87,10 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "TemplateDecl")  templates.push(node);
             else if (node.kind === "EntryDecl")     entry = node;
             else if (node.kind === "BindDecl")      binds.push(node);
-            else if (node.kind === "VolatileDecl")  volatiles.push(node);
+            else if (node.kind === "StrictDecl")  stricts.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, volatiles);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts);
     }
 
     visitTopLevelDecl(ctx) {
@@ -271,13 +271,13 @@ export class AstBuilder extends HopperVisitor {
         return BindDecl(hardwareAddress, functionName);
     }
 
-    // ── volatile ───────────────────────────────────────────────────────────
+    // ── strict ───────────────────────────────────────────────────────────
 
-    visitVolatileDecl(ctx) {
+    visitStrictDecl(ctx) {
         const type            = ctx.type().getText();
         const name            = ctx.Identifier().getText();
         const hardwareAddress = ctx.HexLiteral().getText();
-        return VolatileDecl(type, name, hardwareAddress);
+        return StrictDecl(type, name, hardwareAddress);
     }
 
     // ── functions ──────────────────────────────────────────────────────────
@@ -656,7 +656,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         ast.aliases.unshift(...importedAst.aliases);
         ast.templates.unshift(...importedAst.templates);
         ast.binds.unshift(...importedAst.binds);
-        ast.volatiles.unshift(...importedAst.volatiles);
+        ast.stricts.unshift(...importedAst.stricts);
         // entry is never inherited from imports — only the main file sets it
     }
 

@@ -16,7 +16,7 @@ topLevelDecl
     | aliasDecl
     | entryDecl
     | bindDecl
-    | volatileDecl
+    | strictDecl
     ;
 
 importDecl
@@ -29,10 +29,10 @@ bindDecl
     : 'bind' HexLiteral '=' Identifier '::' 'address'
     ;
 
-// volatile — named alias for a memory-mapped hardware register
-// volatile int uart_dr = 0x40021000
-volatileDecl
-    : 'volatile' type Identifier '=' HexLiteral
+// strict — named alias for a memory-mapped hardware register
+// strict int uart_dr = 0x40021000
+strictDecl
+    : 'strict' type Identifier '=' HexLiteral
     ;
 
 // entry — the program entry point, not a function

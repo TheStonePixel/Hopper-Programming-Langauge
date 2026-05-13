@@ -19,9 +19,9 @@ Hopper's answer is to make those things part of the language itself — not flag
 bind 0x00000004 = reset::address
 bind 0x0000003c = timer::address
 
-// hardware registers — volatile load/store aliases
-volatile int uart_dr = 0x40021000
-volatile int uart_sr = 0x40021004
+// hardware registers — strict load/store aliases
+strict int uart_dr = 0x40021000
+strict int uart_sr = 0x40021004
 
 // unambiguous program entry point
 entry main {
@@ -35,11 +35,11 @@ No linker script. No startup assembly. No build flags. It's all code.
 
 ## Design Principles
 
-**No global variables.** Program-lifetime state lives in a Runtime class on the stack. The only exceptions are `bind` (linker-time, no RAM cost) and `volatile` (a name for a hardware address, not a variable).
+**No global variables.** Program-lifetime state lives in a Runtime class on the stack. The only exceptions are `bind` (linker-time, no RAM cost) and `strict` (a name for a hardware address, not a variable).
 
 **No operating system required.** Hopper is designed for freestanding, bare-metal execution. An OS can run on top of Hopper — it is not a dependency of it.
 
-**The language and the linker speak the same language.** `bind`, `volatile`, and `entry` are not directives to an external tool. They are declarations in the same language as the rest of your program. A Hopper program can describe its own hardware layout.
+**The language and the linker speak the same language.** `bind`, `strict`, and `entry` are not directives to an external tool. They are declarations in the same language as the rest of your program. A Hopper program can describe its own hardware layout.
 
 **It's all code, not instructions.** You don't tell the toolchain how to operate. You describe what exists, and the toolchain figures out the rest.
 
@@ -57,7 +57,7 @@ No linker script. No startup assembly. No build flags. It's all code.
 - Control flow — `if/else`, `while`, `for`, `break`, `continue`, `defer`
 - `entry` — unambiguous program entry point (inline or address form)
 - `bind` — linker directive mapping hardware addresses to function pointers
-- `volatile` — named aliases for memory-mapped hardware registers
+- `strict` — named aliases for memory-mapped hardware registers
 - Import system with stdlib
 - LLVM IR backend
 
@@ -70,7 +70,7 @@ import "stdlib/io"
 
 bind 0x00000004 = reset::address
 
-volatile int uart_dr = 0x40021000
+strict int uart_dr = 0x40021000
 
 function reset() {
     print("booted\n", 7)
@@ -87,7 +87,7 @@ entry main {
 
 ### Now — Language Core (current)
 - Full type system, classes, templates
-- `entry`, `bind`, `volatile`
+- `entry`, `bind`, `strict`
 - LLVM IR codegen
 
 ### Next — Toolchain
@@ -100,7 +100,7 @@ entry main {
 ### Then — Bare Metal Targets
 - AVR (Arduino Uno)
 - ARM Cortex-M (STM32, RP2040)
-- Bare metal stdlib using `volatile` and `bind`
+- Bare metal stdlib using `strict` and `bind`
 - Arduino programs written entirely in Hopper
 
 ### Goal

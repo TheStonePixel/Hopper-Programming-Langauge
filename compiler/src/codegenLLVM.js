@@ -1217,8 +1217,8 @@ function genModule(ast) {
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 
-    // Register volatile MMIO bindings for load/store codegen
-    for (const v of ast.volatiles || []) {
+    // Register strict MMIO bindings for load/store codegen
+    for (const v of ast.stricts || []) {
         const hType  = normalizeType(v.type);
         const llType = llvmType(hType);
         const addr   = String(parseInt(v.hardwareAddress, 16));

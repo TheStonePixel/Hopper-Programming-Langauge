@@ -1,7 +1,7 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], volatiles = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, volatiles };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts };
 }
 
 // bind — linker directive: place function pointer at hardware address
@@ -10,10 +10,10 @@ export function BindDecl(hardwareAddress, functionName) {
     return { kind: "BindDecl", hardwareAddress, functionName };
 }
 
-// volatile — named alias for a memory-mapped hardware register
-// volatile int uart_dr = 0x40021000
-export function VolatileDecl(type, name, hardwareAddress) {
-    return { kind: "VolatileDecl", type, name, hardwareAddress };
+// strict — named alias for a memory-mapped hardware register
+// strict int uart_dr = 0x40021000
+export function StrictDecl(type, name, hardwareAddress) {
+    return { kind: "StrictDecl", type, name, hardwareAddress };
 }
 
 // entry — the program entry point (not a function, a jump target)
