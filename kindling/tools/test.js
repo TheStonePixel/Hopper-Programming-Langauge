@@ -21,7 +21,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const ROOT       = path.resolve(__dirname, "..", "..");
-const TESTS_DIR  = path.join(ROOT, "core", "tests");
+const TESTS_DIR  = path.join(ROOT, "toolchain", "tests");
 const BUILD_DIR  = path.join(ROOT, "build", "tests");
 
 // ── ANSI colours ─────────────────────────────────────────────────────────────
