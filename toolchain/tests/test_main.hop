@@ -1,6 +1,7 @@
 
+import io from linux
+
 entry main(int argc, string[] argv) {
-
-
+	print("Hello, World!", 13)
 	return argc
 }
