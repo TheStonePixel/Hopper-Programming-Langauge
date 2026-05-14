@@ -1,12 +1,17 @@
-// Hopper I/O — Linux syscalls only, no libc
+// Linux I/O — direct syscalls, no libc
 
-extern function write(int fd, String buf, int count) int
-extern function read(int fd, String buf, int count) int
-
-function print(String s, int len) {
-    write(1, s, len)
+function write(int fd, string buf, int count) int {
+    return syscall(1, fd, buf, count)
 }
 
-function error(String s, int len) {
-    write(2, s, len)
+function read(int fd, string buf, int count) int {
+    return syscall(0, fd, buf, count)
+}
+
+function print(string s, int len) {
+    syscall(1, 1, s, len)
+}
+
+function error(string s, int len) {
+    syscall(1, 2, s, len)
 }
