@@ -1222,7 +1222,7 @@ function typeSize(hType) {
     if (t === "float")        return 8;
     if (t === "bool")         return 1;
     if (t === "byte")         return 1;
-    if (t === "address")      return 8;
+    if (t === "address" || t.startsWith("address:")) return 8;
     if (t === "string[]")     return 8;
     if (t === "string")       return 8;
     if (t === "String")       return 8;
