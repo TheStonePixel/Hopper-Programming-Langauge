@@ -1,169 +1,115 @@
-Here is a **cleanly rewritten README** with:
+# Hopper
 
-* **“Why Hopper?” as the second section**
-* **A roadmap at the end**
-* No mention of any existing languages
-* A strong, future-focused identity
+Hopper is a strongly typed, bare-metal systems language that compiles to LLVM IR.
 
 ---
 
-# **Hopper Language**
+## The Thesis
 
-Hopper is an **experimental, strongly typed, multiparadigm systems language** focused on clarity, precision, and intentional design.
-Its goal is to give developers low-level control *without* unnecessary syntactic noise or conceptual baggage.
+**The toolchain is complicated because the language failed. Fix the language, and the toolchain becomes simple.**
 
-Hopper is currently **version 0.0.1**—a prototype, not a product.
-It compiles to LLVM IR, supports basic control flow and functions, and is growing toward a full systems language targeted for **v1.0 between Christmas 2026–2027**.
+Every bare-metal C project ships with a linker script, a startup file, a Makefile, and a handful of `#pragma` hacks. That complexity isn't accidental — it's the bill that comes due for every design decision C couldn't make cleanly. Decades of duct tape on top of duct tape.
 
----
+C has no way to describe hardware, so you need a linker script. C has no entry point concept, so you need a startup file. C has no first-class hardware access story, so you get `volatile` buried in a type declaration and `__attribute__((section(...)))` buried in a pragma.
 
-## **Why Hopper?**
-
-Modern software development demands clarity, safety, and performance—but also expressiveness and approachability. Hopper explores a new path:
-
-* **A language shaped by design principles, not legacy.**
-* **A focus on values, constraints, and meaning**, rather than low-level machine details.
-* **A consistent, intentional syntax** that favors directness and readability.
-* **A philosophy of steady evolution through versioning**, ensuring the ecosystem stays clean while older codebases remain stable.
-
-Hopper is not built to mimic anything. Its purpose is to rethink what a modern systems language can feel like when freed from historical limitations.
-
----
-
-## **Core Ideas**
-
-### 🌱 **A fresh foundation**
-
-Hopper includes only features that improve clarity, safety, or expressive power.
-Unnecessary ceremony is removed; essential semantics remain.
-
-### 🔒 **Strong typing with intention**
-
-Hopper encourages developers to think in terms of **values and invariants**, not hardware sizes.
-Future releases will support constraint-guided typing:
+Hopper's answer is to make those things part of the language itself — not flags, not instructions to the toolchain, just code that describes what exists:
 
 ```hopper
-int x = 0 constraint[0 ... 255]
+// vector table — burned into flash by the linker
+bind 0x00000004 = reset::address
+bind 0x0000003c = timer::address
+
+// hardware registers — strict load/store aliases
+strict int uart_dr = 0x40021000
+strict int uart_sr = 0x40021004
+
+// unambiguous program entry point
+entry main {
+    uart_dr = 65
+}
 ```
 
-The compiler will infer optimal representations—letting developers write code that expresses meaning, not memory layout.
-
-### 🚦 **Multiparadigm without complexity**
-
-Procedural and functional patterns coexist naturally.
-Every feature must earn its place and reduce cognitive overhead, not increase it.
-
-### ⚙️ **Explicit control, modern ergonomics**
-
-Memory behavior is explicit and predictable.
-At the same time, Hopper aims to provide a standard library and modern conveniences that make systems code feel more intuitive and expressive.
-
-### 🌐 **Interoperability as a first-class goal**
-
-Even in its prototype stage, Hopper supports **extern function declarations**, enabling calls into existing libraries and environments.
+No linker script. No startup assembly. No build flags. It's all code.
 
 ---
 
-## **Current Prototype Capabilities (0.0.1)**
+## Design Principles
 
-* Function definitions and external declarations
-* Typed parameters and return types
-* Variables and assignments
-* Integer and boolean expressions
-* `if`, `else`, `while`
-* Function calls
-* LLVM IR backend (via a JavaScript toolchain)
-* Ability to link and call external functions
+**No global variables.** Program-lifetime state lives in a Runtime class on the stack. The only exceptions are `bind` (linker-time, no RAM cost) and `strict` (a name for a hardware address, not a variable).
 
-Example:
+**No operating system required.** Hopper is designed for freestanding, bare-metal execution. An OS can run on top of Hopper — it is not a dependency of it.
+
+**The language and the linker speak the same language.** `bind`, `strict`, and `entry` are not directives to an external tool. They are declarations in the same language as the rest of your program. A Hopper program can describe its own hardware layout.
+
+**It's all code, not instructions.** You don't tell the toolchain how to operate. You describe what exists, and the toolchain figures out the rest.
+
+---
+
+## Current Capabilities
+
+- Functions, extern functions (variadic supported)
+- Structs — memory layout, pad fields
+- Classes — fields, methods, operators, constructor, destructor
+- Templates — monomorphized generics (`Box<int>`, `List<float>`)
+- Type aliases, top-level constants
+- Full expression system — arithmetic, bitwise, logical, comparison, cast
+- Arrays, pointers (`::address`, `::value`)
+- Control flow — `if/else`, `while`, `for`, `break`, `continue`, `defer`
+- `entry` — unambiguous program entry point (inline or address form)
+- `bind` — linker directive mapping hardware addresses to function pointers
+- `strict` — named aliases for memory-mapped hardware registers
+- Import system with stdlib
+- LLVM IR backend
+
+---
+
+## Example
 
 ```hopper
-extern function putchar(int c) int
+import "stdlib/io"
 
-function main() int {
-    int x = 0
-    while (x < 26) {
-        putchar(65 + x)
-        x = x + 1
-    }
-    putchar(10)
-    return 0
+bind 0x00000004 = reset::address
+
+strict int uart_dr = 0x40021000
+
+function reset() {
+    print("booted\n", 7)
+}
+
+entry main {
+    uart_dr = 65
 }
 ```
 
 ---
 
-## **Long-Term Direction**
+## Roadmap
 
-Hopper is intended to grow into:
+### Now — Language Core (current)
+- Full type system, classes, templates
+- `entry`, `bind`, `strict`
+- LLVM IR codegen
 
-### ✔️ A **clean, modern low-level language**
+### Next — Toolchain
+- `sizeof(T)` compile-time operator
+- Heap allocator (bring-your-own-buffer)
+- Build tool — one command from `.hop` to ELF
+- Linker script generator from `bind` declarations
+- Startup file written in Hopper
 
-Focused, consistent, and pleasant to write.
+### Then — Bare Metal Targets
+- AVR (Arduino Uno)
+- ARM Cortex-M (STM32, RP2040)
+- Bare metal stdlib using `strict` and `bind`
+- Arduino programs written entirely in Hopper
 
-### ✔️ A **value-oriented compiler**
-
-Capable of optimizing based on ranges, constraints, and semantic meaning.
-
-### ✔️ A **multiparadigm tool**
-
-Allowing mixing of imperative and functional styles naturally.
-
-### ✔️ A **versioned, future-proof ecosystem**
-
-Where evolution doesn’t mean accumulating baggage.
-
----
-
-## **Roadmap**
-
-### **0.1 — Language Essentials**
-
-* Full expression system
-* Boolean logic (`&&`, `||`)
-* Better error reporting
-* More robust standard library stubs
-* Initial constraint syntax (parsed, not yet optimized)
-
-### **0.3 — Usability & Structure**
-
-* Modules / imports
-* Type aliases
-* Improved extern handling
-* Preliminary standard library components
-* Better toolchain integration
-
-### **0.5 — Advanced Features**
-
-* Constraint-based optimization engine
-* Pattern matching
-* Basic generics / templates
-* Memory utilities and safer APIs
-
-### **1.0 — Stable Systems Language**
-
-* Complete standard library core
-* Fully optimized constraint-aware compiler
-* Stable syntax and semantics
-* Real-world compilation workflows
-* Production-ready tooling
+### Goal
+Write an Arduino program in Hopper. One command. No C toolchain.
 
 ---
 
-## **Status**
+## Status
 
-Hopper is in its early experimental phase.
-APIs and syntax will change frequently.
-Nothing is stable yet, and everything is open to refinement.
+Version 0.1 — prototype. Syntax and APIs will change. Nothing is stable yet.
 
-If you’re excited about language design, compilers, or systems programming, follow the project as it progresses toward v1.
-
----
-
-If you'd like, I can also prepare:
-
-* A **constraints system overview**
-* A **syntactic style guide**
-* A **vision document** for Hopper 1.0
-
-Just say the word.
+The compiler frontend generates LLVM IR. A complete bare-metal toolchain is the target.

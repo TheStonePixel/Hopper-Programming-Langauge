@@ -1,0 +1,17 @@
+// Linux process/system — direct syscalls, no libc
+
+function exit(int code) {
+    syscall(60, code)
+}
+
+function fork() int {
+    return syscall(57)
+}
+
+function execve(string filename, string[] argv, string[] envp) int {
+    return syscall(59, filename, argv, envp)
+}
+
+function waitpid(int pid, address wstatus, int options) int {
+    return syscall(61, pid, wstatus, options, null)
+}

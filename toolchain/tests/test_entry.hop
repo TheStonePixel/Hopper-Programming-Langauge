@@ -1,0 +1,7 @@
+// EXPECT: hopper
+
+import io from linux
+
+entry main {
+    print("hopper\n", 7)
+}

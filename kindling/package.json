@@ -1,0 +1,20 @@
+{
+  "name": "hopper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+"scripts": {
+    "gen:grammar": "java -jar tools/antlr-4.13.1-complete.jar -Dlanguage=JavaScript -visitor -o src/generated grammar/Hopper.g4",
+    "test": "node tools/test.js"
+  },
+  "bin": {
+    "hopper": "./hopper"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "antlr4": "^4.13.2"
+  }
+}

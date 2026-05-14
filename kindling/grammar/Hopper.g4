@@ -1,0 +1,267 @@
+grammar Hopper;
+
+// ===== PARSER RULES =====
+
+program
+    : NEWLINE* (topLevelDecl NEWLINE*)* EOF
+    ;
+
+topLevelDecl
+    : functionDecl
+    | structDecl
+    | classDecl
+    | templateDecl
+    | constDecl
+    | importDecl
+    | aliasDecl
+    | entryDecl
+    | bindDecl
+    | strictDecl
+    ;
+
+importDecl
+    : 'import' Identifier (',' Identifier)* 'from' Identifier   # ImportFrom
+    | 'import' Identifier                                         # ImportModule
+    ;
+
+// bind — linker directive: place function pointer at hardware address
+// bind 0x00000004 = reset::address
+bindDecl
+    : 'bind' HexLiteral '=' Identifier '::' 'address'
+    ;
+
+// strict — named alias for a memory-mapped hardware register
+// strict int uart_dr = 0x40021000
+strictDecl
+    : 'strict' type Identifier '=' HexLiteral
+    ;
+
+// entry — the program entry point, not a function
+// inline:  entry main { ... }
+// address: entry main = startup::address
+entryDecl
+    : 'entry' Identifier '(' paramList ')' block  # EntryBlockParams
+    | 'entry' Identifier block                     # EntryBlock
+    | 'entry' Identifier '=' expression            # EntryAddr
+    ;
+
+constDecl
+    : 'const' Identifier '=' literal
+    ;
+
+aliasDecl
+    : 'alias' Identifier '=' type
+    ;
+
+functionDecl
+    : 'extern' 'function' Identifier '(' externParamList? ')' type   # ExternFuncDecl
+    | 'extern' 'function' Identifier '(' externParamList? ')'        # ExternProcDecl
+    | 'function' Identifier '(' paramList? ')' type block            # FuncDecl
+    | 'function' Identifier '(' paramList? ')' block                 # ProcDecl
+    ;
+
+// struct = memory layout only, no methods, no default values
+structDecl
+    : 'struct' Identifier '{' NEWLINE* (structMember (NEWLINE+ structMember)* NEWLINE*)? '}'
+    ;
+
+structMember
+    : type fieldName        # StructField
+    | 'pad' IntegerLiteral  # StructPad
+    ;
+
+// template = parameterized class, monomorphized at use sites
+templateDecl
+    : 'template' Identifier '<' Identifier (',' Identifier)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+// class = data + behavior, compiler-optimized layout
+classDecl
+    : 'class' Identifier '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+classMember
+    : type fieldName                                            # ClassField
+    | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
+    | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
+    | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
+    | 'constructor' '(' paramList? ')' block                   # ClassConstructor
+    | 'destructor' '(' ')' block                               # ClassDestructor
+    ;
+
+// fieldName allows keywords that are only special in :: context to be used as field names
+fieldName
+    : Identifier
+    | 'value'
+    | 'address'
+    | 'size'
+    ;
+
+operatorSymbol
+    : '+' | '-' | '*' | '/' | '%'
+    | '==' | '!=' | '<' | '<=' | '>' | '>='
+    | '&' | '|' | '^' | '<<' | '>>'
+    | '[' ']'
+    ;
+
+// paramList for regular functions — no variadic
+paramList
+    : param (',' param)*
+    ;
+
+// externParamList allows optional trailing '...' for variadic C functions (e.g. printf)
+externParamList
+    : param (',' param)* (',' '...')?
+    | '...'
+    ;
+
+param
+    : type paramName
+    ;
+
+// paramName mirrors fieldName — allows contextual keywords as parameter names
+paramName
+    : Identifier
+    | 'value'
+    | 'address'
+    | 'size'
+    ;
+
+type
+    : 'int'
+    | 'bool'
+    | 'float'
+    | 'byte'
+    | 'string' '[' ']'  // array of strings — argv type, maps to i8**
+    | 'string'
+    | 'String'
+    | 'address'
+    | 'unsigned' 'int'
+    | 'unsigned' 'byte'
+    | Identifier '<' type (',' type)* '>'   // template instantiation: List<int>, Map<String,int>
+    | Identifier    // user-defined types (structs, classes)
+    ;
+
+// blocks: statements separated by NEWLINEs
+block
+    : '{'
+      NEWLINE*
+      ( statement (NEWLINE+ statement)*
+        NEWLINE* )?
+      '}'
+    ;
+
+statement
+    : type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
+    | type Identifier '[' IntegerLiteral ']'             # ArrayDecl
+    | type Identifier '=' expression                     # VarDecl
+    | type Identifier                                    # VarDeclNoInit
+    | Identifier '[' expression ']' '=' expression       # ArrayAssign
+    | Identifier '=' expression                          # Assign
+    | Identifier '.' fieldName '=' expression             # FieldAssign
+    | Identifier '::' 'value' '=' expression             # DerefAssign
+    | expression                                         # ExprStmt
+    | 'if' '(' expression ')' block ('else' block)?      # IfStmt
+    | 'while' '(' expression ')' block                   # WhileStmt
+    | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
+    | 'break'                                            # BreakStmt
+    | 'continue'                                         # ContinueStmt
+    | 'return' expression?                               # ReturnStmt
+    | 'defer' expression                                 # DeferStmt
+    | 'asm' asmBlock                                     # AsmStmt
+    ;
+
+asmBlock
+    : '{' NEWLINE* (asmLine (NEWLINE+ asmLine)* NEWLINE*)? '}'
+    ;
+
+asmLine
+    : Identifier '=' asmOperand    # AsmLineAssign
+    | Identifier                   # AsmLineOp
+    ;
+
+asmOperand
+    : IntegerLiteral
+    | HexLiteral
+    | Identifier
+    ;
+
+forInit
+    : type Identifier '=' expression    # ForInitDecl
+    | Identifier '=' expression         # ForInitAssign
+    ;
+
+forUpdate
+    : Identifier '=' expression
+    ;
+
+
+
+// ===== EXPRESSIONS =====
+
+expression      : logicalOr ;
+logicalOr       : logicalAnd ( '||' logicalAnd )* ;
+logicalAnd      : bitwiseOr  ( '&&' bitwiseOr  )* ;
+bitwiseOr       : bitwiseXor ( '|'  bitwiseXor )* ;
+bitwiseXor      : bitwiseAnd ( '^'  bitwiseAnd )* ;
+bitwiseAnd      : equality   ( '&'  equality   )* ;
+equality        : relational ( ('==' | '!=') relational )* ;
+relational      : shift ( ('<' | '<=' | '>' | '>=') shift )* ;
+shift           : additive ( ('<<' | '>>') additive )* ;
+additive        : multiplicative ( ('+' | '-') multiplicative )* ;
+multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
+unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
+primary
+    : IntegerLiteral
+    | HexLiteral
+    | FloatLiteral
+    | StringLiteral
+    | 'true'
+    | 'false'
+    | 'null'
+    | Identifier '[' expression ']' '::' 'address'      // address of array element
+    | Identifier '::' 'address'                         // address of variable/function
+    | Identifier '::' 'value'                           // dereference address
+    | Identifier '::' 'size'                            // byte size of variable or type
+    | Identifier '(' argList? ')'                       // function call
+    | Identifier '.' Identifier '(' argList? ')'        // method call
+    | Identifier '[' expression ']'                     // array element access
+    | Identifier '.' fieldName                          // field access
+    | Identifier
+    | 'value'                                               // contextual keyword as variable ref
+    | 'address'                                             // contextual keyword as variable ref
+    | 'size'                                                // contextual keyword as variable ref
+    | '(' expression ')'
+    ;
+
+argList
+    : expression (',' expression)*
+    ;
+
+literal
+    : IntegerLiteral
+    | HexLiteral
+    | FloatLiteral
+    | StringLiteral
+    | 'true'
+    | 'false'
+    ;
+
+
+// ===== LEXER RULES =====
+
+IntegerLiteral  : [0-9]+ ;
+HexLiteral      : '0x' [0-9a-fA-F]+ ;
+FloatLiteral    : [0-9]+ '.' [0-9]+ ;
+StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
+// CharLiteral removed — characters are byte values, e.g. 72 not 'H'
+Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
+
+// keep newlines as real tokens (for statement separation)
+NEWLINE         : '\r'? '\n' ;
+
+// comment to end of line, does not eat the newline
+LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
+
+// spaces and tabs only
+WS              : [ \t]+ -> skip ;

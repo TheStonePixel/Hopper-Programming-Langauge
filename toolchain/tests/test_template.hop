@@ -1,0 +1,32 @@
+// EXPECT: hello template
+// EXPECT: 42
+// EXPECT: 3.14
+
+import io from linux
+extern function printf(String fmt, ...) int
+
+template Box<T> {
+    T value
+
+    constructor(T v) {
+        self.value = v
+    }
+
+    function get() T {
+        return self.value
+    }
+}
+
+function main() int {
+    print("hello template\n", 15)
+
+    Box<int> b = Box(42)
+    int x = b.get()
+    printf("%lld\n", x)
+
+    Box<float> f = Box(3.14)
+    float pi = f.get()
+    printf("%.2f\n", pi)
+
+    return 0
+}

@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
+import { buildAstFromSource } from "./src/astBuilder.js";
+import { genModule } from "./src/codegenLLVM.js";
+import { parseSource } from "./src/parse.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+const BUILD_DIR  = path.join(__dirname, "..", "build");
+
+if (!fs.existsSync(BUILD_DIR)) fs.mkdirSync(BUILD_DIR, { recursive: true });
+
+// ── arg parsing ────────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2);
+
+function flag(name) {
+    const i = args.indexOf(name);
+    if (i === -1) return null;
+    args.splice(i, 1);
+    return true;
+}
+
+function option(name) {
+    const i = args.indexOf(name);
+    if (i === -1 || i + 1 >= args.length) return null;
+    const val = args[i + 1];
+    args.splice(i, 2);
+    return val;
+}
+
+const doCompile = flag("-c")    || flag("--compile");
+const doRun     = flag("-r")    || flag("--run");
+const doIR      = flag("--ir");
+const doAST     = flag("--ast");
+const doParse   = flag("--parse");
+const output    = option("-o");
+
+// remaining args are files
+const files = args.filter(a => !a.startsWith("-"));
+
+function usage() {
+    console.log([
+        "",
+        "  Hopper Compiler",
+        "",
+        "  ./hopper -c, --compile <files...> [-o out]   compile to executable",
+        "  ./hopper -r, --run <file>                    compile and run",
+        "  ./hopper --ir <file>                         print LLVM IR",
+        "  ./hopper --ast <file>                        print AST as JSON",
+        "  ./hopper --parse <file>                      print parse tree",
+        "",
+    ].join("\n"));
+    process.exit(1);
+}
+
+if (!doCompile && !doRun && !doIR && !doAST && !doParse) usage();
+if (files.length === 0) usage();
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function baseName(file) {
+    return path.basename(file, path.extname(file));
+}
+
+function toIR(file) {
+    const src = fs.readFileSync(file, "utf8");
+    const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
+    return genModule(ast);
+}
+
+function toObject(file) {
+    const ir      = toIR(file);
+    const llFile  = path.join(BUILD_DIR, `${baseName(file)}.ll`);
+    const objFile = path.join(BUILD_DIR, `${baseName(file)}.o`);
+    fs.writeFileSync(llFile, ir, "utf8");
+    execSync(`llc -filetype=obj -relocation-model=pic "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    return objFile;
+}
+
+function link(objFiles, outFile) {
+    const objs = objFiles.map(f => `"${f}"`).join(" ");
+    execSync(`clang ${objs} -o "${outFile}"`, { stdio: "inherit" });
+    return outFile;
+}
+
+// ── commands ───────────────────────────────────────────────────────────────
+
+if (doParse) {
+    const src          = fs.readFileSync(files[0], "utf8");
+    const { parser, tree } = parseSource(src);
+    console.log(tree.toStringTree(parser.ruleNames));
+    process.exit(0);
+}
+
+if (doAST) {
+    const src = fs.readFileSync(files[0], "utf8");
+    const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(files[0])) });
+    console.log(JSON.stringify(ast, null, 2));
+    process.exit(0);
+}
+
+if (doIR) {
+    console.log(toIR(files[0]));
+    process.exit(0);
+}
+
+if (doCompile) {
+    const objFiles = files.map(toObject);
+    const outFile  = output || path.join(BUILD_DIR, baseName(files[0]));
+    link(objFiles, outFile);
+    console.log(`built: ${outFile}`);
+    process.exit(0);
+}
+
+if (doRun) {
+    const objFiles = files.map(toObject);
+    const outFile  = path.join(BUILD_DIR, baseName(files[0]));
+    link(objFiles, outFile);
+    execSync(outFile, { stdio: "inherit" });
+    process.exit(0);
+}

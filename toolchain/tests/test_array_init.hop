@@ -1,0 +1,15 @@
+// EXPECT: 72
+// EXPECT: 101
+// EXPECT: 3
+
+import io from linux
+extern function printf(String fmt, ...) int
+
+entry main {
+    byte letters[5] = [72, 101, 108, 108, 111]
+    printf("%d\n", letters[0])
+    printf("%d\n", letters[1])
+
+    int nums[3] = [10, 20, 3]
+    printf("%d\n", nums[2])
+}

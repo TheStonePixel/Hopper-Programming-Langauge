@@ -1,0 +1,26 @@
+// Tests byte type in struct fields and function parameters
+// Byte arithmetic compiles correctly — printing bytes requires 'as' casting
+// which is not yet implemented. Full byte I/O tests come after 'as' lands.
+// COMPILE_ONLY
+
+struct ByteBuffer {
+    byte b0
+    byte b1
+    byte b2
+    byte b3
+}
+
+// Byte arithmetic: add two bytes, return a byte
+function addBytes(byte a, byte b) byte {
+    return a + b
+}
+
+// Byte bitwise ops
+function maskByte(byte val, byte mask) byte {
+    return val & mask
+}
+
+function main() int {
+    ByteBuffer buf
+    return 0
+}
