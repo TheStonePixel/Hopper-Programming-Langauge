@@ -23,12 +23,12 @@ template Array<T> {
     int     capacity    // number of elements allocated
 
     constructor(int initialCap) {
-        self.data     = allocate initialCap * T::size
+        self.data     = allocate (initialCap * T::size)
         self.length   = 0
         self.capacity = initialCap
     }
 
-    destructor {
+    destructor() {
         deallocate self.data
     }
 
@@ -44,13 +44,13 @@ template Array<T> {
 
     // Get element at index i. No bounds check — caller ensures i < len().
     function get(int i) T {
-        address ptr = self.data + i * T::size
+        address ptr = self.data + (i * T::size)
         return ptr::value
     }
 
     // Set element at index i. No bounds check — caller ensures i < len().
     function set(int i, T val) {
-        address ptr = self.data + i * T::size
+        address ptr = self.data + (i * T::size)
         ptr::value = val
     }
 
@@ -59,7 +59,7 @@ template Array<T> {
         if (self.length == self.capacity) {
             self.grow()
         }
-        address ptr = self.data + self.length * T::size
+        address ptr = self.data + (self.length * T::size)
         ptr::value = val
         self.length = self.length + 1
     }
@@ -67,13 +67,13 @@ template Array<T> {
     // Remove and return the last element. Caller ensures len() > 0.
     function pop() T {
         self.length = self.length - 1
-        address ptr = self.data + self.length * T::size
+        address ptr = self.data + (self.length * T::size)
         return ptr::value
     }
 
     // Return last element without removing it. Caller ensures len() > 0.
     function peek() T {
-        address ptr = self.data + (self.length - 1) * T::size
+        address ptr = self.data + ((self.length - 1) * T::size)
         return ptr::value
     }
 
@@ -90,12 +90,12 @@ template Array<T> {
     // Double capacity. Called automatically by push() when full.
     function grow() {
         int     newCap  = self.capacity * 2
-        address newData = allocate newCap * T::size
+        address newData = allocate (newCap * T::size)
         int i = 0
         while (i < self.length) {
-            address src = self.data + i * T::size
-            address dst = newData  + i * T::size
-            dst::value = src::value
+            T elem = self.get(i)
+            address dst = newData + (i * T::size)
+            dst::value = elem
             i = i + 1
         }
         deallocate self.data

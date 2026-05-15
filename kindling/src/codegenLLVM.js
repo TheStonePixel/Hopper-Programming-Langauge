@@ -88,15 +88,33 @@ function substBlock(block, subst) {
     return { ...block, statements: block.statements.map(s => substStmt(s, subst)) };
 }
 
+function substExpr(e, subst) {
+    if (!e) return null;
+    switch (e.kind) {
+        case "SizeOf":        return { ...e, name: substTypeStr(e.name, subst) };
+        case "Binary":        return { ...e, left: substExpr(e.left, subst), right: substExpr(e.right, subst) };
+        case "Unary":         return { ...e, expr: substExpr(e.expr, subst) };
+        case "AllocateExpr":  return { ...e, sizeExpr: substExpr(e.sizeExpr, subst) };
+        case "DeallocateStmt": return { ...e, expr: substExpr(e.expr, subst) };
+        default:              return e;
+    }
+}
+
 function substStmt(s, subst) {
     if (!s) return null;
     switch (s.kind) {
-        case "VarDecl":       return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDecl":     return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDeclInit": return { ...s, type: substTypeStr(s.type, subst) };
-        case "IfStmt":      return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
-        case "WhileStmt":   return { ...s, body: substBlock(s.body, subst) };
-        case "ForStmt":     return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        case "VarDecl":        return { ...s, type: substTypeStr(s.type, subst), init: substExpr(s.init, subst) };
+        case "ArrayDecl":      return { ...s, type: substTypeStr(s.type, subst) };
+        case "ArrayDeclInit":  return { ...s, type: substTypeStr(s.type, subst) };
+        case "IfStmt":         return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
+        case "WhileStmt":      return { ...s, body: substBlock(s.body, subst) };
+        case "ForStmt":        return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        case "DeallocateStmt": return { ...s, expr: substExpr(s.expr, subst) };
+        case "ExprStmt":       return { ...s, expr: substExpr(s.expr, subst) };
+        case "ReturnStmt":     return { ...s, expr: substExpr(s.expr, subst) };
+        case "FieldAssign":    return { ...s, expr: substExpr(s.expr, subst) };
+        case "Assign":         return { ...s, expr: substExpr(s.expr, subst) };
+        case "DerefAssign":    return { ...s, expr: substExpr(s.expr, subst) };
         default: return s;
     }
 }
@@ -243,6 +261,8 @@ function collectTypeUsages(ast) {
         }
     }
     for (const s of ast.structs || []) s.fields.forEach(f => checkType(f.type));
+
+    if (ast.entry && ast.entry.body) scanBlock(ast.entry.body);
 
     return usages;
 }
@@ -668,9 +688,15 @@ function genExpr(ir, expr) {
         case "Deref": {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
-            if (!v.hType.startsWith("address:"))
+            // Plain address: infer pointedTo from the address:T tag if present, else from return type
+            let pointedTo;
+            if (v.hType.startsWith("address:")) {
+                pointedTo = v.hType.substring(8);
+            } else if (v.hType === "address" && ir.returnType) {
+                pointedTo = ir.returnType;
+            } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            const pointedTo   = v.hType.substring(8);
+            }
             const llPointedTo = llvmType(pointedTo);
             const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
@@ -1068,15 +1094,22 @@ function genStmt(ir, stmt, retType) {
         case "DerefAssign": {
             const v = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
-            if (!v.hType.startsWith("address:"))
+            const val = genExpr(ir, stmt.expr);
+            let pointedTo;
+            if (v.hType.startsWith("address:")) {
+                pointedTo = v.hType.substring(8);
+            } else if (v.hType === "address" && ir.returnType) {
+                pointedTo = ir.returnType;
+            } else if (v.hType === "address") {
+                pointedTo = val.type; // infer from RHS
+            } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            const pointedTo   = v.hType.substring(8);
+            }
             const llPointedTo = llvmType(pointedTo);
             const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
             const typedAddr   = ir.newTmp();
             ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
-            const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llPointedTo} ${val.value}, ${llPointedTo}* ${typedAddr}`);
             break;
         }
@@ -1304,6 +1337,7 @@ function genBlock(ir, block, retType) {
 
 function genFunction(fn) {
     const ir         = new IRBuilder();
+    ir.returnType    = fn.returnType;
     const isVoid     = fn.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(fn.returnType);
     const paramSig   = fn.params.map((p, i) => `${llvmType(normalizeType(p.type))} %p${i}`).join(", ");
@@ -1333,6 +1367,7 @@ function genFunction(fn) {
 
 function genMethod(typeName, method, isClass = true) {
     const ir         = new IRBuilder();
+    ir.returnType    = method.returnType;
     const isVoid     = method.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
     const mangled    = `${typeName}_${method.name}`;
