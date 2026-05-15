@@ -1,6 +1,10 @@
 # Hopper — Roadmap to ARM Cortex-M
 
-**Goal: Run a Hopper program on ARM Cortex-M hardware by end of 2026.**
+**Goal: Three real deliverables running on ARM Cortex-M hardware by end of 2026.**
+
+1. **Bootloader** — UART firmware loader written entirely in Hopper. No C, no CMSIS, no HAL.
+2. **Sensor Stack** — I2C/SPI peripheral drivers as Hopper bitfield declarations. No vendor SDK.
+3. **USB CDC** — board enumerates as a serial port on any host. No driver install.
 
 The path: standard libraries → frontend compiler in Hopper → LLVM wrapper in Hopper → ARM target + build tool → bare metal.
 
@@ -144,21 +148,92 @@ Everything above runs on x86-64 Linux. This phase makes it run on hardware.
 
 ---
 
-## Phase 5 — Validation (December)
+## Phase 5 — Deliverable 1: Bootloader (November)
 
-- [ ] Blink an LED on a Nucleo board (STM32F4) with `hopbuild`
-- [ ] UART echo program — receive a byte, send it back
-- [ ] No C toolchain, no vendor SDK, no linker script written by hand
-- [ ] Document the full workflow: install Hopper → write code → flash board
+A UART bootloader written entirely in Hopper. Receives new firmware over serial,
+writes it to flash, verifies it, and boots it. The first real Hopper program that
+runs on hardware and does something that matters.
+
+This is the self-referential proof: Hopper writes the tool that programs Hopper.
+
+### Register Maps Required
+- [ ] `targets/stm32f4/rcc.hop` — clock enable registers (needed before anything runs)
+- [ ] `targets/stm32f4/gpio.hop` — GPIO mode/speed/pupdr/ODR registers
+- [ ] `targets/stm32f4/uart.hop` — UART CR1/CR2/SR/DR registers
+- [ ] `targets/stm32f4/flash.hop` — flash control/status/key registers
+
+### Bootloader Implementation (`bootloader/main.hop`)
+- [ ] Clock init — enable HSI, set PLL, switch sysclk via `rcc` bitfields
+- [ ] GPIO init — PA2/PA3 to UART alternate function via `gpio` bitfields
+- [ ] UART init — baud rate, enable TX/RX via `uart` bitfields
+- [ ] Receive firmware over UART — XMODEM or raw length-prefixed binary
+- [ ] Write received bytes to application flash region
+- [ ] CRC32 verification of received firmware
+- [ ] Boot application — set stack pointer, jump to application reset vector
+- [ ] Fallback — if no firmware received within timeout, boot existing application
+- [ ] Written with `bind` vector table, `strict` registers, `entry main`
+- [ ] No C, no CMSIS, no HAL, no linker script written by hand
 
 ---
 
-## Stretch Goals (if time allows)
+## Phase 6 — Deliverable 2: Sensor Stack (November – December)
+
+A complete I2C and SPI peripheral driver written as Hopper bitfield declarations,
+paired with a real sensor application. This is the proof that Hopper replaces
+vendor SDKs — the entire driver is readable hardware documentation.
+
+### Register Maps Required
+- [ ] `targets/stm32f4/i2c.hop` — I2C CR1/CR2/SR1/SR2/DR registers
+- [ ] `targets/stm32f4/spi.hop` — SPI CR1/CR2/SR/DR registers
+- [ ] `targets/sensors/bme280.hop` — BME280 register map (temp/humidity/pressure)
+- [ ] `targets/sensors/mpu6050.hop` — MPU6050 register map (accel/gyro)
+
+### Driver Implementation
+- [ ] `drivers/i2c.hop` — init, start, stop, write byte, read byte, read burst
+- [ ] `drivers/spi.hop` — init, select/deselect, transfer byte, transfer burst
+- [ ] `drivers/bme280.hop` — init, read raw, apply compensation formula, return struct
+- [ ] `drivers/mpu6050.hop` — init, read raw accel/gyro, scale to physical units
+
+### Application (`sensor_app/main.hop`)
+- [ ] Read BME280 every second — temperature, humidity, pressure
+- [ ] Read MPU6050 at 100Hz — accelerometer and gyroscope
+- [ ] Format readings as structured output over UART
+- [ ] Use `String` and `Array<T>` from stdlib for output formatting
+- [ ] No vendor library anywhere in the call stack
+
+---
+
+## Phase 7 — Deliverable 3: USB CDC Device (December)
+
+A USB CDC (Communications Device Class) implementation — the board appears as a
+serial port on any host computer with no driver install required.
+Most complex of the three but the most impressive: plug in a Hopper device,
+it shows up as `/dev/ttyACM0` with no setup.
+
+### Register Maps Required
+- [ ] `targets/stm32f4/usb.hop` — USB OTG FS core and device registers
+- [ ] `targets/stm32f4/usb_ep.hop` — endpoint control/status registers
+
+### Protocol Stack (`usb/`)
+- [ ] `usb/descriptors.hop` — device, configuration, interface, endpoint descriptors as structs
+- [ ] `usb/ep0.hop` — control endpoint handler, standard device requests
+- [ ] `usb/cdc.hop` — CDC class requests, line coding, serial state
+- [ ] `usb/bulk.hop` — bulk IN/OUT endpoint handlers
+- [ ] `usb/core.hop` — interrupt handler, endpoint dispatch, reset handling
+
+### Application
+- [ ] Board enumerates as USB serial device on Linux, macOS, Windows
+- [ ] Data received over USB forwarded to UART and vice versa (USB↔UART bridge)
+- [ ] Or: expose sensor data from Phase 6 over USB serial
+
+---
+
+## Stretch Goals
 
 - [ ] `hopfmt` — source formatter
 - [ ] `hoplsp` — language server for IDE support
-- [ ] RP2040 (Raspberry Pi Pico) target
-- [ ] AVR target (Arduino Uno) — very different architecture, stretch
+- [ ] RP2040 (Raspberry Pi Pico) target — different enough to prove portability
+- [ ] AVR target (Arduino Uno) — very different architecture, longer stretch
 
 ---
 
@@ -177,4 +252,7 @@ Everything above runs on x86-64 Linux. This phase makes it run on hardware.
 | LLVM wrapper in Hopper | Not started |
 | ARM target | Not started |
 | Build tool | Not started |
+| Bootloader | Not started |
+| Sensor stack (I2C/SPI + BME280/MPU6050) | Not started |
+| USB CDC device | Not started |
 | Hardware register maps | Not started |
