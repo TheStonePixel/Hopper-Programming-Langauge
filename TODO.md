@@ -133,16 +133,16 @@ Everything above runs on x86-64 Linux. This phase makes it run on hardware.
 - [ ] Written entirely in Hopper with inline `asm` where needed
 
 ### Build Tool (`hopbuild`)
-- [ ] CLI: `hopbuild main.hop --target stm32f4 --out main.elf`
+- [ ] CLI: `hopbuild main.hop --target stm32f411 --out main.elf`  *(STM32F411 Black Pill — primary target)*
 - [ ] Chains: `.hop` → LLVM IR → `llc` → `.o` → `ld` → ELF
 - [ ] Reads `bind` declarations to determine flash/RAM layout
 - [ ] Generates linker script automatically
 - [ ] Flash tool integration: `hopbuild flash --port /dev/ttyACM0`
 
 ### Hardware Register Maps
-- [ ] `targets/stm32f4/uart.hop` — UART bitfield declarations
-- [ ] `targets/stm32f4/gpio.hop` — GPIO bitfield declarations
-- [ ] `targets/stm32f4/rcc.hop` — clock control register declarations
+- [ ] `targets/stm32f411/uart.hop` — UART bitfield declarations
+- [ ] `targets/stm32f411/gpio.hop` — GPIO bitfield declarations
+- [ ] `targets/stm32f411/rcc.hop` — clock control register declarations
 - [ ] `targets/rp2040/` — RP2040 register maps
 - [ ] These replace vendor SDKs entirely — pure Hopper bitfield declarations
 
@@ -157,10 +157,10 @@ runs on hardware and does something that matters.
 This is the self-referential proof: Hopper writes the tool that programs Hopper.
 
 ### Register Maps Required
-- [ ] `targets/stm32f4/rcc.hop` — clock enable registers (needed before anything runs)
-- [ ] `targets/stm32f4/gpio.hop` — GPIO mode/speed/pupdr/ODR registers
-- [ ] `targets/stm32f4/uart.hop` — UART CR1/CR2/SR/DR registers
-- [ ] `targets/stm32f4/flash.hop` — flash control/status/key registers
+- [ ] `targets/stm32f411/rcc.hop` — clock enable registers (needed before anything runs)
+- [ ] `targets/stm32f411/gpio.hop` — GPIO mode/speed/pupdr/ODR registers
+- [ ] `targets/stm32f411/uart.hop` — UART CR1/CR2/SR/DR registers
+- [ ] `targets/stm32f411/flash.hop` — flash control/status/key registers
 
 ### Bootloader Implementation (`bootloader/main.hop`)
 - [ ] Clock init — enable HSI, set PLL, switch sysclk via `rcc` bitfields
@@ -183,8 +183,8 @@ paired with a real sensor application. This is the proof that Hopper replaces
 vendor SDKs — the entire driver is readable hardware documentation.
 
 ### Register Maps Required
-- [ ] `targets/stm32f4/i2c.hop` — I2C CR1/CR2/SR1/SR2/DR registers
-- [ ] `targets/stm32f4/spi.hop` — SPI CR1/CR2/SR/DR registers
+- [ ] `targets/stm32f411/i2c.hop` — I2C CR1/CR2/SR1/SR2/DR registers
+- [ ] `targets/stm32f411/spi.hop` — SPI CR1/CR2/SR/DR registers
 - [ ] `targets/sensors/bme280.hop` — BME280 register map (temp/humidity/pressure)
 - [ ] `targets/sensors/mpu6050.hop` — MPU6050 register map (accel/gyro)
 
@@ -211,8 +211,8 @@ Most complex of the three but the most impressive: plug in a Hopper device,
 it shows up as `/dev/ttyACM0` with no setup.
 
 ### Register Maps Required
-- [ ] `targets/stm32f4/usb.hop` — USB OTG FS core and device registers
-- [ ] `targets/stm32f4/usb_ep.hop` — endpoint control/status registers
+- [ ] `targets/stm32f411/usb.hop` — USB OTG FS core and device registers
+- [ ] `targets/stm32f411/usb_ep.hop` — endpoint control/status registers
 
 ### Protocol Stack (`usb/`)
 - [ ] `usb/descriptors.hop` — device, configuration, interface, endpoint descriptors as structs
