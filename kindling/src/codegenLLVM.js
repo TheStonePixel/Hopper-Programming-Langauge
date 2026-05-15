@@ -540,6 +540,28 @@ function genExpr(ir, expr) {
         }
 
         case "FieldAccess": {
+            // Check MMIO (strict) bitfield first — uses volatile load
+            const mmioFA = mmioBindings.get(expr.object);
+            if (mmioFA && bitfieldTypes.has(mmioFA.hType)) {
+                const bf = bitfieldTypes.get(mmioFA.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmioFA.addr} to ${llType}*`);
+                const container = ir.newTmp();
+                ir.emit(`${container} = load volatile ${llType}, ${llType}* ${ptr}`);
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = lshr ${llType} ${container}, ${offset}`);
+                const mask = (1n << BigInt(width)) - 1n;
+                const masked = ir.newTmp();
+                ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
+                const llFieldType = llvmType(fieldType);
+                if (llFieldType === llType) return { value: masked, type: fieldType };
+                const result = ir.newTmp();
+                ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
+                return { value: result, type: fieldType };
+            }
+
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
 
@@ -978,6 +1000,38 @@ function genStmt(ir, stmt, retType) {
         }
 
         case "FieldAssign": {
+            // Check MMIO (strict) bitfield first — uses volatile load/store
+            const mmioFW = mmioBindings.get(stmt.object);
+            if (mmioFW && bitfieldTypes.has(mmioFW.hType)) {
+                const bf = bitfieldTypes.get(mmioFW.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width } = bitfieldFieldInfo(bf, stmt.field);
+                const val = genExpr(ir, stmt.expr);
+                const srcLL = llvmType(val.type);
+                const srcBits = parseInt(srcLL.slice(1));
+                const dstBits = parseInt(llType.slice(1));
+                let inContainer = val.value;
+                if (srcLL !== llType) {
+                    const norm = ir.newTmp();
+                    ir.emit(`${norm} = ${srcBits > dstBits ? "trunc" : "zext"} ${srcLL} ${val.value} to ${llType}`);
+                    inContainer = norm;
+                }
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = shl ${llType} ${inContainer}, ${offset}`);
+                const fieldMask = (1n << BigInt(width)) - 1n;
+                const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmioFW.addr} to ${llType}*`);
+                const current = ir.newTmp();
+                ir.emit(`${current} = load volatile ${llType}, ${llType}* ${ptr}`);
+                const cleared = ir.newTmp();
+                ir.emit(`${cleared} = and ${llType} ${current}, ${clearMask}`);
+                const merged = ir.newTmp();
+                ir.emit(`${merged} = or ${llType} ${cleared}, ${shifted}`);
+                ir.emit(`store volatile ${llType} ${merged}, ${llType}* ${ptr}`);
+                break;
+            }
+
             const v = ir.vars.get(stmt.object);
             if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
 
