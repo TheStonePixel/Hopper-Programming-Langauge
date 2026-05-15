@@ -58,6 +58,61 @@ import { RouterLink } from 'vue-router'
       </div>
     </section>
 
+    <section class="separation">
+      <div class="container">
+        <span class="label">The Separation</span>
+        <p class="sep-statement">
+          Hopper is intentionally hostile to application development.<br>
+          That friction is the feature.
+        </p>
+        <p class="sep-body">
+          C++ tried to be a systems language and an application language at the same time.
+          The result is a language so complex that no two codebases agree on which subset to use.
+          Decades of committees, dialects, and footguns — because the boundary between
+          "close to the metal" and "close to the programmer" was never enforced.
+        </p>
+        <p class="sep-body">
+          Hopper enforces it by design. No exceptions. No garbage collector. No closures,
+          no async, no string class. When an application developer picks up Hopper and tries
+          to build a web interface, they hit a wall. That wall says: <em>you want Hopper+.</em>
+        </p>
+        <div class="sep-example">
+          <div class="sep-col">
+            <div class="sep-col-label">Hopper</div>
+            <div class="sep-col-sub">The foundation</div>
+            <ul>
+              <li>TCP socket handling</li>
+              <li>Connection pooling</li>
+              <li>Request parsing</li>
+              <li>Memory management</li>
+              <li>Raw syscalls</li>
+            </ul>
+            <p class="sep-col-note">What makes it fast.</p>
+          </div>
+          <div class="sep-divider">+</div>
+          <div class="sep-col right">
+            <div class="sep-col-label hopper-plus">Hopper+</div>
+            <div class="sep-col-sub">The interface</div>
+            <ul>
+              <li>Route handlers</li>
+              <li>Middleware</li>
+              <li>Request / Response objects</li>
+              <li>JSON, templates, strings</li>
+              <li>Exception handling</li>
+            </ul>
+            <p class="sep-col-note">What makes it ergonomic.</p>
+          </div>
+        </div>
+        <p class="sep-payoff">
+          The application developer writes route handlers in Hopper+. Every byte that moves
+          through the network is handled by Hopper underneath. They get the ergonomics of a
+          high-level language with the performance of systems code — because the systems code
+          <em>is</em> the foundation, not a wrapper around C.
+          No foreign boundary. No ABI crossing. One language family, owned end to end.
+        </p>
+      </div>
+    </section>
+
     <section class="code-example">
       <div class="container">
         <span class="label">It's all code</span>
@@ -342,6 +397,121 @@ import { RouterLink } from 'vue-router'
 .compare-link:hover {
   color: #7eb8f0;
   border-color: #2a5a8c;
+}
+
+/* ── Separation ── */
+.separation {
+  padding: 5rem 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.sep-statement {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.4;
+  margin-bottom: 2rem;
+}
+
+.sep-body {
+  font-size: 0.9rem;
+  color: #777;
+  max-width: 640px;
+  line-height: 1.8;
+  margin-bottom: 1rem;
+}
+
+.sep-body em {
+  color: #aaa;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.sep-example {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin: 3rem 0;
+  max-width: 680px;
+}
+
+.sep-col {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid #161b22;
+  border-radius: 8px;
+  padding: 1.75rem;
+}
+
+.sep-col.right {
+  background: #0d1520;
+  border-color: #1c2a3a;
+}
+
+.sep-col-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #569cd6;
+  margin-bottom: 0.2rem;
+}
+
+.sep-col-label.hopper-plus {
+  color: #4ec9b0;
+}
+
+.sep-col-sub {
+  font-size: 0.72rem;
+  color: #444;
+  margin-bottom: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.sep-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.sep-col ul li {
+  font-size: 0.85rem;
+  color: #666;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #111;
+}
+
+.sep-col ul li::before {
+  content: '→ ';
+  color: #333;
+}
+
+.sep-col-note {
+  font-size: 0.78rem;
+  color: #444;
+  font-style: italic;
+}
+
+.sep-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.5rem;
+  font-size: 1.5rem;
+  color: #222;
+  margin-top: 3rem;
+}
+
+.sep-payoff {
+  font-size: 0.9rem;
+  color: #666;
+  max-width: 640px;
+  line-height: 1.8;
+}
+
+.sep-payoff em {
+  color: #aaa;
+  font-style: normal;
+  font-weight: 500;
 }
 
 /* ── Code ── */
