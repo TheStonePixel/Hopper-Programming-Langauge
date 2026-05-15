@@ -511,9 +511,15 @@ function genExpr(ir, expr) {
                 const elemType = v.hType.split(":")[1];
                 const elemPtr  = ir.newTmp();
                 ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 0`);
-                return { value: elemPtr, type: `address:${elemType}` };
+                // Normalize to i8* — all address:T values use i8* as their LLVM representation
+                const cast = ir.newTmp();
+                ir.emit(`${cast} = bitcast ${llvmType(elemType)}* ${elemPtr} to i8*`);
+                return { value: cast, type: `address:${elemType}` };
             }
-            return { value: v.ptr, type: `address:${v.hType}` };
+            // Normalize to i8* — all address:T values use i8* as their LLVM representation
+            const cast = ir.newTmp();
+            ir.emit(`${cast} = bitcast ${llvmType(v.hType)}* ${v.ptr} to i8*`);
+            return { value: cast, type: `address:${v.hType}` };
         }
 
         case "ArrayAccess": {
@@ -553,7 +559,10 @@ function genExpr(ir, expr) {
             const indexVal   = genExpr(ir, expr.index);
             const elemPtr    = ir.newTmp();
             ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i64 ${indexVal.value}`);
-            return { value: elemPtr, type: `address:${elemType}` };
+            // Normalize to i8* — all address:T values use i8* as their LLVM representation
+            const cast = ir.newTmp();
+            ir.emit(`${cast} = bitcast ${llvmType(elemType)}* ${elemPtr} to i8*`);
+            return { value: cast, type: `address:${elemType}` };
         }
 
         case "Deref": {
@@ -610,10 +619,16 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
+                        // left.value is i8* (all address:T values normalized); bitcast to T* for GEP then back
                         const pointedTo = left.type.substring(8);
-                        const tmp = ir.newTmp();
-                        ir.emit(`${tmp} = getelementptr ${llvmType(pointedTo)}, ${llvmType(pointedTo)}* ${left.value}, i64 ${right.value}`);
-                        return { value: tmp, type: left.type };
+                        const llPtrType = `${llvmType(pointedTo)}*`;
+                        const castIn = ir.newTmp();
+                        ir.emit(`${castIn} = bitcast i8* ${left.value} to ${llPtrType}`);
+                        const gep = ir.newTmp();
+                        ir.emit(`${gep} = getelementptr ${llvmType(pointedTo)}, ${llPtrType} ${castIn}, i64 ${right.value}`);
+                        const castOut = ir.newTmp();
+                        ir.emit(`${castOut} = bitcast ${llPtrType} ${gep} to i8*`);
+                        return { value: castOut, type: left.type };
                     }
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = ${isF ? "fadd" : "add"} ${lt} ${left.value}, ${right.value}`);
@@ -628,12 +643,18 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
+                        // left.value is i8* (all address:T values normalized); bitcast to T* for GEP then back
                         const pointedTo = left.type.substring(8);
+                        const llPtrType = `${llvmType(pointedTo)}*`;
+                        const castIn = ir.newTmp();
+                        ir.emit(`${castIn} = bitcast i8* ${left.value} to ${llPtrType}`);
                         const neg = ir.newTmp();
                         ir.emit(`${neg} = sub i64 0, ${right.value}`);
-                        const tmp = ir.newTmp();
-                        ir.emit(`${tmp} = getelementptr ${llvmType(pointedTo)}, ${llvmType(pointedTo)}* ${left.value}, i64 ${neg}`);
-                        return { value: tmp, type: left.type };
+                        const gep = ir.newTmp();
+                        ir.emit(`${gep} = getelementptr ${llvmType(pointedTo)}, ${llPtrType} ${castIn}, i64 ${neg}`);
+                        const castOut = ir.newTmp();
+                        ir.emit(`${castOut} = bitcast ${llPtrType} ${gep} to i8*`);
+                        return { value: castOut, type: left.type };
                     }
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = ${isF ? "fsub" : "sub"} ${lt} ${left.value}, ${right.value}`);
@@ -705,7 +726,8 @@ function genExpr(ir, expr) {
                 const syscallRegs = ['rax','rdi','rsi','rdx','r10','r8','r9'];
                 const args = (expr.args || []).map(a => genExpr(ir, a));
                 const inputArgs = args.map((a, i) => {
-                    let v = a.value, t = llvmType(a.type);
+                    // address:T values are normalized to i8*; all other pointer types keep their ll type
+                    let v = a.value, t = a.type.startsWith("address:") ? "i8*" : llvmType(a.type);
                     if (t.endsWith("*")) {
                         const tmp2 = ir.newTmp();
                         ir.emit(`${tmp2} = ptrtoint ${t} ${v} to i64`);
@@ -730,7 +752,8 @@ function genExpr(ir, expr) {
             }
 
             const args     = (expr.args || []).map(a => genExpr(ir, a));
-            const argStr   = args.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
+            // address:T values are normalized to i8* — use i8* as LLVM type in call args
+            const argStr   = args.map(v => `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`).join(", ");
             const fnInfo   = functionReturnTypes.get(expr.callee);
             const retType  = fnInfo ? fnInfo.returnType : "int";
             const isVararg = fnInfo && fnInfo.isVariadic;
@@ -836,9 +859,8 @@ function genStmt(ir, stmt, retType) {
 
             if (init) {
                 if (isAddress && init.type.startsWith("address:")) {
-                    const castPtr = ir.newTmp();
-                    ir.emit(`${castPtr} = bitcast ${llvmType(init.type)} ${init.value} to i8*`);
-                    ir.emit(`store i8* ${castPtr}, i8** ${ptr}`);
+                    // init.value is already i8* (all address:T values normalized to i8*)
+                    ir.emit(`store i8* ${init.value}, i8** ${ptr}`);
                 } else {
                     ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
                 }
@@ -869,9 +891,8 @@ function genStmt(ir, stmt, retType) {
             }
             if (v.hType === "address" && val.type.startsWith("address:")) v.hType = val.type;
             if (v.type === "i8*" && val.type.startsWith("address:")) {
-                const castPtr = ir.newTmp();
-                ir.emit(`${castPtr} = bitcast ${llvmType(val.type)} ${val.value} to i8*`);
-                ir.emit(`store i8* ${castPtr}, i8** ${v.ptr}`);
+                // val.value is already i8* (all address:T values normalized to i8*)
+                ir.emit(`store i8* ${val.value}, i8** ${v.ptr}`);
             } else {
                 ir.emit(`store ${v.type} ${val.value}, ${v.type}* ${v.ptr}`);
             }

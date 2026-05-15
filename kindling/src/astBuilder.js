@@ -438,6 +438,14 @@ export class AstBuilder extends HopperVisitor {
 
     visitBreakStmt()    { return BreakStmt(); }
     visitContinueStmt() { return ContinueStmt(); }
+
+    // ── compile-time contract stubs (not yet implemented) ──────────────────
+    // requires / ensures / invariant / constrain are reserved and parsed
+    // but silently ignored until the constraint system is built.
+    visitRequiresClause()  { return null; }
+    visitEnsuresClause()   { return null; }
+    visitInvariantClause() { return null; }
+    visitConstrainClause() { return null; }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
         return ReturnStmt(expr);

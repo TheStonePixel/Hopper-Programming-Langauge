@@ -1,0 +1,32 @@
+// Tests compile-time contract keywords: requires, ensures, invariant, constrain
+// Keywords are reserved and parsed; semantics not yet implemented.
+// EXPECT: ok
+
+import io from linux
+
+// requires / ensures on a function — compile-time pre/postconditions (stub)
+function clamp(int val, int lo, int hi) int
+    requires lo <= hi
+    ensures result >= lo
+    ensures result <= hi
+{
+    if (val < lo) { return lo }
+    if (val > hi) { return hi }
+    return val
+}
+
+entry main {
+    // constrain on a variable declaration — narrows storage class (stub)
+    int x = 42 constrain [byte]
+
+    // invariant on a while loop — loop correctness assertion (stub)
+    int i = 0
+    while (i < 3)
+        invariant i >= 0
+    {
+        i = i + 1
+    }
+
+    int result = clamp(x, 0, 100)
+    print("ok\n", 3)
+}
