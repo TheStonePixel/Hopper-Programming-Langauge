@@ -205,6 +205,7 @@ statement
     | 'continue'                                                # ContinueStmt
     | 'return' expression?                                      # ReturnStmt
     | 'defer' expression                                        # DeferStmt
+    | 'deallocate' expression                                   # DeallocateStmt
     | 'asm' asmBlock                                            # AsmStmt
     ;
 
@@ -259,7 +260,7 @@ relational      : shift ( ('<' | '<=' | '>' | '>=') shift )* ;
 shift           : additive ( ('<<' | '>>') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
 multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
-unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
+unary           : ('!' | '-' | '~') unary | 'cast' unary | 'allocate' unary | primary ;
 primary
     : IntegerLiteral
     | HexLiteral

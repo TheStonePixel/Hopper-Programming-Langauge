@@ -868,6 +868,14 @@ function genExpr(ir, expr) {
         case "CastExpr":
             throw new Error("cast requires an assignment context");
 
+        case "AllocateExpr": {
+            const size = genExpr(ir, expr.sizeExpr);
+            const sizeVal = size.type !== "int" ? size.value : size.value;
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call i8* @malloc(i64 ${sizeVal})`);
+            return { value: tmp, type: "address" };
+        }
+
         default:
             throw new Error(`Unsupported expr kind: ${expr.kind}`);
     }
@@ -1273,6 +1281,12 @@ function genStmt(ir, stmt, retType) {
             break;
         }
 
+        case "DeallocateStmt": {
+            const ptr = genExpr(ir, stmt.expr);
+            ir.emit(`call void @free(i8* ${ptr.value})`);
+            break;
+        }
+
         case "BreakStmt":    ir.emit(`br label %${ir.currentLoop().breakLabel}`);    break;
         case "ContinueStmt": ir.emit(`br label %${ir.currentLoop().continueLabel}`); break;
         case "ExprStmt":     genExpr(ir, stmt.expr);                                  break;
@@ -1589,6 +1603,10 @@ function genModule(ast) {
     }
 
     if (typeDefs.length > 0) out += typeDefs.join("") + "\n";
+
+    // Runtime heap declarations — backing allocate/deallocate directives
+    out += `declare i8* @malloc(i64)\n`;
+    out += `declare void @free(i8*)\n\n`;
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 

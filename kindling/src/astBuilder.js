@@ -40,6 +40,8 @@ import {
     ContinueStmt,
     ReturnStmt,
     DeferStmt,
+    AllocateExpr,
+    DeallocateStmt,
     ExprStmt,
     Block,
     Binary,
@@ -499,8 +501,9 @@ export class AstBuilder extends HopperVisitor {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
         return ReturnStmt(expr);
     }
-    visitDeferStmt(ctx)  { return DeferStmt(this.visit(ctx.expression())); }
-    visitExprStmt(ctx)   { return ExprStmt(this.visit(ctx.expression())); }
+    visitDeferStmt(ctx)      { return DeferStmt(this.visit(ctx.expression())); }
+    visitDeallocateStmt(ctx) { return DeallocateStmt(this.visit(ctx.expression())); }
+    visitExprStmt(ctx)       { return ExprStmt(this.visit(ctx.expression())); }
 
     // ── expressions ────────────────────────────────────────────────────────
 
@@ -583,8 +586,9 @@ export class AstBuilder extends HopperVisitor {
 
     visitUnary(ctx) {
         if (ctx.primary()) return this.visit(ctx.primary());
-        const op = ctx.children[0].getText(); // '!', '-', '~', or 'cast'
-        if (op === "cast") return CastExpr(this.visit(ctx.unary()));
+        const op = ctx.children[0].getText(); // '!', '-', '~', 'cast', or 'allocate'
+        if (op === "cast")     return CastExpr(this.visit(ctx.unary()));
+        if (op === "allocate") return AllocateExpr(this.visit(ctx.unary()));
         return Unary(op, this.visit(ctx.unary()));
     }
 

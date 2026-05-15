@@ -152,6 +152,14 @@ export function DeferStmt(expr) {
     return { kind: "DeferStmt", expr };
 }
 
+export function AllocateExpr(sizeExpr) {
+    return { kind: "AllocateExpr", sizeExpr };
+}
+
+export function DeallocateStmt(expr) {
+    return { kind: "DeallocateStmt", expr };
+}
+
 export function Block(statements) {
     return { kind: "Block", statements };
 }
