@@ -821,36 +821,6 @@ function genExpr(ir, expr) {
         }
 
         case "Call": {
-            // syscall(num, arg1, ...) builtin — maps directly to Linux syscall instruction
-            if (expr.callee === "syscall") {
-                const syscallRegs = ['rax','rdi','rsi','rdx','r10','r8','r9'];
-                const args = (expr.args || []).map(a => genExpr(ir, a));
-                const inputArgs = args.map((a, i) => {
-                    // address:T values are normalized to i8*; all other pointer types keep their ll type
-                    let v = a.value, t = a.type.startsWith("address:") ? "i8*" : llvmType(a.type);
-                    if (t.endsWith("*")) {
-                        const tmp2 = ir.newTmp();
-                        ir.emit(`${tmp2} = ptrtoint ${t} ${v} to i64`);
-                        v = tmp2; t = "i64";
-                    }
-                    if (t === "i8" || t === "i1") {
-                        const tmp2 = ir.newTmp();
-                        ir.emit(`${tmp2} = zext ${t} ${v} to i64`);
-                        v = tmp2; t = "i64";
-                    }
-                    return { reg: syscallRegs[i], llType: t, value: v };
-                });
-                const outC  = `={rax}`;
-                // first input (syscall number) uses tied constraint "0" = same reg as output 0 (rax)
-                const inC   = inputArgs.map((a, i) => i === 0 ? "0" : `{${a.reg}}`).join(",");
-                const clob  = `~{rcx},~{r11},~{memory}`;
-                const constraints = `${outC},${inC},${clob}`;
-                const argStr = inputArgs.map(a => `${a.llType} ${a.value}`).join(", ");
-                const tmp = ir.newTmp();
-                ir.emit(`${tmp} = call i64 asm sideeffect "syscall", "${constraints}"(${argStr})`);
-                return { value: tmp, type: "int" };
-            }
-
             const args     = (expr.args || []).map(a => genExpr(ir, a));
             // address:T values are normalized to i8* — use i8* as LLVM type in call args
             const argStr   = args.map(v => `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`).join(", ");
