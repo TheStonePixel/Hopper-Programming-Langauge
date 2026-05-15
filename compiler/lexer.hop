@@ -1,0 +1,178 @@
+// Hopper self-hosted lexer
+// Reads source text and produces a flat stream of tokens.
+// Depends on: Array<Token>, String from stdlib (Phase 1)
+//
+// Token type values (use as int literals):
+//   0  = EOF
+//   1  = NEWLINE
+//   2  = IDENT
+//   3  = INT_LIT        e.g. 42
+//   4  = HEX_LIT        e.g. 0xFF
+//   5  = FLOAT_LIT      e.g. 3.14
+//   6  = STRING_LIT     e.g. "hello"
+//   7  = PLUS           +
+//   8  = MINUS          -
+//   9  = STAR           *
+//   10 = SLASH          /
+//   11 = PERCENT        %
+//   12 = AMP            &
+//   13 = PIPE           |
+//   14 = CARET          ^
+//   15 = TILDE          ~
+//   16 = BANG           !
+//   17 = LT             <
+//   18 = GT             >
+//   19 = EQ             =
+//   20 = DOT            .
+//   21 = COMMA          ,
+//   22 = COLON          :
+//   23 = LBRACE         {
+//   24 = RBRACE         }
+//   25 = LPAREN         (
+//   26 = RPAREN         )
+//   27 = LBRACKET       [
+//   28 = RBRACKET       ]
+//   29 = LTEQ           <=
+//   30 = GTEQ           >=
+//   31 = EQEQ           ==
+//   32 = BANGEQ         !=
+//   33 = LTLT           <<
+//   34 = GTGT           >>
+//   35 = ANDAND         &&
+//   36 = PIPEPIPE       ||
+//   37 = COLONCOLON     ::
+//   38 = ELLIPSIS       ...
+//   -- Keywords start at 100 --
+//   100 = KW_FUNCTION
+//   101 = KW_ENTRY
+//   102 = KW_STRUCT
+//   103 = KW_CLASS
+//   104 = KW_TEMPLATE
+//   105 = KW_BITFIELD
+//   106 = KW_IMPORT
+//   107 = KW_FROM
+//   108 = KW_EXTERN
+//   109 = KW_RETURN
+//   110 = KW_IF
+//   111 = KW_ELSE
+//   112 = KW_WHILE
+//   113 = KW_FOR
+//   114 = KW_BREAK
+//   115 = KW_CONTINUE
+//   116 = KW_DEFER
+//   117 = KW_ASM
+//   118 = KW_BIND
+//   119 = KW_STRICT
+//   120 = KW_CONST
+//   121 = KW_ALIAS
+//   122 = KW_PAD
+//   123 = KW_BIT
+//   124 = KW_BYTE
+//   125 = KW_INT
+//   126 = KW_FLOAT
+//   127 = KW_BOOL
+//   128 = KW_STRING
+//   129 = KW_ADDRESS
+//   130 = KW_UNSIGNED
+//   131 = KW_CAST
+//   132 = KW_NULL
+//   133 = KW_TRUE
+//   134 = KW_FALSE
+//   135 = KW_OPERATOR
+//   136 = KW_CONSTRUCTOR
+//   137 = KW_DESTRUCTOR
+//   138 = KW_REQUIRES
+//   139 = KW_ENSURES
+//   140 = KW_INVARIANT
+//   141 = KW_CONSTRAIN
+//   142 = KW_VALUE
+//   143 = KW_SIZE
+
+
+// ── Token ─────────────────────────────────────────────────────────────────────
+
+struct Token {
+    int    kind     // one of the type values above
+    int    line     // 1-based source line
+    int    col      // 1-based column
+    // value: the raw text of the token — needs String from stdlib
+    // String value
+}
+
+
+// ── Lexer ─────────────────────────────────────────────────────────────────────
+// Holds the source buffer and current scan position.
+// Call lex_next() repeatedly until TOKEN_EOF.
+
+class Lexer {
+
+    // source: the full source file loaded into memory (string or String)
+    // pos:    current byte offset into source
+    // len:    total byte length of source
+    // line:   current line number (starts at 1)
+    // col:    current column (starts at 1)
+
+    // constructor(string src, int len)
+    //   Store src, len. Set pos=0, line=1, col=1.
+
+    // function lex_all() Array<Token>
+    //   Scan the entire source and return a flat array of tokens.
+    //   Calls lex_next() in a loop until TOKEN_EOF.
+
+    // function lex_next() Token
+    //   Return the next token from the source.
+    //   Skip whitespace (spaces and tabs) and comments.
+    //   Dispatch to the appropriate scan function based on the current character.
+
+}
+
+
+// ── Internal scan functions ───────────────────────────────────────────────────
+// Each consumes characters from the source and returns a Token.
+// Call from lex_next() after peeking at the current character.
+
+// function scan_newline(Lexer l) Token
+//   Consume \r?\n. Increment line, reset col to 1. Return NEWLINE.
+
+// function scan_comment(Lexer l)
+//   Consume from // to end of line. Do NOT consume the newline itself.
+//   Return nothing — caller loops back to lex_next().
+
+// function scan_ident_or_keyword(Lexer l) Token
+//   Consume [a-zA-Z_][a-zA-Z0-9_]*.
+//   Look up the result in the keyword table.
+//   If found: return the keyword token kind.
+//   If not:   return IDENT with the identifier text as value.
+
+// function scan_number(Lexer l) Token
+//   If source starts with 0x or 0X: scan hex digits → HEX_LIT
+//   Else scan decimal digits.
+//   If a dot follows and the next char is a digit: scan fractional → FLOAT_LIT
+//   Otherwise: INT_LIT
+
+// function scan_string(Lexer l) Token
+//   Consume the opening quote.
+//   Scan characters until closing unescaped quote.
+//   Handle escape sequences: \n \t \r \\ \"
+//   Return STRING_LIT with the raw (including quotes) or decoded text.
+
+// function scan_operator(Lexer l) Token
+//   Peek one or two characters to distinguish multi-char operators:
+//     < vs <= vs <<
+//     > vs >= vs >>
+//     = vs ==
+//     ! vs !=
+//     & vs &&
+//     | vs ||
+//     : vs ::
+//     . vs ... (ellipsis)
+//   Return the appropriate token kind.
+
+
+// ── Keyword table ─────────────────────────────────────────────────────────────
+// Map from identifier string to keyword token kind.
+// Use HashMap<String, int> from stdlib once available.
+// On first call, populate with all keyword → kind pairs listed above.
+
+// function keyword_kind(string word, int len) int
+//   Return the keyword token kind if word is a keyword, else -1.
