@@ -5,11 +5,18 @@ using the `template` keyword — no libc, no runtime dependencies.
 
 ---
 
-## Naming Notes
+## Naming Convention
 
-- Raw fixed-size arrays already exist as language syntax: `int arr[5]`
-- The dynamic growable array is `Vec<T>` (avoids confusion with raw `array`)
-- `Heap` is avoided as a name — it conflicts with "heap memory". Use `MinHeap<T>` / `MaxHeap<T>`.
+Capital letter = object (class). Lowercase = fundamental type. This is consistent
+across the whole language:
+
+| Primitive | Object |
+|-----------|--------|
+| `string` — raw `i8*` pointer | `String` — safe, length-tracked |
+| `int` — native word-size integer | `Int` — boxed integer object |
+| `array` — raw fixed-size stack array (`int arr[5]`) | `Array<T>` — dynamic growable array |
+
+- `Heap` is avoided as a data structure name — conflicts with "heap memory". Use `MinHeap<T>` / `MaxHeap<T>`.
 
 ---
 
@@ -19,8 +26,8 @@ These are the building blocks. Stack and Queue depend on Vec.
 
 | Name | File | Description |
 |------|------|-------------|
-| `Vec<T>` | `ds/vec.hop` | Growable array. Heap-allocated, tracks length and capacity. Doubles capacity on overflow. |
-| `String` | `ds/string.hop` | Safe string. Wraps `Vec<byte>`. Tracks length. Replaces raw `string` for application code. |
+| `Array<T>` | `ds/array.hop` | Growable array. Heap-allocated, tracks length and capacity. Doubles capacity on overflow. |
+| `String` | `ds/string.hop` | Safe string. Wraps `Array<byte>`. Tracks length. Replaces raw `string` for application code. |
 
 ---
 
@@ -30,7 +37,7 @@ Built on top of Vec or linked nodes.
 
 | Name | File | Description |
 |------|------|-------------|
-| `Stack<T>` | `ds/stack.hop` | LIFO. Thin wrapper over `Vec<T>`. `push`, `pop`, `peek`. |
+| `Stack<T>` | `ds/stack.hop` | LIFO. Thin wrapper over `Array<T>`. `push`, `pop`, `peek`. |
 | `Queue<T>` | `ds/queue.hop` | FIFO. Ring-buffer backed for O(1) enqueue/dequeue. `enqueue`, `dequeue`, `peek`. |
 | `LinkedList<T>` | `ds/linked_list.hop` | Singly linked list. Node-based, O(1) prepend. Useful where Vec reallocation is undesirable. |
 | `Deque<T>` | `ds/deque.hop` | Double-ended queue. Push/pop from both ends. Backed by a ring buffer. |
@@ -63,9 +70,9 @@ Useful specifically for systems and embedded contexts.
 ## Implementation Order
 
 ```
-Vec<T>          ← start here, everything else depends on it
-String          ← pairs naturally with Vec
-Stack<T>        ← trivial once Vec exists
+Array<T>        ← start here, everything else depends on it
+String          ← pairs naturally with Array<byte>
+Stack<T>        ← trivial once Array exists
 Queue<T>        ← ring buffer, independent of Vec
 LinkedList<T>   ← teaches node/pointer patterns in Hopper
 Deque<T>
@@ -82,7 +89,6 @@ Pool<T>
 
 ## Open Questions
 
-- **Naming**: `Vec<T>` vs `Vector<T>` — decide before first implementation
-- **Allocator**: do we pass an allocator to Vec, or use a global `malloc`/`free` shim?
+- **Allocator**: do we pass an allocator to `Array`, or use a global `malloc`/`free` shim?
 - **Comparator**: how does `MinHeap` / `HashMap` receive a compare/hash function? Operator overloading (`==`, `<`) or explicit function pointer?
 - **Iterator protocol**: do we design a standard `iter()` / `next()` interface now, or add it later?
