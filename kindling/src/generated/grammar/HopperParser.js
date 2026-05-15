@@ -2,6 +2,8 @@
 // jshint ignore: start
 import antlr4 from 'antlr4';
 import HopperListener from './HopperListener.js';
+import HopperVisitor from './HopperVisitor.js';
+
 const serializedATN = [4,1,87,884,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
 4,2,5,7,5,2,6,7,6,2,7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,
 2,13,7,13,2,14,7,14,2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,
@@ -3709,6 +3711,14 @@ class ProgramContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitProgram(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -3784,6 +3794,14 @@ class TopLevelDeclContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitTopLevelDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -3843,6 +3861,14 @@ class ImportFromContext extends ImportDeclContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitImportFrom(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -3869,6 +3895,14 @@ class ImportModuleContext extends ImportDeclContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitImportModule(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitImportModule(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -3908,6 +3942,14 @@ class BindDeclContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitBindDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBindDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -3951,6 +3993,14 @@ class StrictDeclContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitStrictDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitStrictDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4012,6 +4062,14 @@ class EntryBlockParamsContext extends EntryDeclContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitEntryBlockParams(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4044,6 +4102,14 @@ class EntryAddrContext extends EntryDeclContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitEntryAddr(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4074,6 +4140,14 @@ class EntryBlockContext extends EntryDeclContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitEntryBlock(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitEntryBlock(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4115,6 +4189,14 @@ class ConstDeclContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitConstDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4152,6 +4234,14 @@ class AliasDeclContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitAliasDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAliasDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4224,6 +4314,14 @@ class ProcDeclContext extends FunctionDeclContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitProcDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4260,6 +4358,14 @@ class ExternFuncDeclContext extends FunctionDeclContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitExternFuncDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4290,6 +4396,14 @@ class ExternProcDeclContext extends FunctionDeclContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitExternProcDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitExternProcDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4341,6 +4455,14 @@ class FuncDeclContext extends FunctionDeclContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitFuncDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitFuncDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4406,6 +4528,14 @@ class EnsuresClauseContext extends ContractClauseContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitEnsuresClause(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4444,6 +4574,14 @@ class RequiresClauseContext extends ContractClauseContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitRequiresClause(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitRequiresClause(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4504,6 +4642,14 @@ class StructDeclContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitStructDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4555,6 +4701,14 @@ class StructPadContext extends StructMemberContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitStructPad(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4585,6 +4739,14 @@ class StructFieldContext extends StructMemberContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitStructField(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitStructField(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4643,6 +4805,14 @@ class BitfieldDeclContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitBitfieldDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitfieldDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4704,6 +4874,14 @@ class BitfieldArrayFieldContext extends BitfieldMemberContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitfieldArrayField(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4730,6 +4908,14 @@ class BitfieldPadContext extends BitfieldMemberContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitBitfieldPad(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitfieldPad(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4762,6 +4948,14 @@ class BitfieldFieldContext extends BitfieldMemberContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitBitfieldField(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitfieldField(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4833,6 +5027,14 @@ class TemplateDeclContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitTemplateDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4884,6 +5086,14 @@ class FreeParamContext extends TemplateParamContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitFreeParam(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -4907,6 +5117,14 @@ class FixedParamContext extends TemplateParamContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitFixedParam(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitFixedParam(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -4965,6 +5183,14 @@ class ClassDeclContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitClassDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5026,6 +5252,14 @@ class ClassProcMethodContext extends ClassMemberContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassProcMethod(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5052,6 +5286,14 @@ class ClassDestructorContext extends ClassMemberContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitClassDestructor(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassDestructor(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5094,6 +5336,14 @@ class ClassOperatorContext extends ClassMemberContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassOperator(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5134,6 +5384,14 @@ class ClassMethodContext extends ClassMemberContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassMethod(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5166,6 +5424,14 @@ class ClassFieldContext extends ClassMemberContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassField(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5196,6 +5462,14 @@ class ClassConstructorContext extends ClassMemberContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitClassConstructor(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitClassConstructor(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5233,6 +5507,14 @@ class FieldNameContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitFieldName(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5263,6 +5545,14 @@ class OperatorSymbolContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitOperatorSymbol(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitOperatorSymbol(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5307,6 +5597,14 @@ class ParamListContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitParamList(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5349,6 +5647,14 @@ class ExternParamListContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitExternParamList(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5388,6 +5694,14 @@ class ParamContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitParam(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5421,6 +5735,14 @@ class ParamNameContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitParamName(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitParamName(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5467,6 +5789,14 @@ class TypeContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitType(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitType(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5523,6 +5853,14 @@ class BlockContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBlock(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5574,6 +5912,14 @@ class DeallocateStmtContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitDeallocateStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5608,6 +5954,14 @@ class FieldAssignContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitFieldAssign(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitFieldAssign(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5649,6 +6003,14 @@ class ArrayAssignContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitArrayAssign(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5672,6 +6034,14 @@ class ContinueStmtContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitContinueStmt(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitContinueStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5713,6 +6083,14 @@ class IfStmtContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitIfStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5739,6 +6117,14 @@ class ExprStmtContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitExprStmt(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitExprStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5779,6 +6165,14 @@ class VarDeclContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitVarDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitVarDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5824,6 +6218,14 @@ class WhileStmtContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitWhileStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5847,6 +6249,14 @@ class BreakStmtContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitBreakStmt(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBreakStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5885,6 +6295,14 @@ class VarDeclNoInitContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitVarDeclNoInit(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5917,6 +6335,14 @@ class AssignContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAssign(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -5943,6 +6369,14 @@ class AsmStmtContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitAsmStmt(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAsmStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -5975,6 +6409,14 @@ class DerefAssignContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitDerefAssign(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitDerefAssign(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6017,6 +6459,14 @@ class ArrayDeclInitContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitArrayDeclInit(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6057,6 +6507,14 @@ class ForStmtContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitForStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6085,6 +6543,14 @@ class ReturnStmtContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitReturnStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6111,6 +6577,14 @@ class DeferStmtContext extends StatementContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitDeferStmt(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitDeferStmt(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6149,6 +6623,14 @@ class ArrayDeclContext extends StatementContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitArrayDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6184,6 +6666,14 @@ class ConstrainClauseContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitConstrainClause(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6217,6 +6707,14 @@ class InvariantClauseContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitInvariantClause(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitInvariantClause(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6271,6 +6769,14 @@ class AsmBlockContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitAsmBlock(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAsmBlock(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6328,6 +6834,14 @@ class AsmLineAssignContext extends AsmLineContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAsmLineAssign(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6354,6 +6868,14 @@ class AsmLineOpContext extends AsmLineContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitAsmLineOp(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAsmLineOp(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6397,6 +6919,14 @@ class AsmOperandContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitAsmOperand(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAsmOperand(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6454,6 +6984,14 @@ class ForInitAssignContext extends ForInitContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitForInitAssign(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6488,6 +7026,14 @@ class ForInitDeclContext extends ForInitContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitForInitDecl(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitForInitDecl(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6529,6 +7075,14 @@ class ForUpdateContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitForUpdate(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6562,6 +7116,14 @@ class ExpressionContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitExpression(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitExpression(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6606,6 +7168,14 @@ class LogicalOrContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitLogicalOr(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6646,6 +7216,14 @@ class LogicalAndContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitLogicalAnd(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitLogicalAnd(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6690,6 +7268,14 @@ class BitwiseOrContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitwiseOr(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6730,6 +7316,14 @@ class BitwiseXorContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitBitwiseXor(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitwiseXor(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6774,6 +7368,14 @@ class BitwiseAndContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitBitwiseAnd(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6814,6 +7416,14 @@ class EqualityContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitEquality(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitEquality(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6858,6 +7468,14 @@ class RelationalContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitRelational(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6898,6 +7516,14 @@ class ShiftContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitShift(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitShift(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -6942,6 +7568,14 @@ class AdditiveContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitAdditive(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -6984,6 +7618,14 @@ class MultiplicativeContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitMultiplicative(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -7021,6 +7663,14 @@ class UnaryContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitUnary(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitUnary(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -7094,6 +7744,14 @@ class PrimaryContext extends antlr4.ParserRuleContext {
 		}
 	}
 
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitPrimary(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
 
 }
 
@@ -7134,6 +7792,14 @@ class ArgListContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitArgList(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitArgList(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
@@ -7181,6 +7847,14 @@ class LiteralContext extends antlr4.ParserRuleContext {
 	    if(listener instanceof HopperListener ) {
 	        listener.exitLiteral(this);
 		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitLiteral(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
 	}
 
 
