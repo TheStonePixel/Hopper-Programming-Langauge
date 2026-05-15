@@ -1,0 +1,69 @@
+// LLVM target machine — object file and assembly emission
+// Required for compiling Hopper to native binaries.
+//
+// Typical usage:
+//   1. Initialize the target you need (X86 or ARM)
+//   2. Get the default triple or build one manually
+//   3. Create a target machine from the triple
+//   4. Emit to object file or assembly
+//
+// Target triple examples:
+//   "x86_64-pc-linux-gnu"        — 64-bit Linux
+//   "thumbv7em-none-eabi"        — ARM Cortex-M4/M7 bare metal
+//   "thumbv6m-none-eabi"         — ARM Cortex-M0 bare metal
+//   "aarch64-unknown-linux-gnu"  — ARM64 Linux
+//
+// Int constants (pass as literals):
+//   Optimization level:  None=0  Less=1  Default=2  Aggressive=3
+//   Reloc mode:          Default=0  Static=1  PIC=2  DynamicNoPic=3
+//   Code model:          Default=0  Tiny=1  Small=2  Kernel=3  Medium=4  Large=5
+//   Output type:         Assembly=0  Object=1  Null=2
+
+
+// ── X86 / x86-64 target ───────────────────────────────────────────────────────
+extern function LLVMInitializeX86TargetInfo()
+extern function LLVMInitializeX86Target()
+extern function LLVMInitializeX86TargetMC()
+extern function LLVMInitializeX86AsmPrinter()
+extern function LLVMInitializeX86AsmParser()
+
+// ── ARM / Thumb target ────────────────────────────────────────────────────────
+extern function LLVMInitializeARMTargetInfo()
+extern function LLVMInitializeARMTarget()
+extern function LLVMInitializeARMTargetMC()
+extern function LLVMInitializeARMAsmPrinter()
+extern function LLVMInitializeARMAsmParser()
+
+// ── AArch64 target ────────────────────────────────────────────────────────────
+extern function LLVMInitializeAArch64TargetInfo()
+extern function LLVMInitializeAArch64Target()
+extern function LLVMInitializeAArch64TargetMC()
+extern function LLVMInitializeAArch64AsmPrinter()
+extern function LLVMInitializeAArch64AsmParser()
+
+// ── Target lookup ─────────────────────────────────────────────────────────────
+extern function LLVMGetDefaultTargetTriple() string
+extern function LLVMNormalizeTargetTriple(string triple) string
+extern function LLVMGetTargetFromTriple(string triple, address target, address errMsg) int
+extern function LLVMGetTargetName(address target) string
+extern function LLVMGetTargetDescription(address target) string
+
+// ── Target machine ────────────────────────────────────────────────────────────
+extern function LLVMCreateTargetMachine(address target, string triple, string cpu, string features, int optLevel, int relocMode, int codeModel) address
+extern function LLVMDisposeTargetMachine(address tm)
+extern function LLVMGetTargetMachineTriple(address tm) string
+extern function LLVMGetTargetMachineCPU(address tm) string
+extern function LLVMGetTargetMachineFeatureString(address tm) string
+
+// ── Data layout ───────────────────────────────────────────────────────────────
+extern function LLVMCreateTargetDataLayout(address tm) address
+extern function LLVMDisposeTargetData(address td)
+extern function LLVMSetModuleDataLayout(address module, address dl)
+extern function LLVMSetTarget(address module, string triple)
+extern function LLVMCopyStringRepOfTargetData(address td) string
+extern function LLVMABISizeOfType(address td, address type) int
+extern function LLVMABIAlignmentOfType(address td, address type) int
+
+// ── Emission ──────────────────────────────────────────────────────────────────
+extern function LLVMTargetMachineEmitToFile(address tm, address module, string filename, int codegen, address errMsg) int
+extern function LLVMTargetMachineEmitToMemoryBuffer(address tm, address module, int codegen, address errMsg, address outBuf) int
