@@ -102,13 +102,26 @@ import { RouterLink } from 'vue-router'
             </ul>
             <p class="sep-col-note">What makes it ergonomic.</p>
           </div>
+          <div class="sep-divider">+</div>
+          <div class="sep-col script">
+            <div class="sep-col-label hopper-script">Hopper Script</div>
+            <div class="sep-col-sub">The extension layer</div>
+            <ul>
+              <li>Shell scripting</li>
+              <li>Website interactivity</li>
+              <li>Plugin and mod systems</li>
+              <li>User-defined behavior</li>
+              <li>Embedded in any Hopper+ app</li>
+            </ul>
+            <p class="sep-col-note">What makes it extensible.</p>
+          </div>
         </div>
         <p class="sep-payoff">
           The application developer writes route handlers in Hopper+. Every byte that moves
-          through the network is handled by Hopper underneath. They get the ergonomics of a
-          high-level language with the performance of systems code — because the systems code
-          <em>is</em> the foundation, not a wrapper around C.
-          No foreign boundary. No ABI crossing. One language family, owned end to end.
+          through the network is handled by Hopper underneath. And when the end user wants to
+          extend the application — write a shell script, add a plugin, mod a game — they reach
+          for Hopper Script. Like Lua in a game engine, or Python in Blender. One language family,
+          owned end to end. No foreign boundary at any layer.
         </p>
       </div>
     </section>
@@ -432,7 +445,7 @@ import { RouterLink } from 'vue-router'
   align-items: flex-start;
   gap: 0;
   margin: 3rem 0;
-  max-width: 680px;
+  max-width: 960px;
 }
 
 .sep-col {
@@ -457,6 +470,15 @@ import { RouterLink } from 'vue-router'
 
 .sep-col-label.hopper-plus {
   color: #4ec9b0;
+}
+
+.sep-col-label.hopper-script {
+  color: #dcdcaa;
+}
+
+.sep-col.script {
+  background: #131209;
+  border-color: #2a2a14;
 }
 
 .sep-col-sub {
@@ -776,9 +798,12 @@ footer p {
   .hero h1        { font-size: 3rem; letter-spacing: -1px; }
   .tagline        { font-size: 1rem; }
   .thesis-statement { font-size: 1.2rem; }
+  .sep-statement  { font-size: 1.2rem; }
   .what-grid,
   .grid,
   .feature-grid   { grid-template-columns: 1fr; }
   .layer          { flex-direction: column; gap: 0.25rem; }
+  .sep-example    { flex-direction: column; }
+  .sep-divider    { padding: 0.5rem 0; }
 }
 </style>
