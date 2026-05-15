@@ -8,24 +8,20 @@
 //   gpio.hop — set TX/RX pins to alternate function mode
 //
 // Pin mapping:
-//   USART1 — PA9  (TX), PA10 (RX) — APB2 @ 16MHz
-//   USART2 — PA2  (TX), PA3  (RX) — APB1 @ 16MHz
-//   USART6 — PC6  (TX), PC7  (RX) — APB2 @ 16MHz
-
-
-// ── Baud rate constants ───────────────────────────────────────────────────────
-// Precomputed BRR values for APB @ 16MHz HSI, OVER8=0
-// Formula: BRR = fCK / (16 * baud)
-// mantissa = integer part, fraction = fractional part * 16
-
-const BAUD_9600   = 0x0683
-const BAUD_19200  = 0x0341
-const BAUD_38400  = 0x01A1
-const BAUD_57600  = 0x0116
-const BAUD_115200 = 0x008B
-const BAUD_230400 = 0x0045
-const BAUD_460800 = 0x0023
-const BAUD_921600 = 0x0011
+//   USART1 — PA9  (TX), PA10 (RX) — APB2
+//   USART2 — PA2  (TX), PA3  (RX) — APB1
+//   USART6 — PC6  (TX), PC7  (RX) — APB2
+//
+// Baud rate register (BRR) values at 16MHz HSI, OVER8=0:
+//   9600   = 0x0683
+//   19200  = 0x0341
+//   38400  = 0x01A1
+//   57600  = 0x0116
+//   115200 = 0x008B
+//   230400 = 0x0045
+//   921600 = 0x0011
+//
+// Formula: mantissa = fCK / (16 * baud), fraction = remainder * 16
 
 
 // ── Status Register (SR) ──────────────────────────────────────────────────────
@@ -138,12 +134,12 @@ strict UartCR3 usart6_cr3 = 0x40011414
 
 // ── USART1 ────────────────────────────────────────────────────────────────────
 
-function uart1_init(int baud) {
-    usart1_brr.mantissa = baud >> 4
-    usart1_brr.fraction = baud & 0xF
-    usart1_cr1.te  = 1
-    usart1_cr1.re  = 1
-    usart1_cr1.ue  = 1
+function uart1_init(int brr) {
+    usart1_brr.mantissa = brr >> 4
+    usart1_brr.fraction = brr & 0xF
+    usart1_cr1.te = 1
+    usart1_cr1.re = 1
+    usart1_cr1.ue = 1
 }
 
 function uart1_send(byte b) {
@@ -184,12 +180,12 @@ function uart1_clear_errors() {
 
 // ── USART2 ────────────────────────────────────────────────────────────────────
 
-function uart2_init(int baud) {
-    usart2_brr.mantissa = baud >> 4
-    usart2_brr.fraction = baud & 0xF
-    usart2_cr1.te  = 1
-    usart2_cr1.re  = 1
-    usart2_cr1.ue  = 1
+function uart2_init(int brr) {
+    usart2_brr.mantissa = brr >> 4
+    usart2_brr.fraction = brr & 0xF
+    usart2_cr1.te = 1
+    usart2_cr1.re = 1
+    usart2_cr1.ue = 1
 }
 
 function uart2_send(byte b) {
@@ -230,12 +226,12 @@ function uart2_clear_errors() {
 
 // ── USART6 ────────────────────────────────────────────────────────────────────
 
-function uart6_init(int baud) {
-    usart6_brr.mantissa = baud >> 4
-    usart6_brr.fraction = baud & 0xF
-    usart6_cr1.te  = 1
-    usart6_cr1.re  = 1
-    usart6_cr1.ue  = 1
+function uart6_init(int brr) {
+    usart6_brr.mantissa = brr >> 4
+    usart6_brr.fraction = brr & 0xF
+    usart6_cr1.te = 1
+    usart6_cr1.re = 1
+    usart6_cr1.ue = 1
 }
 
 function uart6_send(byte b) {
