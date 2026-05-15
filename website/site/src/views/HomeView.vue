@@ -1,3 +1,7 @@
+<script setup>
+import { RouterLink } from 'vue-router'
+</script>
+
 <template>
   <div class="page">
 
@@ -58,6 +62,7 @@
       <div class="container">
         <span class="label">It's all code</span>
         <p class="section-desc">Hardware description, program logic, and entry point — all in one language.</p>
+        <RouterLink to="/vs-c" class="compare-link">See Hopper vs C: memory operations side by side →</RouterLink>
         <pre><code><span class="comment">// vector table — burned into flash by the linker</span>
 <span class="kw">bind</span> <span class="hex">0x00000004</span> <span class="op">=</span> reset<span class="op">::</span>address
 <span class="kw">bind</span> <span class="hex">0x0000003c</span> <span class="op">=</span> timer<span class="op">::</span>address
@@ -321,6 +326,22 @@
   font-size: 0.875rem;
   color: #777;
   line-height: 1.7;
+}
+
+.compare-link {
+  display: inline-block;
+  margin-bottom: 2rem;
+  font-size: 0.85rem;
+  color: #569cd6;
+  text-decoration: none;
+  border-bottom: 1px solid #1a3a5c;
+  padding-bottom: 1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.compare-link:hover {
+  color: #7eb8f0;
+  border-color: #2a5a8c;
 }
 
 /* ── Code ── */
