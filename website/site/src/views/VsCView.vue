@@ -306,9 +306,9 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 }
 
 .container {
-  max-width: 980px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 5rem;
 }
 
 .label {
@@ -387,9 +387,9 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 }
 
 .compare-header p {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: #666;
-  max-width: 680px;
+  max-width: 900px;
   line-height: 1.7;
 }
 
@@ -479,7 +479,13 @@ footer p {
 }
 
 /* ── Responsive ── */
+@media (max-width: 1100px) {
+  .container { padding: 0 3rem; }
+}
+
 @media (max-width: 700px) {
+  .container      { padding: 0 1.5rem; }
+  .page-header    { padding: 3rem 0 2.5rem; }
   .page-header h1 { font-size: 2.5rem; letter-spacing: -1px; }
   .pair           { grid-template-columns: 1fr; }
   .block-label    { border-radius: 4px 4px 0 0; }

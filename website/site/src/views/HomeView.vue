@@ -298,9 +298,9 @@ import { RouterLink } from 'vue-router'
 }
 
 .container {
-  max-width: 860px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 5rem;
 }
 
 .label {
@@ -315,34 +315,39 @@ import { RouterLink } from 'vue-router'
 .section-desc {
   color: #888;
   margin-bottom: 2rem;
-  max-width: 560px;
+  max-width: 720px;
 }
 
 /* ── Hero ── */
 .hero {
-  padding: 7rem 2rem 6rem;
+  padding: 10rem 5rem 9rem;
   text-align: center;
   border-bottom: 1px solid #1a1a1a;
 }
 
+.hero-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
 .hero h1 {
-  font-size: 5rem;
+  font-size: 7rem;
   font-weight: 700;
-  letter-spacing: -3px;
+  letter-spacing: -5px;
   color: #ffffff;
 }
 
 .tagline {
-  margin-top: 1.25rem;
-  font-size: 1.25rem;
+  margin-top: 1.5rem;
+  font-size: 1.4rem;
   color: #ccc;
   font-weight: 500;
 }
 
 .sub {
-  margin-top: 0.5rem;
-  font-size: 1rem;
-  color: #666;
+  margin-top: 0.6rem;
+  font-size: 1.05rem;
+  color: #555;
 }
 
 /* ── Thesis ── */
@@ -352,17 +357,20 @@ import { RouterLink } from 'vue-router'
 }
 
 .thesis-statement {
-  font-size: 1.6rem;
+  font-size: 2rem;
   font-weight: 600;
   color: #ffffff;
   line-height: 1.4;
   margin-bottom: 2rem;
+  max-width: 860px;
 }
 
 .thesis p {
   color: #888;
-  max-width: 640px;
+  max-width: 780px;
   margin-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.8;
 }
 
 /* ── What ── */
@@ -373,7 +381,7 @@ import { RouterLink } from 'vue-router'
 
 .what-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.5rem;
 }
 
@@ -419,17 +427,18 @@ import { RouterLink } from 'vue-router'
 }
 
 .sep-statement {
-  font-size: 1.6rem;
+  font-size: 2rem;
   font-weight: 600;
   color: #ffffff;
   line-height: 1.4;
   margin-bottom: 2rem;
+  max-width: 860px;
 }
 
 .sep-body {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #777;
-  max-width: 640px;
+  max-width: 860px;
   line-height: 1.8;
   margin-bottom: 1rem;
 }
@@ -445,7 +454,6 @@ import { RouterLink } from 'vue-router'
   align-items: flex-start;
   gap: 0;
   margin: 3rem 0;
-  max-width: 960px;
 }
 
 .sep-col {
@@ -524,9 +532,9 @@ import { RouterLink } from 'vue-router'
 }
 
 .sep-payoff {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #666;
-  max-width: 640px;
+  max-width: 860px;
   line-height: 1.8;
 }
 
@@ -572,7 +580,7 @@ code {
 
 .feature-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
 }
 
@@ -609,7 +617,7 @@ code {
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.5rem;
 }
 
@@ -647,16 +655,17 @@ code {
 }
 
 .vision-statement {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   font-weight: 600;
   color: #ddd;
   margin-bottom: 1rem;
+  max-width: 860px;
 }
 
 .vision-sub {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #777;
-  max-width: 640px;
+  max-width: 860px;
   line-height: 1.8;
   margin-bottom: 2.5rem;
 }
@@ -680,7 +689,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: 660px;
+  max-width: 1000px;
 }
 
 .layer {
@@ -794,11 +803,20 @@ footer p {
 }
 
 /* ── Responsive ── */
-@media (max-width: 640px) {
-  .hero h1        { font-size: 3rem; letter-spacing: -1px; }
-  .tagline        { font-size: 1rem; }
-  .thesis-statement { font-size: 1.2rem; }
-  .sep-statement  { font-size: 1.2rem; }
+@media (max-width: 1100px) {
+  .container      { padding: 0 3rem; }
+  .what-grid,
+  .grid,
+  .feature-grid   { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 700px) {
+  .container      { padding: 0 1.5rem; }
+  .hero           { padding: 6rem 1.5rem 5rem; }
+  .hero h1        { font-size: 3.5rem; letter-spacing: -2px; }
+  .tagline        { font-size: 1.05rem; }
+  .thesis-statement,
+  .sep-statement  { font-size: 1.3rem; }
   .what-grid,
   .grid,
   .feature-grid   { grid-template-columns: 1fr; }
