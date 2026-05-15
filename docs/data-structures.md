@@ -12,9 +12,13 @@ across the whole language:
 
 | Primitive | Object |
 |-----------|--------|
-| `string` — raw `i8*` pointer | `String` — safe, length-tracked |
-| `int` — native word-size integer | `Int` — boxed integer object |
-| `array` — raw fixed-size stack array (`int arr[5]`) | `Array<T>` — dynamic growable array |
+| `string` — raw `i8*` pointer | `String` — `template String<byte>`, managed sequence of bytes |
+| `int` — native word-size integer | `Int` — `template Int<int>`, boxed integer |
+| `byte` — 8-bit value | `Byte` — `template Byte<byte>`, boxed byte |
+| `float` — floating point | `Float` — `template Float<float>`, boxed float |
+| `bool` — boolean | `Bool` — `template Bool<bool>`, boxed bool |
+| `address` — raw pointer | `Pointer` — `template Pointer<address>`, typed pointer wrapper |
+| `array` — raw fixed-size stack array (`int arr[5]`) | `Array<T>` — dynamic growable array (T is free) |
 
 - `Heap` is avoided as a data structure name — conflicts with "heap memory". Use `MinHeap<T>` / `MaxHeap<T>`.
 

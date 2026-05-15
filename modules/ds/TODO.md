@@ -33,9 +33,10 @@ The foundation. Everything else depends on this.
 
 ---
 
-## string.hop — not yet created  (`String`)
+## string.hop — not yet created  (`String` = `template String<byte>`)
 
-Wraps `Array<byte>`. Safe, length-tracked replacement for raw `string`.
+Declared as `template String<byte>` — a managed sequence of bytes.
+Safe, length-tracked replacement for raw `string`.
 
 - [ ] `constructor(string raw, int len)` — build from raw pointer + known length
 - [ ] `destructor`
