@@ -10,6 +10,7 @@ const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
 const templateDefs       = new Map();   // template name → TemplateDecl
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
+const bitfieldTypes      = new Map();   // name → BitfieldDecl
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
 
@@ -22,6 +23,7 @@ function resetAll() {
     functionReturnTypes.clear();
     templateDefs.clear();
     mmioBindings.clear();
+    bitfieldTypes.clear();
     instantiatedClasses = [];
     stringCounter = 0;
 }
@@ -263,6 +265,7 @@ function llvmType(t) {
     if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
+    if (t === "bit")          return "i1";
     if (t === "byte")         return "i8";
     if (t === "float")        return "double";
     if (t === "string[]")     return "i8**";
@@ -273,6 +276,7 @@ function llvmType(t) {
     if (t === "unsignedbyte") return "i8";
     if (structTypes.has(t))   return `%struct.${t}`;
     if (classTypes.has(t))    return `%class.${t}`;
+    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
     if (t.includes('<')) {
         const m = mangleTemplate(t);
@@ -283,22 +287,76 @@ function llvmType(t) {
 }
 
 function isFloatType(t) { return t === "float"; }
-function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "unsignedint" || t === "unsignedbyte"; }
+function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "bit" || t === "unsignedint" || t === "unsignedbyte"; }
 function isUnsigned(t)  { return t === "unsignedint" || t === "unsignedbyte"; }
+
+// Number of BITS a type occupies (used for bitfield layout)
+function bitWidth(type, count = 1) {
+    if (type === "bit")          return 1 * count;
+    if (type === "bool")         return 1 * count;
+    if (type === "byte")         return 8 * count;
+    if (type === "unsignedbyte") return 8 * count;
+    if (type === "int")          return 64 * count;
+    if (type === "unsignedint")  return 64 * count;
+    if (type === "float")        return 64 * count;
+    if (type === "address")      return 64 * count;
+    return 8 * count; // default: treat as byte-sized
+}
+
+// Smallest integer LLVM type that holds N bits (rounded up to 8/16/32/64)
+function bitsToLLType(n) {
+    if (n <= 8)  return "i8";
+    if (n <= 16) return "i16";
+    if (n <= 32) return "i32";
+    return "i64";
+}
+
+// Total bit count and LLVM container type for a bitfield
+function bitfieldLayout(bf) {
+    let total = 0;
+    for (const f of bf.fields) {
+        if (f.isPad) { total += f.bits; continue; }
+        total += bitWidth(f.type, f.count);
+    }
+    return { totalBits: total, llType: bitsToLLType(total) };
+}
+
+function bitfieldLLType(bf) {
+    return bitfieldLayout(bf).llType;
+}
 
 function sizeOfType(t) {
     if (t === "int")     return 8;
     if (t === "byte")    return 1;
+    if (t === "bit")     return 1;  // stored as i8 minimum when standalone
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
     if (t === "string")  return 8;
     if (t === "String")  return 8;
     if (t === "address") return 8;
+    if (bitfieldTypes.has(t)) {
+        const { totalBits } = bitfieldLayout(bitfieldTypes.get(t));
+        return Math.ceil(totalBits / 8);
+    }
     if (structTypes.has(t)) {
         return structTypes.get(t).fields.reduce((s, f) =>
             s + (f.isPad ? f.size : sizeOfType(f.type)), 0);
     }
     throw new Error(`Unknown type for sizeof: ${t}`);
+}
+
+// ── bitfield field lookup ─────────────────────────────────────────────────
+
+// Returns { offset (bit), width (bits), fieldType } for a named field in a bitfield
+function bitfieldFieldInfo(bf, fieldName) {
+    let offset = 0;
+    for (const f of bf.fields) {
+        if (f.isPad) { offset += f.bits; continue; }
+        const width = bitWidth(f.type, f.count);
+        if (f.name === fieldName) return { offset, width, fieldType: f.type };
+        offset += width;
+    }
+    throw new Error(`Field '${fieldName}' not found in bitfield`);
 }
 
 // ── field lookup (struct and class) ───────────────────────────────────────
@@ -484,6 +542,26 @@ function genExpr(ir, expr) {
         case "FieldAccess": {
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+
+            // Bitfield read: load container integer, shift right by field offset, mask to width
+            if (bitfieldTypes.has(v.hType)) {
+                const bf = bitfieldTypes.get(v.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
+                const container = ir.newTmp();
+                ir.emit(`${container} = load ${llType}, ${llType}* ${v.ptr}`);
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = lshr ${llType} ${container}, ${offset}`);
+                const mask = (1n << BigInt(width)) - 1n;
+                const masked = ir.newTmp();
+                ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
+                // Truncate to the field's natural LLVM type
+                const llFieldType = llvmType(fieldType);
+                if (llFieldType === llType) return { value: masked, type: fieldType };
+                const result = ir.newTmp();
+                ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
+                return { value: result, type: fieldType };
+            }
 
             if (classTypes.has(v.hType) && !v.isSelf) {
                 throw new Error(
@@ -902,6 +980,39 @@ function genStmt(ir, stmt, retType) {
         case "FieldAssign": {
             const v = ir.vars.get(stmt.object);
             if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
+
+            // Bitfield write: read-modify-write on the container integer
+            if (bitfieldTypes.has(v.hType)) {
+                const bf = bitfieldTypes.get(v.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width } = bitfieldFieldInfo(bf, stmt.field);
+                const val = genExpr(ir, stmt.expr);
+                // Normalize value to container width (trunc if larger, zext if smaller)
+                const srcLL = llvmType(val.type);
+                const srcBits = parseInt(srcLL.slice(1));
+                const dstBits = parseInt(llType.slice(1));
+                let inContainer = val.value;
+                if (srcLL !== llType) {
+                    const norm = ir.newTmp();
+                    ir.emit(`${norm} = ${srcBits > dstBits ? "trunc" : "zext"} ${srcLL} ${val.value} to ${llType}`);
+                    inContainer = norm;
+                }
+                // Shift value into position
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = shl ${llType} ${inContainer}, ${offset}`);
+                // Build clear mask (all 1s except the field bits)
+                const fieldMask = (1n << BigInt(width)) - 1n;
+                const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
+                // Load current container, clear field bits, OR in new value
+                const current = ir.newTmp();
+                ir.emit(`${current} = load ${llType}, ${llType}* ${v.ptr}`);
+                const cleared = ir.newTmp();
+                ir.emit(`${cleared} = and ${llType} ${current}, ${clearMask}`);
+                const merged = ir.newTmp();
+                ir.emit(`${merged} = or ${llType} ${cleared}, ${shifted}`);
+                ir.emit(`store ${llType} ${merged}, ${llType}* ${v.ptr}`);
+                break;
+            }
 
             if (classTypes.has(v.hType) && !v.isSelf) {
                 throw new Error(
@@ -1398,6 +1509,9 @@ function genModule(ast) {
             templateDefs.set(t.name, t);
         }
     }
+
+    // Register bitfield types — stored as their integer container (i8/i16/i32/i64)
+    for (const bf of ast.bitfields || []) bitfieldTypes.set(bf.name, bf);
 
     // Register regular struct and class types first (monomorphization may reference them)
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);

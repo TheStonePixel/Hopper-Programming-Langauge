@@ -1,7 +1,7 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields };
 }
 
 // bind — linker directive: place function pointer at hardware address
@@ -39,6 +39,21 @@ export function StructField(name, type) {
 // pad N inside a struct — explicit reserved bytes
 export function StructPad(size) {
     return { kind: "StructPad", isPad: true, size };
+}
+
+// bitfield = bit-level layout, fields packed sequentially from LSB
+// Each field has: name, type (bit/byte/int/etc.), count (1 for scalars, N for arrays)
+// bit width = typeSize(type) * 8 * count
+export function BitfieldDecl(name, fields) {
+    return { kind: "BitfieldDecl", name, fields };
+}
+
+export function BitfieldField(name, type, count = 1) {
+    return { kind: "BitfieldField", name, type, count };
+}
+
+export function BitfieldPad(bits) {
+    return { kind: "BitfieldPad", isPad: true, bits };
 }
 
 // class = data + behavior, compiler-optimized layout

@@ -185,6 +185,42 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#bitfieldDecl.
+	enterBitfieldDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#bitfieldDecl.
+	exitBitfieldDecl(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#BitfieldArrayField.
+	enterBitfieldArrayField(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#BitfieldArrayField.
+	exitBitfieldArrayField(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#BitfieldField.
+	enterBitfieldField(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#BitfieldField.
+	exitBitfieldField(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#BitfieldPad.
+	enterBitfieldPad(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#BitfieldPad.
+	exitBitfieldPad(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#templateDecl.
 	enterTemplateDecl(ctx) {
 	}

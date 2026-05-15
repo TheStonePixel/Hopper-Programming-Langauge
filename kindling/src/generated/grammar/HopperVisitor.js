@@ -126,6 +126,30 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#bitfieldDecl.
+	visitBitfieldDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#BitfieldArrayField.
+	visitBitfieldArrayField(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#BitfieldField.
+	visitBitfieldField(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#BitfieldPad.
+	visitBitfieldPad(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#templateDecl.
 	visitTemplateDecl(ctx) {
 	  return this.visitChildren(ctx);

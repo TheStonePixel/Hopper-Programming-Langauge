@@ -63,6 +63,9 @@ import {
     ArrayAssign,
     ArrayElementAddress,
     AsmStmt,
+    BitfieldDecl,
+    BitfieldField,
+    BitfieldPad,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
@@ -75,23 +78,25 @@ export class AstBuilder extends HopperVisitor {
         const templates = [];
         const binds = [];
         const stricts = [];
+        const bitfields = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
             if (!node) continue;
-            if (node.kind === "FunctionDecl")       functions.push(node);
-            else if (node.kind === "StructDecl")    structs.push(node);
-            else if (node.kind === "ClassDecl")     classes.push(node);
-            else if (node.kind === "ConstDecl")     consts.push(node);
-            else if (node.kind === "AliasDecl")     aliases.push(node);
-            else if (node.kind === "TemplateDecl")  templates.push(node);
-            else if (node.kind === "EntryDecl")     entry = node;
-            else if (node.kind === "BindDecl")      binds.push(node);
-            else if (node.kind === "StrictDecl")  stricts.push(node);
+            if (node.kind === "FunctionDecl")        functions.push(node);
+            else if (node.kind === "StructDecl")     structs.push(node);
+            else if (node.kind === "ClassDecl")      classes.push(node);
+            else if (node.kind === "ConstDecl")      consts.push(node);
+            else if (node.kind === "AliasDecl")      aliases.push(node);
+            else if (node.kind === "TemplateDecl")   templates.push(node);
+            else if (node.kind === "EntryDecl")      entry = node;
+            else if (node.kind === "BindDecl")       binds.push(node);
+            else if (node.kind === "StrictDecl")     stricts.push(node);
+            else if (node.kind === "BitfieldDecl")   bitfields.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields);
     }
 
     visitTopLevelDecl(ctx) {
@@ -150,6 +155,33 @@ export class AstBuilder extends HopperVisitor {
     visitStructPad(ctx) {
         const size = parseInt(ctx.IntegerLiteral().getText(), 10);
         return StructPad(size);
+    }
+
+    // ── bitfield ───────────────────────────────────────────────────────────
+
+    visitBitfieldDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const members = ctx.bitfieldMember ? ctx.bitfieldMember() : [];
+        const fields = members.map(m => this.visit(m));
+        return BitfieldDecl(name, fields);
+    }
+
+    visitBitfieldField(ctx) {
+        const type = ctx.type().getText();
+        const name = ctx.fieldName().getText();
+        return BitfieldField(name, type, 1);
+    }
+
+    visitBitfieldArrayField(ctx) {
+        const type  = ctx.type().getText();
+        const name  = ctx.fieldName().getText();
+        const count = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return BitfieldField(name, type, count);
+    }
+
+    visitBitfieldPad(ctx) {
+        const bits = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return BitfieldPad(bits);
     }
 
     // ── class ──────────────────────────────────────────────────────────────

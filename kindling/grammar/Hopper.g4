@@ -17,6 +17,7 @@ topLevelDecl
     | entryDecl
     | bindDecl
     | strictDecl
+    | bitfieldDecl
     ;
 
 importDecl
@@ -75,6 +76,18 @@ structDecl
 structMember
     : type fieldName        # StructField
     | 'pad' IntegerLiteral  # StructPad
+    ;
+
+// bitfield = bit-level layout — fields packed sequentially from LSB
+// bit[N] is simply an array of N bits, consistent with int[N] and byte[N]
+bitfieldDecl
+    : 'bitfield' Identifier '{' NEWLINE* (bitfieldMember (NEWLINE+ bitfieldMember)* NEWLINE*)? '}'
+    ;
+
+bitfieldMember
+    : type fieldName '[' IntegerLiteral ']'   # BitfieldArrayField
+    | type fieldName                           # BitfieldField
+    | 'pad' IntegerLiteral                     # BitfieldPad
     ;
 
 // template = parameterized class, monomorphized at use sites
@@ -155,6 +168,7 @@ type
     | 'bool'
     | 'float'
     | 'byte'
+    | 'bit'
     | 'string' '[' ']'  // array of strings — argv type, maps to i8**
     | 'string'
     | 'String'
