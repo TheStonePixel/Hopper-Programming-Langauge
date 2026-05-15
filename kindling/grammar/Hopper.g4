@@ -56,8 +56,15 @@ aliasDecl
 functionDecl
     : 'extern' 'function' Identifier '(' externParamList? ')' type   # ExternFuncDecl
     | 'extern' 'function' Identifier '(' externParamList? ')'        # ExternProcDecl
-    | 'function' Identifier '(' paramList? ')' type block            # FuncDecl
-    | 'function' Identifier '(' paramList? ')' block                 # ProcDecl
+    | 'function' Identifier '(' paramList? ')' type contractClause* block   # FuncDecl
+    | 'function' Identifier '(' paramList? ')' contractClause* block        # ProcDecl
+    ;
+
+// Compile-time contract clauses (Hoare Logic) — reserved, not yet implemented
+// NEWLINEs allowed before each clause so they can appear on their own lines.
+contractClause
+    : NEWLINE+ 'requires' expression   # RequiresClause
+    | NEWLINE+ 'ensures'  expression   # EnsuresClause
     ;
 
 // struct = memory layout only, no methods, no default values
@@ -153,22 +160,34 @@ block
 
 statement
     : type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
-    | type Identifier '[' IntegerLiteral ']'             # ArrayDecl
-    | type Identifier '=' expression                     # VarDecl
-    | type Identifier                                    # VarDeclNoInit
-    | Identifier '[' expression ']' '=' expression       # ArrayAssign
-    | Identifier '=' expression                          # Assign
-    | Identifier '.' fieldName '=' expression             # FieldAssign
-    | Identifier '::' 'value' '=' expression             # DerefAssign
-    | expression                                         # ExprStmt
-    | 'if' '(' expression ')' block ('else' block)?      # IfStmt
-    | 'while' '(' expression ')' block                   # WhileStmt
+    | type Identifier '[' IntegerLiteral ']'                    # ArrayDecl
+    | type Identifier '=' expression constrainClause?           # VarDecl
+    | type Identifier constrainClause?                          # VarDeclNoInit
+    | Identifier '[' expression ']' '=' expression              # ArrayAssign
+    | Identifier '=' expression                                 # Assign
+    | Identifier '.' fieldName '=' expression                   # FieldAssign
+    | Identifier '::' 'value' '=' expression                    # DerefAssign
+    | expression                                                # ExprStmt
+    | 'if' '(' expression ')' block ('else' block)?             # IfStmt
+    | 'while' '(' expression ')' invariantClause* block         # WhileStmt
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
-    | 'break'                                            # BreakStmt
-    | 'continue'                                         # ContinueStmt
-    | 'return' expression?                               # ReturnStmt
-    | 'defer' expression                                 # DeferStmt
-    | 'asm' asmBlock                                     # AsmStmt
+    | 'break'                                                   # BreakStmt
+    | 'continue'                                                # ContinueStmt
+    | 'return' expression?                                      # ReturnStmt
+    | 'defer' expression                                        # DeferStmt
+    | 'asm' asmBlock                                            # AsmStmt
+    ;
+
+// Compile-time constraint clause — reserved, not yet implemented
+// e.g.  int x = 10 constrain [u8]
+constrainClause
+    : 'constrain' '[' type ']'
+    ;
+
+// Compile-time loop invariant — reserved, not yet implemented
+// e.g.  while (i < n) invariant i >= 0 { ... }
+invariantClause
+    : 'invariant' expression
     ;
 
 asmBlock

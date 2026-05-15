@@ -140,6 +140,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#RequiresClause.
+	enterRequiresClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#RequiresClause.
+	exitRequiresClause(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#EnsuresClause.
+	enterEnsuresClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#EnsuresClause.
+	exitEnsuresClause(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#structDecl.
 	enterStructDecl(ctx) {
 	}
@@ -461,6 +479,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 
 	// Exit a parse tree produced by HopperParser#AsmStmt.
 	exitAsmStmt(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#constrainClause.
+	enterConstrainClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#constrainClause.
+	exitConstrainClause(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#invariantClause.
+	enterInvariantClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#invariantClause.
+	exitInvariantClause(ctx) {
 	}
 
 

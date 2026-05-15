@@ -96,6 +96,18 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#RequiresClause.
+	visitRequiresClause(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#EnsuresClause.
+	visitEnsuresClause(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#structDecl.
 	visitStructDecl(ctx) {
 	  return this.visitChildren(ctx);
@@ -308,6 +320,18 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 
 	// Visit a parse tree produced by HopperParser#AsmStmt.
 	visitAsmStmt(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#constrainClause.
+	visitConstrainClause(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#invariantClause.
+	visitInvariantClause(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
