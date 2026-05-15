@@ -303,6 +303,7 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 <style scoped>
 .page {
   min-height: 100vh;
+  background: #faf9f6;
 }
 
 .container {
@@ -314,55 +315,60 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
   display: block;
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 2.5px;
-  color: #555;
+  letter-spacing: 3px;
+  color: #9ca3af;
   margin-bottom: 1.5rem;
+  font-weight: 600;
 }
 
 /* ── Top Nav ── */
 .topnav {
   padding: 1.25rem 0;
-  border-bottom: 1px solid #1a1a1a;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .back {
-  font-size: 0.85rem;
-  color: #555;
+  font-size: 0.9rem;
+  color: #6b7280;
   text-decoration: none;
+  font-weight: 500;
   transition: color 0.15s;
 }
 
-.back:hover { color: #aaa; }
+.back:hover { color: #111827; }
 
 /* ── Page Header ── */
 .page-header {
   padding: 5rem 0 4rem;
-  border-bottom: 1px solid #1a1a1a;
+  background: #ffffff;
+  border-bottom: 2px solid #e5e7eb;
 }
 
 .page-header h1 {
-  font-size: 3.5rem;
-  font-weight: 700;
-  letter-spacing: -2px;
-  color: #fff;
+  font-size: 5rem;
+  font-weight: 800;
+  letter-spacing: -3px;
+  color: #111827;
   margin-bottom: 1.25rem;
 }
 
 .subtitle {
-  font-size: 1rem;
-  color: #666;
-  max-width: 560px;
+  font-size: 1.05rem;
+  color: #6b7280;
+  max-width: 700px;
   line-height: 1.7;
 }
 
 /* ── Compare Sections ── */
 .compare {
   padding: 4rem 0;
-  border-bottom: 1px solid #1a1a1a;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .compare.alt {
-  background: #080808;
+  background: #faf9f6;
 }
 
 .compare-header {
@@ -372,40 +378,41 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 .num-badge {
   font-size: 0.7rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #333;
+  color: #d1d5db;
   letter-spacing: 2px;
   display: block;
   margin-bottom: 0.6rem;
+  font-weight: 700;
 }
 
 .compare-header h2 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #ddd;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #111827;
   margin-bottom: 0.6rem;
 }
 
 .compare-header p {
-  font-size: 0.9rem;
-  color: #666;
+  font-size: 0.95rem;
+  color: #6b7280;
   max-width: 900px;
   line-height: 1.7;
 }
 
 .compare-header code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.8rem;
-  color: #569cd6;
-  background: #1a1a1a;
+  font-size: 0.82rem;
+  color: #2563eb;
+  background: #eff6ff;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 /* ── Code Pair ── */
 .pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .block {
@@ -417,71 +424,65 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 2px;
-  padding: 0.4rem 0.75rem;
-  border-radius: 4px 4px 0 0;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px 6px 0 0;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   width: fit-content;
+  font-weight: 700;
 }
 
 .c-label {
-  color: #888;
-  background: #111;
-  border: 1px solid #222;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
   border-bottom: none;
 }
 
 .hop-label {
-  color: #569cd6;
-  background: #0d1520;
-  border: 1px solid #1c2a3a;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-bottom: none;
 }
 
 pre {
-  background: #0a0a0a;
-  border: 1px solid #1e1e1e;
-  border-radius: 0 4px 4px 4px;
-  padding: 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 0 6px 6px 6px;
+  padding: 1.75rem;
   overflow-x: auto;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   line-height: 2;
   margin: 0;
   flex: 1;
 }
 
 .block:has(.hop-label) pre {
-  background: #070d14;
-  border-color: #1c2a3a;
+  background: #f0f7ff;
+  border-color: #bfdbfe;
 }
 
 code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
-.comment { color: #3d3d3d; }
-.kw      { color: #569cd6; }
-.type    { color: #4ec9b0; }
-.str     { color: #ce9178; }
-.num     { color: #b5cea8; }
-.op      { color: #555; }
+.comment { color: #9ca3af; }
+.kw      { color: #2563eb; }
+.type    { color: #059669; }
+.str     { color: #d97706; }
+.num     { color: #7c3aed; }
+.op      { color: #9ca3af; }
 
 /* ── Footer ── */
 footer {
-  padding: 2.5rem 0;
+  padding: 3rem 0;
   text-align: center;
-  border-top: 1px solid #111;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
 }
 
 footer p {
-  font-size: 0.8rem;
-  color: #333;
-}
-
-/* ── Responsive ── */
-@media (max-width: 700px) {
-  .page-header    { padding: 3rem 0 2.5rem; }
-  .page-header h1 { font-size: 2.5rem; letter-spacing: -1px; }
-  .pair           { grid-template-columns: 1fr; }
-  .block-label    { border-radius: 4px 4px 0 0; }
+  font-size: 0.85rem;
+  color: #9ca3af;
 }
 </style>
