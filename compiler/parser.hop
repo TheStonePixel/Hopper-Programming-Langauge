@@ -201,9 +201,10 @@ class Parser {
 //   KW_RETURN    → parse_return(p)
 //   KW_BREAK     → consume, return BreakStmt
 //   KW_CONTINUE  → consume, return ContinueStmt
-//   KW_DEFER     → consume, parse expression, return DeferStmt
-//   KW_ASM       → parse_asm(p)
-//   else         → parse as expression statement (function call, method call)
+//   KW_DEFER       → consume, parse expression, return DeferStmt
+//   KW_DEALLOCATE  → consume, parse expression, return DeallocateStmt
+//   KW_ASM         → parse_asm(p)
+//   else           → parse as expression statement (function call, method call)
 
 // function parse_if(Parser p) address
 //   Consume KW_IF. Expect LPAREN. Parse expression. Expect RPAREN.
@@ -276,6 +277,7 @@ class Parser {
 // function parse_unary(Parser p) address
 //   If BANG / MINUS / TILDE: consume, parse unary recursively, build UnaryOp.
 //   If KW_CAST: consume, parse unary, build Cast node.
+//   If KW_ALLOCATE: consume, parse unary, build Allocate node. Returns address.
 //   Else: parse_primary(p).
 
 // function parse_primary(Parser p) address

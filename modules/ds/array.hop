@@ -1,33 +1,35 @@
 // Array<T> — growable heap-allocated array
 //
-// Stores elements sequentially in a Heap-allocated buffer.
+// Stores elements sequentially in heap memory.
 // Doubles capacity when full.
 // T is monomorphized at the use site — Array<int>, Array<byte>, etc.
 //
 // Usage:
-//   byte pool[8192]
-//   Heap h = Heap(pool[0]::address, 8192)
-//
-//   Array<int> nums = Array<int>(h, 16)
-//   nums.push(h, 42)
-//   nums.push(h, 99)
+//   Array<int> nums(16)
+//   nums.push(42)
+//   nums.push(99)
 //   int x = nums.get(0)    // 42
 //   int n = nums.len()     // 2
 //   int last = nums.pop()  // 99
 //
-// Note: pass the Heap to push() so the cost of allocation is visible.
-// If you know your max size upfront, set initialCap high enough
-// to avoid grows entirely.
+// Memory:
+//   allocate/deallocate are compiler directives — not function calls.
+//   The constructor allocates heap backing. The destructor frees it.
+//   grow() deallocates the old block and allocates a new one.
 
 template Array<T> {
     address data        // pointer to element storage
     int     length      // number of elements currently held
     int     capacity    // number of elements allocated
 
-    constructor(Heap h, int initialCap) {
-        self.data     = h.alloc(initialCap * T::size)
+    constructor(int initialCap) {
+        self.data     = allocate initialCap * T::size
         self.length   = 0
         self.capacity = initialCap
+    }
+
+    destructor {
+        deallocate self.data
     }
 
     // Number of elements currently in the array.
@@ -53,9 +55,9 @@ template Array<T> {
     }
 
     // Append val to the end. Grows if at capacity.
-    function push(Heap h, T val) {
+    function push(T val) {
         if (self.length == self.capacity) {
-            self.grow(h)
+            self.grow()
         }
         address ptr = self.data + self.length * T::size
         ptr::value = val
@@ -86,16 +88,17 @@ template Array<T> {
     }
 
     // Double capacity. Called automatically by push() when full.
-    function grow(Heap h) {
+    function grow() {
         int     newCap  = self.capacity * 2
-        address newData = h.alloc(newCap * T::size)
+        address newData = allocate newCap * T::size
         int i = 0
         while (i < self.length) {
             address src = self.data + i * T::size
-            address dst = newData + i * T::size
+            address dst = newData  + i * T::size
             dst::value = src::value
             i = i + 1
         }
+        deallocate self.data
         self.data     = newData
         self.capacity = newCap
     }

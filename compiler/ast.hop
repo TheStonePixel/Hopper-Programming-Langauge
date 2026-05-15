@@ -49,6 +49,7 @@
 //   64 = NODE_DEFER
 //   65 = NODE_ASM
 //   66 = NODE_EXPR_STMT
+//   67 = NODE_DEALLOCATE
 //   -- Expressions --
 //   80 = NODE_BINARY_OP
 //   81 = NODE_UNARY_OP
@@ -62,6 +63,7 @@
 //   89 = NODE_DEREF
 //   90 = NODE_SIZEOF
 //   91 = NODE_IDENTIFIER
+//   92 = NODE_ALLOCATE
 //   -- Literals --
 //   100 = NODE_INT_LIT
 //   101 = NODE_HEX_LIT
@@ -357,6 +359,11 @@
 //   address expr
 // }
 
+// struct DeallocateStmt {
+//   int     kind  // NODE_DEALLOCATE
+//   address expr  // the address expression to deallocate
+// }
+
 
 // ── Expressions ───────────────────────────────────────────────────────────────
 
@@ -422,6 +429,11 @@
 // struct SizeOf {
 //   int    kind  // NODE_SIZEOF
 //   String name
+// }
+
+// struct Allocate {
+//   int     kind      // NODE_ALLOCATE
+//   address sizeExpr  // number of bytes to allocate — returns address
 // }
 
 // struct Identifier {
