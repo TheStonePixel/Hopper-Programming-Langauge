@@ -12,13 +12,18 @@ across the whole language:
 
 | Primitive | Object |
 |-----------|--------|
-| `string` — raw `i8*` pointer | `String` — `template String<byte>`, managed sequence of bytes |
-| `int` — native word-size integer | `Int` — `template Int<int>`, boxed integer |
-| `byte` — 8-bit value | `Byte` — `template Byte<byte>`, boxed byte |
-| `float` — floating point | `Float` — `template Float<float>`, boxed float |
-| `bool` — boolean | `Bool` — `template Bool<bool>`, boxed bool |
-| `address` — raw pointer | `Pointer` — `template Pointer<address>`, typed pointer wrapper |
-| `array` — raw fixed-size stack array (`int arr[5]`) | `Array<T>` — dynamic growable array (T is free) |
+| `string` — raw `i8*` pointer | `String` — `template String<byte>`, use as `String name` |
+| `int` — native word-size integer | `Int` — `template Int<int>`, use as `Int name` |
+| `byte` — 8-bit value | `Byte` — `template Byte<byte>`, use as `Byte name` |
+| `float` — floating point | `Float` — `template Float<float>`, use as `Float name` |
+| `bool` — boolean | `Bool` — `template Bool<bool>`, use as `Bool name` |
+| `address` — raw pointer | `Pointer` — `template Pointer<address>`, use as `Pointer name` |
+| `array` — raw fixed-size stack array (`int arr[5]`) | `Array<T>` — T is free, use as `Array<int> name` |
+
+### The Rule
+
+- **Fixed template** (`template Foo<concrete_type>`): `<>` is dropped at every use site. `Foo` becomes a standalone type name — syntactically identical to a primitive.
+- **Parameterized template** (`template Foo<T>`): `<T>` must be supplied at every use site.
 
 - `Heap` is avoided as a data structure name — conflicts with "heap memory". Use `MinHeap<T>` / `MaxHeap<T>`.
 
