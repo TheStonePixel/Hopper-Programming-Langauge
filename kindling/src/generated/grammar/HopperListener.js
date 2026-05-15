@@ -401,6 +401,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#AllocateVarDecl.
+	enterAllocateVarDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AllocateVarDecl.
+	exitAllocateVarDecl(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#VarDecl.
 	enterVarDecl(ctx) {
 	}
@@ -428,12 +437,30 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#AllocateAssign.
+	enterAllocateAssign(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AllocateAssign.
+	exitAllocateAssign(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#Assign.
 	enterAssign(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#Assign.
 	exitAssign(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#AllocateFieldAssign.
+	enterAllocateFieldAssign(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AllocateFieldAssign.
+	exitAllocateFieldAssign(ctx) {
 	}
 
 

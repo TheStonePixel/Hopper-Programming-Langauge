@@ -270,6 +270,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#AllocateVarDecl.
+	visitAllocateVarDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#VarDecl.
 	visitVarDecl(ctx) {
 	  return this.visitChildren(ctx);
@@ -288,8 +294,20 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#AllocateAssign.
+	visitAllocateAssign(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#Assign.
 	visitAssign(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#AllocateFieldAssign.
+	visitAllocateFieldAssign(ctx) {
 	  return this.visitChildren(ctx);
 	}
 

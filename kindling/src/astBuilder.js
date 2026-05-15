@@ -390,6 +390,12 @@ export class AstBuilder extends HopperVisitor {
         return VarDecl(name, type, initExpr);
     }
 
+    visitAllocateVarDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())));
+    }
+
     visitVarDeclNoInit(ctx) {
         const name = ctx.Identifier().getText();
         const type = ctx.type().getText();
@@ -400,11 +406,21 @@ export class AstBuilder extends HopperVisitor {
         return Assign(ctx.Identifier().getText(), this.visit(ctx.expression()));
     }
 
+    visitAllocateAssign(ctx) {
+        return Assign(ctx.Identifier().getText(), AllocateExpr(this.visit(ctx.expression())));
+    }
+
     visitFieldAssign(ctx) {
         const object = ctx.Identifier(0).getText();
         const field  = ctx.fieldName().getText();
         const expr   = this.visit(ctx.expression());
         return FieldAssign(object, field, expr);
+    }
+
+    visitAllocateFieldAssign(ctx) {
+        const object = ctx.Identifier(0).getText();
+        const field  = ctx.fieldName().getText();
+        return FieldAssign(object, field, AllocateExpr(this.visit(ctx.expression())));
     }
 
     visitDerefAssign(ctx) {

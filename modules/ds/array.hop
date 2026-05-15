@@ -23,7 +23,7 @@ template Array<T> {
     int     capacity    // number of elements allocated
 
     constructor(int initialCap) {
-        self.data     = allocate (initialCap * T::size)
+        self.data     = allocate initialCap * T::size
         self.length   = 0
         self.capacity = initialCap
     }
@@ -90,7 +90,7 @@ template Array<T> {
     // Double capacity. Called automatically by push() when full.
     function grow() {
         int     newCap  = self.capacity * 2
-        address newData = allocate (newCap * T::size)
+        address newData = allocate newCap * T::size
         int i = 0
         while (i < self.length) {
             T elem = self.get(i)

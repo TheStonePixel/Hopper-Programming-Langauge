@@ -191,10 +191,13 @@ block
 statement
     : type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
     | type Identifier '[' IntegerLiteral ']'                    # ArrayDecl
+    | type Identifier '=' 'allocate' expression constrainClause?  # AllocateVarDecl
     | type Identifier '=' expression constrainClause?           # VarDecl
     | type Identifier constrainClause?                          # VarDeclNoInit
     | Identifier '[' expression ']' '=' expression              # ArrayAssign
+    | Identifier '=' 'allocate' expression                      # AllocateAssign
     | Identifier '=' expression                                 # Assign
+    | Identifier '.' fieldName '=' 'allocate' expression        # AllocateFieldAssign
     | Identifier '.' fieldName '=' expression                   # FieldAssign
     | Identifier '::' 'value' '=' expression                    # DerefAssign
     | expression                                                # ExprStmt
@@ -260,7 +263,7 @@ relational      : shift ( ('<' | '<=' | '>' | '>=') shift )* ;
 shift           : additive ( ('<<' | '>>') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
 multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
-unary           : ('!' | '-' | '~') unary | 'cast' unary | 'allocate' unary | primary ;
+unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
 primary
     : IntegerLiteral
     | HexLiteral
