@@ -306,9 +306,8 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 }
 
 .container {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 5rem;
+  width: 100%;
+  padding: 0 5vw;
 }
 
 .label {
@@ -479,12 +478,7 @@ footer p {
 }
 
 /* ── Responsive ── */
-@media (max-width: 1100px) {
-  .container { padding: 0 3rem; }
-}
-
 @media (max-width: 700px) {
-  .container      { padding: 0 1.5rem; }
   .page-header    { padding: 3rem 0 2.5rem; }
   .page-header h1 { font-size: 2.5rem; letter-spacing: -1px; }
   .pair           { grid-template-columns: 1fr; }

@@ -298,9 +298,8 @@ import { RouterLink } from 'vue-router'
 }
 
 .container {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 5rem;
+  width: 100%;
+  padding: 0 5vw;
 }
 
 .label {
@@ -804,15 +803,13 @@ footer p {
 
 /* ── Responsive ── */
 @media (max-width: 1100px) {
-  .container      { padding: 0 3rem; }
   .what-grid,
   .grid,
   .feature-grid   { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 700px) {
-  .container      { padding: 0 1.5rem; }
-  .hero           { padding: 6rem 1.5rem 5rem; }
+  .hero           { padding: 6rem 5vw 5rem; }
   .hero h1        { font-size: 3.5rem; letter-spacing: -2px; }
   .tagline        { font-size: 1.05rem; }
   .thesis-statement,
