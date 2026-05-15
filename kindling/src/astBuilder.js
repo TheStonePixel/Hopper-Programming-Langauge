@@ -226,9 +226,22 @@ export class AstBuilder extends HopperVisitor {
     // ── template ───────────────────────────────────────────────────────────
 
     visitTemplateDecl(ctx) {
-        const ids = ctx.Identifier();
-        const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
-        const typeParams = Array.isArray(ids) ? ids.slice(1).map(id => id.getText()) : [];
+        const name = ctx.Identifier().getText();   // template name — always the single Identifier before <
+
+        const typeParams  = [];   // free variables: T, K, V
+        const fixedParams = [];   // concrete types: byte, int, address, ...
+
+        for (const p of ctx.templateParam()) {
+            if (p.constructor.name === "FreeParamContext") {
+                typeParams.push(p.getText());
+            } else {
+                // FixedParam — getText() concatenates tokens, reconstruct spaced keywords
+                let t = p.getText();
+                if (t === "unsignedint")  t = "unsigned int";
+                if (t === "unsignedbyte") t = "unsigned byte";
+                fixedParams.push(t);
+            }
+        }
 
         const fields = [];
         const methods = [];
@@ -247,7 +260,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "ClassDestructor")  destructor = node;
         }
 
-        return TemplateDecl(name, typeParams, fields, methods, operators, constructor, destructor);
+        return TemplateDecl(name, typeParams, fixedParams, fields, methods, operators, constructor, destructor);
     }
 
     // ── entry ──────────────────────────────────────────────────────────────
@@ -438,6 +451,10 @@ export class AstBuilder extends HopperVisitor {
 
     visitBreakStmt()    { return BreakStmt(); }
     visitContinueStmt() { return ContinueStmt(); }
+
+    // templateParam alternatives — handled inline in visitTemplateDecl, not visited directly
+    visitFreeParam()  { return null; }
+    visitFixedParam() { return null; }
 
     // ── compile-time contract stubs (not yet implemented) ──────────────────
     // requires / ensures / invariant / constrain are reserved and parsed

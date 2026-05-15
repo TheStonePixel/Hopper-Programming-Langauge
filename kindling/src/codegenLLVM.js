@@ -1380,8 +1380,24 @@ function genModule(ast) {
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
     for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
 
-    // Register template definitions
-    for (const t of ast.templates || []) templateDefs.set(t.name, t);
+    // Register template definitions.
+    // Fixed templates (all params are concrete types) are monomorphized immediately —
+    // their name becomes a standalone class type with no <> required at use sites.
+    for (const t of ast.templates || []) {
+        if (t.isFixed) {
+            // Build substitution from fixedParams, then monomorphize and register as a class
+            const concreteClass = monomorphize(t, t.fixedParams);
+            // Register under the original readable name (e.g. "String"), not the mangled one
+            registerClass(t.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+            instantiatedClasses.push({ ...concreteClass, name: t.name });
+            if (t.constructor) functionReturnTypes.set(`${t.name}_constructor`, { returnType: null, isVariadic: false, params: concreteClass.constructor?.params || [] });
+            if (t.destructor)  functionReturnTypes.set(`${t.name}_destructor`,  { returnType: null, isVariadic: false, params: [] });
+            for (const m of concreteClass.methods || [])
+                functionReturnTypes.set(`${t.name}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
+        } else {
+            templateDefs.set(t.name, t);
+        }
+    }
 
     // Register regular struct and class types first (monomorphization may reference them)
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);

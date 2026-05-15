@@ -78,8 +78,24 @@ structMember
     ;
 
 // template = parameterized class, monomorphized at use sites
+// templateParam is either a free type variable (Identifier, e.g. T, K, V)
+// or a fixed concrete type (primitive keyword, e.g. byte, int, address).
+// Fixed-param templates are fully monomorphized at declaration time and their
+// name becomes a standalone type — no <> required at use sites.
 templateDecl
-    : 'template' Identifier '<' Identifier (',' Identifier)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'template' Identifier '<' templateParam (',' templateParam)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+templateParam
+    : Identifier        # FreeParam    // free type variable: T, K, V
+    | 'int'             # FixedParam   // fixed primitive types — no <> at use site
+    | 'byte'            # FixedParam
+    | 'float'           # FixedParam
+    | 'bool'            # FixedParam
+    | 'string'          # FixedParam
+    | 'address'         # FixedParam
+    | 'unsigned' 'int'  # FixedParam
+    | 'unsigned' 'byte' # FixedParam
     ;
 
 // class = data + behavior, compiler-optimized layout

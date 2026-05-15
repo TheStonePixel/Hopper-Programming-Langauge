@@ -194,6 +194,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#FreeParam.
+	enterFreeParam(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#FreeParam.
+	exitFreeParam(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#FixedParam.
+	enterFixedParam(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#FixedParam.
+	exitFixedParam(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#classDecl.
 	enterClassDecl(ctx) {
 	}

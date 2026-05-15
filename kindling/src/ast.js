@@ -72,8 +72,12 @@ export function ConstDecl(name, value, type) {
 }
 
 // template = parameterized class, monomorphized per instantiation
-export function TemplateDecl(name, typeParams, fields, methods, operators, constructor = null, destructor = null) {
-    return { kind: "TemplateDecl", name, typeParams, fields, methods, operators, constructor, destructor };
+// typeParams  — free variable names (e.g. ["T", "K"]) — require <> at use site
+// fixedParams — concrete primitive types (e.g. ["byte"]) — no <> at use site
+// isFixed     — true when all params are concrete; name becomes a standalone type
+export function TemplateDecl(name, typeParams, fixedParams, fields, methods, operators, constructor = null, destructor = null) {
+    const isFixed = typeParams.length === 0 && fixedParams.length > 0;
+    return { kind: "TemplateDecl", name, typeParams, fixedParams, isFixed, fields, methods, operators, constructor, destructor };
 }
 
 // alias declaration: alias Name = type
