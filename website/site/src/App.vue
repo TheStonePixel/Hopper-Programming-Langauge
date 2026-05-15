@@ -10,8 +10,8 @@ import { RouterView } from 'vue-router'
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #0d0d0d;
-  color: #e0e0e0;
+  background: #faf9f6;
+  color: #111827;
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.6;
 }
