@@ -388,8 +388,6 @@ Full LLVM C API bindings — used by the Hopper compiler itself to emit IR. Cove
 A bare-metal UART boot sequence on ARM Cortex-M, written entirely in Hopper:
 
 ```hopper
-import sys from linux
-
 // interrupt vector table
 bind 0x00000004 = reset::address
 bind 0x00000008 = nmi::address
