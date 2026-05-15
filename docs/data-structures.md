@@ -25,6 +25,28 @@ across the whole language:
 - **Fixed template** (`template Foo<concrete_type>`): `<>` is dropped at every use site. `Foo` becomes a standalone type name — syntactically identical to a primitive.
 - **Parameterized template** (`template Foo<T>`): `<T>` must be supplied at every use site.
 
+### Name Resolution and Conflicts
+
+Fixed template names resolve per translation unit based on what is imported.
+Two modules can both define `template String<byte>` and `template String<int>` — they
+do not conflict unless you try to import both into the same file.
+
+```hopper
+// stdlib — UTF-8 bytes
+template String<byte> { ... }
+
+// custom wide-char lib — 32-bit codepoints
+template String<int> { ... }
+
+// consumer: import one, the name String is locked for this translation unit
+import string from ds          // String = String<byte>
+// import string from widechar // ERROR: String already defined in this translation unit
+```
+
+The stdlib `String` has no special compiler status — it is just the definition most
+people import. Any module can ship its own fixed template with the same name and a
+different backing type. Users choose at import time.
+
 - `Heap` is avoided as a data structure name — conflicts with "heap memory". Use `MinHeap<T>` / `MaxHeap<T>`.
 
 ---
