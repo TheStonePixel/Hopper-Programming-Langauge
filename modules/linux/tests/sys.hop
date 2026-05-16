@@ -1,4 +1,3 @@
-// Tests linux/sys.hop — exit syscall
 // EXPECT: ok
 
 import io from linux

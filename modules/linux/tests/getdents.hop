@@ -1,4 +1,3 @@
-// Tests linux/fs.hop — getdents64 syscall
 // EXPECT: ok
 
 import fs from linux
