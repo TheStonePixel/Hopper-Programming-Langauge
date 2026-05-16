@@ -12,8 +12,8 @@
 //   soft(len == 3, "expected len 3\n")
 //   panic("unreachable\n")
 
-import io  from linux
-import sys from linux
+import io  from target
+import sys from target
 
 function strLen(string s) int {
     address ptr = cast s
@@ -35,7 +35,7 @@ function strLen(string s) int {
 function panic(string msg) {
     address buf = cast msg
     int len     = strLen(msg)
-    error(buf, len)
+    write(2, buf, len)
     exit(1)
 }
 
@@ -43,7 +43,7 @@ function assert(bool cond, string msg) {
     if (!cond) {
         address buf = cast msg
         int len     = strLen(msg)
-        error(buf, len)
+        write(2, buf, len)
         exit(1)
     }
 }
@@ -52,6 +52,6 @@ function soft(bool cond, string msg) {
     if (!cond) {
         address buf = cast msg
         int len     = strLen(msg)
-        error(buf, len)
+        write(2, buf, len)
     }
 }
