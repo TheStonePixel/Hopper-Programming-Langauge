@@ -8,7 +8,7 @@
 //   String<byte> s = String(64)
 //   s.append(72)          // 'H'
 //   s.append_int(42)      // writes "42" into the string
-//   s.print(1)            // write to stdout via syscall, no libc
+//   write(1, s.ptr(), s.len())  // print via linux io
 //
 // Memory:
 //   constructor allocates heap backing.
@@ -40,7 +40,7 @@ template String<T> {
         return self.capacity
     }
 
-    // Raw pointer to backing buffer — for passing to write() syscall.
+    // Raw pointer to backing buffer — for passing to write().
     function ptr() address {
         return self.data
     }
