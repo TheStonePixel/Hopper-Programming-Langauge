@@ -1,6 +1,4 @@
-// Linux process/system calls — delegates to the x86_64 target.
-//
-// exit(), fork(), execve(), waitpid() are provided by x86_64/sys.hop.
-// Swap the import below to retarget to a different ISA.
+// Linux process/system calls — architecture-neutral.
+// exit(), fork(), execve(), waitpid() come from modules/target/sys.hop.
 
-import sys from x86_64
+import sys from target

@@ -1,9 +1,7 @@
-// Linux filesystem calls — delegates to the x86_64 target.
-//
-// open(), close() are provided by x86_64/fs.hop.
-// Swap the import below to retarget to a different ISA.
+// Linux filesystem calls — architecture-neutral.
+// open(), close() come from modules/target/fs.hop.
 //
 // O_RDONLY = 0   O_WRONLY = 1   O_RDWR   = 2
 // O_CREAT  = 64  O_TRUNC  = 512 O_APPEND = 1024
 
-import fs from x86_64
+import fs from target

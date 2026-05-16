@@ -1,19 +1,16 @@
-// Linux I/O — delegates to the x86_64 target for ISA-specific syscall mechanics.
-//
-// To retarget to ARM64: replace 'import io from x86_64' with
-//                       'import io from arm64' (once modules/arm64/io.hop exists).
-// The rest of this file is architecture-neutral.
+// Linux I/O — architecture-neutral.
+// Delegates to modules/target/io.hop, which selects the ISA.
 
-import io from x86_64
+import io from target
 
-// write() and read() are provided by x86_64/io.hop.
+// write() and read() come from the target.
 
-// Write buf to stdout (fd 1).
+// Write buf to stdout.
 function print(address buf, int len) {
     write(1, buf, len)
 }
 
-// Write buf to stderr (fd 2).
+// Write buf to stderr.
 function error(address buf, int len) {
     write(2, buf, len)
 }
