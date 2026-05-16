@@ -1,0 +1,39 @@
+// EXPECT: empty = 1
+// EXPECT: pushBack 1 2 3
+// EXPECT: len = 3
+// EXPECT: peekFront = 1
+// EXPECT: peekBack = 3
+// EXPECT: popFront = 1
+// EXPECT: popFront = 2
+// EXPECT: len = 1
+// EXPECT: pushFront 0
+// EXPECT: peekFront = 0
+// EXPECT: peekBack = 3
+// EXPECT: len = 2
+
+import linkedlist from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    LinkedList<int> list = LinkedList()
+
+    printf("empty = %lld\n", list.empty())
+    printf("pushBack 1 2 3\n")
+    list.pushBack(1)
+    list.pushBack(2)
+    list.pushBack(3)
+
+    printf("len = %lld\n", list.len())
+    printf("peekFront = %lld\n", list.peekFront())
+    printf("peekBack = %lld\n", list.peekBack())
+
+    printf("popFront = %lld\n", list.popFront())
+    printf("popFront = %lld\n", list.popFront())
+    printf("len = %lld\n", list.len())
+
+    printf("pushFront 0\n")
+    list.pushFront(0)
+    printf("peekFront = %lld\n", list.peekFront())
+    printf("peekBack = %lld\n", list.peekBack())
+    printf("len = %lld\n", list.len())
+}
