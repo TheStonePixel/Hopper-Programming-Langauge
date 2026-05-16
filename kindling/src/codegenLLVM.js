@@ -568,7 +568,7 @@ function genExpr(ir, expr) {
 
         case "StringLiteral": {
             const strName = addStringConstant(expr.value);
-            const len = expr.value.length + 1;
+            const len = Buffer.byteLength(expr.value, 'utf8') + 1;
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
             return { value: tmp, type: "string" };
@@ -1663,16 +1663,15 @@ function genEntry(entry) {
 
 function escapeStringForLLVM(str) {
     let out = '';
-    for (const ch of str) {
-        const c = ch.charCodeAt(0);
-        if      (c === 10) out += '\\0A';
-        else if (c === 13) out += '\\0D';
-        else if (c ===  9) out += '\\09';
-        else if (c ===  0) out += '\\00';
-        else if (c === 92) out += '\\5C';
-        else if (c === 34) out += '\\22';
-        else if (c < 32 || c > 126) out += '\\' + c.toString(16).padStart(2,'0').toUpperCase();
-        else out += ch;
+    for (const byte of Buffer.from(str, 'utf8')) {
+        if      (byte === 10) out += '\\0A';
+        else if (byte === 13) out += '\\0D';
+        else if (byte ===  9) out += '\\09';
+        else if (byte ===  0) out += '\\00';
+        else if (byte === 92) out += '\\5C';
+        else if (byte === 34) out += '\\22';
+        else if (byte < 32 || byte > 126) out += '\\' + byte.toString(16).padStart(2, '0').toUpperCase();
+        else out += String.fromCharCode(byte);
     }
     return out;
 }
@@ -1821,7 +1820,7 @@ function genModule(ast) {
     // Emit string constants (collected during all code generation above)
     for (const [value, name] of stringConstants) {
         const escaped = escapeStringForLLVM(value);
-        const len     = value.length + 1;
+        const len     = Buffer.byteLength(value, 'utf8') + 1;
         out += `${name} = private unnamed_addr constant [${len} x i8] c"${escaped}\\00"\n`;
     }
     if (stringConstants.size > 0) out += "\n";
