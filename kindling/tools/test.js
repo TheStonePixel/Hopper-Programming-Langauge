@@ -54,15 +54,21 @@ function discoverGroups(filter) {
         }
     }
 
-    // toolchain/tests/*.hop
-    if (!filter || filter === "toolchain") {
-        const toolchainDir = path.join(ROOT, "toolchain", "tests");
-        if (existsSync(toolchainDir)) {
-            const files = readdirSync(toolchainDir)
-                .filter(f => f.endsWith(".hop"))
-                .sort()
-                .map(f => path.join(toolchainDir, f));
-            if (files.length) groups.push({ name: "toolchain", files });
+    // toolchain/tests/<group>/*.hop
+    const toolchainDir = path.join(ROOT, "toolchain", "tests");
+    if (existsSync(toolchainDir)) {
+        for (const group of readdirSync(toolchainDir).sort()) {
+            if (filter && group !== filter) continue;
+            const groupDir = path.join(toolchainDir, group);
+            try {
+                const files = readdirSync(groupDir)
+                    .filter(f => f.endsWith(".hop"))
+                    .sort()
+                    .map(f => path.join(groupDir, f));
+                if (files.length) groups.push({ name: group, files });
+            } catch {
+                // not a directory, skip
+            }
         }
     }
 
