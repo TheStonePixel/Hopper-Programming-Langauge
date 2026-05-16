@@ -3,7 +3,7 @@
 // EXPECT: 4096
 
 import io from linux
-import heap from ds
+import bumpallocator from ds
 
 extern function printf(String fmt, ...) int
 
@@ -14,11 +14,11 @@ struct Point {
 
 entry main {
     byte pool[4096]
-    Heap heap = Heap(pool[0]::address, 4096)
+    BumpAllocator alloc = BumpAllocator(pool[0]::address, 4096)
 
-    address a = heap.alloc(Point::size)
-    address b = heap.alloc(Point::size)
-    printf("%d\n", heap.remaining())
+    address a = alloc.alloc(Point::size)
+    address b = alloc.alloc(Point::size)
+    printf("%d\n", alloc.remaining())
 
     int ok = 0
     if (a != null) {
@@ -28,6 +28,6 @@ entry main {
     }
     printf("%d\n", ok)
 
-    heap.reset()
-    printf("%d\n", heap.remaining())
+    alloc.reset()
+    printf("%d\n", alloc.remaining())
 }

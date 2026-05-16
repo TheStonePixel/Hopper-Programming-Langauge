@@ -1,0 +1,40 @@
+// EXPECT: empty = 1
+// EXPECT: peek = 10
+// EXPECT: pop = 10
+// EXPECT: pop = 20
+// EXPECT: pop = 30
+// EXPECT: pop = 40
+// EXPECT: pop = 50
+// EXPECT: empty = 1
+// EXPECT: grow ok min = 0
+
+import minheap from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    MinHeap<int> h = MinHeap(4)
+
+    printf("empty = %lld\n", h.empty())
+
+    h.push(30)
+    h.push(10)
+    h.push(50)
+    h.push(20)
+    h.push(40)
+
+    printf("peek = %lld\n", h.peek())
+    printf("pop = %lld\n", h.pop())
+    printf("pop = %lld\n", h.pop())
+    printf("pop = %lld\n", h.pop())
+    printf("pop = %lld\n", h.pop())
+    printf("pop = %lld\n", h.pop())
+    printf("empty = %lld\n", h.empty())
+
+    MinHeap<int> big = MinHeap(2)
+    int i = 15
+    while (i >= 0) {
+        big.push(i)
+        i = i - 1
+    }
+    printf("grow ok min = %lld\n", big.pop())
+}

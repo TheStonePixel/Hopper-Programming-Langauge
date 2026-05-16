@@ -1,15 +1,15 @@
-// Hopper bump allocator — bring your own buffer
+// BumpAllocator — bring your own buffer
 //
 // Allocates forward through a fixed buffer. No per-block overhead.
 // Reset frees everything at once. No individual free.
 //
 // Usage:
 //   byte pool[4096]
-//   Heap heap = Heap(pool[0]::address, 4096)
-//   address block = heap.alloc(Point::size)
-//   heap.reset()
+//   BumpAllocator alloc = BumpAllocator(pool[0]::address, 4096)
+//   address block = alloc.alloc(Point::size)
+//   alloc.reset()
 
-class Heap {
+class BumpAllocator {
     address start
     address current
     int     capacity
