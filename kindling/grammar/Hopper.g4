@@ -150,7 +150,7 @@ classMember
     : type fieldName                                            # ClassField
     | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
     | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
-    | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
+    | 'operator' operatorSymbol '(' Identifier (',' param)? ')' type block   # ClassOperator
     | 'constructor' '(' paramList? ')' block                   # ClassConstructor
     | 'destructor' '(' ')' block                               # ClassDestructor
     ;
@@ -299,6 +299,7 @@ primary
     : IntegerLiteral
     | HexLiteral
     | CharLiteral
+    | UnicodeLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -328,6 +329,7 @@ literal
     : IntegerLiteral
     | HexLiteral
     | CharLiteral
+    | UnicodeLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -340,6 +342,7 @@ literal
 IntegerLiteral  : [0-9]+ ;
 HexLiteral      : '0x' [0-9a-fA-F]+ ;
 CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
+UnicodeLiteral  : 'U+' [0-9a-fA-F]+ ;
 FloatLiteral    : [0-9]+ '.' [0-9]+ ;
 StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;

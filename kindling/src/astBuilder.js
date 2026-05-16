@@ -147,6 +147,8 @@ export class AstBuilder extends HopperVisitor {
             return { value: parseInt(text, 16), type: "int" };
         if (ctx.CharLiteral && ctx.CharLiteral())
             return { value: charLiteralValue(text), type: "int" };
+        if (ctx.UnicodeLiteral && ctx.UnicodeLiteral())
+            return { value: parseInt(text.slice(2), 16), type: "int" };
         if (ctx.FloatLiteral && ctx.FloatLiteral())
             return { value: parseFloat(text), type: "float" };
         if (ctx.IntegerLiteral && ctx.IntegerLiteral())
@@ -278,8 +280,8 @@ export class AstBuilder extends HopperVisitor {
 
     visitClassOperator(ctx) {
         const op = ctx.operatorSymbol().getText();
-        const p = ctx.param();
-        const param = Param(p.paramName().getText(), p.type().getText());
+        const p  = ctx.param();   // null if unary, param context if binary
+        const param = p ? Param(p.paramName().getText(), p.type().getText()) : null;
         const returnType = ctx.type().getText();
         const body = this.visit(ctx.block());
         return ClassOperator(op, param, returnType, body);
@@ -667,6 +669,11 @@ export class AstBuilder extends HopperVisitor {
         // Character literal: 'H' → 72, '\n' → 10
         if (ctx.CharLiteral && ctx.CharLiteral()) {
             return IntLiteral(charLiteralValue(ctx.CharLiteral().getText()));
+        }
+
+        // Unicode literal: U+1F600 → 128512
+        if (ctx.UnicodeLiteral && ctx.UnicodeLiteral()) {
+            return IntLiteral(parseInt(ctx.UnicodeLiteral().getText().slice(2), 16));
         }
 
         // Float literal: 3.14

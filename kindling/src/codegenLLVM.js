@@ -209,7 +209,7 @@ function instantiateTemplate(typeStr) {
     for (const op of concreteClass.operators || []) {
         const ns = operatorNameSafe(op.op);
         functionReturnTypes.set(`${concreteClass.name}_op_${ns}`, {
-            returnType: op.returnType, isVariadic: false, params: [op.param]
+            returnType: op.returnType, isVariadic: false, params: op.param ? [op.param] : []
         });
     }
     if (concreteClass.constructor) {
@@ -668,6 +668,22 @@ function genExpr(ir, expr) {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
 
+            // Dispatch to class [] operator if defined
+            if (classTypes.has(v.hType)) {
+                const cls = classTypes.get(v.hType);
+                const idxOp = (cls.operators || []).find(o => o.op === '[]');
+                if (idxOp) {
+                    const indexVal = genExpr(ir, expr.index);
+                    const fnName = `${v.hType}_op_idx`;
+                    const selfType = `%class.${v.hType}*`;
+                    const paramType = llvmType(idxOp.param.type);
+                    const retType = idxOp.returnType;
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${v.ptr}, ${paramType} ${indexVal.value})`);
+                    return { value: tmp, type: retType };
+                }
+            }
+
             // string[] (argv) indexing — i8** pointer, each element is i8*
             if (v.hType === "string[]") {
                 const base     = ir.newTmp();
@@ -754,6 +770,25 @@ function genExpr(ir, expr) {
         }
 
         case "Binary": {
+            // Dispatch to class operator if left operand is a class with this operator defined
+            if (expr.left.kind === "Var") {
+                const lv = ir.vars.get(expr.left.name);
+                if (lv && classTypes.has(lv.hType)) {
+                    const cls = classTypes.get(lv.hType);
+                    const matchingOp = (cls.operators || []).find(o => o.op === expr.op && o.param);
+                    if (matchingOp) {
+                        const right = genExpr(ir, expr.right);
+                        const ns = operatorNameSafe(expr.op);
+                        const fnName = `${lv.hType}_op_${ns}`;
+                        const selfType = `%class.${lv.hType}*`;
+                        const paramType = llvmType(matchingOp.param.type);
+                        const retType = matchingOp.returnType;
+                        const tmp = ir.newTmp();
+                        ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${lv.ptr}, ${paramType} ${right.value})`);
+                        return { value: tmp, type: retType };
+                    }
+                }
+            }
             const left  = genExpr(ir, expr.left);
             const right = genExpr(ir, expr.right);
             const lt    = llvmType(left.type);
@@ -1447,7 +1482,7 @@ function genOperator(className, op) {
     const nameSafe = operatorNameSafe(op.op);
     const pseudoMethod = {
         name:       `op_${nameSafe}`,
-        params:     [op.param],
+        params:     op.param ? [op.param] : [],
         returnType: op.returnType,
         body:       op.body
     };
@@ -1658,7 +1693,7 @@ function genModule(ast) {
         }
         for (const op of cls.operators || []) {
             const ns = operatorNameSafe(op.op);
-            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: [op.param] });
+            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: op.param ? [op.param] : [] });
         }
         if (cls.constructor) {
             functionReturnTypes.set(`${cls.name}_constructor`, { returnType: null, isVariadic: false, params: cls.constructor.params });
