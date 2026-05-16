@@ -1,25 +1,40 @@
-// EXPECT: contains 1 = 0
+// EXPECT: contains 1 before add = 0
 // EXPECT: contains 1 = 1
 // EXPECT: contains 2 = 1
 // EXPECT: len = 2
+// EXPECT: duplicate add: len still = 2
 // EXPECT: after remove: contains 1 = 0
 // EXPECT: len = 1
 // EXPECT: grow ok len = 12
+// EXPECT: grow contains ok
 
-import set from ds
+import assert from core
+import set    from ds
 extern function printf(String fmt, ...) int
 
 entry main {
     Set<int> s = Set(4)
 
-    printf("contains 1 = %lld\n", s.contains(1))
+    assert(s.len()       == 0, "new set len should be 0\n")
+    assert(s.contains(1) == 0, "contains on empty set\n")
+    printf("contains 1 before add = %lld\n", s.contains(1))
+
     s.add(1)
     s.add(2)
+    assert(s.contains(1) == 1, "contains 1 after add\n")
+    assert(s.contains(2) == 1, "contains 2 after add\n")
+    assert(s.len()        == 2, "len after 2 adds\n")
     printf("contains 1 = %lld\n", s.contains(1))
     printf("contains 2 = %lld\n", s.contains(2))
     printf("len = %lld\n", s.len())
 
+    s.add(1)
+    assert(s.len() == 2, "duplicate add must not change len\n")
+    printf("duplicate add: len still = %lld\n", s.len())
+
     s.remove(1)
+    assert(s.contains(1) == 0, "contains after remove\n")
+    assert(s.len()        == 1, "len after remove\n")
     printf("after remove: contains 1 = %lld\n", s.contains(1))
     printf("len = %lld\n", s.len())
 
@@ -29,5 +44,12 @@ entry main {
         big.add(i)
         i = i + 1
     }
+    assert(big.len() == 12, "grow: len wrong\n")
     printf("grow ok len = %lld\n", big.len())
+
+    assert(big.contains(0)  == 1, "grow: contains 0\n")
+    assert(big.contains(7)  == 1, "grow: contains 7\n")
+    assert(big.contains(11) == 1, "grow: contains 11\n")
+    assert(big.contains(12) == 0, "grow: should not contain 12\n")
+    printf("grow contains ok\n")
 }

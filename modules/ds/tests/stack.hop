@@ -1,32 +1,54 @@
 // EXPECT: empty = 1
-// EXPECT: push 3 items
-// EXPECT: len = 3
+// EXPECT: len after 3 pushes = 3
 // EXPECT: peek = 30
+// EXPECT: len unchanged after peek = 3
 // EXPECT: pop = 30
 // EXPECT: pop = 20
 // EXPECT: len = 1
 // EXPECT: pop = 10
 // EXPECT: empty = 1
 // EXPECT: grow ok len = 16
+// EXPECT: grow values ok
 
-import stack from ds
+import assert from core
+import stack  from ds
 extern function printf(String fmt, ...) int
 
 entry main {
     Stack<int> s = Stack(4)
 
+    assert(s.empty() == 1, "new stack should be empty\n")
+    assert(s.len()   == 0, "new stack len should be 0\n")
     printf("empty = %lld\n", s.empty())
-    printf("push 3 items\n")
+
     s.push(10)
     s.push(20)
     s.push(30)
 
-    printf("len = %lld\n", s.len())
+    assert(s.len()   == 3, "len after 3 pushes\n")
+    assert(s.empty() == 0, "non-empty stack reports empty\n")
+    printf("len after 3 pushes = %lld\n", s.len())
+
+    assert(s.peek() == 30, "peek wrong\n")
     printf("peek = %lld\n", s.peek())
-    printf("pop = %lld\n", s.pop())
-    printf("pop = %lld\n", s.pop())
+    assert(s.len()  == 3,  "peek must not change len\n")
+    printf("len unchanged after peek = %lld\n", s.len())
+
+    int v = s.pop()
+    assert(v == 30,       "first pop\n")
+    assert(s.len() == 2,  "len after first pop\n")
+    printf("pop = %lld\n", v)
+
+    v = s.pop()
+    assert(v == 20,       "second pop\n")
+    assert(s.len() == 1,  "len after second pop\n")
+    printf("pop = %lld\n", v)
     printf("len = %lld\n", s.len())
-    printf("pop = %lld\n", s.pop())
+
+    v = s.pop()
+    assert(v == 10,        "third pop\n")
+    assert(s.empty() == 1, "stack should be empty after drain\n")
+    printf("pop = %lld\n", v)
     printf("empty = %lld\n", s.empty())
 
     Stack<int> big = Stack(2)
@@ -35,5 +57,10 @@ entry main {
         big.push(i)
         i = i + 1
     }
+    assert(big.len() == 16, "grow: len wrong\n")
     printf("grow ok len = %lld\n", big.len())
+
+    assert(big.pop() == 15, "grow: top value\n")
+    assert(big.pop() == 14, "grow: second value\n")
+    printf("grow values ok\n")
 }

@@ -5,24 +5,43 @@
 // EXPECT: len = 0
 // EXPECT: peek = 10
 // EXPECT: grow ok len = 16
+// EXPECT: grow order ok
 
-import queue from ds
+import assert from core
+import queue  from ds
 extern function printf(String fmt, ...) int
 
 entry main {
     Queue<int> q = Queue(4)
 
+    assert(q.empty() == 1, "new queue should be empty\n")
+    assert(q.len()   == 0, "new queue len should be 0\n")
     printf("empty = %lld\n", q.empty())
+
     q.push(1)
     q.push(2)
     q.push(3)
-    printf("pop = %lld\n", q.pop())
-    printf("pop = %lld\n", q.pop())
-    printf("pop = %lld\n", q.pop())
-    printf("len = %lld\n", q.len())
+    assert(q.len()   == 3, "len after 3 pushes\n")
+    assert(q.peek()  == 1, "peek should be front\n")
+
+    int v = q.pop()
+    assert(v == 1,         "first pop: FIFO order\n")
+    assert(q.len() == 2,   "len after first pop\n")
+    printf("pop = %lld\n", v)
+
+    v = q.pop()
+    assert(v == 2, "second pop: FIFO order\n")
+    printf("pop = %lld\n", v)
+
+    v = q.pop()
+    assert(v == 3,          "third pop: FIFO order\n")
+    assert(q.empty() == 1,  "queue should be empty after drain\n")
+    printf("pop = %lld\n",  v)
+    printf("len = %lld\n",  q.len())
 
     q.push(10)
     q.push(20)
+    assert(q.peek() == 10, "peek after re-push\n")
     printf("peek = %lld\n", q.peek())
 
     Queue<int> big = Queue(2)
@@ -31,5 +50,11 @@ entry main {
         big.push(i)
         i = i + 1
     }
+    assert(big.len() == 16, "grow: len wrong\n")
     printf("grow ok len = %lld\n", big.len())
+
+    assert(big.pop() == 0, "grow: FIFO order at 0\n")
+    assert(big.pop() == 1, "grow: FIFO order at 1\n")
+    assert(big.pop() == 2, "grow: FIFO order at 2\n")
+    printf("grow order ok\n")
 }
