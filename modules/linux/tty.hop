@@ -3,142 +3,44 @@
 //
 // Imported functions: tcgetattr tcsetattr tcflush winsize isatty
 //
-// struct termios layout (Linux, 60 bytes):
-//   iflag(int) oflag(int) cflag(int) lflag(int) line(byte) cc[19](byte) [pad]
+// ── tcsetattr optional_actions ────────────────────────────────────────────────
+//   TCSANOW=0x5402   TCSADRAIN=0x5403   TCSAFLUSH=0x5404
 //
-// Raw mode recipe:
+// ── ioctl request codes ───────────────────────────────────────────────────────
+//   TCGETS=0x5401  TCSETS=0x5402  TCSETSW=0x5403  TCSETSF=0x5404
+//   TCSBRK=0x5409  TCFLSH=0x540B  TIOCGWINSZ=0x5413  TIOCSWINSZ=0x5414
+//
+// ── tcflush queue selectors ───────────────────────────────────────────────────
+//   TCIFLUSH=0  TCOFLUSH=1  TCIOFLUSH=2
+//
+// ── termios c_iflag bits ─────────────────────────────────────────────────────
+//   IGNBRK=1  BRKINT=2  IGNPAR=4  PARMRK=8  INPCK=16  ISTRIP=32
+//   INLCR=64  IGNCR=128  ICRNL=256  IXON=1024  IXOFF=4096  IUTF8=16384
+//
+// ── termios c_oflag bits ─────────────────────────────────────────────────────
+//   OPOST=1  OLCUC=2  ONLCR=4  OCRNL=8  ONOCR=16  ONLRET=32
+//
+// ── termios c_cflag bits ─────────────────────────────────────────────────────
+//   CS5=0  CS6=16  CS7=32  CS8=48  CSTOPB=64  CREAD=128
+//   PARENB=256  PARODD=512  HUPCL=1024  CLOCAL=2048
+//
+// ── termios c_lflag bits ─────────────────────────────────────────────────────
+//   ISIG=1  ICANON=2  ECHO=8  ECHOE=16  ECHOK=32  ECHONL=64
+//   NOFLSH=128  TOSTOP=256  IEXTEN=32768
+//
+// ── termios cc[] indices ─────────────────────────────────────────────────────
+//   VINTR=0  VQUIT=1  VERASE=2  VKILL=3  VEOF=4
+//   VTIME=5  VMIN=6  VSTART=8  VSTOP=9  VSUSP=10
+//
+// ── baud rate constants (c_cflag) ─────────────────────────────────────────────
+//   B0=0  B9600=13  B19200=14  B38400=15
+//   B57600=4097  B115200=4098  B230400=4099  B1000000=4104
+//
+// ── raw mode recipe ───────────────────────────────────────────────────────────
 //   tcgetattr(fd, &t)
-//   t.lflag &= ~(ICANON | ECHO | ISIG)
-//   t.iflag &= ~(IXON | ICRNL)
+//   t.c_lflag &= ~(ICANON|ECHO|ISIG)   // clear 2|8|1 = ~11
+//   t.c_iflag &= ~(IXON|ICRNL)         // clear 1024|256 = ~1280
 //   t.cc[VMIN] = 1; t.cc[VTIME] = 0
 //   tcsetattr(fd, TCSANOW, &t)
 
 import tty from target
-
-// ── tcsetattr optional_actions ───────────────────────────────────────────────
-
-const TCSANOW   = 0x5402
-const TCSADRAIN = 0x5403
-const TCSAFLUSH = 0x5404
-
-// ── ioctl request codes ───────────────────────────────────────────────────────
-
-const TCGETS     = 0x5401
-const TCSETS     = 0x5402
-const TCSETSW    = 0x5403
-const TCSETSF    = 0x5404
-const TCSBRK     = 0x5409
-const TCFLSH     = 0x540B
-const TIOCGWINSZ = 0x5413
-const TIOCSWINSZ = 0x5414
-const TIOCGPGRP  = 0x540F
-const TIOCSPGRP  = 0x5410
-const TIOCEXCL   = 0x540C
-const TIOCNXCL   = 0x540D
-const TIOCSCTTY  = 0x540E
-
-// ── tcflush queue selectors ───────────────────────────────────────────────────
-
-const TCIFLUSH  = 0
-const TCOFLUSH  = 1
-const TCIOFLUSH = 2
-
-// ── termios c_iflag bits ─────────────────────────────────────────────────────
-
-const IGNBRK  = 1
-const BRKINT  = 2
-const IGNPAR  = 4
-const PARMRK  = 8
-const INPCK   = 16
-const ISTRIP  = 32
-const INLCR   = 64
-const IGNCR   = 128
-const ICRNL   = 256
-const IUCLC   = 512
-const IXON    = 1024
-const IXANY   = 2048
-const IXOFF   = 4096
-const IMAXBEL = 8192
-const IUTF8   = 16384
-
-// ── termios c_oflag bits ─────────────────────────────────────────────────────
-
-const OPOST  = 1
-const OLCUC  = 2
-const ONLCR  = 4
-const OCRNL  = 8
-const ONOCR  = 16
-const ONLRET = 32
-const OFILL  = 64
-const OFDEL  = 128
-
-// ── termios c_cflag bits ─────────────────────────────────────────────────────
-
-const CS5    = 0
-const CS6    = 16
-const CS7    = 32
-const CS8    = 48
-const CSTOPB = 64
-const CREAD  = 128
-const PARENB = 256
-const PARODD = 512
-const HUPCL  = 1024
-const CLOCAL = 2048
-
-// ── termios c_lflag bits ─────────────────────────────────────────────────────
-
-const ISIG   = 1
-const ICANON = 2
-const XCASE  = 4
-const ECHO   = 8
-const ECHOE  = 16
-const ECHOK  = 32
-const ECHONL = 64
-const NOFLSH = 128
-const TOSTOP = 256
-const ECHOCTL = 512
-const ECHOPRT = 1024
-const ECHOKE = 2048
-const IEXTEN = 32768
-
-// ── termios cc[] indices ─────────────────────────────────────────────────────
-
-const VINTR  = 0
-const VQUIT  = 1
-const VERASE = 2
-const VKILL  = 3
-const VEOF   = 4
-const VTIME  = 5
-const VMIN   = 6
-const VSTART = 8
-const VSTOP  = 9
-const VSUSP  = 10
-const VEOL   = 11
-
-// ── baud rate constants (c_cflag) ─────────────────────────────────────────────
-
-const B0       = 0
-const B50      = 1
-const B75      = 2
-const B110     = 3
-const B134     = 4
-const B150     = 5
-const B200     = 6
-const B300     = 7
-const B600     = 8
-const B1200    = 9
-const B1800    = 10
-const B2400    = 11
-const B4800    = 12
-const B9600    = 13
-const B19200   = 14
-const B38400   = 15
-const B57600   = 4097
-const B115200  = 4098
-const B230400  = 4099
-const B460800  = 4100
-const B500000  = 4101
-const B921600  = 4103
-const B1000000 = 4104
-const B1500000 = 4105
-const B2000000 = 4106

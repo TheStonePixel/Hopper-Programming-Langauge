@@ -4,38 +4,25 @@
 // Imported functions:
 //   select pselect6 poll ppoll epoll_create1 epoll_ctl epoll_wait epoll_pwait
 //
-// Recommended: use epoll for servers, poll for simple utilities, select only for legacy.
+// Recommendation: epoll for servers, poll for simple utilities, select for legacy.
+//
+// ── poll event flags (struct pollfd .events / .revents) ──────────────────────
+//   POLLIN=1  POLLPRI=2  POLLOUT=4  POLLERR=8  POLLHUP=16  POLLNVAL=32
+//
+// ── epoll event flags (struct epoll_event .events) ────────────────────────────
+//   EPOLLIN=1  EPOLLPRI=2  EPOLLOUT=4  EPOLLERR=8  EPOLLHUP=16
+//   EPOLLET=0x80000000  EPOLLONESHOT=0x40000000  EPOLLWAKEUP=0x20000000
+//
+// ── epoll_ctl operations ──────────────────────────────────────────────────────
+//   EPOLL_CTL_ADD=1  EPOLL_CTL_DEL=2  EPOLL_CTL_MOD=3
+//
+// ── epoll_create1 flags ───────────────────────────────────────────────────────
+//   EPOLL_CLOEXEC=524288
+//
+// ── struct Pollfd ─────────────────────────────────────────────────────────────
+//   fd(int32)  events(int16)  revents(int16)
+//
+// ── struct EpollEvent ─────────────────────────────────────────────────────────
+//   events(int32)  data(int64)  — data is a union; store fd as int64
 
 import poll from target
-
-// ── poll event flags (struct pollfd.events / .revents) ───────────────────────
-
-const POLLIN   = 1
-const POLLPRI  = 2
-const POLLOUT  = 4
-const POLLERR  = 8
-const POLLHUP  = 16
-const POLLNVAL = 32
-
-// ── epoll event flags (struct epoll_event.events) ────────────────────────────
-
-const EPOLLIN      = 1
-const EPOLLPRI     = 2
-const EPOLLOUT     = 4
-const EPOLLERR     = 8
-const EPOLLHUP     = 16
-const EPOLLRDNORM  = 64
-const EPOLLWRNORM  = 256
-const EPOLLET      = 0x80000000
-const EPOLLONESHOT = 0x40000000
-const EPOLLWAKEUP  = 0x20000000
-
-// ── epoll_ctl operations ──────────────────────────────────────────────────────
-
-const EPOLL_CTL_ADD = 1
-const EPOLL_CTL_DEL = 2
-const EPOLL_CTL_MOD = 3
-
-// ── epoll_create1 flags ───────────────────────────────────────────────────────
-
-const EPOLL_CLOEXEC = 524288

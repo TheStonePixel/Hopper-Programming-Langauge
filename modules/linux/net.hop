@@ -8,85 +8,49 @@
 //   setsockopt getsockopt
 //
 // Usage (TCP server):
-//   int fd = socket(AF_INET, SOCK_STREAM, 0)
-//   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, ...)
-//   bind(fd, &addr, sizeof(addr))
+//   int fd = socket(2, 1, 0)       // AF_INET=2 SOCK_STREAM=1
+//   setsockopt(fd, 1, 2, ...)      // SOL_SOCKET=1 SO_REUSEADDR=2
+//   bind(fd, &addr, addrlen)
 //   listen(fd, 128)
 //   int client = accept(fd, 0, 0)
+//
+// ── address families ──────────────────────────────────────────────────────────
+//   AF_UNIX=1  AF_INET=2  AF_INET6=10  AF_NETLINK=16  AF_PACKET=17
+//
+// ── socket types ─────────────────────────────────────────────────────────────
+//   SOCK_STREAM=1  SOCK_DGRAM=2  SOCK_RAW=3  SOCK_SEQPACKET=5
+//   SOCK_NONBLOCK=2048  SOCK_CLOEXEC=524288
+//
+// ── protocols ────────────────────────────────────────────────────────────────
+//   IPPROTO_IP=0  IPPROTO_ICMP=1  IPPROTO_TCP=6  IPPROTO_UDP=17
+//
+// ── socket level ─────────────────────────────────────────────────────────────
+//   SOL_SOCKET=1
+//
+// ── socket options (SOL_SOCKET) ───────────────────────────────────────────────
+//   SO_REUSEADDR=2  SO_TYPE=3  SO_ERROR=4  SO_BROADCAST=6
+//   SO_SNDBUF=7  SO_RCVBUF=8  SO_KEEPALIVE=9  SO_LINGER=13  SO_REUSEPORT=15
+//
+// ── TCP options (IPPROTO_TCP) ─────────────────────────────────────────────────
+//   TCP_NODELAY=1  TCP_KEEPIDLE=4  TCP_KEEPINTVL=5  TCP_KEEPCNT=6
+//
+// ── send/recv flags ──────────────────────────────────────────────────────────
+//   MSG_OOB=1  MSG_PEEK=2  MSG_DONTWAIT=64  MSG_WAITALL=256  MSG_NOSIGNAL=16384
+//
+// ── shutdown how ─────────────────────────────────────────────────────────────
+//   SHUT_RD=0  SHUT_WR=1  SHUT_RDWR=2
+//
+// ── common addresses ─────────────────────────────────────────────────────────
+//   INADDR_ANY=0  INADDR_LOOPBACK=2130706433  INADDR_BROADCAST=4294967295
+//
+// ── struct SockaddrIn (IPv4, 16 bytes) ───────────────────────────────────────
+//   family(2)  port(2, big-endian)  addr(4, big-endian)  zero[8]
+//
+// ── struct SockaddrIn6 (IPv6, 28 bytes) ──────────────────────────────────────
+//   family(2)  port(2)  flowinfo(4)  addr[16]  scope_id(4)
+//
+// ── struct Msghdr ─────────────────────────────────────────────────────────────
+//   name(address)  namelen(int)  iov(address)  iovlen(int)
+//   control(address)  controllen(int)  flags(int)
 
 import net from target
-
-// ── address families ──────────────────────────────────────────────────────────
-
-const AF_UNIX    = 1
-const AF_INET    = 2
-const AF_INET6   = 10
-const AF_NETLINK = 16
-const AF_PACKET  = 17
-
-// ── socket types ─────────────────────────────────────────────────────────────
-
-const SOCK_STREAM    = 1
-const SOCK_DGRAM     = 2
-const SOCK_RAW       = 3
-const SOCK_SEQPACKET = 5
-const SOCK_NONBLOCK  = 2048
-const SOCK_CLOEXEC   = 524288
-
-// ── protocols ────────────────────────────────────────────────────────────────
-
-const IPPROTO_IP   = 0
-const IPPROTO_ICMP = 1
-const IPPROTO_TCP  = 6
-const IPPROTO_UDP  = 17
-
-// ── socket level ─────────────────────────────────────────────────────────────
-
-const SOL_SOCKET = 1
-
-// ── socket options (SOL_SOCKET level) ────────────────────────────────────────
-
-const SO_DEBUG      = 1
-const SO_REUSEADDR  = 2
-const SO_TYPE       = 3
-const SO_ERROR      = 4
-const SO_DONTROUTE  = 5
-const SO_BROADCAST  = 6
-const SO_SNDBUF     = 7
-const SO_RCVBUF     = 8
-const SO_KEEPALIVE  = 9
-const SO_OOBINLINE  = 10
-const SO_LINGER     = 13
-const SO_REUSEPORT  = 15
-const SO_RCVTIMEO   = 20
-const SO_SNDTIMEO   = 21
-
-// ── TCP options (IPPROTO_TCP level) ──────────────────────────────────────────
-
-const TCP_NODELAY   = 1
-const TCP_MAXSEG    = 2
-const TCP_KEEPIDLE  = 4
-const TCP_KEEPINTVL = 5
-const TCP_KEEPCNT   = 6
-const TCP_FASTOPEN  = 23
-
-// ── send / recv flags ────────────────────────────────────────────────────────
-
-const MSG_OOB       = 1
-const MSG_PEEK      = 2
-const MSG_DONTROUTE = 4
-const MSG_DONTWAIT  = 64
-const MSG_WAITALL   = 256
-const MSG_NOSIGNAL  = 16384
-
-// ── shutdown how ─────────────────────────────────────────────────────────────
-
-const SHUT_RD   = 0
-const SHUT_WR   = 1
-const SHUT_RDWR = 2
-
-// ── common addresses ─────────────────────────────────────────────────────────
-
-const INADDR_ANY       = 0
-const INADDR_LOOPBACK  = 2130706433
-const INADDR_BROADCAST = 4294967295
