@@ -1,18 +1,35 @@
-// EXPECT: len after push = 3
+// TEST: constructor
+// EXPECT: new() -> empty = 1
+// EXPECT: new() -> len = 0
+
+// TEST: push
+// EXPECT: push(10, 20, 30) -> len = 3
 // EXPECT: get(0) = 10
 // EXPECT: get(1) = 20
 // EXPECT: get(2) = 30
-// EXPECT: empty = 0
-// EXPECT: indexOf 20 = 1
-// EXPECT: contains 30 = 1
-// EXPECT: contains 99 = 0
-// EXPECT: after remove(1): 10 30
-// EXPECT: after insert(0,5): 5 10 30
-// EXPECT: pop = 30
-// EXPECT: peek = 10
-// EXPECT: len after pop = 2
-// EXPECT: grow ok len = 32
-// EXPECT: grow values ok
+// EXPECT: empty() = 0
+
+// TEST: indexOf
+// EXPECT: indexOf(20) = 1
+
+// TEST: contains
+// EXPECT: contains(30) = 1
+// EXPECT: contains(99) = 0
+
+// TEST: remove
+// EXPECT: remove(1) -> [10, 30]
+
+// TEST: insert
+// EXPECT: insert(0, 5) -> [5, 10, 30]
+
+// TEST: pop / peek
+// EXPECT: pop() = 30
+// EXPECT: peek() = 10
+// EXPECT: pop() -> len = 2
+
+// TEST: grow
+// EXPECT: grow(32) -> len = 32
+// EXPECT: grow(32) -> values preserved
 
 import assert from core
 import array  from ds
@@ -23,6 +40,8 @@ entry main {
 
     assert(nums.empty() == 1, "new array should be empty\n")
     assert(nums.len()   == 0, "new array len should be 0\n")
+    printf("new() -> empty = %lld\n", nums.empty())
+    printf("new() -> len = %lld\n", nums.len())
 
     nums.push(10)
     nums.push(20)
@@ -33,39 +52,39 @@ entry main {
     assert(nums.get(0)  == 10, "get(0) wrong\n")
     assert(nums.get(1)  == 20, "get(1) wrong\n")
     assert(nums.get(2)  == 30, "get(2) wrong\n")
-    printf("len after push = %lld\n", nums.len())
+    printf("push(10, 20, 30) -> len = %lld\n", nums.len())
     printf("get(0) = %lld\n", nums.get(0))
     printf("get(1) = %lld\n", nums.get(1))
     printf("get(2) = %lld\n", nums.get(2))
-    printf("empty = %lld\n",  nums.empty())
+    printf("empty() = %lld\n", nums.empty())
 
     assert(nums.indexOf(20) == 1,  "indexOf 20\n")
     assert(nums.contains(30) == 1, "contains 30\n")
     assert(nums.contains(99) == 0, "contains 99\n")
-    printf("indexOf 20 = %lld\n",  nums.indexOf(20))
-    printf("contains 30 = %lld\n", nums.contains(30))
-    printf("contains 99 = %lld\n", nums.contains(99))
+    printf("indexOf(20) = %lld\n", nums.indexOf(20))
+    printf("contains(30) = %lld\n", nums.contains(30))
+    printf("contains(99) = %lld\n", nums.contains(99))
 
     nums.remove(1)
     assert(nums.len()   == 2,  "len after remove\n")
     assert(nums.get(0)  == 10, "get(0) after remove\n")
     assert(nums.get(1)  == 30, "get(1) after remove\n")
-    printf("after remove(1): %lld %lld\n", nums.get(0), nums.get(1))
+    printf("remove(1) -> [%lld, %lld]\n", nums.get(0), nums.get(1))
 
     nums.insert(0, 5)
     assert(nums.len()  == 3,  "len after insert\n")
     assert(nums.get(0) == 5,  "get(0) after insert\n")
     assert(nums.get(1) == 10, "get(1) after insert\n")
     assert(nums.get(2) == 30, "get(2) after insert\n")
-    printf("after insert(0,5): %lld %lld %lld\n", nums.get(0), nums.get(1), nums.get(2))
+    printf("insert(0, 5) -> [%lld, %lld, %lld]\n", nums.get(0), nums.get(1), nums.get(2))
 
     int top = nums.pop()
     assert(top         == 30, "pop value\n")
     assert(nums.len()  == 2,  "len after pop\n")
     assert(nums.peek() == 10, "peek after pop\n")
-    printf("pop = %lld\n",  top)
-    printf("peek = %lld\n", nums.peek())
-    printf("len after pop = %lld\n", nums.len())
+    printf("pop() = %lld\n", top)
+    printf("peek() = %lld\n", nums.peek())
+    printf("pop() -> len = %lld\n", nums.len())
 
     Array<int> big = Array(2)
     int i = 0
@@ -74,10 +93,10 @@ entry main {
         i = i + 1
     }
     assert(big.len() == 32, "grow: len wrong\n")
-    printf("grow ok len = %lld\n", big.len())
+    printf("grow(32) -> len = %lld\n", big.len())
 
     assert(big.get(0)  == 0,  "grow: value at 0\n")
     assert(big.get(15) == 45, "grow: value at 15\n")
     assert(big.get(31) == 93, "grow: value at 31\n")
-    printf("grow values ok\n")
+    printf("grow(32) -> values preserved\n")
 }

@@ -1,10 +1,16 @@
-// EXPECT: contains hello = 1
-// EXPECT: contains world = 1
-// EXPECT: contains hell = 0
-// EXPECT: contains xyz = 0
-// EXPECT: prefix not a word
-// EXPECT: after insert hell: contains hell = 1
-// EXPECT: hello still present = 1
+// TEST: constructor
+// EXPECT: new() -> contains("hello") = 0
+
+// TEST: insert / contains
+// EXPECT: insert("hello") -> contains("hello") = 1
+// EXPECT: insert("world") -> contains("world") = 1
+// EXPECT: contains("hell") = 0
+// EXPECT: contains("xyz") = 0
+// EXPECT: contains("helloworld") = 0
+
+// TEST: prefix vs word
+// EXPECT: insert("hell") -> contains("hell") = 1
+// EXPECT: insert("hell") -> contains("hello") = 1
 
 import assert from core
 import trie   from ds
@@ -15,6 +21,7 @@ entry main {
 
     assert(t.contains("hello") == 0, "empty trie should not contain hello\n")
     assert(t.contains("world") == 0, "empty trie should not contain world\n")
+    printf("new() -> contains(\"hello\") = %lld\n", t.contains("hello"))
 
     t.insert("hello")
     t.insert("world")
@@ -24,15 +31,15 @@ entry main {
     assert(t.contains("hell")  == 0, "prefix hell is not a word\n")
     assert(t.contains("xyz")   == 0, "xyz was never inserted\n")
     assert(t.contains("helloworld") == 0, "helloworld was never inserted\n")
-    printf("contains hello = %lld\n", t.contains("hello"))
-    printf("contains world = %lld\n", t.contains("world"))
-    printf("contains hell = %lld\n",  t.contains("hell"))
-    printf("contains xyz = %lld\n",   t.contains("xyz"))
-    printf("prefix not a word\n")
+    printf("insert(\"hello\") -> contains(\"hello\") = %lld\n", t.contains("hello"))
+    printf("insert(\"world\") -> contains(\"world\") = %lld\n", t.contains("world"))
+    printf("contains(\"hell\") = %lld\n",  t.contains("hell"))
+    printf("contains(\"xyz\") = %lld\n",   t.contains("xyz"))
+    printf("contains(\"helloworld\") = %lld\n", t.contains("helloworld"))
 
     t.insert("hell")
     assert(t.contains("hell")  == 1, "contains hell after insert\n")
     assert(t.contains("hello") == 1, "hello should still be present\n")
-    printf("after insert hell: contains hell = %lld\n", t.contains("hell"))
-    printf("hello still present = %lld\n", t.contains("hello"))
+    printf("insert(\"hell\") -> contains(\"hell\") = %lld\n", t.contains("hell"))
+    printf("insert(\"hell\") -> contains(\"hello\") = %lld\n", t.contains("hello"))
 }

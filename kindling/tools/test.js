@@ -3,17 +3,18 @@
  * Hopper Test Runner
  *
  * Discovers tests from two locations:
- *   modules/<name>/tests/*.hop  — module tests, grouped by module name
- *   toolchain/tests/<group>/*.hop — language/compiler tests
+ *   modules/<name>/tests/*.hop       — module tests, grouped by module name
+ *   toolchain/tests/<group>/*.hop    — language/compiler tests
  *
  * Conventions inside each .hop test file:
- *   // EXPECT: <line>       — expected stdout line (one per expected line)
- *   // COMPILE_ONLY         — only verify the file compiles, don't run
- *   // EXPECT_ERROR: <msg>  — compilation should fail with a message containing <msg>
+ *   // TEST: name          — start a named section (groups following assertions)
+ *   // EXPECT: <line>      — expected stdout line (one assertion per line)
+ *   // COMPILE_ONLY        — only verify the file compiles, don't run
+ *   // EXPECT_ERROR: <msg> — compilation should fail with a message containing <msg>
  *
  * Usage:
  *   node tools/test.js              — run all tests
- *   node tools/test.js linux        — run modules/linux/tests/ only
+ *   node tools/test.js ds           — run modules/ds/tests/ only
  */
 
 import { readFileSync, mkdirSync, existsSync, readdirSync } from "fs";
@@ -37,7 +38,6 @@ const RST  = "\x1b[0m";
 function discoverGroups(filter) {
     const groups = [];
 
-    // modules/<name>/tests/*.hop
     const modulesDir = path.join(ROOT, "modules");
     if (existsSync(modulesDir)) {
         for (const mod of readdirSync(modulesDir).sort()) {
@@ -52,7 +52,6 @@ function discoverGroups(filter) {
         }
     }
 
-    // toolchain/tests/<group>/*.hop
     const toolchainDir = path.join(ROOT, "toolchain", "tests");
     if (existsSync(toolchainDir)) {
         for (const group of readdirSync(toolchainDir).sort()) {
@@ -64,9 +63,7 @@ function discoverGroups(filter) {
                     .sort()
                     .map(f => path.join(groupDir, f));
                 if (files.length) groups.push({ name: group, files });
-            } catch {
-                // not a directory, skip
-            }
+            } catch { /* not a directory */ }
         }
     }
 
@@ -74,11 +71,19 @@ function discoverGroups(filter) {
 }
 
 // ── Metadata parsing ───────────────────────────────────────────────────────────
+//
+// Returns:
+//   sections:      [{ name: string|null, expected: string[] }]
+//   compileOnly:   bool
+//   expectedError: string|null
+//
+// A null-named section holds any EXPECT lines that appear before the first TEST.
 
 function parseMeta(source) {
-    const expected      = [];
-    let   compileOnly   = false;
-    let   expectedError = null;
+    const sections     = [{ name: null, expected: [] }];
+    let cur            = sections[0];
+    let compileOnly    = false;
+    let expectedError  = null;
 
     for (const line of source.split("\n")) {
         const t = line.trim();
@@ -86,25 +91,25 @@ function parseMeta(source) {
             compileOnly = true;
         else if (t.startsWith("// EXPECT_ERROR:"))
             expectedError = t.slice("// EXPECT_ERROR:".length).trim();
-        else if (t.startsWith("// EXPECT:"))
-            expected.push(t.slice("// EXPECT:".length).trim());
+        else if (t.startsWith("// TEST:")) {
+            cur = { name: t.slice("// TEST:".length).trim(), expected: [] };
+            sections.push(cur);
+        } else if (t.startsWith("// EXPECT:"))
+            cur.expected.push(t.slice("// EXPECT:".length).trim());
     }
 
-    return { expected, compileOnly, expectedError };
+    return { sections, compileOnly, expectedError };
 }
 
 // ── Run a single test ──────────────────────────────────────────────────────────
 //
 // Returns:
-//   { name, status, note, assertions: [{ label, status, got }] }
-//
-// status is "PASS" | "FAIL"
-// assertions is empty for compile-only / no-output-check tests
+//   { name, status, note?, sections: [{ name, assertions: [{label, status, got}] }] }
 
 function runTest(testFile, group) {
     const name   = path.basename(testFile, ".hop");
     const source = readFileSync(testFile, "utf8");
-    const { expected, compileOnly, expectedError } = parseMeta(source);
+    const { sections, compileOnly, expectedError } = parseMeta(source);
     const exePath = path.join(BUILD_DIR, `${group}__${name}`);
 
     const build = spawnSync(
@@ -118,54 +123,79 @@ function runTest(testFile, group) {
 
     if (compileFailed) {
         if (expectedError) {
-            if (compileOutput.includes(expectedError))
-                return { name, status: "PASS", note: "errored as expected", assertions: [
-                    { label: `compile error: ${expectedError}`, status: "PASS" }
-                ]};
-            return { name, status: "FAIL",
-                note: `expected error "${expectedError}"\ngot: ${compileOutput.slice(0, 300)}`,
-                assertions: [{ label: `compile error: ${expectedError}`, status: "FAIL",
-                    got: compileOutput.slice(0, 200) }]
+            const ok = compileOutput.includes(expectedError);
+            return { name, status: ok ? "PASS" : "FAIL",
+                sections: [{ name: null, assertions: [{
+                    label: `compile error: ${expectedError}`,
+                    status: ok ? "PASS" : "FAIL",
+                    got:    ok ? null : compileOutput.slice(0, 200)
+                }]}]
             };
         }
         return { name, status: "FAIL",
-            note: `compile failed:\n${compileOutput.slice(0, 400)}`,
-            assertions: [{ label: "compile", status: "FAIL", got: compileOutput.slice(0, 200) }]
+            sections: [{ name: null, assertions: [{
+                label: "compile", status: "FAIL", got: compileOutput.slice(0, 200)
+            }]}]
         };
     }
 
     if (expectedError)
-        return { name, status: "FAIL", note: "expected compile error but compilation succeeded",
-            assertions: [{ label: "compile error expected", status: "FAIL", got: "compiled ok" }]
+        return { name, status: "FAIL",
+            sections: [{ name: null, assertions: [{
+                label: "compile error expected", status: "FAIL", got: "compiled ok"
+            }]}]
         };
 
     if (compileOnly)
         return { name, status: "PASS", note: "compile only",
-            assertions: [{ label: "compiles ok", status: "PASS" }]
+            sections: [{ name: null, assertions: [{ label: "compiles ok", status: "PASS" }] }]
         };
 
     const run         = spawnSync(exePath, [], { encoding: "utf8" });
-    const actualLines = (run.stdout || "").trimEnd().split("\n").filter((_, i, a) =>
-        !(i === a.length - 1 && a[i] === "")
-    );
+    const actualLines = (run.stdout || "").trimEnd().split("\n");
+    if (actualLines.length === 1 && actualLines[0] === "") actualLines.length = 0;
 
-    if (expected.length === 0)
+    const totalExpected = sections.reduce((n, s) => n + s.expected.length, 0);
+
+    if (totalExpected === 0)
         return { name, status: "PASS", note: "ran (no output check)",
-            assertions: [{ label: "ran ok", status: "PASS" }]
+            sections: [{ name: null, assertions: [{ label: "ran ok", status: "PASS" }] }]
         };
 
-    const assertions = expected.map((exp, i) => {
-        const got = i < actualLines.length ? actualLines[i] : "(missing)";
-        return { label: exp, status: got === exp ? "PASS" : "FAIL", got: got === exp ? null : got };
-    });
+    // Match actual output lines to sections in order.
+    let lineIndex = 0;
+    const resultSections = sections
+        .filter(s => s.expected.length > 0)
+        .map(s => {
+            const assertions = s.expected.map(exp => {
+                const got = lineIndex < actualLines.length ? actualLines[lineIndex++] : "(missing)";
+                return { label: exp, status: got === exp ? "PASS" : "FAIL", got: got === exp ? null : got };
+            });
+            return { name: s.name, assertions };
+        });
 
-    // flag any extra lines the program printed that weren't expected
-    for (let i = expected.length; i < actualLines.length; i++) {
-        assertions.push({ label: "(unexpected output)", status: "FAIL", got: actualLines[i] });
+    // Any extra output lines the program produced beyond what was expected.
+    while (lineIndex < actualLines.length) {
+        const extra = actualLines[lineIndex++];
+        if (extra === "") continue;
+        if (!resultSections[resultSections.length - 1]) resultSections.push({ name: null, assertions: [] });
+        resultSections[resultSections.length - 1].assertions.push(
+            { label: "(unexpected output)", status: "FAIL", got: extra }
+        );
     }
 
-    const allPass = assertions.every(a => a.status === "PASS");
-    return { name, status: allPass ? "PASS" : "FAIL", assertions };
+    const allPass = resultSections.every(s => s.assertions.every(a => a.status === "PASS"));
+    return { name, status: allPass ? "PASS" : "FAIL", sections: resultSections };
+}
+
+// ── Display helpers ────────────────────────────────────────────────────────────
+
+function countAssertions(result) {
+    return result.sections.reduce((n, s) => n + s.assertions.length, 0);
+}
+
+function countPassed(result) {
+    return result.sections.reduce((n, s) => n + s.assertions.filter(a => a.status === "PASS").length, 0);
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
@@ -186,42 +216,47 @@ let totalPass = 0;
 let totalFail = 0;
 
 for (const { name, files } of groups) {
-    const results = files.map(f => runTest(f, name));
-
+    const results    = files.map(f => runTest(f, name));
     const filePass   = results.filter(r => r.status === "PASS").length;
-    const fileFail   = results.filter(r => r.status === "FAIL").length;
-    const assertPass = results.reduce((n, r) => n + r.assertions.filter(a => a.status === "PASS").length, 0);
-    const assertFail = results.reduce((n, r) => n + r.assertions.filter(a => a.status === "FAIL").length, 0);
-    const assertTotal = assertPass + assertFail;
-
-    const groupOk = fileFail === 0;
-    const groupColour = groupOk ? G : R;
+    const assertPass = results.reduce((n, r) => n + countPassed(r), 0);
+    const assertTotal = results.reduce((n, r) => n + countAssertions(r), 0);
 
     console.log(`\n${BOLD}${name}${RST}  ${DIM}${files.length} file${files.length !== 1 ? "s" : ""}, ${assertTotal} assertion${assertTotal !== 1 ? "s" : ""}${RST}`);
     console.log(`${DIM}${"─".repeat(50)}${RST}`);
 
     for (const result of results) {
+        const passed = countPassed(result);
+        const total  = countAssertions(result);
         const fileIcon = result.status === "PASS" ? `${G}✓${RST}` : `${R}✗${RST}`;
-        const aPass    = result.assertions.filter(a => a.status === "PASS").length;
-        const aTotal   = result.assertions.length;
-        const aColour  = aPass === aTotal ? G : R;
-        const aNote    = result.note ? ` ${DIM}${result.note}${RST}` : `  ${DIM}${aColour}${aPass}/${aTotal}${RST}`;
+        const countStr = result.note
+            ? `  ${DIM}${result.note}${RST}`
+            : `  ${DIM}${passed === total ? G : R}${passed}/${total}${RST}`;
 
-        console.log(`  ${fileIcon}  ${result.name}${aNote}`);
+        console.log(`  ${fileIcon}  ${result.name}${countStr}`);
 
-        for (const a of result.assertions) {
-            const icon = a.status === "PASS" ? `${G}✓${RST}` : `${R}✗${RST}`;
-            if (a.status === "PASS") {
-                console.log(`       ${icon}  ${DIM}${a.label}${RST}`);
-            } else {
-                console.log(`       ${icon}  ${R}${a.label}${RST}`);
-                if (a.got != null)
-                    console.log(`          ${DIM}got: ${a.got}${RST}`);
+        for (const section of result.sections) {
+            if (section.name) {
+                const sPass  = section.assertions.filter(a => a.status === "PASS").length;
+                const sTotal = section.assertions.length;
+                const sColour = sPass === sTotal ? G : R;
+                console.log(`       ${DIM}${sColour}${section.name}${RST}  ${DIM}(${sPass}/${sTotal})${RST}`);
+            }
+
+            const indent = section.name ? "         " : "       ";
+            for (const a of section.assertions) {
+                const icon = a.status === "PASS" ? `${G}✓${RST}` : `${R}✗${RST}`;
+                if (a.status === "PASS") {
+                    console.log(`${indent}${icon}  ${DIM}${a.label}${RST}`);
+                } else {
+                    console.log(`${indent}${icon}  ${R}${a.label}${RST}`);
+                    if (a.got != null)
+                        console.log(`${indent}   ${DIM}got: ${a.got}${RST}`);
+                }
             }
         }
 
-        totalPass += result.assertions.filter(a => a.status === "PASS").length;
-        totalFail += result.assertions.filter(a => a.status === "FAIL").length;
+        totalPass += countPassed(result);
+        totalFail += total - countPassed(result);
     }
 }
 

@@ -1,13 +1,21 @@
-// EXPECT: empty = 1
-// EXPECT: len after 4 pushes = 4
-// EXPECT: peekFront = 0
-// EXPECT: peekBack = 3
-// EXPECT: popFront = 0
-// EXPECT: popBack = 3
-// EXPECT: peekFront = 1
-// EXPECT: peekBack = 2
-// EXPECT: len = 2
-// EXPECT: drained ok
+// TEST: constructor
+// EXPECT: new() -> empty = 1
+// EXPECT: new() -> len = 0
+
+// TEST: pushBack / pushFront
+// EXPECT: push(0,1,2,3) -> len = 4
+// EXPECT: peekFront() = 0
+// EXPECT: peekBack() = 3
+
+// TEST: popFront / popBack
+// EXPECT: popFront() = 0
+// EXPECT: popBack() = 3
+// EXPECT: pop() -> peekFront() = 1
+// EXPECT: pop() -> peekBack() = 2
+// EXPECT: pop() -> len = 2
+
+// TEST: drain
+// EXPECT: drain() -> empty = 1
 
 import assert           from core
 import doublylinkedlist from ds
@@ -18,7 +26,8 @@ entry main {
 
     assert(list.empty() == 1, "new list should be empty\n")
     assert(list.len()   == 0, "new list len should be 0\n")
-    printf("empty = %lld\n", list.empty())
+    printf("new() -> empty = %lld\n", list.empty())
+    printf("new() -> len = %lld\n", list.len())
 
     list.pushBack(1)
     list.pushBack(2)
@@ -28,29 +37,29 @@ entry main {
     assert(list.len()       == 4, "len after 4 pushes\n")
     assert(list.peekFront() == 0, "peekFront wrong\n")
     assert(list.peekBack()  == 3, "peekBack wrong\n")
-    printf("len after 4 pushes = %lld\n", list.len())
-    printf("peekFront = %lld\n", list.peekFront())
-    printf("peekBack = %lld\n",  list.peekBack())
+    printf("push(0,1,2,3) -> len = %lld\n", list.len())
+    printf("peekFront() = %lld\n", list.peekFront())
+    printf("peekBack() = %lld\n", list.peekBack())
 
     int v = list.popFront()
     assert(v == 0,           "popFront wrong\n")
     assert(list.len() == 3,  "len after popFront\n")
-    printf("popFront = %lld\n", v)
+    printf("popFront() = %lld\n", v)
 
     v = list.popBack()
     assert(v == 3,           "popBack wrong\n")
     assert(list.len() == 2,  "len after popBack\n")
-    printf("popBack = %lld\n", v)
+    printf("popBack() = %lld\n", v)
 
     assert(list.peekFront() == 1, "peekFront after pops\n")
     assert(list.peekBack()  == 2, "peekBack after pops\n")
-    printf("peekFront = %lld\n", list.peekFront())
-    printf("peekBack = %lld\n",  list.peekBack())
-    printf("len = %lld\n", list.len())
+    printf("pop() -> peekFront() = %lld\n", list.peekFront())
+    printf("pop() -> peekBack() = %lld\n", list.peekBack())
+    printf("pop() -> len = %lld\n", list.len())
 
     list.popFront()
     list.popFront()
     assert(list.empty() == 1, "list should be empty after drain\n")
     assert(list.len()   == 0, "len should be 0 after drain\n")
-    printf("drained ok\n")
+    printf("drain() -> empty = %lld\n", list.empty())
 }
