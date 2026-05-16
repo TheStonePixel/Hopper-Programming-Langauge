@@ -1,8 +1,9 @@
 // String — byte-backed, ASCII / UTF-8 byte sequence
 //
 // Each element is one byte. append(byte c) takes a raw byte value.
-// Use append_int / append_hex for number-to-text conversion.
-// Use ptr() + len() to hand the buffer to I/O: write(1, s.ptr(), s.len())
+// Use appendNumber() / appendHex() for number-to-text conversion.
+// Use pointer() + length() to hand the buffer to I/O:
+//   write(1, s.pointer(), s.length())
 //
 // Import this module with: import String from ascii
 
@@ -25,26 +26,39 @@ class String implements IString {
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    function len() int {
+    function length() int {
         return self.length
     }
 
-    function cap() int {
+    function capacity() int {
         return self.capacity
     }
 
-    function ptr() address {
+    function pointer() address {
         return self.data
     }
 
-    function empty() bool {
+    function isEmpty() bool {
         return self.length == 0
+    }
+
+    // Read the byte at a given index.
+    function get(int index) byte {
+        address ptr = self.data + index
+        byte b = ptr::value
+        return b
     }
 
     // ── Mutation ──────────────────────────────────────────────────────────────
 
     function clear() {
         self.length = 0
+    }
+
+    // Overwrite the byte at a given index.
+    function set(int index, byte c) {
+        address ptr = self.data + index
+        ptr::value = c
     }
 
     // Append a single byte (raw ASCII / UTF-8 byte value).
@@ -58,10 +72,20 @@ class String implements IString {
         self.length = self.length + 1
     }
 
+    // Append every byte from another String.
+    function appendString(String other) {
+        int i = 0
+        while (i < other.length()) {
+            byte b = other.get(i)
+            self.append(b)
+            i = i + 1
+        }
+    }
+
     // ── Number formatting ─────────────────────────────────────────────────────
 
     // Append a signed decimal integer.
-    function append_int(int n) {
+    function appendNumber(int n) {
         if (n == 0) {
             self.appendByte(48)
             return
@@ -90,7 +114,7 @@ class String implements IString {
     }
 
     // Append an unsigned integer as lowercase hexadecimal (no "0x" prefix).
-    function append_hex(int n) {
+    function appendHex(int n) {
         if (n == 0) {
             self.appendByte(48)
             return
@@ -129,7 +153,7 @@ class String implements IString {
         self.length = self.length + 1
     }
 
-    // Write a byte at a given position (used by append_int / append_hex).
+    // Write a byte at a given position (used by appendNumber / appendHex).
     function writeByte(int pos, int ch) {
         address ptr = self.data + pos
         byte b = cast ch

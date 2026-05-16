@@ -9,5 +9,5 @@ entry main {
     s.append(111)
     s.append(107)
     s.append(10)
-    write(1, s.ptr(), s.len())
+    write(1, s.pointer(), s.length())
 }

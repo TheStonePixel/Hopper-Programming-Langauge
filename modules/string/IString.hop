@@ -5,15 +5,20 @@
 //                                   or import String from utf8
 //
 // I/O is intentionally absent — String manages bytes, not file descriptors.
-// To print: write(1, s.ptr(), s.len())  (from linux/io.hop)
+// To print: write(1, s.pointer(), s.length())  (from linux/io.hop)
 //
-// append() is also absent — ASCII takes a byte, UTF8 takes an int codepoint.
+// append() is absent from the interface — ASCII takes a byte, UTF-8 takes
+// an int codepoint.  appendNumber() and appendHex() work the same in both.
 
 interface IString {
-    function len() int
-    function empty() bool
+    function length() int
+    function capacity() int
+    function isEmpty() bool
+    function pointer() address
+    function get(int index) byte
+    function set(int index, byte c)
     function clear()
-    function ptr() address
-    function append_int(int n)
-    function append_hex(int n)
+    function appendNumber(int n)
+    function appendHex(int n)
+    function appendString(String other)
 }

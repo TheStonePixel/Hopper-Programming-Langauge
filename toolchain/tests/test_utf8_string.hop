@@ -12,16 +12,16 @@ entry main {
     s.append(108)
     s.append(111)
     s.append(10)
-    write(1, s.ptr(), s.len())
+    write(1, s.pointer(), s.length())
 
     String n = String(16)
-    n.append_int(42)
+    n.appendNumber(42)
     n.append(10)
-    write(1, n.ptr(), n.len())
+    write(1, n.pointer(), n.length())
 
     // U+03A9 GREEK CAPITAL LETTER OMEGA — 2-byte UTF-8: 0xCE 0xA9
     String u = String(8)
     u.append(937)
     u.append(10)
-    write(1, u.ptr(), u.len())
+    write(1, u.pointer(), u.length())
 }
