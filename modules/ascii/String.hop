@@ -49,6 +49,12 @@ class String implements IString {
         return b
     }
 
+    operator [](self, int index) byte {
+        address ptr = self.data + index
+        byte b = ptr::value
+        return b
+    }
+
     // ── Mutation ──────────────────────────────────────────────────────────────
 
     function clear() {

@@ -1,0 +1,96 @@
+// EXPECT: 30
+// EXPECT: 10
+// EXPECT: 200
+// EXPECT: 2
+// EXPECT: true
+// EXPECT: H
+import io from linux
+import String from ascii
+
+class Vec {
+    int x
+
+    constructor(int v) {
+        self.x = v
+    }
+
+    function x() int {
+        return self.x
+    }
+
+    operator +(self, Vec other) Vec {
+        Vec result = Vec(self.x + other.x)
+        return result
+    }
+
+    operator -(self, Vec other) Vec {
+        Vec result = Vec(self.x - other.x)
+        return result
+    }
+
+    operator *(self, Vec other) Vec {
+        Vec result = Vec(self.x * other.x)
+        return result
+    }
+
+    operator /(self, Vec other) Vec {
+        Vec result = Vec(self.x / other.x)
+        return result
+    }
+
+    operator ==(self, Vec other) bool {
+        return self.x == other.x
+    }
+}
+
+entry main {
+    Vec a = Vec(20)
+    Vec b = Vec(10)
+
+    String s = String(8)
+
+    Vec c = a + b
+    s.appendNumber(c.x())
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    Vec d = a - b
+    s.appendNumber(d.x())
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    Vec e = a * b
+    s.appendNumber(e.x())
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    Vec f = a / b
+    s.appendNumber(f.x())
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    Vec g = Vec(20)
+    bool eq = a == g
+    if (eq) {
+        s.append('t')
+        s.append('r')
+        s.append('u')
+        s.append('e')
+    }
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    // [] operator on String
+    s.append('H')
+    s.append('i')
+    byte ch = s[0]
+    String out = String(4)
+    out.append(ch)
+    out.append('\n')
+    write(1, out.pointer(), out.length())
+}

@@ -430,6 +430,14 @@ function getFieldType(typeName, fieldName) {
     return f.type;
 }
 
+// Return the appropriate LLVM zero-value literal for a given LLVM type string.
+function llvmZeroValue(llType) {
+    if (llType === "double") return "0.0";
+    if (llType.endsWith("*")) return "null";
+    if (llType.startsWith("%class.") || llType.startsWith("%struct.")) return "zeroinitializer";
+    return "0";
+}
+
 // ── IRBuilder ──────────────────────────────────────────────────────────────
 
 class IRBuilder {
@@ -627,7 +635,7 @@ function genExpr(ir, expr) {
                 return { value: result, type: fieldType };
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf) {
+            if (classTypes.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
                 );
@@ -1429,7 +1437,7 @@ function genFunction(fn) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
+        ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
@@ -1438,6 +1446,7 @@ function genFunction(fn) {
 function genMethod(typeName, method, isClass = true) {
     const ir         = new IRBuilder();
     ir.returnType    = method.returnType;
+    ir.currentClass  = typeName;
     const isVoid     = method.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
     const mangled    = `${typeName}_${method.name}`;
@@ -1472,7 +1481,7 @@ function genMethod(typeName, method, isClass = true) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
+        ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
