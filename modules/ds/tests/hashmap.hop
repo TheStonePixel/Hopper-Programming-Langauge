@@ -1,0 +1,41 @@
+// EXPECT: contains 1 = 0
+// EXPECT: get 1 = 100
+// EXPECT: get 2 = 200
+// EXPECT: len = 2
+// EXPECT: update 1 = 999
+// EXPECT: contains 1 = 1
+// EXPECT: after remove contains 1 = 0
+// EXPECT: len after remove = 1
+// EXPECT: grow ok len = 12
+
+import hashmap from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    HashMap<int, int> m = HashMap(4)
+
+    printf("contains 1 = %lld\n", m.contains(1))
+
+    m.set(1, 100)
+    m.set(2, 200)
+
+    printf("get 1 = %lld\n", m.get(1))
+    printf("get 2 = %lld\n", m.get(2))
+    printf("len = %lld\n", m.len())
+
+    m.set(1, 999)
+    printf("update 1 = %lld\n", m.get(1))
+    printf("contains 1 = %lld\n", m.contains(1))
+
+    m.remove(1)
+    printf("after remove contains 1 = %lld\n", m.contains(1))
+    printf("len after remove = %lld\n", m.len())
+
+    HashMap<int, int> big = HashMap(4)
+    int i = 0
+    while (i < 12) {
+        big.set(i, i * 10)
+        i = i + 1
+    }
+    printf("grow ok len = %lld\n", big.len())
+}
