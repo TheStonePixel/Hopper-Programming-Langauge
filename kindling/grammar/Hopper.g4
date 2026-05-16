@@ -48,7 +48,7 @@ entryDecl
     ;
 
 constDecl
-    : 'const' Identifier '=' literal
+    : 'const' Identifier '=' '-'? literal
     ;
 
 aliasDecl

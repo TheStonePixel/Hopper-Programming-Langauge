@@ -1,7 +1,125 @@
-// Linux filesystem calls — architecture-neutral.
-// open(), close() come from modules/target/fs.hop.
+// Linux filesystem — architecture-neutral.
+// Delegates to modules/target/fs.hop, which selects the ISA.
 //
-// O_RDONLY = 0   O_WRONLY = 1   O_RDWR   = 2
-// O_CREAT  = 64  O_TRUNC  = 512 O_APPEND = 1024
+// Imported functions:
+//   open close creat stat fstat lstat statfs fstatfs lseek
+//   access chmod fchmod chown fchown lchown umask
+//   truncate ftruncate fsync fdatasync sync
+//   getdents64 getcwd chdir fchdir mkdir rmdir rename link unlink symlink readlink
+//   dup dup2 dup3 pipe pipe2 fcntl flock
+//   openat mkdirat unlinkat renameat linkat symlinkat readlinkat fchmodat faccessat fchownat
+//   inotify_init1 inotify_add_watch inotify_rm_watch
 
 import fs from target
+
+// ── open flags ────────────────────────────────────────────────────────────────
+
+const O_RDONLY   = 0
+const O_WRONLY   = 1
+const O_RDWR     = 2
+const O_CREAT    = 64
+const O_EXCL     = 128
+const O_NOCTTY   = 256
+const O_TRUNC    = 512
+const O_APPEND   = 1024
+const O_NONBLOCK = 2048
+const O_DSYNC    = 4096
+const O_DIRECTORY = 65536
+const O_NOFOLLOW = 131072
+const O_CLOEXEC  = 524288
+const O_SYNC     = 1052672
+
+// ── lseek whence ──────────────────────────────────────────────────────────────
+
+const SEEK_SET = 0
+const SEEK_CUR = 1
+const SEEK_END = 2
+
+// ── access mode ───────────────────────────────────────────────────────────────
+
+const F_OK = 0
+const X_OK = 1
+const W_OK = 2
+const R_OK = 4
+
+// ── fcntl commands ────────────────────────────────────────────────────────────
+
+const F_DUPFD   = 0
+const F_GETFD   = 1
+const F_SETFD   = 2
+const F_GETFL   = 3
+const F_SETFL   = 4
+const F_SETLK   = 6
+const F_SETLKW  = 7
+const F_GETLK   = 5
+const FD_CLOEXEC = 1
+
+// ── flock operations ──────────────────────────────────────────────────────────
+
+const LOCK_SH = 1
+const LOCK_EX = 2
+const LOCK_NB = 4
+const LOCK_UN = 8
+
+// ── at-syscall sentinel ───────────────────────────────────────────────────────
+
+const AT_FDCWD            = -100
+const AT_SYMLINK_NOFOLLOW = 256
+const AT_REMOVEDIR        = 512
+const AT_EMPTY_PATH       = 4096
+
+// ── file type bits (from stat.st_mode) ───────────────────────────────────────
+
+const S_IFMT   = 0xF000
+const S_IFREG  = 0x8000
+const S_IFDIR  = 0x4000
+const S_IFLNK  = 0xA000
+const S_IFCHR  = 0x2000
+const S_IFBLK  = 0x6000
+const S_IFIFO  = 0x1000
+const S_IFSOCK = 0xC000
+
+// ── permission bits ───────────────────────────────────────────────────────────
+
+const S_IRWXU = 448
+const S_IRUSR = 256
+const S_IWUSR = 128
+const S_IXUSR = 64
+const S_IRWXG = 56
+const S_IRGRP = 32
+const S_IWGRP = 16
+const S_IXGRP = 8
+const S_IRWXO = 7
+const S_IROTH = 4
+const S_IWOTH = 2
+const S_IXOTH = 1
+
+// ── getdents64 dirent type byte ───────────────────────────────────────────────
+
+const DT_UNKNOWN = 0
+const DT_FIFO    = 1
+const DT_CHR     = 2
+const DT_DIR     = 4
+const DT_BLK     = 6
+const DT_REG     = 8
+const DT_LNK     = 10
+const DT_SOCK    = 12
+const DT_WHT     = 14
+
+// ── inotify event masks ───────────────────────────────────────────────────────
+
+const IN_ACCESS        = 1
+const IN_MODIFY        = 2
+const IN_ATTRIB        = 4
+const IN_CLOSE_WRITE   = 8
+const IN_CLOSE_NOWRITE = 16
+const IN_OPEN          = 32
+const IN_MOVED_FROM    = 64
+const IN_MOVED_TO      = 128
+const IN_CREATE        = 256
+const IN_DELETE        = 512
+const IN_DELETE_SELF   = 1024
+const IN_MOVE_SELF     = 2048
+const IN_ALL_EVENTS    = 4095
+const IN_NONBLOCK      = 2048
+const IN_CLOEXEC       = 524288

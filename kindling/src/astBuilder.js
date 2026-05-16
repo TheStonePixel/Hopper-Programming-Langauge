@@ -138,7 +138,10 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const litCtx = ctx.literal();
         const lit = this.visitLiteral(litCtx);
-        return ConstDecl(name, lit.value, lit.type);
+        // Check for optional leading '-' (negative constants)
+        const negative = ctx.children && ctx.children.some(c => c.getText && c.getText() === '-');
+        const value = negative ? -lit.value : lit.value;
+        return ConstDecl(name, value, lit.type);
     }
 
     visitLiteral(ctx) {

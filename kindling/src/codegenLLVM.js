@@ -517,6 +517,15 @@ function emitCast(ir, srcVal, srcType, targetType) {
         (srcType === "address" && targetType === "string")) {
         return { value: srcVal, type: targetType };
     }
+    // int ↔ address (inttoptr / ptrtoint) — natural in systems code
+    if ((srcType === "int" || srcType === "unsignedint") && targetType === "address") {
+        ir.emit(`${tmp} = inttoptr i64 ${srcVal} to i8*`);
+        return { value: tmp, type: "address" };
+    }
+    if (srcType === "address" && (targetType === "int" || targetType === "unsignedint")) {
+        ir.emit(`${tmp} = ptrtoint i8* ${srcVal} to i64`);
+        return { value: tmp, type: targetType };
+    }
 
     if (srcType === "bool" && (targetType === "int" || targetType === "unsignedint")) {
         ir.emit(`${tmp} = zext i1 ${srcVal} to i64`);

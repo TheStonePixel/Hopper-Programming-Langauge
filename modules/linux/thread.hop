@@ -1,0 +1,22 @@
+// Linux threading — architecture-neutral.
+// Delegates to modules/target/thread.hop, which selects the ISA.
+//
+// Imported functions:
+//   gettid set_tid_address futex futex_wait futex_wake sched_yield
+//
+// Threads are created via clone() from linux/sys (with CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD).
+// Synchronization uses futex — the only kernel primitive needed for
+// mutexes, semaphores, and condition variables.
+
+import thread from target
+
+// ── futex ops ────────────────────────────────────────────────────────────────
+
+const FUTEX_WAIT         = 0
+const FUTEX_WAKE         = 1
+const FUTEX_FD           = 2
+const FUTEX_REQUEUE      = 3
+const FUTEX_CMP_REQUEUE  = 4
+const FUTEX_PRIVATE_FLAG = 128
+const FUTEX_WAIT_PRIVATE = 128
+const FUTEX_WAKE_PRIVATE = 129

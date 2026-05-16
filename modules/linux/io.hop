@@ -1,9 +1,11 @@
 // Linux I/O — architecture-neutral.
 // Delegates to modules/target/io.hop, which selects the ISA.
+//
+// Imported functions: write read pread64 pwrite64 readv writev sendfile splice tee ioctl
+//
+// To print: write(1, buf, len)   (fd 1 = stdout, fd 2 = stderr)
 
 import io from target
-
-// write() and read() come from the target.
 
 // Write buf to stdout.
 function print(address buf, int len) {
@@ -14,3 +16,7 @@ function print(address buf, int len) {
 function error(address buf, int len) {
     write(2, buf, len)
 }
+
+// struct iovec — for readv / writev scatter-gather I/O
+//   base : address  — pointer to buffer
+//   len  : int      — length of buffer

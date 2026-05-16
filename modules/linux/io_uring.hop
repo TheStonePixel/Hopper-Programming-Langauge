@@ -1,0 +1,66 @@
+// Linux io_uring — architecture-neutral.
+// Delegates to modules/target/io_uring.hop, which selects the ISA.
+//
+// Imported functions: io_uring_setup io_uring_enter io_uring_register
+//
+// io_uring is the highest-performance async I/O interface on Linux 5.1+.
+// The kernel and userspace communicate through mmap'd ring buffers, so
+// after setup most operations require zero syscalls (kernel polling mode).
+//
+// Requires Linux 5.1+. For older kernels fall back to epoll.
+
+import io_uring from target
+
+// ── io_uring_enter flags ─────────────────────────────────────────────────────
+
+const IORING_ENTER_GETEVENTS = 1
+const IORING_ENTER_SQ_WAKEUP = 2
+
+// ── io_uring_register opcodes ────────────────────────────────────────────────
+
+const IORING_REGISTER_BUFFERS        = 0
+const IORING_UNREGISTER_BUFFERS      = 1
+const IORING_REGISTER_FILES          = 2
+const IORING_UNREGISTER_FILES        = 3
+const IORING_REGISTER_EVENTFD        = 4
+const IORING_UNREGISTER_EVENTFD      = 5
+const IORING_REGISTER_FILES_UPDATE   = 6
+const IORING_REGISTER_EVENTFD_ASYNC  = 7
+const IORING_REGISTER_PROBE          = 8
+
+// ── submission queue entry opcodes (IORING_OP_*) ─────────────────────────────
+
+const IORING_OP_NOP      = 0
+const IORING_OP_READV    = 1
+const IORING_OP_WRITEV   = 2
+const IORING_OP_FSYNC    = 3
+const IORING_OP_READ     = 22
+const IORING_OP_WRITE    = 23
+const IORING_OP_ACCEPT   = 13
+const IORING_OP_CONNECT  = 16
+const IORING_OP_RECV     = 27
+const IORING_OP_SEND     = 26
+const IORING_OP_OPENAT   = 18
+const IORING_OP_CLOSE    = 19
+const IORING_OP_STATX    = 21
+const IORING_OP_TIMEOUT  = 11
+const IORING_OP_POLL_ADD = 6
+const IORING_OP_POLL_REMOVE = 7
+
+// ── SQE flags ────────────────────────────────────────────────────────────────
+
+const IOSQE_FIXED_FILE    = 1
+const IOSQE_IO_DRAIN      = 2
+const IOSQE_IO_LINK       = 4
+const IOSQE_IO_HARDLINK   = 8
+const IOSQE_ASYNC         = 16
+const IOSQE_BUFFER_SELECT = 32
+
+// ── io_uring_setup params.flags ───────────────────────────────────────────────
+
+const IORING_SETUP_IOPOLL    = 1
+const IORING_SETUP_SQPOLL    = 2
+const IORING_SETUP_SQ_AFF    = 4
+const IORING_SETUP_CQSIZE    = 8
+const IORING_SETUP_CLAMP     = 16
+const IORING_SETUP_ATTACH_WQ = 32

@@ -1,0 +1,25 @@
+// Linux System V message queues — architecture-neutral.
+// Delegates to modules/target/msg.hop, which selects the ISA.
+//
+// Imported functions: msgget msgsnd msgrcv msgctl
+//
+// For new code prefer sockets or pipes — SysV IPC is here for compatibility.
+//
+// Message layout: struct msgbuf { int mtype (>0); byte mtext[...]; }
+
+import msg from target
+
+// ── IPC flags ────────────────────────────────────────────────────────────────
+
+const IPC_PRIVATE = 0
+const IPC_CREAT   = 512
+const IPC_EXCL    = 1024
+const IPC_RMID    = 0
+const IPC_SET     = 1
+const IPC_STAT    = 2
+
+// ── msgflg ────────────────────────────────────────────────────────────────────
+
+const IPC_NOWAIT  = 0x800
+const MSG_NOERROR = 0x1000
+const MSG_EXCEPT  = 0x2000

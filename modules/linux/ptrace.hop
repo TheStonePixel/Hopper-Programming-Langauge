@@ -1,0 +1,11 @@
+// Linux ptrace — architecture-neutral.
+// Delegates to modules/target/ptrace.hop, which selects the ISA.
+//
+// Imported functions: ptrace
+//
+// Constants are defined in linux/sys since ptrace is part of the process control family.
+// Import both modules if you need ptrace + signal constants together:
+//   import sys  from linux
+//   import ptrace from linux
+
+import ptrace from target

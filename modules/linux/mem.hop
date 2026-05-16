@@ -1,0 +1,74 @@
+// Linux memory mapping — architecture-neutral.
+// Delegates to modules/target/mem.hop, which selects the ISA.
+//
+// Imported functions:
+//   mmap munmap mprotect mremap msync madvise mincore
+//   mlock munlock mlockall munlockall memfd_create
+//
+// Quick reference:
+//   Anonymous private pages:  mmap(0, len, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0)
+//   Executable JIT buffer:    mmap(0, len, PROT_READ|PROT_EXEC,  MAP_PRIVATE|MAP_ANON, -1, 0)
+//   File-backed shared:       mmap(0, len, PROT_READ,            MAP_SHARED, fd, 0)
+
+import mem from target
+
+// ── mmap prot flags ───────────────────────────────────────────────────────────
+
+const PROT_NONE  = 0
+const PROT_READ  = 1
+const PROT_WRITE = 2
+const PROT_EXEC  = 4
+
+// ── mmap flags ────────────────────────────────────────────────────────────────
+
+const MAP_SHARED    = 1
+const MAP_PRIVATE   = 2
+const MAP_FIXED     = 16
+const MAP_ANON      = 32
+const MAP_ANONYMOUS = 32
+const MAP_GROWSDOWN = 256
+const MAP_LOCKED    = 8192
+const MAP_POPULATE  = 32768
+const MAP_NONBLOCK  = 65536
+const MAP_STACK     = 131072
+const MAP_HUGETLB   = 262144
+
+// ── mremap flags ─────────────────────────────────────────────────────────────
+
+const MREMAP_MAYMOVE = 1
+const MREMAP_FIXED   = 2
+
+// ── msync flags ───────────────────────────────────────────────────────────────
+
+const MS_ASYNC      = 1
+const MS_INVALIDATE = 2
+const MS_SYNC       = 4
+
+// ── madvise hints ────────────────────────────────────────────────────────────
+
+const MADV_NORMAL      = 0
+const MADV_RANDOM      = 1
+const MADV_SEQUENTIAL  = 2
+const MADV_WILLNEED    = 3
+const MADV_DONTNEED    = 4
+const MADV_FREE        = 8
+const MADV_HUGEPAGE    = 14
+const MADV_NOHUGEPAGE  = 15
+const MADV_DONTDUMP    = 16
+const MADV_DODUMP      = 17
+
+// ── mlockall flags ────────────────────────────────────────────────────────────
+
+const MCL_CURRENT = 1
+const MCL_FUTURE  = 2
+const MCL_ONFAULT = 4
+
+// ── memfd flags ───────────────────────────────────────────────────────────────
+
+const MFD_CLOEXEC       = 1
+const MFD_ALLOW_SEALING = 2
+const MFD_HUGETLB       = 4
+
+// ── sentinel return value on error ───────────────────────────────────────────
+
+const MAP_FAILED = -1

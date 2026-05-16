@@ -1,4 +1,165 @@
-// Linux process/system calls — architecture-neutral.
-// exit(), fork(), execve(), waitpid() come from modules/target/sys.hop.
+// Linux process / system calls — architecture-neutral.
+// Delegates to modules/target/sys.hop, which selects the ISA.
+//
+// Imported functions:
+//   exit exit_group fork vfork clone clone3 execve execveat waitpid waitid
+//   getpid getppid gettid getuid getgid geteuid getegid
+//   setuid setgid setreuid setregid setsid setpgid getpgid
+//   kill tkill tgkill pause alarm
+//   rt_sigaction rt_sigprocmask rt_sigpending rt_sigsuspend sigaltstack
+//   nanosleep clock_gettime clock_settime clock_getres clock_nanosleep
+//   gettimeofday settimeofday times getitimer setitimer
+//   uname sysinfo getrusage getrlimit setrlimit prctl arch_prctl
+//   sched_yield sched_getscheduler sched_setscheduler sched_getparam sched_setparam
+//   sched_getaffinity sched_setaffinity getpriority setpriority
+//   chroot brk ptrace
 
 import sys from target
+
+// ── signal numbers ────────────────────────────────────────────────────────────
+
+const SIGHUP    = 1
+const SIGINT    = 2
+const SIGQUIT   = 3
+const SIGILL    = 4
+const SIGTRAP   = 5
+const SIGABRT   = 6
+const SIGBUS    = 7
+const SIGFPE    = 8
+const SIGKILL   = 9
+const SIGUSR1   = 10
+const SIGSEGV   = 11
+const SIGUSR2   = 12
+const SIGPIPE   = 13
+const SIGALRM   = 14
+const SIGTERM   = 15
+const SIGCHLD   = 17
+const SIGCONT   = 18
+const SIGSTOP   = 19
+const SIGTSTP   = 20
+const SIGTTIN   = 21
+const SIGTTOU   = 22
+const SIGURG    = 23
+const SIGXCPU   = 24
+const SIGXFSZ   = 25
+const SIGVTALRM = 26
+const SIGPROF   = 27
+const SIGWINCH  = 28
+const SIGIO     = 29
+const SIGPWR    = 30
+const SIGSYS    = 31
+
+// ── sigaction flags ───────────────────────────────────────────────────────────
+
+const SIG_DFL        = 0
+const SIG_IGN        = 1
+const SA_NOCLDSTOP   = 1
+const SA_NOCLDWAIT   = 2
+const SA_SIGINFO     = 4
+const SA_RESTORER    = 67108864
+const SA_ONSTACK     = 134217728
+const SA_RESTART     = 268435456
+const SA_NODEFER     = 1073741824
+
+// ── sigprocmask how ───────────────────────────────────────────────────────────
+
+const SIG_BLOCK   = 0
+const SIG_UNBLOCK = 1
+const SIG_SETMASK = 2
+
+// ── clock ids ─────────────────────────────────────────────────────────────────
+
+const CLOCK_REALTIME           = 0
+const CLOCK_MONOTONIC          = 1
+const CLOCK_PROCESS_CPUTIME_ID = 2
+const CLOCK_THREAD_CPUTIME_ID  = 3
+const CLOCK_MONOTONIC_RAW      = 4
+const CLOCK_REALTIME_COARSE    = 5
+const CLOCK_MONOTONIC_COARSE   = 6
+const CLOCK_BOOTTIME           = 7
+const CLOCK_TAI                = 11
+const TIMER_ABSTIME            = 1
+
+// ── waitpid / waitid options ──────────────────────────────────────────────────
+
+const WNOHANG    = 1
+const WUNTRACED  = 2
+const WCONTINUED = 8
+const WNOWAIT    = 16777216
+
+// ── resource limits ───────────────────────────────────────────────────────────
+
+const RLIMIT_CPU     = 0
+const RLIMIT_FSIZE   = 1
+const RLIMIT_DATA    = 2
+const RLIMIT_STACK   = 3
+const RLIMIT_CORE    = 4
+const RLIMIT_RSS     = 5
+const RLIMIT_NPROC   = 6
+const RLIMIT_NOFILE  = 7
+const RLIMIT_MEMLOCK = 8
+const RLIMIT_AS      = 9
+const RLIMIT_LOCKS   = 10
+const RLIMIT_SIGPENDING = 11
+const RLIMIT_MSGQUEUE = 12
+const RLIMIT_NICE    = 13
+const RLIMIT_RTPRIO  = 14
+const RLIM_INFINITY  = -1
+
+// ── rusage who ────────────────────────────────────────────────────────────────
+
+const RUSAGE_SELF     = 0
+const RUSAGE_CHILDREN = -1
+const RUSAGE_THREAD   = 1
+
+// ── scheduling policies ───────────────────────────────────────────────────────
+
+const SCHED_NORMAL = 0
+const SCHED_FIFO   = 1
+const SCHED_RR     = 2
+const SCHED_BATCH  = 3
+const SCHED_IDLE   = 5
+
+// ── priority which ────────────────────────────────────────────────────────────
+
+const PRIO_PROCESS = 0
+const PRIO_PGRP    = 1
+const PRIO_USER    = 2
+
+// ── clone flags ───────────────────────────────────────────────────────────────
+
+const CLONE_VM        = 256
+const CLONE_FS        = 512
+const CLONE_FILES     = 1024
+const CLONE_SIGHAND   = 2048
+const CLONE_THREAD    = 65536
+const CLONE_SYSVSEM   = 262144
+const CLONE_SETTLS    = 524288
+const CLONE_PARENT_SETTID = 1048576
+const CLONE_CHILD_CLEARTID = 2097152
+const CLONE_DETACHED  = 4194304
+const CLONE_NEWNS     = 131072
+const CLONE_NEWPID    = 536870912
+
+// ── ptrace requests ───────────────────────────────────────────────────────────
+
+const PTRACE_TRACEME    = 0
+const PTRACE_PEEKTEXT   = 1
+const PTRACE_PEEKDATA   = 2
+const PTRACE_PEEKUSER   = 3
+const PTRACE_POKETEXT   = 4
+const PTRACE_POKEDATA   = 5
+const PTRACE_CONT       = 7
+const PTRACE_KILL       = 8
+const PTRACE_SINGLESTEP = 9
+const PTRACE_GETREGS    = 12
+const PTRACE_SETREGS    = 13
+const PTRACE_ATTACH     = 16
+const PTRACE_DETACH     = 17
+const PTRACE_SYSCALL    = 24
+const PTRACE_SETOPTIONS = 0x4200
+const PTRACE_GETSIGINFO = 0x4202
+const PTRACE_O_TRACESYSGOOD = 1
+const PTRACE_O_TRACEFORK    = 2
+const PTRACE_O_TRACECLONE   = 8
+const PTRACE_O_EXITKILL     = 1048576

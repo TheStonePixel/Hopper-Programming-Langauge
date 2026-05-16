@@ -1,0 +1,20 @@
+// Linux random — architecture-neutral.
+// Delegates to modules/target/random.hop, which selects the ISA.
+//
+// Imported functions: getrandom
+//
+// getrandom is the preferred source of cryptographic randomness.
+// It uses the kernel CSPRNG (same pool as /dev/urandom) without opening any fd.
+// On Linux 3.17+ it never blocks once the pool is seeded at boot.
+//
+// Usage:
+//   byte buf[32]
+//   getrandom(&buf, 32, 0)
+
+import random from target
+
+// ── getrandom flags ───────────────────────────────────────────────────────────
+
+const GRND_NONBLOCK = 1
+const GRND_RANDOM   = 2
+const GRND_INSECURE = 4
