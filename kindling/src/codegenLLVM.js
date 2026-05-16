@@ -512,6 +512,12 @@ function emitCast(ir, srcVal, srcType, targetType) {
         }
         return { value: tmp, type: targetType };
     }
+    // string and address are both i8* in LLVM — no instruction needed
+    if ((srcType === "string" && targetType === "address") ||
+        (srcType === "address" && targetType === "string")) {
+        return { value: srcVal, type: targetType };
+    }
+
     if (srcType === "bool" && (targetType === "int" || targetType === "unsignedint")) {
         ir.emit(`${tmp} = zext i1 ${srcVal} to i64`);
         return { value: tmp, type: targetType };
@@ -785,14 +791,24 @@ function genExpr(ir, expr) {
                     const cls = classTypes.get(lv.hType);
                     const matchingOp = (cls.operators || []).find(o => o.op === expr.op && o.param);
                     if (matchingOp) {
-                        const right = genExpr(ir, expr.right);
                         const ns = operatorNameSafe(expr.op);
                         const fnName = `${lv.hType}_op_${ns}`;
                         const selfType = `%class.${lv.hType}*`;
-                        const paramType = llvmType(matchingOp.param.type);
+                        const paramNormT = normalizeType(matchingOp.param.type);
                         const retType = matchingOp.returnType;
                         const tmp = ir.newTmp();
-                        ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${lv.ptr}, ${paramType} ${right.value})`);
+                        let rightArgStr;
+                        if (classTypes.has(paramNormT) && expr.right.kind === "Var") {
+                            const rv = ir.vars.get(expr.right.name);
+                            if (rv && classTypes.has(rv.hType)) {
+                                rightArgStr = `%class.${paramNormT}* ${rv.ptr}`;
+                            }
+                        }
+                        if (!rightArgStr) {
+                            const right = genExpr(ir, expr.right);
+                            rightArgStr = `${llvmType(matchingOp.param.type)} ${right.value}`;
+                        }
+                        ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${lv.ptr}, ${rightArgStr})`);
                         return { value: tmp, type: retType };
                     }
                 }
@@ -943,16 +959,28 @@ function genExpr(ir, expr) {
             const mangled    = `${typeName}_${expr.method}`;
             const mInfo      = functionReturnTypes.get(mangled);
             const retType    = mInfo ? mInfo.returnType : "int";
-            const rawArgs    = (expr.args || []).map(a => genExpr(ir, a));
-            // Coerce each argument to the declared parameter type so the LLVM
-            // call instruction types match the function signature exactly.
+            // Generate args — class-type params are passed by pointer (not by value)
+            const rawArgs = (expr.args || []).map((a, i) => {
+                const expectedNormT = mInfo && mInfo.params[i] ? normalizeType(mInfo.params[i].type) : null;
+                if (expectedNormT && classTypes.has(expectedNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar && classTypes.has(argVar.hType)) {
+                        return { value: argVar.ptr, type: argVar.hType, isClassPtr: true };
+                    }
+                }
+                return genExpr(ir, a);
+            });
             const coercedArgs = rawArgs.map((a, i) => {
+                if (a.isClassPtr) return a;
                 const expectedType = mInfo && mInfo.params[i] ? mInfo.params[i].type : null;
                 if (!expectedType || expectedType === a.type) return a;
                 try { return emitCast(ir, a.value, a.type, expectedType); } catch { return a; }
             });
-            const selfArg    = `${llTypeName}* ${v.ptr}`;
-            const otherArgs  = coercedArgs.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+            const selfArg   = `${llTypeName}* ${v.ptr}`;
+            const otherArgs = coercedArgs.map(a => {
+                if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
+                return `${llvmType(a.type)} ${a.value}`;
+            }).join(", ");
             const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             if (retType === null) {
                 ir.emit(`call void @${mangled}(${argStr})`);
@@ -1455,7 +1483,11 @@ function genMethod(typeName, method, isClass = true) {
     const paramParts = [`${llTypeName}* %self`];
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
-        paramParts.push(`${llvmType(normT)} %p${i}`);
+        if (classTypes.has(normT)) {
+            paramParts.push(`%class.${normT}* %p${i}`);
+        } else {
+            paramParts.push(`${llvmType(normT)} %p${i}`);
+        }
     });
     ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")}) {`);
     ir.emit("entry:");
@@ -1469,11 +1501,16 @@ function genMethod(typeName, method, isClass = true) {
 
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
-        const lt    = llvmType(normT);
-        const ptr   = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${lt}`);
-        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        if (classTypes.has(normT)) {
+            // Class params passed by pointer — store directly, no alloca needed
+            ir.vars.set(p.name, { ptr: `%p${i}`, type: `%class.${normT}`, hType: normT });
+        } else {
+            const lt  = llvmType(normT);
+            const ptr = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${lt}`);
+            ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+            ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        }
     });
 
     genBlock(ir, method.body, method.returnType);
