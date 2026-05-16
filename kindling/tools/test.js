@@ -277,30 +277,33 @@ let totalXfail = 0;
 const failures = [];
 
 for (const { name, files } of groups) {
-    const results = files.map(f => runTest(f, name));
-
-    const assertTotal = results.reduce((n, r) => n + totalAssertions(r), 0);
-    const assertPass  = results.reduce((n, r) => n + passedAssertions(r), 0);
-    const groupOk     = assertPass === assertTotal;
-
-    const headerCount = groupOk
-        ? `${DIM}${files.length} file${files.length !== 1 ? "s" : ""}  ${DOT}  ${assertTotal} assertion${assertTotal !== 1 ? "s" : ""}${RST}`
-        : `${DIM}${files.length} file${files.length !== 1 ? "s" : ""}  ${DOT}  ${RST}${R}${assertPass}/${assertTotal}${RST}${DIM} assertions${RST}`;
-
-    console.log(`${BOLD}${name}${RST}  ${headerCount}`);
+    console.log(`${BOLD}${name}${RST}  ${DIM}${files.length} file${files.length !== 1 ? "s" : ""}${RST}`);
     console.log(`${DIM}${LINE}${RST}`);
 
-    for (const result of results) {
+    let gPass = 0, gTotal = 0;
+
+    for (const f of files) {
+        const result = runTest(f, name);
         renderResult(result, name, failures);
+
+        const p = passedAssertions(result);
+        const t = totalAssertions(result);
+        gPass  += p;
+        gTotal += t;
 
         if (result.xfail && result.status === "FAIL") {
             totalXfail++;
         } else {
-            totalPass += passedAssertions(result);
-            totalFail += totalAssertions(result) - passedAssertions(result);
+            totalPass += p;
+            totalFail += t - p;
         }
     }
 
+    const groupOk    = gPass === gTotal;
+    const countStr   = groupOk
+        ? `${G}${gTotal} assertion${gTotal !== 1 ? "s" : ""} passed${RST}`
+        : `${R}${gPass}/${gTotal} assertions passed${RST}`;
+    console.log(`\n  ${DIM}${countStr}${RST}`);
     console.log();
 }
 

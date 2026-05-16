@@ -12,46 +12,23 @@
 //   soft(len == 3, "expected len 3\n")
 //   panic("unreachable\n")
 
-import io  from target
+import io  from core
 import sys from target
 
-function strLen(string s) int {
-    address ptr = cast s
-    int len    = 0
-    int active = 1
-    while (active == 1) {
-        byte b  = ptr::value
-        int  bi = cast b
-        if (bi == 0) {
-            active = 0
-        } else {
-            len = len + 1
-            ptr = ptr + 1
-        }
-    }
-    return len
-}
-
 function panic(string msg) {
-    address buf = cast msg
-    int len     = strLen(msg)
-    write(2, buf, len)
+    eprint(msg)
     exit(1)
 }
 
 function assert(bool cond, string msg) {
     if (!cond) {
-        address buf = cast msg
-        int len     = strLen(msg)
-        write(2, buf, len)
+        eprint(msg)
         exit(1)
     }
 }
 
 function soft(bool cond, string msg) {
     if (!cond) {
-        address buf = cast msg
-        int len     = strLen(msg)
-        write(2, buf, len)
+        eprint(msg)
     }
 }
