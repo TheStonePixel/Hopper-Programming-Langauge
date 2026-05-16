@@ -72,6 +72,23 @@ import {
     BitfieldPad,
 } from "./ast.js";
 
+// Resolve a CharLiteral token (e.g. 'H', '\n') to its integer byte value.
+function charLiteralValue(text) {
+    const inner = text.slice(1, -1); // strip surrounding single quotes
+    if (inner.length === 1) return inner.charCodeAt(0);
+    // escape sequences
+    switch (inner[1]) {
+        case 'n':  return 10;
+        case 't':  return 9;
+        case 'r':  return 13;
+        case '0':  return 0;
+        case '\\': return 92;
+        case '\'': return 39;
+        case '"':  return 34;
+        default:   return inner.charCodeAt(1);
+    }
+}
+
 export class AstBuilder extends HopperVisitor {
     visitProgram(ctx) {
         const functions = [];
@@ -128,6 +145,8 @@ export class AstBuilder extends HopperVisitor {
         const text = ctx.getText();
         if (ctx.HexLiteral && ctx.HexLiteral())
             return { value: parseInt(text, 16), type: "int" };
+        if (ctx.CharLiteral && ctx.CharLiteral())
+            return { value: charLiteralValue(text), type: "int" };
         if (ctx.FloatLiteral && ctx.FloatLiteral())
             return { value: parseFloat(text), type: "float" };
         if (ctx.IntegerLiteral && ctx.IntegerLiteral())
@@ -643,6 +662,11 @@ export class AstBuilder extends HopperVisitor {
         // Hex literal: 0xFF
         if (ctx.HexLiteral && ctx.HexLiteral()) {
             return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
+        }
+
+        // Character literal: 'H' → 72, '\n' → 10
+        if (ctx.CharLiteral && ctx.CharLiteral()) {
+            return IntLiteral(charLiteralValue(ctx.CharLiteral().getText()));
         }
 
         // Float literal: 3.14

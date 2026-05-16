@@ -298,6 +298,7 @@ unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
 primary
     : IntegerLiteral
     | HexLiteral
+    | CharLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -326,6 +327,7 @@ argList
 literal
     : IntegerLiteral
     | HexLiteral
+    | CharLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -337,9 +339,9 @@ literal
 
 IntegerLiteral  : [0-9]+ ;
 HexLiteral      : '0x' [0-9a-fA-F]+ ;
+CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
 FloatLiteral    : [0-9]+ '.' [0-9]+ ;
 StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
-// CharLiteral removed — characters are byte values, e.g. 72 not 'H'
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
 
 // keep newlines as real tokens (for statement separation)

@@ -1,0 +1,41 @@
+// EXPECT: Hello, Lenny
+// EXPECT: tab:	end
+// EXPECT: 65
+import String from ascii
+import io from linux
+
+entry main {
+    String s = String(16)
+    s.append('H')
+    s.append('e')
+    s.append('l')
+    s.append('l')
+    s.append('o')
+    s.append(',')
+    s.append(' ')
+    s.append('L')
+    s.append('e')
+    s.append('n')
+    s.append('n')
+    s.append('y')
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    s.append('t')
+    s.append('a')
+    s.append('b')
+    s.append(':')
+    s.append('\t')
+    s.append('e')
+    s.append('n')
+    s.append('d')
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+    s.clear()
+
+    // 'A' == 65 — char literal as integer
+    s.appendNumber('A')
+    s.append('\n')
+    write(1, s.pointer(), s.length())
+}
