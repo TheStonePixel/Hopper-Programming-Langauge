@@ -4,6 +4,13 @@
 // EXPECT: 20
 // EXPECT: 30
 // EXPECT: 1
+// EXPECT: indexOf 20 = 1
+// EXPECT: contains 30 = 1
+// EXPECT: contains 99 = 0
+// EXPECT: after remove(1): 10 30
+// EXPECT: after insert(0,5): 5 10 30
+// EXPECT: pop = 30
+// EXPECT: peek = 10
 
 import array from ds
 extern function printf(String fmt, ...) int
@@ -23,4 +30,18 @@ entry main {
     printf("%lld\n", nums.get(2))
 
     printf("%lld\n", nums.empty() == 0)
+
+    printf("indexOf 20 = %lld\n", nums.indexOf(20))
+    printf("contains 30 = %lld\n", nums.contains(30))
+    printf("contains 99 = %lld\n", nums.contains(99))
+
+    nums.remove(1)
+    printf("after remove(1): %lld %lld\n", nums.get(0), nums.get(1))
+
+    nums.insert(0, 5)
+    printf("after insert(0,5): %lld %lld %lld\n", nums.get(0), nums.get(1), nums.get(2))
+
+    int last = nums.pop()
+    printf("pop = %lld\n", last)
+    printf("peek = %lld\n", nums.peek())
 }

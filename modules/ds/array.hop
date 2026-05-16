@@ -87,6 +87,52 @@ template Array<T> {
         self.length = 0
     }
 
+    // First index of val, or -1 if not found.
+    function indexOf(T val) int {
+        int i = 0
+        while (i < self.length) {
+            T elem = self.get(i)
+            if (elem == val) {
+                return i
+            }
+            i = i + 1
+        }
+        return -1
+    }
+
+    // True if val exists in the array.
+    function contains(T val) bool {
+        return self.indexOf(val) != -1
+    }
+
+    // Remove element at index i. Shifts remaining elements left.
+    // Caller ensures i < len().
+    function remove(int i) {
+        int j = i
+        while (j < self.length - 1) {
+            T next = self.get(j + 1)
+            self.set(j, next)
+            j = j + 1
+        }
+        self.length = self.length - 1
+    }
+
+    // Insert val at index i. Shifts remaining elements right.
+    // Caller ensures i <= len().
+    function insert(int i, T val) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        int j = self.length
+        while (j > i) {
+            T elem = self.get(j - 1)
+            self.set(j, elem)
+            j = j - 1
+        }
+        self.set(i, val)
+        self.length = self.length + 1
+    }
+
     // Double capacity. Called automatically by push() when full.
     function grow() {
         int     newCap  = self.capacity * 2
