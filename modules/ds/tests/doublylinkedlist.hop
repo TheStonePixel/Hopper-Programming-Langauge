@@ -1,0 +1,29 @@
+// EXPECT: empty = 1
+// EXPECT: peekFront = 0
+// EXPECT: peekBack = 3
+// EXPECT: popFront = 0
+// EXPECT: popBack = 3
+// EXPECT: peekFront = 1
+// EXPECT: peekBack = 2
+// EXPECT: len = 2
+
+import doublylinkedlist from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    DoublyLinkedList<int> list = DoublyLinkedList()
+
+    printf("empty = %lld\n", list.empty())
+    list.pushBack(1)
+    list.pushBack(2)
+    list.pushBack(3)
+    list.pushFront(0)
+
+    printf("peekFront = %lld\n", list.peekFront())
+    printf("peekBack = %lld\n", list.peekBack())
+    printf("popFront = %lld\n", list.popFront())
+    printf("popBack = %lld\n", list.popBack())
+    printf("peekFront = %lld\n", list.peekFront())
+    printf("peekBack = %lld\n", list.peekBack())
+    printf("len = %lld\n", list.len())
+}

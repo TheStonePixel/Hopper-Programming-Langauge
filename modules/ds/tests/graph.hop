@@ -1,0 +1,26 @@
+// EXPECT: hasEdge 0->1 = 1
+// EXPECT: hasEdge 0->2 = 1
+// EXPECT: hasEdge 1->2 = 0
+// EXPECT: degree 0 = 2
+// EXPECT: degree 1 = 1
+// EXPECT: after remove: hasEdge 0->1 = 0
+
+import graph from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Graph g = Graph(4)
+
+    g.addEdge(0, 1)
+    g.addEdge(0, 2)
+    g.addEdge(1, 3)
+
+    printf("hasEdge 0->1 = %lld\n", g.hasEdge(0, 1))
+    printf("hasEdge 0->2 = %lld\n", g.hasEdge(0, 2))
+    printf("hasEdge 1->2 = %lld\n", g.hasEdge(1, 2))
+    printf("degree 0 = %lld\n", g.degree(0))
+    printf("degree 1 = %lld\n", g.degree(1))
+
+    g.removeEdge(0, 1)
+    printf("after remove: hasEdge 0->1 = %lld\n", g.hasEdge(0, 1))
+}

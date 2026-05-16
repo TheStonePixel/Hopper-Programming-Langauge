@@ -1,0 +1,34 @@
+// EXPECT: empty = 1
+// EXPECT: peekFront = 0
+// EXPECT: peekBack = 3
+// EXPECT: popFront = 0
+// EXPECT: popBack = 3
+// EXPECT: len = 2
+// EXPECT: grow ok len = 16
+
+import deque from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Deque<int> d = Deque(4)
+
+    printf("empty = %lld\n", d.empty())
+    d.pushBack(1)
+    d.pushBack(2)
+    d.pushBack(3)
+    d.pushFront(0)
+
+    printf("peekFront = %lld\n", d.peekFront())
+    printf("peekBack = %lld\n", d.peekBack())
+    printf("popFront = %lld\n", d.popFront())
+    printf("popBack = %lld\n", d.popBack())
+    printf("len = %lld\n", d.len())
+
+    Deque<int> big = Deque(2)
+    int i = 0
+    while (i < 16) {
+        big.pushBack(i)
+        i = i + 1
+    }
+    printf("grow ok len = %lld\n", big.len())
+}

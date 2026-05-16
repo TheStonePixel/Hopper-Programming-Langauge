@@ -1,0 +1,35 @@
+// EXPECT: empty = 1
+// EXPECT: pop = 1
+// EXPECT: pop = 2
+// EXPECT: pop = 3
+// EXPECT: len = 0
+// EXPECT: peek = 10
+// EXPECT: grow ok len = 16
+
+import queue from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Queue<int> q = Queue(4)
+
+    printf("empty = %lld\n", q.empty())
+    q.push(1)
+    q.push(2)
+    q.push(3)
+    printf("pop = %lld\n", q.pop())
+    printf("pop = %lld\n", q.pop())
+    printf("pop = %lld\n", q.pop())
+    printf("len = %lld\n", q.len())
+
+    q.push(10)
+    q.push(20)
+    printf("peek = %lld\n", q.peek())
+
+    Queue<int> big = Queue(2)
+    int i = 0
+    while (i < 16) {
+        big.push(i)
+        i = i + 1
+    }
+    printf("grow ok len = %lld\n", big.len())
+}

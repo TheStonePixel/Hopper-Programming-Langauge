@@ -1,0 +1,33 @@
+// EXPECT: contains 1 = 0
+// EXPECT: contains 1 = 1
+// EXPECT: contains 2 = 1
+// EXPECT: len = 2
+// EXPECT: after remove: contains 1 = 0
+// EXPECT: len = 1
+// EXPECT: grow ok len = 12
+
+import set from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Set<int> s = Set(4)
+
+    printf("contains 1 = %lld\n", s.contains(1))
+    s.add(1)
+    s.add(2)
+    printf("contains 1 = %lld\n", s.contains(1))
+    printf("contains 2 = %lld\n", s.contains(2))
+    printf("len = %lld\n", s.len())
+
+    s.remove(1)
+    printf("after remove: contains 1 = %lld\n", s.contains(1))
+    printf("len = %lld\n", s.len())
+
+    Set<int> big = Set(4)
+    int i = 0
+    while (i < 12) {
+        big.add(i)
+        i = i + 1
+    }
+    printf("grow ok len = %lld\n", big.len())
+}

@@ -1105,6 +1105,12 @@ function genStmt(ir, stmt, retType) {
             if (stmt.expr.kind === "CastExpr") {
                 const inner = genExpr(ir, stmt.expr.expr);
                 val = emitCast(ir, inner.value, inner.type, v.hType);
+            } else if (stmt.expr.kind === "Deref") {
+                // target variable's type determines load width, same as VarDecl
+                const savedRet = ir.returnType;
+                ir.returnType = v.hType;
+                val = genExpr(ir, stmt.expr);
+                ir.returnType = savedRet;
             } else {
                 val = genExpr(ir, stmt.expr);
             }
@@ -1213,10 +1219,8 @@ function genStmt(ir, stmt, retType) {
             let pointedTo;
             if (v.hType.startsWith("address:")) {
                 pointedTo = v.hType.substring(8);
-            } else if (v.hType === "address" && ir.returnType) {
-                pointedTo = ir.returnType;
             } else if (v.hType === "address") {
-                pointedTo = val.type; // infer from RHS
+                pointedTo = val.type; // always infer from RHS — never use ir.returnType
             } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
             }

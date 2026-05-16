@@ -1,0 +1,23 @@
+// EXPECT: contains hello = 1
+// EXPECT: contains world = 1
+// EXPECT: contains hell = 0
+// EXPECT: contains xyz = 0
+// EXPECT: after insert hell: contains hell = 1
+
+import trie from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Trie t = Trie()
+
+    t.insert("hello")
+    t.insert("world")
+
+    printf("contains hello = %lld\n", t.contains("hello"))
+    printf("contains world = %lld\n", t.contains("world"))
+    printf("contains hell = %lld\n", t.contains("hell"))
+    printf("contains xyz = %lld\n", t.contains("xyz"))
+
+    t.insert("hell")
+    printf("after insert hell: contains hell = %lld\n", t.contains("hell"))
+}
