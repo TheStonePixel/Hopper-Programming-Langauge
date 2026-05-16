@@ -84,10 +84,8 @@ function toObject(file) {
 }
 
 function link(results, outFile) {
-    const objs      = results.map(r => `"${r.objFile}"`).join(" ");
-    const entryName = results[0]?.entryName ?? "main";
-    const flags     = entryName !== "main" ? `-nostartfiles -e ${entryName}` : "";
-    execSync(`clang ${flags} ${objs} -o "${outFile}"`, { stdio: "inherit" });
+    const objs = results.map(r => `"${r.objFile}"`).join(" ");
+    execSync(`clang ${objs} -o "${outFile}"`, { stdio: "inherit" });
     return outFile;
 }
 

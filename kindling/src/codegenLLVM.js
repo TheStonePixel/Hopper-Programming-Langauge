@@ -1492,6 +1492,16 @@ function genEntry(entry) {
         emitDeferred(ir);
         ir.emit("ret i64 0");
         ir.emit("}");
+        // Non-main entries: emit a @main stub so the C runtime initialises
+        // normally (libc, stdio, etc.). @main calls the named entry and exits.
+        if (entry.name !== "main") {
+            ir.emit(`\ndefine i64 @main() {`);
+            ir.emit(`entry:`);
+            const r = ir.newTmp();
+            ir.emit(`${r} = call i64 @${entry.name}()`);
+            ir.emit(`ret i64 ${r}`);
+            ir.emit(`}`);
+        }
     } else if (entry.address) {
         // address form: entry main = startup::address
         // emit a thin wrapper that calls the target function
