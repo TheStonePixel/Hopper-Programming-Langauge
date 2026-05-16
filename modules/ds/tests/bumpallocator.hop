@@ -1,6 +1,12 @@
-// EXPECT: remaining after 2 allocs = 4064
-// EXPECT: both allocs ok = 1
-// EXPECT: remaining after reset = 4096
+// TEST: constructor
+// EXPECT: new(4096) -> remaining = 4096
+
+// TEST: alloc
+// EXPECT: alloc(Point x2) -> remaining = 4064
+// EXPECT: alloc(Point x2) -> both non-null = 1
+
+// TEST: reset
+// EXPECT: reset() -> remaining = 4096
 
 import assert       from core
 import bumpallocator from ds
@@ -16,12 +22,13 @@ entry main {
     BumpAllocator alloc = BumpAllocator(pool[0]::address, 4096)
 
     assert(alloc.remaining() == 4096, "initial remaining should be full capacity\n")
+    printf("new(4096) -> remaining = %lld\n", alloc.remaining())
 
     address a = alloc.alloc(Point::size)
     address b = alloc.alloc(Point::size)
 
     assert(alloc.remaining() == 4064, "remaining after 2 Point allocs\n")
-    printf("remaining after 2 allocs = %lld\n", alloc.remaining())
+    printf("alloc(Point x2) -> remaining = %lld\n", alloc.remaining())
 
     assert(a != null, "first alloc should not be null\n")
     assert(b != null, "second alloc should not be null\n")
@@ -31,9 +38,9 @@ entry main {
             ok = 1
         }
     }
-    printf("both allocs ok = %lld\n", ok)
+    printf("alloc(Point x2) -> both non-null = %lld\n", ok)
 
     alloc.reset()
     assert(alloc.remaining() == 4096, "remaining after reset should be full\n")
-    printf("remaining after reset = %lld\n", alloc.remaining())
+    printf("reset() -> remaining = %lld\n", alloc.remaining())
 }
