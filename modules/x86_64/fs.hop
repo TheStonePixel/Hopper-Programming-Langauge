@@ -1,0 +1,31 @@
+// x86-64 filesystem syscalls.
+//
+// open flags (O_ constants — same values on all Linux architectures):
+//   O_RDONLY = 0   O_WRONLY = 1   O_RDWR = 2
+//   O_CREAT  = 64  O_TRUNC  = 512 O_APPEND = 1024
+
+// Syscall nr 2 — open or create a file, return fd or negative errno.
+function open(string path, int flags, int mode) int {
+    int result
+    asm {
+        rax = 2
+        rdi = path
+        rsi = flags
+        rdx = mode
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 3 — close a file descriptor.
+function close(int fd) int {
+    int result
+    asm {
+        rax = 3
+        rdi = fd
+        syscall
+        result = rax
+    }
+    return result
+}

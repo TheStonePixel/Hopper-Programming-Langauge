@@ -1,0 +1,52 @@
+// x86-64 process/system syscalls.
+//
+// Syscall numbers differ between x86-64 and ARM64 — see arm64/sys.hop
+// for the equivalent AArch64 implementation.
+
+// Syscall nr 60 — terminate the process.
+function exit(int code) {
+    asm {
+        rax = 60
+        rdi = code
+        syscall
+    }
+}
+
+// Syscall nr 57 — fork the process.
+function fork() int {
+    int result
+    asm {
+        rax = 57
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 59 — execute a program.
+function execve(string filename, string[] argv, string[] envp) int {
+    int result
+    asm {
+        rax = 59
+        rdi = filename
+        rsi = argv
+        rdx = envp
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 61 — wait for a child process.
+function waitpid(int pid, address wstatus, int options) int {
+    int result
+    asm {
+        rax = 61
+        rdi = pid
+        rsi = wstatus
+        rdx = options
+        syscall
+        result = rax
+    }
+    return result
+}

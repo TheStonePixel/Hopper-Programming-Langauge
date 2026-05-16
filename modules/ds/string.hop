@@ -135,24 +135,6 @@ template String<T> {
         self.length = self.length + count
     }
 
-    // ── I/O ───────────────────────────────────────────────────────────────────
-
-    // Write contents to a file descriptor using the Linux write syscall.
-    // fd 1 = stdout, fd 2 = stderr.
-    function print(int fd) {
-        int bytes = self.length * T::size
-        address buf = self.data
-        int written
-        asm {
-            rax = 1
-            rdi = fd
-            rsi = buf
-            rdx = bytes
-            syscall
-            written = rax
-        }
-    }
-
     // ── Internal ──────────────────────────────────────────────────────────────
 
     // Read the element at position i from an arbitrary buffer.

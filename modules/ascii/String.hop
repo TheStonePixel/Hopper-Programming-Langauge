@@ -2,7 +2,7 @@
 //
 // Each element is one byte. append(byte c) takes a raw byte value.
 // Use append_int / append_hex for number-to-text conversion.
-// Use print(fd) to write the buffer to a file descriptor via syscall.
+// Use ptr() + len() to hand the buffer to I/O: write(1, s.ptr(), s.len())
 //
 // Import this module with: import String from ascii
 
@@ -114,24 +114,6 @@ class String implements IString {
             pos = pos - 1
         }
         self.length = self.length + count
-    }
-
-    // ── I/O ───────────────────────────────────────────────────────────────────
-
-    // Write contents to a file descriptor using the Linux write syscall.
-    // fd 1 = stdout, fd 2 = stderr.
-    function print(int fd) {
-        address buf = self.data
-        int bytes = self.length
-        int written
-        asm {
-            rax = 1
-            rdi = fd
-            rsi = buf
-            rdx = bytes
-            syscall
-            written = rax
-        }
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────

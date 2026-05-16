@@ -4,14 +4,16 @@
 // interchangeable at compile time via: import String from ascii
 //                                   or import String from utf8
 //
-// Note: append() is intentionally absent — ASCII takes a byte, UTF8 takes an
-// int codepoint, so the signatures differ between implementations.
+// I/O is intentionally absent — String manages bytes, not file descriptors.
+// To print: write(1, s.ptr(), s.len())  (from linux/io.hop)
+//
+// append() is also absent — ASCII takes a byte, UTF8 takes an int codepoint.
 
 interface IString {
     function len() int
     function empty() bool
     function clear()
-    function print(int fd)
+    function ptr() address
     function append_int(int n)
     function append_hex(int n)
 }

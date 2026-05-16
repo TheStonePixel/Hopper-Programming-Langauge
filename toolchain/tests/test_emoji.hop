@@ -3,6 +3,7 @@
 // EXPECT: Let's go 🚀
 // EXPECT: 💻 + 🤖 = ❤
 import String from utf8
+import io from linux
 
 entry main {
     String s = String(64)
@@ -16,7 +17,7 @@ entry main {
     s.append(32)       // space
     s.append(127757)   // 🌍
     s.append(10)
-    s.print(1)
+    write(1, s.ptr(), s.len())
     s.clear()
 
     // "Hopper is 🔥"  — U+1F525 = 128293 (Fire, 4-byte UTF-8)
@@ -32,7 +33,7 @@ entry main {
     s.append(32)       // space
     s.append(128293)   // 🔥
     s.append(10)
-    s.print(1)
+    write(1, s.ptr(), s.len())
     s.clear()
 
     // "Let's go 🚀"  — U+1F680 = 128640 (Rocket, 4-byte UTF-8)
@@ -47,7 +48,7 @@ entry main {
     s.append(32)       // space
     s.append(128640)   // 🚀
     s.append(10)
-    s.print(1)
+    write(1, s.ptr(), s.len())
     s.clear()
 
     // "💻 + 🤖 = ❤"
@@ -61,5 +62,5 @@ entry main {
     s.append(32)       // space
     s.append(10084)    // ❤   U+2764 Heart (3-byte UTF-8)
     s.append(10)
-    s.print(1)
+    write(1, s.ptr(), s.len())
 }

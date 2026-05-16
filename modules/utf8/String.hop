@@ -1,8 +1,8 @@
 // String — UTF-8 encoded string backed by a byte buffer
 //
 // append(int codepoint) accepts a Unicode codepoint and encodes it to
-// 1-4 UTF-8 bytes before storing. This lets you mix ASCII and non-ASCII
-// characters naturally without tracking byte widths yourself.
+// 1-4 UTF-8 bytes before storing.
+// Use ptr() + len() to hand the buffer to I/O: write(1, s.ptr(), s.len())
 //
 // For ASCII-only work, import String from ascii instead — it's faster.
 //
@@ -132,24 +132,6 @@ class String implements IString {
             pos = pos - 1
         }
         self.length = self.length + count
-    }
-
-    // ── I/O ───────────────────────────────────────────────────────────────────
-
-    // Write the UTF-8 byte buffer to a file descriptor via the write syscall.
-    // fd 1 = stdout, fd 2 = stderr.
-    function print(int fd) {
-        address buf = self.data
-        int bytes = self.length
-        int written
-        asm {
-            rax = 1
-            rdi = fd
-            rsi = buf
-            rdx = bytes
-            syscall
-            written = rax
-        }
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────

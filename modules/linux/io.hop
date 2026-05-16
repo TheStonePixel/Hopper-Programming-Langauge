@@ -1,47 +1,19 @@
-// Linux I/O — direct asm syscalls, no libc
+// Linux I/O — delegates to the x86_64 target for ISA-specific syscall mechanics.
+//
+// To retarget to ARM64: replace 'import io from x86_64' with
+//                       'import io from arm64' (once modules/arm64/io.hop exists).
+// The rest of this file is architecture-neutral.
 
-function write(int fd, string buf, int count) int {
-    int result
-    asm {
-        rax = 1
-        rdi = fd
-        rsi = buf
-        rdx = count
-        syscall
-        result = rax
-    }
-    return result
+import io from x86_64
+
+// write() and read() are provided by x86_64/io.hop.
+
+// Write buf to stdout (fd 1).
+function print(address buf, int len) {
+    write(1, buf, len)
 }
 
-function read(int fd, string buf, int count) int {
-    int result
-    asm {
-        rax = 0
-        rdi = fd
-        rsi = buf
-        rdx = count
-        syscall
-        result = rax
-    }
-    return result
-}
-
-function print(string s, int len) {
-    asm {
-        rax = 1
-        rdi = 1
-        rsi = s
-        rdx = len
-        syscall
-    }
-}
-
-function error(string s, int len) {
-    asm {
-        rax = 1
-        rdi = 2
-        rsi = s
-        rdx = len
-        syscall
-    }
+// Write buf to stderr (fd 2).
+function error(address buf, int len) {
+    write(2, buf, len)
 }

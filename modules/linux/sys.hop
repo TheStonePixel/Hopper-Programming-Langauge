@@ -1,45 +1,6 @@
-// Linux process/system — direct asm syscalls, no libc
+// Linux process/system calls — delegates to the x86_64 target.
+//
+// exit(), fork(), execve(), waitpid() are provided by x86_64/sys.hop.
+// Swap the import below to retarget to a different ISA.
 
-function exit(int code) {
-    asm {
-        rax = 60
-        rdi = code
-        syscall
-    }
-}
-
-function fork() int {
-    int result
-    asm {
-        rax = 57
-        syscall
-        result = rax
-    }
-    return result
-}
-
-function execve(string filename, string[] argv, string[] envp) int {
-    int result
-    asm {
-        rax = 59
-        rdi = filename
-        rsi = argv
-        rdx = envp
-        syscall
-        result = rax
-    }
-    return result
-}
-
-function waitpid(int pid, address wstatus, int options) int {
-    int result
-    asm {
-        rax = 61
-        rdi = pid
-        rsi = wstatus
-        rdx = options
-        syscall
-        result = rax
-    }
-    return result
-}
+import sys from x86_64

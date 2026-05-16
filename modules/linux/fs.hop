@@ -1,33 +1,9 @@
-// Linux filesystem — direct asm syscalls, no libc
+// Linux filesystem calls — delegates to the x86_64 target.
 //
-// open flags (pass as int literals):
-//   O_RDONLY = 0
-//   O_WRONLY = 1
-//   O_RDWR   = 2
-//   O_CREAT  = 64
-//   O_TRUNC  = 512
-//   O_APPEND = 1024
+// open(), close() are provided by x86_64/fs.hop.
+// Swap the import below to retarget to a different ISA.
+//
+// O_RDONLY = 0   O_WRONLY = 1   O_RDWR   = 2
+// O_CREAT  = 64  O_TRUNC  = 512 O_APPEND = 1024
 
-function open(string path, int flags, int mode) int {
-    int result
-    asm {
-        rax = 2
-        rdi = path
-        rsi = flags
-        rdx = mode
-        syscall
-        result = rax
-    }
-    return result
-}
-
-function close(int fd) int {
-    int result
-    asm {
-        rax = 3
-        rdi = fd
-        syscall
-        result = rax
-    }
-    return result
-}
+import fs from x86_64

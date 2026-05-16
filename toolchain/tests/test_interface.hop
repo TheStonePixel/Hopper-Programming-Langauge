@@ -2,11 +2,12 @@
 // The ascii String class implements IString — verified at compile time.
 // EXPECT: ok
 import String from ascii
+import io from linux
 
 entry main {
     String s = String(4)
     s.append(111)
     s.append(107)
     s.append(10)
-    s.print(1)
+    write(1, s.ptr(), s.len())
 }
