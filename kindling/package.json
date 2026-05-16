@@ -8,7 +8,7 @@
     "test": "node tools/test.js",
     "build": "node tools/build.js",
     "run": "node tools/run.js",
-    "install:ext": "mkdir -p ~/.vscode/extensions && cp -r ../extensions/hopper-vscode ~/.vscode/extensions/hopper-language-0.1.0"
+    "install:ext": "node tools/install-ext.js"
   },
   "bin": {
     "hopper": "./hopper"
