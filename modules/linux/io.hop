@@ -1,17 +1,47 @@
-// Linux I/O — direct syscalls, no libc
+// Linux I/O — direct asm syscalls, no libc
 
 function write(int fd, string buf, int count) int {
-    return syscall(1, fd, buf, count)
+    int result
+    asm {
+        rax = 1
+        rdi = fd
+        rsi = buf
+        rdx = count
+        syscall
+        result = rax
+    }
+    return result
 }
 
 function read(int fd, string buf, int count) int {
-    return syscall(0, fd, buf, count)
+    int result
+    asm {
+        rax = 0
+        rdi = fd
+        rsi = buf
+        rdx = count
+        syscall
+        result = rax
+    }
+    return result
 }
 
 function print(string s, int len) {
-    syscall(1, 1, s, len)
+    asm {
+        rax = 1
+        rdi = 1
+        rsi = s
+        rdx = len
+        syscall
+    }
 }
 
 function error(string s, int len) {
-    syscall(1, 2, s, len)
+    asm {
+        rax = 1
+        rdi = 2
+        rsi = s
+        rdx = len
+        syscall
+    }
 }

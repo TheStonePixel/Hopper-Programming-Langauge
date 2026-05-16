@@ -126,8 +126,44 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#bitfieldDecl.
+	visitBitfieldDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#BitfieldArrayField.
+	visitBitfieldArrayField(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#BitfieldField.
+	visitBitfieldField(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#BitfieldPad.
+	visitBitfieldPad(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#templateDecl.
 	visitTemplateDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#FreeParam.
+	visitFreeParam(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#FixedParam.
+	visitFixedParam(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
@@ -234,6 +270,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#AllocateVarDecl.
+	visitAllocateVarDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#VarDecl.
 	visitVarDecl(ctx) {
 	  return this.visitChildren(ctx);
@@ -252,8 +294,20 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#AllocateAssign.
+	visitAllocateAssign(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#Assign.
 	visitAssign(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#AllocateFieldAssign.
+	visitAllocateFieldAssign(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
@@ -314,6 +368,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 
 	// Visit a parse tree produced by HopperParser#DeferStmt.
 	visitDeferStmt(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#DeallocateStmt.
+	visitDeallocateStmt(ctx) {
 	  return this.visitChildren(ctx);
 	}
 

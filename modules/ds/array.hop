@@ -1,0 +1,105 @@
+// Array<T> — growable heap-allocated array
+//
+// Stores elements sequentially in heap memory.
+// Doubles capacity when full.
+// T is monomorphized at the use site — Array<int>, Array<byte>, etc.
+//
+// Usage:
+//   Array<int> nums(16)
+//   nums.push(42)
+//   nums.push(99)
+//   int x = nums.get(0)    // 42
+//   int n = nums.len()     // 2
+//   int last = nums.pop()  // 99
+//
+// Memory:
+//   allocate/deallocate are compiler directives — not function calls.
+//   The constructor allocates heap backing. The destructor frees it.
+//   grow() deallocates the old block and allocates a new one.
+
+template Array<T> {
+    address data        // pointer to element storage
+    int     length      // number of elements currently held
+    int     capacity    // number of elements allocated
+
+    constructor(int initialCap) {
+        self.data     = allocate initialCap * T::size
+        self.length   = 0
+        self.capacity = initialCap
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    // Number of elements currently in the array.
+    function len() int {
+        return self.length
+    }
+
+    // Allocated capacity in elements.
+    function cap() int {
+        return self.capacity
+    }
+
+    // Get element at index i. No bounds check — caller ensures i < len().
+    function get(int i) T {
+        address ptr = self.data + (i * T::size)
+        return ptr::value
+    }
+
+    // Set element at index i. No bounds check — caller ensures i < len().
+    function set(int i, T val) {
+        address ptr = self.data + (i * T::size)
+        ptr::value = val
+    }
+
+    // Append val to the end. Grows if at capacity.
+    function push(T val) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        address ptr = self.data + (self.length * T::size)
+        ptr::value = val
+        self.length = self.length + 1
+    }
+
+    // Remove and return the last element. Caller ensures len() > 0.
+    function pop() T {
+        self.length = self.length - 1
+        address ptr = self.data + (self.length * T::size)
+        return ptr::value
+    }
+
+    // Return last element without removing it. Caller ensures len() > 0.
+    function peek() T {
+        address ptr = self.data + ((self.length - 1) * T::size)
+        return ptr::value
+    }
+
+    // Return true if the array holds no elements.
+    function empty() bool {
+        return self.length == 0
+    }
+
+    // Reset length to zero. Keeps allocation — no memory is freed.
+    function reset() {
+        self.length = 0
+    }
+
+    // Double capacity. Called automatically by push() when full.
+    function grow() {
+        int     newCap  = self.capacity * 2
+        address newData = allocate newCap * T::size
+        int i = 0
+        while (i < self.length) {
+            T elem = self.get(i)
+            address dst = newData + (i * T::size)
+            dst::value = elem
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = newData
+        self.capacity = newCap
+    }
+}

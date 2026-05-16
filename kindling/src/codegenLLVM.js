@@ -10,6 +10,7 @@ const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
 const templateDefs       = new Map();   // template name → TemplateDecl
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
+const bitfieldTypes      = new Map();   // name → BitfieldDecl
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
 
@@ -22,6 +23,7 @@ function resetAll() {
     functionReturnTypes.clear();
     templateDefs.clear();
     mmioBindings.clear();
+    bitfieldTypes.clear();
     instantiatedClasses = [];
     stringCounter = 0;
 }
@@ -86,15 +88,33 @@ function substBlock(block, subst) {
     return { ...block, statements: block.statements.map(s => substStmt(s, subst)) };
 }
 
+function substExpr(e, subst) {
+    if (!e) return null;
+    switch (e.kind) {
+        case "SizeOf":        return { ...e, name: substTypeStr(e.name, subst) };
+        case "Binary":        return { ...e, left: substExpr(e.left, subst), right: substExpr(e.right, subst) };
+        case "Unary":         return { ...e, expr: substExpr(e.expr, subst) };
+        case "AllocateExpr":  return { ...e, sizeExpr: substExpr(e.sizeExpr, subst) };
+        case "DeallocateStmt": return { ...e, expr: substExpr(e.expr, subst) };
+        default:              return e;
+    }
+}
+
 function substStmt(s, subst) {
     if (!s) return null;
     switch (s.kind) {
-        case "VarDecl":       return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDecl":     return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDeclInit": return { ...s, type: substTypeStr(s.type, subst) };
-        case "IfStmt":      return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
-        case "WhileStmt":   return { ...s, body: substBlock(s.body, subst) };
-        case "ForStmt":     return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        case "VarDecl":        return { ...s, type: substTypeStr(s.type, subst), init: substExpr(s.init, subst) };
+        case "ArrayDecl":      return { ...s, type: substTypeStr(s.type, subst) };
+        case "ArrayDeclInit":  return { ...s, type: substTypeStr(s.type, subst) };
+        case "IfStmt":         return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
+        case "WhileStmt":      return { ...s, body: substBlock(s.body, subst) };
+        case "ForStmt":        return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        case "DeallocateStmt": return { ...s, expr: substExpr(s.expr, subst) };
+        case "ExprStmt":       return { ...s, expr: substExpr(s.expr, subst) };
+        case "ReturnStmt":     return { ...s, expr: substExpr(s.expr, subst) };
+        case "FieldAssign":    return { ...s, expr: substExpr(s.expr, subst) };
+        case "Assign":         return { ...s, expr: substExpr(s.expr, subst) };
+        case "DerefAssign":    return { ...s, expr: substExpr(s.expr, subst) };
         default: return s;
     }
 }
@@ -242,6 +262,8 @@ function collectTypeUsages(ast) {
     }
     for (const s of ast.structs || []) s.fields.forEach(f => checkType(f.type));
 
+    if (ast.entry && ast.entry.body) scanBlock(ast.entry.body);
+
     return usages;
 }
 
@@ -263,6 +285,7 @@ function llvmType(t) {
     if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
+    if (t === "bit")          return "i1";
     if (t === "byte")         return "i8";
     if (t === "float")        return "double";
     if (t === "string[]")     return "i8**";
@@ -273,6 +296,7 @@ function llvmType(t) {
     if (t === "unsignedbyte") return "i8";
     if (structTypes.has(t))   return `%struct.${t}`;
     if (classTypes.has(t))    return `%class.${t}`;
+    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
     if (t.includes('<')) {
         const m = mangleTemplate(t);
@@ -283,22 +307,76 @@ function llvmType(t) {
 }
 
 function isFloatType(t) { return t === "float"; }
-function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "unsignedint" || t === "unsignedbyte"; }
+function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "bit" || t === "unsignedint" || t === "unsignedbyte"; }
 function isUnsigned(t)  { return t === "unsignedint" || t === "unsignedbyte"; }
+
+// Number of BITS a type occupies (used for bitfield layout)
+function bitWidth(type, count = 1) {
+    if (type === "bit")          return 1 * count;
+    if (type === "bool")         return 1 * count;
+    if (type === "byte")         return 8 * count;
+    if (type === "unsignedbyte") return 8 * count;
+    if (type === "int")          return 64 * count;
+    if (type === "unsignedint")  return 64 * count;
+    if (type === "float")        return 64 * count;
+    if (type === "address")      return 64 * count;
+    return 8 * count; // default: treat as byte-sized
+}
+
+// Smallest integer LLVM type that holds N bits (rounded up to 8/16/32/64)
+function bitsToLLType(n) {
+    if (n <= 8)  return "i8";
+    if (n <= 16) return "i16";
+    if (n <= 32) return "i32";
+    return "i64";
+}
+
+// Total bit count and LLVM container type for a bitfield
+function bitfieldLayout(bf) {
+    let total = 0;
+    for (const f of bf.fields) {
+        if (f.isPad) { total += f.bits; continue; }
+        total += bitWidth(f.type, f.count);
+    }
+    return { totalBits: total, llType: bitsToLLType(total) };
+}
+
+function bitfieldLLType(bf) {
+    return bitfieldLayout(bf).llType;
+}
 
 function sizeOfType(t) {
     if (t === "int")     return 8;
     if (t === "byte")    return 1;
+    if (t === "bit")     return 1;  // stored as i8 minimum when standalone
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
     if (t === "string")  return 8;
     if (t === "String")  return 8;
     if (t === "address") return 8;
+    if (bitfieldTypes.has(t)) {
+        const { totalBits } = bitfieldLayout(bitfieldTypes.get(t));
+        return Math.ceil(totalBits / 8);
+    }
     if (structTypes.has(t)) {
         return structTypes.get(t).fields.reduce((s, f) =>
             s + (f.isPad ? f.size : sizeOfType(f.type)), 0);
     }
     throw new Error(`Unknown type for sizeof: ${t}`);
+}
+
+// ── bitfield field lookup ─────────────────────────────────────────────────
+
+// Returns { offset (bit), width (bits), fieldType } for a named field in a bitfield
+function bitfieldFieldInfo(bf, fieldName) {
+    let offset = 0;
+    for (const f of bf.fields) {
+        if (f.isPad) { offset += f.bits; continue; }
+        const width = bitWidth(f.type, f.count);
+        if (f.name === fieldName) return { offset, width, fieldType: f.type };
+        offset += width;
+    }
+    throw new Error(`Field '${fieldName}' not found in bitfield`);
 }
 
 // ── field lookup (struct and class) ───────────────────────────────────────
@@ -482,8 +560,50 @@ function genExpr(ir, expr) {
         }
 
         case "FieldAccess": {
+            // Check MMIO (strict) bitfield first — uses volatile load
+            const mmioFA = mmioBindings.get(expr.object);
+            if (mmioFA && bitfieldTypes.has(mmioFA.hType)) {
+                const bf = bitfieldTypes.get(mmioFA.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmioFA.addr} to ${llType}*`);
+                const container = ir.newTmp();
+                ir.emit(`${container} = load volatile ${llType}, ${llType}* ${ptr}`);
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = lshr ${llType} ${container}, ${offset}`);
+                const mask = (1n << BigInt(width)) - 1n;
+                const masked = ir.newTmp();
+                ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
+                const llFieldType = llvmType(fieldType);
+                if (llFieldType === llType) return { value: masked, type: fieldType };
+                const result = ir.newTmp();
+                ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
+                return { value: result, type: fieldType };
+            }
+
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+
+            // Bitfield read: load container integer, shift right by field offset, mask to width
+            if (bitfieldTypes.has(v.hType)) {
+                const bf = bitfieldTypes.get(v.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
+                const container = ir.newTmp();
+                ir.emit(`${container} = load ${llType}, ${llType}* ${v.ptr}`);
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = lshr ${llType} ${container}, ${offset}`);
+                const mask = (1n << BigInt(width)) - 1n;
+                const masked = ir.newTmp();
+                ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
+                // Truncate to the field's natural LLVM type
+                const llFieldType = llvmType(fieldType);
+                if (llFieldType === llType) return { value: masked, type: fieldType };
+                const result = ir.newTmp();
+                ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
+                return { value: result, type: fieldType };
+            }
 
             if (classTypes.has(v.hType) && !v.isSelf) {
                 throw new Error(
@@ -568,9 +688,15 @@ function genExpr(ir, expr) {
         case "Deref": {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
-            if (!v.hType.startsWith("address:"))
+            // Plain address: infer pointedTo from the address:T tag if present, else from return type
+            let pointedTo;
+            if (v.hType.startsWith("address:")) {
+                pointedTo = v.hType.substring(8);
+            } else if (v.hType === "address" && ir.returnType) {
+                pointedTo = ir.returnType;
+            } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            const pointedTo   = v.hType.substring(8);
+            }
             const llPointedTo = llvmType(pointedTo);
             const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
@@ -721,36 +847,6 @@ function genExpr(ir, expr) {
         }
 
         case "Call": {
-            // syscall(num, arg1, ...) builtin — maps directly to Linux syscall instruction
-            if (expr.callee === "syscall") {
-                const syscallRegs = ['rax','rdi','rsi','rdx','r10','r8','r9'];
-                const args = (expr.args || []).map(a => genExpr(ir, a));
-                const inputArgs = args.map((a, i) => {
-                    // address:T values are normalized to i8*; all other pointer types keep their ll type
-                    let v = a.value, t = a.type.startsWith("address:") ? "i8*" : llvmType(a.type);
-                    if (t.endsWith("*")) {
-                        const tmp2 = ir.newTmp();
-                        ir.emit(`${tmp2} = ptrtoint ${t} ${v} to i64`);
-                        v = tmp2; t = "i64";
-                    }
-                    if (t === "i8" || t === "i1") {
-                        const tmp2 = ir.newTmp();
-                        ir.emit(`${tmp2} = zext ${t} ${v} to i64`);
-                        v = tmp2; t = "i64";
-                    }
-                    return { reg: syscallRegs[i], llType: t, value: v };
-                });
-                const outC  = `={rax}`;
-                // first input (syscall number) uses tied constraint "0" = same reg as output 0 (rax)
-                const inC   = inputArgs.map((a, i) => i === 0 ? "0" : `{${a.reg}}`).join(",");
-                const clob  = `~{rcx},~{r11},~{memory}`;
-                const constraints = `${outC},${inC},${clob}`;
-                const argStr = inputArgs.map(a => `${a.llType} ${a.value}`).join(", ");
-                const tmp = ir.newTmp();
-                ir.emit(`${tmp} = call i64 asm sideeffect "syscall", "${constraints}"(${argStr})`);
-                return { value: tmp, type: "int" };
-            }
-
             const args     = (expr.args || []).map(a => genExpr(ir, a));
             // address:T values are normalized to i8* — use i8* as LLVM type in call args
             const argStr   = args.map(v => `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`).join(", ");
@@ -797,6 +893,14 @@ function genExpr(ir, expr) {
 
         case "CastExpr":
             throw new Error("cast requires an assignment context");
+
+        case "AllocateExpr": {
+            const size = genExpr(ir, expr.sizeExpr);
+            const sizeVal = size.type !== "int" ? size.value : size.value;
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call i8* @malloc(i64 ${sizeVal})`);
+            return { value: tmp, type: "address" };
+        }
 
         default:
             throw new Error(`Unsupported expr kind: ${expr.kind}`);
@@ -900,8 +1004,73 @@ function genStmt(ir, stmt, retType) {
         }
 
         case "FieldAssign": {
+            // Check MMIO (strict) bitfield first — uses volatile load/store
+            const mmioFW = mmioBindings.get(stmt.object);
+            if (mmioFW && bitfieldTypes.has(mmioFW.hType)) {
+                const bf = bitfieldTypes.get(mmioFW.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width } = bitfieldFieldInfo(bf, stmt.field);
+                const val = genExpr(ir, stmt.expr);
+                const srcLL = llvmType(val.type);
+                const srcBits = parseInt(srcLL.slice(1));
+                const dstBits = parseInt(llType.slice(1));
+                let inContainer = val.value;
+                if (srcLL !== llType) {
+                    const norm = ir.newTmp();
+                    ir.emit(`${norm} = ${srcBits > dstBits ? "trunc" : "zext"} ${srcLL} ${val.value} to ${llType}`);
+                    inContainer = norm;
+                }
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = shl ${llType} ${inContainer}, ${offset}`);
+                const fieldMask = (1n << BigInt(width)) - 1n;
+                const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmioFW.addr} to ${llType}*`);
+                const current = ir.newTmp();
+                ir.emit(`${current} = load volatile ${llType}, ${llType}* ${ptr}`);
+                const cleared = ir.newTmp();
+                ir.emit(`${cleared} = and ${llType} ${current}, ${clearMask}`);
+                const merged = ir.newTmp();
+                ir.emit(`${merged} = or ${llType} ${cleared}, ${shifted}`);
+                ir.emit(`store volatile ${llType} ${merged}, ${llType}* ${ptr}`);
+                break;
+            }
+
             const v = ir.vars.get(stmt.object);
             if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
+
+            // Bitfield write: read-modify-write on the container integer
+            if (bitfieldTypes.has(v.hType)) {
+                const bf = bitfieldTypes.get(v.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width } = bitfieldFieldInfo(bf, stmt.field);
+                const val = genExpr(ir, stmt.expr);
+                // Normalize value to container width (trunc if larger, zext if smaller)
+                const srcLL = llvmType(val.type);
+                const srcBits = parseInt(srcLL.slice(1));
+                const dstBits = parseInt(llType.slice(1));
+                let inContainer = val.value;
+                if (srcLL !== llType) {
+                    const norm = ir.newTmp();
+                    ir.emit(`${norm} = ${srcBits > dstBits ? "trunc" : "zext"} ${srcLL} ${val.value} to ${llType}`);
+                    inContainer = norm;
+                }
+                // Shift value into position
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = shl ${llType} ${inContainer}, ${offset}`);
+                // Build clear mask (all 1s except the field bits)
+                const fieldMask = (1n << BigInt(width)) - 1n;
+                const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
+                // Load current container, clear field bits, OR in new value
+                const current = ir.newTmp();
+                ir.emit(`${current} = load ${llType}, ${llType}* ${v.ptr}`);
+                const cleared = ir.newTmp();
+                ir.emit(`${cleared} = and ${llType} ${current}, ${clearMask}`);
+                const merged = ir.newTmp();
+                ir.emit(`${merged} = or ${llType} ${cleared}, ${shifted}`);
+                ir.emit(`store ${llType} ${merged}, ${llType}* ${v.ptr}`);
+                break;
+            }
 
             if (classTypes.has(v.hType) && !v.isSelf) {
                 throw new Error(
@@ -925,15 +1094,22 @@ function genStmt(ir, stmt, retType) {
         case "DerefAssign": {
             const v = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
-            if (!v.hType.startsWith("address:"))
+            const val = genExpr(ir, stmt.expr);
+            let pointedTo;
+            if (v.hType.startsWith("address:")) {
+                pointedTo = v.hType.substring(8);
+            } else if (v.hType === "address" && ir.returnType) {
+                pointedTo = ir.returnType;
+            } else if (v.hType === "address") {
+                pointedTo = val.type; // infer from RHS
+            } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            const pointedTo   = v.hType.substring(8);
+            }
             const llPointedTo = llvmType(pointedTo);
             const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
             const typedAddr   = ir.newTmp();
             ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
-            const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llPointedTo} ${val.value}, ${llPointedTo}* ${typedAddr}`);
             break;
         }
@@ -1138,6 +1314,12 @@ function genStmt(ir, stmt, retType) {
             break;
         }
 
+        case "DeallocateStmt": {
+            const ptr = genExpr(ir, stmt.expr);
+            ir.emit(`call void @free(i8* ${ptr.value})`);
+            break;
+        }
+
         case "BreakStmt":    ir.emit(`br label %${ir.currentLoop().breakLabel}`);    break;
         case "ContinueStmt": ir.emit(`br label %${ir.currentLoop().continueLabel}`); break;
         case "ExprStmt":     genExpr(ir, stmt.expr);                                  break;
@@ -1155,6 +1337,7 @@ function genBlock(ir, block, retType) {
 
 function genFunction(fn) {
     const ir         = new IRBuilder();
+    ir.returnType    = fn.returnType;
     const isVoid     = fn.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(fn.returnType);
     const paramSig   = fn.params.map((p, i) => `${llvmType(normalizeType(p.type))} %p${i}`).join(", ");
@@ -1184,6 +1367,7 @@ function genFunction(fn) {
 
 function genMethod(typeName, method, isClass = true) {
     const ir         = new IRBuilder();
+    ir.returnType    = method.returnType;
     const isVoid     = method.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
     const mangled    = `${typeName}_${method.name}`;
@@ -1308,6 +1492,16 @@ function genEntry(entry) {
         emitDeferred(ir);
         ir.emit("ret i64 0");
         ir.emit("}");
+        // Non-main entries: emit a @main stub so the C runtime initialises
+        // normally (libc, stdio, etc.). @main calls the named entry and exits.
+        if (entry.name !== "main") {
+            ir.emit(`\ndefine i64 @main() {`);
+            ir.emit(`entry:`);
+            const r = ir.newTmp();
+            ir.emit(`${r} = call i64 @${entry.name}()`);
+            ir.emit(`ret i64 ${r}`);
+            ir.emit(`}`);
+        }
     } else if (entry.address) {
         // address form: entry main = startup::address
         // emit a thin wrapper that calls the target function
@@ -1380,8 +1574,27 @@ function genModule(ast) {
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
     for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
 
-    // Register template definitions
-    for (const t of ast.templates || []) templateDefs.set(t.name, t);
+    // Register template definitions.
+    // Fixed templates (all params are concrete types) are monomorphized immediately —
+    // their name becomes a standalone class type with no <> required at use sites.
+    for (const t of ast.templates || []) {
+        if (t.isFixed) {
+            // Build substitution from fixedParams, then monomorphize and register as a class
+            const concreteClass = monomorphize(t, t.fixedParams);
+            // Register under the original readable name (e.g. "String"), not the mangled one
+            registerClass(t.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+            instantiatedClasses.push({ ...concreteClass, name: t.name });
+            if (t.constructor) functionReturnTypes.set(`${t.name}_constructor`, { returnType: null, isVariadic: false, params: concreteClass.constructor?.params || [] });
+            if (t.destructor)  functionReturnTypes.set(`${t.name}_destructor`,  { returnType: null, isVariadic: false, params: [] });
+            for (const m of concreteClass.methods || [])
+                functionReturnTypes.set(`${t.name}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
+        } else {
+            templateDefs.set(t.name, t);
+        }
+    }
+
+    // Register bitfield types — stored as their integer container (i8/i16/i32/i64)
+    for (const bf of ast.bitfields || []) bitfieldTypes.set(bf.name, bf);
 
     // Register regular struct and class types first (monomorphization may reference them)
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);
@@ -1435,6 +1648,10 @@ function genModule(ast) {
     }
 
     if (typeDefs.length > 0) out += typeDefs.join("") + "\n";
+
+    // Runtime heap declarations — backing allocate/deallocate directives
+    out += `declare i8* @malloc(i64)\n`;
+    out += `declare void @free(i8*)\n\n`;
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 

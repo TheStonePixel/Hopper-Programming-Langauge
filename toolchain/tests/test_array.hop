@@ -1,0 +1,26 @@
+// EXPECT: 0
+// EXPECT: 3
+// EXPECT: 10
+// EXPECT: 20
+// EXPECT: 30
+// EXPECT: 1
+
+import array from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Array<int> nums = Array(4)
+
+    printf("%lld\n", nums.len())
+
+    nums.push(10)
+    nums.push(20)
+    nums.push(30)
+
+    printf("%lld\n", nums.len())
+    printf("%lld\n", nums.get(0))
+    printf("%lld\n", nums.get(1))
+    printf("%lld\n", nums.get(2))
+
+    printf("%lld\n", nums.empty() == 0)
+}

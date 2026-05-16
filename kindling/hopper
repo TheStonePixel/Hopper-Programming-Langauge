@@ -73,16 +73,18 @@ function toIR(file) {
 }
 
 function toObject(file) {
-    const ir      = toIR(file);
+    const src    = fs.readFileSync(file, "utf8");
+    const ast    = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
+    const ir     = genModule(ast);
     const llFile  = path.join(BUILD_DIR, `${baseName(file)}.ll`);
     const objFile = path.join(BUILD_DIR, `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
     execSync(`llc -filetype=obj -relocation-model=pic "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
-    return objFile;
+    return { objFile, entryName: ast.entry?.name ?? "main" };
 }
 
-function link(objFiles, outFile) {
-    const objs = objFiles.map(f => `"${f}"`).join(" ");
+function link(results, outFile) {
+    const objs = results.map(r => `"${r.objFile}"`).join(" ");
     execSync(`clang ${objs} -o "${outFile}"`, { stdio: "inherit" });
     return outFile;
 }
@@ -109,17 +111,17 @@ if (doIR) {
 }
 
 if (doCompile) {
-    const objFiles = files.map(toObject);
-    const outFile  = output || path.join(BUILD_DIR, baseName(files[0]));
-    link(objFiles, outFile);
+    const results = files.map(toObject);
+    const outFile = output || path.join(BUILD_DIR, baseName(files[0]));
+    link(results, outFile);
     console.log(`built: ${outFile}`);
     process.exit(0);
 }
 
 if (doRun) {
-    const objFiles = files.map(toObject);
-    const outFile  = path.join(BUILD_DIR, baseName(files[0]));
-    link(objFiles, outFile);
+    const results = files.map(toObject);
+    const outFile = path.join(BUILD_DIR, baseName(files[0]));
+    link(results, outFile);
     execSync(outFile, { stdio: "inherit" });
     process.exit(0);
 }

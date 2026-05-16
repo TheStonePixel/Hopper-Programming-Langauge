@@ -1,16 +1,33 @@
-// Linux file system — direct syscalls, no libc
-
-const O_RDONLY = 0
-const O_WRONLY = 1
-const O_RDWR   = 2
-const O_CREAT  = 64
-const O_TRUNC  = 512
-const O_APPEND = 1024
+// Linux filesystem — direct asm syscalls, no libc
+//
+// open flags (pass as int literals):
+//   O_RDONLY = 0
+//   O_WRONLY = 1
+//   O_RDWR   = 2
+//   O_CREAT  = 64
+//   O_TRUNC  = 512
+//   O_APPEND = 1024
 
 function open(string path, int flags, int mode) int {
-    return syscall(2, path, flags, mode)
+    int result
+    asm {
+        rax = 2
+        rdi = path
+        rsi = flags
+        rdx = mode
+        syscall
+        result = rax
+    }
+    return result
 }
 
 function close(int fd) int {
-    return syscall(3, fd)
+    int result
+    asm {
+        rax = 3
+        rdi = fd
+        syscall
+        result = rax
+    }
+    return result
 }

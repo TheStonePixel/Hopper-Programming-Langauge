@@ -17,7 +17,7 @@ template Box<T> {
     }
 }
 
-function main() int {
+entry main {
     print("hello template\n", 15)
 
     Box<int> b = Box(42)
@@ -28,5 +28,4 @@ function main() int {
     float pi = f.get()
     printf("%.2f\n", pi)
 
-    return 0
 }

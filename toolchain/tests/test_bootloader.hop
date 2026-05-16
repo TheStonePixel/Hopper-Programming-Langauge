@@ -1,0 +1,12 @@
+// Tests that entry points can be named anything, not just main.
+// The compiler emits a thin @main stub that calls @bootloader so the
+// C runtime initialises normally — no special linker flags needed.
+// EXPECT: booting
+// EXPECT: done
+
+extern function printf(String fmt, ...) int
+
+entry bootloader {
+    printf("booting\n")
+    printf("done\n")
+}

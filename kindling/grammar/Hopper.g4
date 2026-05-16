@@ -17,6 +17,7 @@ topLevelDecl
     | entryDecl
     | bindDecl
     | strictDecl
+    | bitfieldDecl
     ;
 
 importDecl
@@ -77,9 +78,37 @@ structMember
     | 'pad' IntegerLiteral  # StructPad
     ;
 
+// bitfield = bit-level layout — fields packed sequentially from LSB
+// bit[N] is simply an array of N bits, consistent with int[N] and byte[N]
+bitfieldDecl
+    : 'bitfield' Identifier '{' NEWLINE* (bitfieldMember (NEWLINE+ bitfieldMember)* NEWLINE*)? '}'
+    ;
+
+bitfieldMember
+    : type fieldName '[' IntegerLiteral ']'   # BitfieldArrayField
+    | type fieldName                           # BitfieldField
+    | 'pad' IntegerLiteral                     # BitfieldPad
+    ;
+
 // template = parameterized class, monomorphized at use sites
+// templateParam is either a free type variable (Identifier, e.g. T, K, V)
+// or a fixed concrete type (primitive keyword, e.g. byte, int, address).
+// Fixed-param templates are fully monomorphized at declaration time and their
+// name becomes a standalone type — no <> required at use sites.
 templateDecl
-    : 'template' Identifier '<' Identifier (',' Identifier)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'template' Identifier '<' templateParam (',' templateParam)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+templateParam
+    : Identifier        # FreeParam    // free type variable: T, K, V
+    | 'int'             # FixedParam   // fixed primitive types — no <> at use site
+    | 'byte'            # FixedParam
+    | 'float'           # FixedParam
+    | 'bool'            # FixedParam
+    | 'string'          # FixedParam
+    | 'address'         # FixedParam
+    | 'unsigned' 'int'  # FixedParam
+    | 'unsigned' 'byte' # FixedParam
     ;
 
 // class = data + behavior, compiler-optimized layout
@@ -139,6 +168,7 @@ type
     | 'bool'
     | 'float'
     | 'byte'
+    | 'bit'
     | 'string' '[' ']'  // array of strings — argv type, maps to i8**
     | 'string'
     | 'String'
@@ -161,10 +191,13 @@ block
 statement
     : type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
     | type Identifier '[' IntegerLiteral ']'                    # ArrayDecl
+    | type Identifier '=' 'allocate' expression constrainClause?  # AllocateVarDecl
     | type Identifier '=' expression constrainClause?           # VarDecl
     | type Identifier constrainClause?                          # VarDeclNoInit
     | Identifier '[' expression ']' '=' expression              # ArrayAssign
+    | Identifier '=' 'allocate' expression                      # AllocateAssign
     | Identifier '=' expression                                 # Assign
+    | Identifier '.' fieldName '=' 'allocate' expression        # AllocateFieldAssign
     | Identifier '.' fieldName '=' expression                   # FieldAssign
     | Identifier '::' 'value' '=' expression                    # DerefAssign
     | expression                                                # ExprStmt
@@ -175,6 +208,7 @@ statement
     | 'continue'                                                # ContinueStmt
     | 'return' expression?                                      # ReturnStmt
     | 'defer' expression                                        # DeferStmt
+    | 'deallocate' expression                                   # DeallocateStmt
     | 'asm' asmBlock                                            # AsmStmt
     ;
 

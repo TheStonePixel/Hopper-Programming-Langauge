@@ -1,7 +1,7 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields };
 }
 
 // bind — linker directive: place function pointer at hardware address
@@ -41,6 +41,21 @@ export function StructPad(size) {
     return { kind: "StructPad", isPad: true, size };
 }
 
+// bitfield = bit-level layout, fields packed sequentially from LSB
+// Each field has: name, type (bit/byte/int/etc.), count (1 for scalars, N for arrays)
+// bit width = typeSize(type) * 8 * count
+export function BitfieldDecl(name, fields) {
+    return { kind: "BitfieldDecl", name, fields };
+}
+
+export function BitfieldField(name, type, count = 1) {
+    return { kind: "BitfieldField", name, type, count };
+}
+
+export function BitfieldPad(bits) {
+    return { kind: "BitfieldPad", isPad: true, bits };
+}
+
 // class = data + behavior, compiler-optimized layout
 export function ClassDecl(name, fields, methods, operators, constructor = null, destructor = null) {
     return { kind: "ClassDecl", name, fields, methods, operators, constructor, destructor };
@@ -72,8 +87,12 @@ export function ConstDecl(name, value, type) {
 }
 
 // template = parameterized class, monomorphized per instantiation
-export function TemplateDecl(name, typeParams, fields, methods, operators, constructor = null, destructor = null) {
-    return { kind: "TemplateDecl", name, typeParams, fields, methods, operators, constructor, destructor };
+// typeParams  — free variable names (e.g. ["T", "K"]) — require <> at use site
+// fixedParams — concrete primitive types (e.g. ["byte"]) — no <> at use site
+// isFixed     — true when all params are concrete; name becomes a standalone type
+export function TemplateDecl(name, typeParams, fixedParams, fields, methods, operators, constructor = null, destructor = null) {
+    const isFixed = typeParams.length === 0 && fixedParams.length > 0;
+    return { kind: "TemplateDecl", name, typeParams, fixedParams, isFixed, fields, methods, operators, constructor, destructor };
 }
 
 // alias declaration: alias Name = type
@@ -131,6 +150,14 @@ export function ReturnStmt(expr) {
 
 export function DeferStmt(expr) {
     return { kind: "DeferStmt", expr };
+}
+
+export function AllocateExpr(sizeExpr) {
+    return { kind: "AllocateExpr", sizeExpr };
+}
+
+export function DeallocateStmt(expr) {
+    return { kind: "DeallocateStmt", expr };
 }
 
 export function Block(statements) {
