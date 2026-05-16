@@ -158,6 +158,7 @@ function monomorphize(tmpl, typeArgs) {
         return {
             ...op,
             param:      substParam(op.param, subst),
+            params:     (op.params || []).map(p => substParam(p, subst)),
             returnType: substTypeStr(op.returnType, subst),
             body:       substBlock(op.body, subst),
         };
@@ -208,8 +209,9 @@ function instantiateTemplate(typeStr) {
     }
     for (const op of concreteClass.operators || []) {
         const ns = operatorNameSafe(op.op);
+        const opParams = op.params && op.params.length > 0 ? op.params : (op.param ? [op.param] : []);
         functionReturnTypes.set(`${concreteClass.name}_op_${ns}`, {
-            returnType: op.returnType, isVariadic: false, params: op.param ? [op.param] : []
+            returnType: op.returnType, isVariadic: false, params: opParams
         });
     }
     if (concreteClass.constructor) {
@@ -288,7 +290,7 @@ function collectTypeUsages(ast) {
 
 function operatorNameSafe(op) {
     return op
-        .replace('[]','idx').replace('<<','shl').replace('>>','shr')
+        .replace('[]=','setidx').replace('[]','idx').replace('<<','shl').replace('>>','shr')
         .replace('<=','le').replace('>=','ge').replace('==','eq').replace('!=','ne')
         .replace('+','plus').replace('-','minus').replace('*','mul')
         .replace('/','div').replace('%','mod').replace('<','lt').replace('>','gt')
@@ -1332,6 +1334,19 @@ function genStmt(ir, stmt, retType) {
         case "ArrayAssign": {
             const v = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+
+            if (classTypes.has(v.hType)) {
+                const cls      = classTypes.get(v.hType);
+                const setIdxOp = (cls.operators || []).find(o => o.op === '[]=');
+                if (!setIdxOp) throw new Error(`Class '${v.hType}' has no []= operator`);
+                const fnName   = `${v.hType}_op_setidx`;
+                const selfType = `%class.${v.hType}*`;
+                const indexVal = genExpr(ir, stmt.index);
+                const val      = genExpr(ir, stmt.expr);
+                ir.emit(`call void @${fnName}(${selfType} ${v.ptr}, ${llvmType(setIdxOp.param.type)} ${indexVal.value}, ${llvmType(val.type)} ${val.value})`);
+                break;
+            }
+
             if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot index non-array type: ${v.hType}`);
             const elemType   = v.hType.split(":")[1];
@@ -1544,7 +1559,7 @@ function genOperator(className, op) {
     const nameSafe = operatorNameSafe(op.op);
     const pseudoMethod = {
         name:       `op_${nameSafe}`,
-        params:     op.param ? [op.param] : [],
+        params:     op.params && op.params.length > 0 ? op.params : (op.param ? [op.param] : []),
         returnType: op.returnType,
         body:       op.body
     };

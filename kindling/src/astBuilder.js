@@ -282,12 +282,14 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitClassOperator(ctx) {
-        const op = ctx.operatorSymbol().getText();
-        const p  = ctx.param();   // null if unary, param context if binary
-        const param = p ? Param(p.paramName().getText(), p.type().getText()) : null;
-        const returnType = ctx.type().getText();
+        const op     = ctx.operatorSymbol().getText();
+        const ps     = ctx.param();
+        const params = ps ? ps.map(p => Param(p.paramName().getText(), p.type().getText())) : [];
+        const param  = params[0] ?? null;   // first extra param (backward compat)
+        const rawReturn  = ctx.type().getText();
+        const returnType = rawReturn === "void" ? null : rawReturn;
         const body = this.visit(ctx.block());
-        return ClassOperator(op, param, returnType, body);
+        return ClassOperator(op, param, returnType, body, params);
     }
 
     visitClassProcMethod(ctx) {

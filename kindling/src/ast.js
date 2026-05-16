@@ -79,8 +79,8 @@ export function ClassMethod(name, params, returnType, body) {
     return { kind: "ClassMethod", name, params, returnType, body };
 }
 
-export function ClassOperator(op, param, returnType, body) {
-    return { kind: "ClassOperator", op, param, returnType, body };
+export function ClassOperator(op, param, returnType, body, params = []) {
+    return { kind: "ClassOperator", op, param, returnType, body, params };
 }
 
 export function ClassConstructor(params, body) {

@@ -133,6 +133,16 @@ template Array<T> {
         self.length = self.length + 1
     }
 
+    // Subscript read: arr[i]
+    operator [](self, int i) T {
+        return self.get(i)
+    }
+
+    // Subscript write: arr[i] = val
+    operator []=(self, int i, T val) void {
+        self.set(i, val)
+    }
+
     // Double capacity. Called automatically by push() when full.
     function grow() {
         int     newCap  = self.capacity * 2

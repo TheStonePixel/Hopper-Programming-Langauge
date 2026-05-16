@@ -9,23 +9,13 @@
 // Ships: Carrier(5), Battleship(4), Cruiser(3), Submarine(3), Destroyer(2)
 // Ships are placed randomly. Player fires manually; computer fires randomly.
 
-import array from ds
+import array  from ds
+import io     from core
 
-extern function printf(String fmt, ...) int
 extern function scanf(String fmt, ...) int
 extern function rand() int
 extern function srand(int seed)
 extern function time(int t) int
-
-// --- Grid helpers ---
-
-function cell_get(Array<int> g, int r, int c) int {
-    return g.get(r * 10 + c)
-}
-
-function cell_set(Array<int> g, int r, int c, int val) {
-    g.set(r * 10 + c, val)
-}
 
 // --- Ship placement ---
 
@@ -42,7 +32,7 @@ function can_place(Array<int> g, int r, int c, int len, int dir) bool {
         if (rr >= 10) { ok = false }
         if (cc >= 10) { ok = false }
         if (ok) {
-            if (cell_get(g, rr, cc) == 1) { ok = false }
+            if (g[rr * 10 + cc] == 1) { ok = false }
         }
         i = i + 1
     }
@@ -50,10 +40,10 @@ function can_place(Array<int> g, int r, int c, int len, int dir) bool {
 }
 
 function place_ship(Array<int> g, int len) {
-    int placed = 0
-    while (placed == 0) {
-        int r = rand() % 10
-        int c = rand() % 10
+    bool placed = false
+    while (!placed) {
+        int r   = rand() % 10
+        int c   = rand() % 10
         int dir = rand() % 2
         if (can_place(g, r, c, len, dir)) {
             int i = 0
@@ -62,10 +52,10 @@ function place_ship(Array<int> g, int len) {
                 int cc = c
                 if (dir == 0) { cc = c + i }
                 if (dir == 1) { rr = r + i }
-                cell_set(g, rr, cc, 1)
+                g[rr * 10 + cc] = 1
                 i = i + 1
             }
-            placed = 1
+            placed = true
         }
     }
 }
@@ -80,25 +70,26 @@ function place_ships(Array<int> g) {
 
 // --- Display ---
 
-// reveal 1 = show ships (your own board), reveal 0 = hide ships (enemy board)
-function print_grid(Array<int> g, int reveal) {
-    printf("  0 1 2 3 4 5 6 7 8 9\n")
+// reveal = show ships (your own board) or hide them (enemy board)
+function print_grid(Array<int> g, bool reveal) {
+    println("  0 1 2 3 4 5 6 7 8 9")
     int r = 0
     while (r < 10) {
-        printf("%lld ", r)
+        printInt(r)
+        print(" ")
         int c = 0
         while (c < 10) {
-            int v = cell_get(g, r, c)
-            if (v == 2) { printf("X ") }
-            if (v == 3) { printf(". ") }
-            if (v == 0) { printf("~ ") }
+            int v = g[r * 10 + c]
+            if (v == 2) { print("X ") }
+            if (v == 3) { print(". ") }
+            if (v == 0) { print("~ ") }
             if (v == 1) {
-                if (reveal == 1) { printf("S ") }
-                if (reveal == 0) { printf("~ ") }
+                if (reveal)  { print("S ") }
+                if (!reveal) { print("~ ") }
             }
             c = c + 1
         }
-        printf("\n")
+        print("\n")
         r = r + 1
     }
 }
@@ -108,7 +99,7 @@ function ships_left(Array<int> g) int {
     int count = 0
     int i = 0
     while (i < 100) {
-        if (g.get(i) == 1) { count = count + 1 }
+        if (g[i] == 1) { count = count + 1 }
         i = i + 1
     }
     return count
@@ -116,63 +107,70 @@ function ships_left(Array<int> g) int {
 
 // --- Turns ---
 
-// Ask player for a shot on grid g. Loops until a valid, unfired cell is chosen.
-// Returns 1 on hit, 0 on miss.
-function player_turn(Array<int> g) int {
-    int hit = 0
-    int valid = 0
+// Ask player for a shot. Loops until a valid, unfired cell is chosen.
+// Returns true on hit.
+function player_turn(Array<int> g) bool {
+    bool hit   = false
+    bool valid = false
     int row = 0
     int col = 0
-    while (valid == 0) {
-        printf("Your shot (row col): ")
+    while (!valid) {
+        print("Your shot (row col): ")
         scanf("%lld %lld", row::address, col::address)
         bool ok = true
-        if (row < 0) { ok = false }
-        if (col < 0) { ok = false }
+        if (row < 0)  { ok = false }
+        if (col < 0)  { ok = false }
         if (row >= 10) { ok = false }
         if (col >= 10) { ok = false }
         if (!ok) {
-            printf("Out of bounds - enter row and col 0-9.\n")
+            println("Out of bounds - enter row and col 0-9.")
         }
         if (ok) {
-            int v = cell_get(g, row, col)
-            if (v == 2) { printf("Already hit there - try again.\n") }
-            if (v == 3) { printf("Already fired there - try again.\n") }
+            int v = g[row * 10 + col]
+            if (v == 2) { println("Already hit there - try again.") }
+            if (v == 3) { println("Already fired there - try again.") }
             if (v == 0) {
-                cell_set(g, row, col, 3)
-                printf("Miss.\n")
-                valid = 1
+                g[row * 10 + col] = 3
+                println("Miss.")
+                valid = true
             }
             if (v == 1) {
-                cell_set(g, row, col, 2)
-                printf("HIT!\n")
-                hit = 1
-                valid = 1
+                g[row * 10 + col] = 2
+                println("HIT!")
+                hit   = true
+                valid = true
             }
         }
     }
     return hit
 }
 
-// Computer fires at a random unfired cell on grid g.
-// Returns 1 on hit, 0 on miss.
-function computer_turn(Array<int> g) int {
-    int hit = 0
-    int done = 0
-    while (done == 0) {
+// Computer fires at a random unfired cell. Returns true on hit.
+function computer_turn(Array<int> g) bool {
+    bool hit  = false
+    bool done = false
+    while (!done) {
         int r = rand() % 10
         int c = rand() % 10
-        int v = cell_get(g, r, c)
+        int v = g[r * 10 + c]
         if (v == 0) {
-            cell_set(g, r, c, 3)
-            printf("Computer fires at %lld %lld: Miss.\n", r, c)
-            done = 1
+            g[r * 10 + c] = 3
+            print("Computer fires at ")
+            printInt(r)
+            print(" ")
+            printInt(c)
+            println(": Miss.")
+            done = true
         }
         if (v == 1) {
-            cell_set(g, r, c, 2)
-            printf("Computer fires at %lld %lld: HIT!\n", r, c)
-            hit = 1
-            done = 1
+            g[r * 10 + c] = 2
+            print("Computer fires at ")
+            printInt(r)
+            print(" ")
+            printInt(c)
+            println(": HIT!")
+            hit  = true
+            done = true
         }
     }
     return hit
@@ -196,44 +194,43 @@ entry main {
     place_ships(player)
     place_ships(computer)
 
-    printf("=== BATTLESHIP ===\n")
-    printf("17 ship cells each. Sink them all to win!\n\n")
+    println("=== BATTLESHIP ===")
+    println("17 ship cells each. Sink them all to win!")
 
-    int game_over = 0
-    int player_wins = 0
+    bool game_over   = false
+    bool player_wins = false
 
-    while (game_over == 0) {
-        printf("\n--- Your fleet ---\n")
-        print_grid(player, 1)
-        printf("\n--- Enemy waters ---\n")
-        print_grid(computer, 0)
-        printf("\n")
+    while (!game_over) {
+        print("\n")
+        println("--- Your fleet ---")
+        print_grid(player, true)
+        print("\n")
+        println("--- Enemy waters ---")
+        print_grid(computer, false)
+        print("\n")
 
         player_turn(computer)
 
         if (ships_left(computer) == 0) {
-            game_over = 1
-            player_wins = 1
+            game_over   = true
+            player_wins = true
         }
 
-        if (game_over == 0) {
+        if (!game_over) {
             computer_turn(player)
             if (ships_left(player) == 0) {
-                game_over = 1
+                game_over = true
             }
         }
     }
 
-    printf("\n--- Final state ---\n")
-    printf("Your fleet:\n")
-    print_grid(player, 1)
-    printf("Enemy fleet:\n")
-    print_grid(computer, 1)
+    print("\n")
+    println("--- Final state ---")
+    println("Your fleet:")
+    print_grid(player, true)
+    println("Enemy fleet:")
+    print_grid(computer, true)
 
-    if (player_wins == 1) {
-        printf("\nYou win! All enemy ships sunk!\n")
-    }
-    if (player_wins == 0) {
-        printf("\nComputer wins! Your fleet is destroyed!\n")
-    }
+    if (player_wins)  { println("\nYou win! All enemy ships sunk!") }
+    if (!player_wins) { println("\nComputer wins! Your fleet is destroyed!") }
 }

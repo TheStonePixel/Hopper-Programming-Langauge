@@ -150,7 +150,7 @@ classMember
     : type fieldName                                            # ClassField
     | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
     | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
-    | 'operator' operatorSymbol '(' Identifier (',' param)? ')' type block   # ClassOperator
+    | 'operator' operatorSymbol '(' Identifier (',' param)* ')' type block   # ClassOperator
     | 'constructor' '(' paramList? ')' block                   # ClassConstructor
     | 'destructor' '(' ')' block                               # ClassDestructor
     ;
@@ -167,6 +167,7 @@ operatorSymbol
     : '+' | '-' | '*' | '/' | '%'
     | '==' | '!=' | '<' | '<=' | '>' | '>='
     | '&' | '|' | '^' | '<<' | '>>'
+    | '[' ']' '='
     | '[' ']'
     ;
 
@@ -194,7 +195,8 @@ paramName
     ;
 
 type
-    : 'int'
+    : 'void'
+    | 'int'
     | 'bool'
     | 'float'
     | 'byte'
