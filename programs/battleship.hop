@@ -29,9 +29,9 @@ function cell_set(Array<int> g, int r, int c, int val) {
 
 // --- Ship placement ---
 
-// Returns 1 if a ship of given length fits at (r,c).
+// Returns true if a ship of given length fits at (r,c).
 // dir 0 = horizontal (growing c), dir 1 = vertical (growing r).
-function can_place(Array<int> g, int r, int c, int len, int dir) int {
+function can_place(Array<int> g, int r, int c, int len, int dir) bool {
     bool ok = true
     int i = 0
     while (i < len) {
@@ -55,7 +55,7 @@ function place_ship(Array<int> g, int len) {
         int r = rand() % 10
         int c = rand() % 10
         int dir = rand() % 2
-        if (can_place(g, r, c, len, dir) == true) {
+        if (can_place(g, r, c, len, dir)) {
             int i = 0
             while (i < len) {
                 int rr = r

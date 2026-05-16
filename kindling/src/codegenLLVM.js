@@ -1419,8 +1419,11 @@ function genStmt(ir, stmt, retType) {
                     const casted = emitCast(ir, inner.value, inner.type, retType);
                     ir.emit(`ret ${llvmType(retType)} ${casted.value}`);
                 } else {
-                    const val = genExpr(ir, stmt.expr);
-                    ir.emit(`ret ${llvmType(retType)} ${val.value}`);
+                    const val     = genExpr(ir, stmt.expr);
+                    const coerced = val.type !== retType
+                        ? emitCast(ir, val.value, val.type, retType)
+                        : val;
+                    ir.emit(`ret ${llvmType(retType)} ${coerced.value}`);
                 }
             } else {
                 ir.emit(`ret void`);
