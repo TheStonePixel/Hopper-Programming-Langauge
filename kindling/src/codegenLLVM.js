@@ -1058,8 +1058,8 @@ function genStmt(ir, stmt, retType) {
                     const inner = genExpr(ir, stmt.init.expr);
                     init = emitCast(ir, inner.value, inner.type, stmt.type);
                     hType = normType;
-                } else if (stmt.init.kind === "Deref" && !ir.returnType) {
-                    // 'byte b = ptr::value' — use the declared type as the load width
+                } else if (stmt.init.kind === "Deref") {
+                    // declared type always determines load width, even inside template methods
                     const savedRet = ir.returnType;
                     ir.returnType = stmt.type;
                     init = genExpr(ir, stmt.init);

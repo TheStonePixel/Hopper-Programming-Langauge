@@ -1,9 +1,7 @@
 // HashMap<K, V> — open-addressing hash map with linear probing
 //
 // Three parallel arrays (keys, values, used) avoid struct alignment issues.
-// used[] stores int: 0 = empty, 1 = occupied, 2 = tombstone.
-// Using int for used slots avoids a codegen edge case where byte loads
-// inside templates resolve to the template type width instead of i8.
+// Slots: used[i] = 0 (empty), 1 (occupied), 2 (tombstone).
 // Grows at 75% load — doubles capacity and rehashes all live entries.
 // K must support == and be castable to int for hashing.
 //
@@ -26,11 +24,11 @@ template HashMap<K, V> {
         self.length   = 0
         self.keys     = allocate initialCap * K::size
         self.values   = allocate initialCap * V::size
-        self.used     = allocate initialCap * 8
+        self.used     = allocate initialCap
         int i = 0
         while (i < initialCap) {
-            address ptr = self.used + (i * 8)
-            int zero = 0
+            address ptr = self.used + i
+            byte zero = cast 0
             ptr::value = zero
             i = i + 1
         }
@@ -69,16 +67,17 @@ template HashMap<K, V> {
             self.grow()
         }
         int slot = self.probe(key)
-        address uptr = self.used + (slot * 8)
-        int u = uptr::value
-        if (u != 1) {
+        address uptr = self.used + slot
+        byte u = uptr::value
+        int ui = cast u
+        if (ui != 1) {
             self.length = self.length + 1
         }
         address kptr = self.keys + (slot * K::size)
         address vptr = self.values + (slot * V::size)
         kptr::value = key
         vptr::value = val
-        int one = 1
+        byte one = cast 1
         uptr::value = one
     }
 
@@ -88,8 +87,8 @@ template HashMap<K, V> {
         if (slot == -1) {
             return
         }
-        address uptr = self.used + (slot * 8)
-        int tomb = 2
+        address uptr = self.used + slot
+        byte tomb = cast 2
         uptr::value = tomb
         self.length = self.length - 1
     }
@@ -100,12 +99,13 @@ template HashMap<K, V> {
         int i = 0
         while (i < self.capacity) {
             int slot = (h + i) % self.capacity
-            address uptr = self.used + (slot * 8)
-            int u = uptr::value
-            if (u == 0) {
+            address uptr = self.used + slot
+            byte u = uptr::value
+            int ui = cast u
+            if (ui == 0) {
                 return -1
             }
-            if (u == 1) {
+            if (ui == 1) {
                 address kptr = self.keys + (slot * K::size)
                 K k = kptr::value
                 if (k == key) {
@@ -124,20 +124,21 @@ template HashMap<K, V> {
         int i = 0
         while (i < self.capacity) {
             int slot = (h + i) % self.capacity
-            address uptr = self.used + (slot * 8)
-            int u = uptr::value
-            if (u == 0) {
+            address uptr = self.used + slot
+            byte u = uptr::value
+            int ui = cast u
+            if (ui == 0) {
                 if (tomb != -1) {
                     return tomb
                 }
                 return slot
             }
-            if (u == 2) {
+            if (ui == 2) {
                 if (tomb == -1) {
                     tomb = slot
                 }
             }
-            if (u == 1) {
+            if (ui == 1) {
                 address kptr = self.keys + (slot * K::size)
                 K k = kptr::value
                 if (k == key) {
@@ -169,20 +170,21 @@ template HashMap<K, V> {
         self.length   = 0
         self.keys     = allocate newCap * K::size
         self.values   = allocate newCap * V::size
-        self.used     = allocate newCap * 8
+        self.used     = allocate newCap
         int i = 0
         while (i < newCap) {
-            address ptr = self.used + (i * 8)
-            int zero = 0
+            address ptr = self.used + i
+            byte zero = cast 0
             ptr::value = zero
             i = i + 1
         }
 
         int j = 0
         while (j < oldCap) {
-            address uptr = oldUsed + (j * 8)
-            int u = uptr::value
-            if (u == 1) {
+            address uptr = oldUsed + j
+            byte u = uptr::value
+            int ui = cast u
+            if (ui == 1) {
                 address kptr = oldKeys + (j * K::size)
                 address vptr = oldValues + (j * V::size)
                 K k = kptr::value
