@@ -1,0 +1,57 @@
+// assert — panic, assert, soft
+//
+// panic(msg)          — write msg to stderr and exit 1. Never returns.
+// assert(cond, msg)   — panics if cond is false. Use for invariants.
+// soft(cond, msg)     — writes msg to stderr if cond is false, continues.
+//                       Use in test suites to surface all failures at once.
+//
+// Usage:
+//   import assert from core
+//
+//   assert(x > 0, "x must be positive\n")
+//   soft(len == 3, "expected len 3\n")
+//   panic("unreachable\n")
+
+import io  from linux
+import sys from linux
+
+function strLen(string s) int {
+    address ptr = cast s
+    int len    = 0
+    int active = 1
+    while (active == 1) {
+        byte b  = ptr::value
+        int  bi = cast b
+        if (bi == 0) {
+            active = 0
+        } else {
+            len = len + 1
+            ptr = ptr + 1
+        }
+    }
+    return len
+}
+
+function panic(string msg) {
+    address buf = cast msg
+    int len     = strLen(msg)
+    error(buf, len)
+    exit(1)
+}
+
+function assert(bool cond, string msg) {
+    if (!cond) {
+        address buf = cast msg
+        int len     = strLen(msg)
+        error(buf, len)
+        exit(1)
+    }
+}
+
+function soft(bool cond, string msg) {
+    if (!cond) {
+        address buf = cast msg
+        int len     = strLen(msg)
+        error(buf, len)
+    }
+}

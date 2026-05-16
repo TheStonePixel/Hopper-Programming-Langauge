@@ -1,0 +1,20 @@
+// EXPECT: assert true passed
+// EXPECT: soft true passed
+// EXPECT: soft false printed to stderr
+// EXPECT: done
+
+import assert from core
+extern function printf(string fmt, ...) int
+
+entry main {
+    assert(1 == 1, "assert true failed\n")
+    printf("assert true passed\n")
+
+    soft(1 == 1, "soft true failed\n")
+    printf("soft true passed\n")
+
+    soft(1 == 2, "soft false: this goes to stderr\n")
+    printf("soft false printed to stderr\n")
+
+    printf("done\n")
+}
