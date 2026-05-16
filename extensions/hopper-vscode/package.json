@@ -1,0 +1,29 @@
+{
+    "name": "hopper-language",
+    "displayName": "Hopper Language",
+    "description": "Syntax highlighting for the Hopper programming language (.hop)",
+    "version": "0.1.0",
+    "publisher": "hopper",
+    "engines": { "vscode": "^1.70.0" },
+    "categories": ["Programming Languages"],
+    "contributes": {
+        "languages": [
+            {
+                "id": "hopper",
+                "aliases": ["Hopper", "hop"],
+                "extensions": [".hop"],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "hopper",
+                "scopeName": "source.hopper",
+                "path": "./syntaxes/hopper.tmLanguage.json"
+            }
+        ]
+    },
+    "scripts": {
+        "install:vscode": "cp -r . ~/.vscode/extensions/hopper-language-0.1.0"
+    }
+}

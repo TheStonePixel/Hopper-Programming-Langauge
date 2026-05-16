@@ -1,0 +1,156 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Hopper",
+    "scopeName": "source.hopper",
+    "fileTypes": ["hop"],
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#function-decl" },
+        { "include": "#type-decl" },
+        { "include": "#control-keywords" },
+        { "include": "#other-keywords" },
+        { "include": "#types" },
+        { "include": "#language-constants" },
+        { "include": "#numbers" },
+        { "include": "#scope-access" },
+        { "include": "#operators" }
+    ],
+    "repository": {
+
+        "comments": {
+            "name": "comment.line.double-slash.hopper",
+            "match": "//.*$"
+        },
+
+        "strings": {
+            "name": "string.quoted.double.hopper",
+            "begin": "\"",
+            "end": "\"",
+            "patterns": [
+                {
+                    "name": "constant.character.escape.hopper",
+                    "match": "\\\\."
+                }
+            ]
+        },
+
+        "function-decl": {
+            "comment": "Colors the name after function / entry keywords",
+            "patterns": [
+                {
+                    "match": "\\b(function|entry)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+                    "captures": {
+                        "1": { "name": "keyword.other.hopper" },
+                        "2": { "name": "entity.name.function.hopper" }
+                    }
+                },
+                {
+                    "comment": "extern function — three tokens, name is third",
+                    "match": "\\b(extern)\\s+(function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+                    "captures": {
+                        "1": { "name": "keyword.other.hopper" },
+                        "2": { "name": "keyword.other.hopper" },
+                        "3": { "name": "entity.name.function.hopper" }
+                    }
+                }
+            ]
+        },
+
+        "type-decl": {
+            "comment": "Colors the name after struct / class / template / alias",
+            "match": "\\b(struct|class|template|alias)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.other.hopper" },
+                "2": { "name": "entity.name.type.hopper" }
+            }
+        },
+
+        "control-keywords": {
+            "name": "keyword.control.hopper",
+            "match": "\\b(if|else|while|for|break|continue|return|defer)\\b"
+        },
+
+        "other-keywords": {
+            "name": "keyword.other.hopper",
+            "match": "\\b(function|entry|extern|struct|class|template|import|from|const|alias|bind|strict|bitfield|asm|pad|operator|constructor|destructor|cast|allocate|deallocate|requires|ensures|invariant|constrain|unsigned)\\b"
+        },
+
+        "types": {
+            "name": "storage.type.hopper",
+            "match": "\\b(int|bool|float|byte|bit|string|String|address)\\b"
+        },
+
+        "language-constants": {
+            "patterns": [
+                {
+                    "name": "constant.language.hopper",
+                    "match": "\\b(true|false|null)\\b"
+                },
+                {
+                    "name": "variable.language.hopper",
+                    "match": "\\bself\\b"
+                }
+            ]
+        },
+
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.hex.hopper",
+                    "match": "\\b0x[0-9a-fA-F]+\\b"
+                },
+                {
+                    "name": "constant.numeric.float.hopper",
+                    "match": "\\b[0-9]+\\.[0-9]+\\b"
+                },
+                {
+                    "name": "constant.numeric.integer.hopper",
+                    "match": "\\b[0-9]+\\b"
+                }
+            ]
+        },
+
+        "scope-access": {
+            "comment": ":: operator and the contextual words that follow it",
+            "patterns": [
+                {
+                    "match": "([a-zA-Z_][a-zA-Z0-9_]*)(::)(value|address|size)",
+                    "captures": {
+                        "2": { "name": "keyword.operator.scope.hopper" },
+                        "3": { "name": "support.constant.hopper" }
+                    }
+                },
+                {
+                    "name": "keyword.operator.scope.hopper",
+                    "match": "::"
+                }
+            ]
+        },
+
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.logical.hopper",
+                    "match": "(&&|\\|\\||!(?!=))"
+                },
+                {
+                    "name": "keyword.operator.comparison.hopper",
+                    "match": "(==|!=|<=|>=|<|>)"
+                },
+                {
+                    "name": "keyword.operator.bitwise.hopper",
+                    "match": "(&(?!&)|\\|(?!\\|)|\\^|~|<<|>>)"
+                },
+                {
+                    "name": "keyword.operator.arithmetic.hopper",
+                    "match": "(\\+|-|\\*|/|%)"
+                },
+                {
+                    "name": "keyword.operator.assignment.hopper",
+                    "match": "(?<![=!<>])=(?!=)"
+                }
+            ]
+        }
+    }
+}
