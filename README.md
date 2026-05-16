@@ -1,5 +1,12 @@
 # Hopper
 
+> Donations fund velocity, not direction.<br>
+> Direction is non-negotiable.<br>
+> Velocity is for sale.<br>
+> Vision is not.
+
+---
+
 Hopper is a strongly typed, bare-metal systems language that compiles to LLVM IR.
 
 ---
