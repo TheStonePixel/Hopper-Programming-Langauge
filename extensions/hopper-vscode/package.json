@@ -27,23 +27,9 @@
                 "textMateRules": [
 
                     {
-                        "comment": "=== MEMORY (red) ===",
+                        "comment": "=== MEMORY (red bold) ===",
                         "comment2": "allocate, deallocate, ::, ::value, ::size, ::address",
-                        "scope": [
-                            "keyword.memory.hopper",
-                            "keyword.operator.scope.hopper",
-                            "support.constant.memory.hopper"
-                        ],
-                        "settings": { "foreground": "#E06C75" }
-                    },
-                    {
-                        "comment": "memory keywords bold so they stand out",
                         "scope": "keyword.memory.hopper",
-                        "settings": { "foreground": "#E06C75", "fontStyle": "bold" }
-                    },
-                    {
-                        "comment": "::value ::size ::address — bold to signal dereference",
-                        "scope": "support.constant.memory.hopper",
                         "settings": { "foreground": "#E06C75", "fontStyle": "bold" }
                     },
 

@@ -161,12 +161,12 @@
                     "comment": "Identifier::value/address/size — color the whole access",
                     "match": "([a-zA-Z_][a-zA-Z0-9_]*)(::)(value|address|size)",
                     "captures": {
-                        "2": { "name": "keyword.operator.scope.hopper" },
-                        "3": { "name": "support.constant.memory.hopper" }
+                        "2": { "name": "keyword.memory.hopper" },
+                        "3": { "name": "keyword.memory.hopper" }
                     }
                 },
                 {
-                    "name": "keyword.operator.scope.hopper",
+                    "name": "keyword.memory.hopper",
                     "match": "::"
                 }
             ]
