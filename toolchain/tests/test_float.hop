@@ -6,7 +6,7 @@
 
 extern function printf(String fmt, ...) int
 
-function main() int {
+entry main {
     float pi   = 3.14
     float two  = 2.0
     float tau  = pi * two
@@ -17,5 +17,4 @@ function main() int {
     printf("tau: %f\n",  tau)
     printf("half: %f\n", half)
     printf("neg: %f\n",  neg)
-    return 0
 }

@@ -4,9 +4,8 @@
 
 import io from linux
 
-function main() int {
+entry main {
     print("hello from hopper\n", 18)
     print("second line\n", 12)
     error("this goes to stderr\n", 20)
-    return 0
 }
