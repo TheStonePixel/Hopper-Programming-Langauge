@@ -96,7 +96,14 @@ bitfieldMember
 // Fixed-param templates are fully monomorphized at declaration time and their
 // name becomes a standalone type — no <> required at use sites.
 templateDecl
-    : 'template' Identifier '<' templateParam (',' templateParam)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'template' templateName '<' templateParam (',' templateParam)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+// Allow 'String' as a template name in addition to plain identifiers.
+// 'String' is a reserved keyword so it cannot be used as Identifier directly.
+templateName
+    : Identifier
+    | 'String'
     ;
 
 templateParam
@@ -171,6 +178,7 @@ type
     | 'bit'
     | 'string' '[' ']'  // array of strings — argv type, maps to i8**
     | 'string'
+    | 'String' '<' type (',' type)* '>'   // String<byte>, String<int> — template instantiation
     | 'String'
     | 'address'
     | 'unsigned' 'int'
@@ -278,6 +286,7 @@ primary
     | Identifier '::' 'size'                            // byte size of variable or type
     | Identifier '(' argList? ')'                       // function call
     | Identifier '.' Identifier '(' argList? ')'        // method call
+    | 'String' '(' argList? ')'                         // String template constructor call
     | Identifier '[' expression ']'                     // array element access
     | Identifier '.' fieldName                          // field access
     | Identifier

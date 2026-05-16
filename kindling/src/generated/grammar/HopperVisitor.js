@@ -156,6 +156,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#templateName.
+	visitTemplateName(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#FreeParam.
 	visitFreeParam(ctx) {
 	  return this.visitChildren(ctx);

@@ -260,7 +260,7 @@ export class AstBuilder extends HopperVisitor {
     // ── template ───────────────────────────────────────────────────────────
 
     visitTemplateDecl(ctx) {
-        const name = ctx.Identifier().getText();   // template name — always the single Identifier before <
+        const name = ctx.templateName().getText();   // template name — Identifier or 'String' keyword
 
         const typeParams  = [];   // free variables: T, K, V
         const fixedParams = [];   // concrete types: byte, int, address, ...
@@ -712,6 +712,14 @@ export class AstBuilder extends HopperVisitor {
             const ids = ctx.Identifier();
             if (Array.isArray(ids) && ids.length === 1) return Var(ids[0].getText());
             if (ids && !Array.isArray(ids)) return Var(ids.getText());
+        }
+
+        // String template constructor call: String(cap)
+        if (childTexts[0] === 'String' && childTexts.includes('(')) {
+            const args = ctx.argList && ctx.argList()
+                ? ctx.argList().expression().map(e => this.visit(e))
+                : [];
+            return Call("String", args);
         }
 
         // parenthesised expression

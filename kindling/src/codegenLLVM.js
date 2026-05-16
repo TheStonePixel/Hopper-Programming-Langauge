@@ -876,12 +876,19 @@ function genExpr(ir, expr) {
             const isClass    = classTypes.has(typeName);
             const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
             const mangled    = `${typeName}_${expr.method}`;
-            const args       = (expr.args || []).map(a => genExpr(ir, a));
-            const selfArg    = `${llTypeName}* ${v.ptr}`;
-            const otherArgs  = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
-            const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             const mInfo      = functionReturnTypes.get(mangled);
             const retType    = mInfo ? mInfo.returnType : "int";
+            const rawArgs    = (expr.args || []).map(a => genExpr(ir, a));
+            // Coerce each argument to the declared parameter type so the LLVM
+            // call instruction types match the function signature exactly.
+            const coercedArgs = rawArgs.map((a, i) => {
+                const expectedType = mInfo && mInfo.params[i] ? mInfo.params[i].type : null;
+                if (!expectedType || expectedType === a.type) return a;
+                try { return emitCast(ir, a.value, a.type, expectedType); } catch { return a; }
+            });
+            const selfArg    = `${llTypeName}* ${v.ptr}`;
+            const otherArgs  = coercedArgs.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+            const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             if (retType === null) {
                 ir.emit(`call void @${mangled}(${argStr})`);
                 return { value: "0", type: "int" };
