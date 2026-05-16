@@ -32,17 +32,17 @@ function cell_set(Array<int> g, int r, int c, int val) {
 // Returns 1 if a ship of given length fits at (r,c).
 // dir 0 = horizontal (growing c), dir 1 = vertical (growing r).
 function can_place(Array<int> g, int r, int c, int len, int dir) int {
-    int ok = 1
+    bool ok = true
     int i = 0
     while (i < len) {
         int rr = r
         int cc = c
         if (dir == 0) { cc = c + i }
         if (dir == 1) { rr = r + i }
-        if (rr >= 10) { ok = 0 }
-        if (cc >= 10) { ok = 0 }
-        if (ok == 1) {
-            if (cell_get(g, rr, cc) == 1) { ok = 0 }
+        if (rr >= 10) { ok = false }
+        if (cc >= 10) { ok = false }
+        if (ok) {
+            if (cell_get(g, rr, cc) == 1) { ok = false }
         }
         i = i + 1
     }
@@ -55,7 +55,7 @@ function place_ship(Array<int> g, int len) {
         int r = rand() % 10
         int c = rand() % 10
         int dir = rand() % 2
-        if (can_place(g, r, c, len, dir) == 1) {
+        if (can_place(g, r, c, len, dir) == true) {
             int i = 0
             while (i < len) {
                 int rr = r
@@ -126,15 +126,15 @@ function player_turn(Array<int> g) int {
     while (valid == 0) {
         printf("Your shot (row col): ")
         scanf("%lld %lld", row::address, col::address)
-        int ok = 1
-        if (row < 0) { ok = 0 }
-        if (col < 0) { ok = 0 }
-        if (row >= 10) { ok = 0 }
-        if (col >= 10) { ok = 0 }
-        if (ok == 0) {
+        bool ok = true
+        if (row < 0) { ok = false }
+        if (col < 0) { ok = false }
+        if (row >= 10) { ok = false }
+        if (col >= 10) { ok = false }
+        if (!ok) {
             printf("Out of bounds - enter row and col 0-9.\n")
         }
-        if (ok == 1) {
+        if (ok) {
             int v = cell_get(g, row, col)
             if (v == 2) { printf("Already hit there - try again.\n") }
             if (v == 3) { printf("Already fired there - try again.\n") }
