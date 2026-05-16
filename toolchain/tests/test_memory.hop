@@ -1,0 +1,45 @@
+// Tests address, ::value (read/write), and ::size
+// EXPECT: 42
+// EXPECT: 99
+// EXPECT: 8
+// EXPECT: 1
+// EXPECT: 8
+// EXPECT: 16
+// EXPECT: 20
+
+extern function printf(String fmt, ...) int
+
+struct Vec2 {
+    int x
+    int y
+}
+
+entry main {
+    // ::address — take address of a variable
+    // ::value   — read through pointer
+    int n = 42
+    address ptr = n::address
+    printf("%d\n", ptr::value)
+
+    // ::value = — write through pointer, modifies original
+    ptr::value = 99
+    printf("%d\n", n)
+
+    // ::size — primitive types
+    printf("%d\n", n::size)      // int   = 8 bytes
+    byte b = 0
+    printf("%d\n", b::size)      // byte  = 1 byte
+    printf("%d\n", ptr::size)    // address = 8 bytes
+
+    // ::size — struct (two ints)
+    Vec2 v
+    printf("%d\n", v::size)      // Vec2  = 16 bytes
+
+    // ::address on array element + ::value read
+    int arr[3]
+    arr[0] = 10
+    arr[1] = 20
+    arr[2] = 30
+    address elem = arr[1]::address
+    printf("%d\n", elem::value)  // 20
+}

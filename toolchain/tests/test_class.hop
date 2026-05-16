@@ -29,7 +29,7 @@ class Counter {
     }
 }
 
-function main() int {
+entry main {
     Counter c
     c.init(10)
     printf("start: %ld\n",    c.get())
@@ -39,5 +39,4 @@ function main() int {
     printf("after inc: %ld\n", v2)
     int d = c.doubled()
     printf("doubled: %ld\n",   d)
-    return 0
 }

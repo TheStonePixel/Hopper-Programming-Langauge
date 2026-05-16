@@ -20,7 +20,6 @@ function maskByte(byte val, byte mask) byte {
     return val & mask
 }
 
-function main() int {
+entry main {
     ByteBuffer buf
-    return 0
 }

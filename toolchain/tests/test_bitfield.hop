@@ -1,0 +1,30 @@
+// Tests bitfield declaration, bit keyword, field read and write
+// EXPECT: 1
+// EXPECT: 0
+// EXPECT: 3
+// EXPECT: 255
+
+import io from linux
+
+extern function printf(string fmt, ...) int
+
+bitfield StatusReg {
+    bit    ready
+    bit    error
+    bit    mode[2]
+    byte   data
+}
+
+entry main {
+    StatusReg reg
+
+    reg.ready = 1
+    reg.error = 0
+    reg.mode  = 3
+    reg.data  = 255
+
+    printf("%d\n", reg.ready)
+    printf("%d\n", reg.error)
+    printf("%d\n", reg.mode)
+    printf("%d\n", reg.data)
+}

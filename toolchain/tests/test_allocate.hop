@@ -1,0 +1,32 @@
+// EXPECT: 100
+// EXPECT: 200
+// EXPECT: done
+
+extern function printf(String fmt, ...) int
+
+struct Point {
+    int x
+    int y
+}
+
+entry main {
+    // allocate raw memory for two Points
+    address a = allocate Point::size
+    address b = allocate Point::size
+
+    Point p1
+    p1.x = 100
+    p1.y = 1
+
+    Point p2
+    p2.x = 200
+    p2.y = 2
+
+    printf("%lld\n", p1.x)
+    printf("%lld\n", p2.x)
+
+    deallocate a
+    deallocate b
+
+    printf("done\n")
+}

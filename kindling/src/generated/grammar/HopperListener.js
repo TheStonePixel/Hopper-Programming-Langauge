@@ -140,6 +140,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#RequiresClause.
+	enterRequiresClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#RequiresClause.
+	exitRequiresClause(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#EnsuresClause.
+	enterEnsuresClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#EnsuresClause.
+	exitEnsuresClause(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#structDecl.
 	enterStructDecl(ctx) {
 	}
@@ -167,12 +185,75 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#bitfieldDecl.
+	enterBitfieldDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#bitfieldDecl.
+	exitBitfieldDecl(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#BitfieldArrayField.
+	enterBitfieldArrayField(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#BitfieldArrayField.
+	exitBitfieldArrayField(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#BitfieldField.
+	enterBitfieldField(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#BitfieldField.
+	exitBitfieldField(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#BitfieldPad.
+	enterBitfieldPad(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#BitfieldPad.
+	exitBitfieldPad(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#templateDecl.
 	enterTemplateDecl(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#templateDecl.
 	exitTemplateDecl(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#templateName.
+	enterTemplateName(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#templateName.
+	exitTemplateName(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#FreeParam.
+	enterFreeParam(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#FreeParam.
+	exitFreeParam(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#FixedParam.
+	enterFixedParam(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#FixedParam.
+	exitFixedParam(ctx) {
 	}
 
 
@@ -329,6 +410,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#AllocateVarDecl.
+	enterAllocateVarDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AllocateVarDecl.
+	exitAllocateVarDecl(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#VarDecl.
 	enterVarDecl(ctx) {
 	}
@@ -356,12 +446,30 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#AllocateAssign.
+	enterAllocateAssign(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AllocateAssign.
+	exitAllocateAssign(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#Assign.
 	enterAssign(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#Assign.
 	exitAssign(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#AllocateFieldAssign.
+	enterAllocateFieldAssign(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#AllocateFieldAssign.
+	exitAllocateFieldAssign(ctx) {
 	}
 
 
@@ -455,12 +563,39 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#DeallocateStmt.
+	enterDeallocateStmt(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#DeallocateStmt.
+	exitDeallocateStmt(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#AsmStmt.
 	enterAsmStmt(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#AsmStmt.
 	exitAsmStmt(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#constrainClause.
+	enterConstrainClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#constrainClause.
+	exitConstrainClause(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#invariantClause.
+	enterInvariantClause(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#invariantClause.
+	exitInvariantClause(ctx) {
 	}
 
 

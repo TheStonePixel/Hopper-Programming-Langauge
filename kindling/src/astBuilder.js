@@ -40,6 +40,8 @@ import {
     ContinueStmt,
     ReturnStmt,
     DeferStmt,
+    AllocateExpr,
+    DeallocateStmt,
     ExprStmt,
     Block,
     Binary,
@@ -63,6 +65,9 @@ import {
     ArrayAssign,
     ArrayElementAddress,
     AsmStmt,
+    BitfieldDecl,
+    BitfieldField,
+    BitfieldPad,
 } from "./ast.js";
 
 export class AstBuilder extends HopperVisitor {
@@ -75,23 +80,25 @@ export class AstBuilder extends HopperVisitor {
         const templates = [];
         const binds = [];
         const stricts = [];
+        const bitfields = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
             if (!node) continue;
-            if (node.kind === "FunctionDecl")       functions.push(node);
-            else if (node.kind === "StructDecl")    structs.push(node);
-            else if (node.kind === "ClassDecl")     classes.push(node);
-            else if (node.kind === "ConstDecl")     consts.push(node);
-            else if (node.kind === "AliasDecl")     aliases.push(node);
-            else if (node.kind === "TemplateDecl")  templates.push(node);
-            else if (node.kind === "EntryDecl")     entry = node;
-            else if (node.kind === "BindDecl")      binds.push(node);
-            else if (node.kind === "StrictDecl")  stricts.push(node);
+            if (node.kind === "FunctionDecl")        functions.push(node);
+            else if (node.kind === "StructDecl")     structs.push(node);
+            else if (node.kind === "ClassDecl")      classes.push(node);
+            else if (node.kind === "ConstDecl")      consts.push(node);
+            else if (node.kind === "AliasDecl")      aliases.push(node);
+            else if (node.kind === "TemplateDecl")   templates.push(node);
+            else if (node.kind === "EntryDecl")      entry = node;
+            else if (node.kind === "BindDecl")       binds.push(node);
+            else if (node.kind === "StrictDecl")     stricts.push(node);
+            else if (node.kind === "BitfieldDecl")   bitfields.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields);
     }
 
     visitTopLevelDecl(ctx) {
@@ -150,6 +157,33 @@ export class AstBuilder extends HopperVisitor {
     visitStructPad(ctx) {
         const size = parseInt(ctx.IntegerLiteral().getText(), 10);
         return StructPad(size);
+    }
+
+    // ── bitfield ───────────────────────────────────────────────────────────
+
+    visitBitfieldDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const members = ctx.bitfieldMember ? ctx.bitfieldMember() : [];
+        const fields = members.map(m => this.visit(m));
+        return BitfieldDecl(name, fields);
+    }
+
+    visitBitfieldField(ctx) {
+        const type = ctx.type().getText();
+        const name = ctx.fieldName().getText();
+        return BitfieldField(name, type, 1);
+    }
+
+    visitBitfieldArrayField(ctx) {
+        const type  = ctx.type().getText();
+        const name  = ctx.fieldName().getText();
+        const count = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return BitfieldField(name, type, count);
+    }
+
+    visitBitfieldPad(ctx) {
+        const bits = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return BitfieldPad(bits);
     }
 
     // ── class ──────────────────────────────────────────────────────────────
@@ -226,9 +260,22 @@ export class AstBuilder extends HopperVisitor {
     // ── template ───────────────────────────────────────────────────────────
 
     visitTemplateDecl(ctx) {
-        const ids = ctx.Identifier();
-        const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
-        const typeParams = Array.isArray(ids) ? ids.slice(1).map(id => id.getText()) : [];
+        const name = ctx.templateName().getText();   // template name — Identifier or 'String' keyword
+
+        const typeParams  = [];   // free variables: T, K, V
+        const fixedParams = [];   // concrete types: byte, int, address, ...
+
+        for (const p of ctx.templateParam()) {
+            if (p.constructor.name === "FreeParamContext") {
+                typeParams.push(p.getText());
+            } else {
+                // FixedParam — getText() concatenates tokens, reconstruct spaced keywords
+                let t = p.getText();
+                if (t === "unsignedint")  t = "unsigned int";
+                if (t === "unsignedbyte") t = "unsigned byte";
+                fixedParams.push(t);
+            }
+        }
 
         const fields = [];
         const methods = [];
@@ -247,7 +294,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "ClassDestructor")  destructor = node;
         }
 
-        return TemplateDecl(name, typeParams, fields, methods, operators, constructor, destructor);
+        return TemplateDecl(name, typeParams, fixedParams, fields, methods, operators, constructor, destructor);
     }
 
     // ── entry ──────────────────────────────────────────────────────────────
@@ -343,6 +390,12 @@ export class AstBuilder extends HopperVisitor {
         return VarDecl(name, type, initExpr);
     }
 
+    visitAllocateVarDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())));
+    }
+
     visitVarDeclNoInit(ctx) {
         const name = ctx.Identifier().getText();
         const type = ctx.type().getText();
@@ -353,11 +406,21 @@ export class AstBuilder extends HopperVisitor {
         return Assign(ctx.Identifier().getText(), this.visit(ctx.expression()));
     }
 
+    visitAllocateAssign(ctx) {
+        return Assign(ctx.Identifier().getText(), AllocateExpr(this.visit(ctx.expression())));
+    }
+
     visitFieldAssign(ctx) {
         const object = ctx.Identifier(0).getText();
         const field  = ctx.fieldName().getText();
         const expr   = this.visit(ctx.expression());
         return FieldAssign(object, field, expr);
+    }
+
+    visitAllocateFieldAssign(ctx) {
+        const object = ctx.Identifier(0).getText();
+        const field  = ctx.fieldName().getText();
+        return FieldAssign(object, field, AllocateExpr(this.visit(ctx.expression())));
     }
 
     visitDerefAssign(ctx) {
@@ -438,12 +501,25 @@ export class AstBuilder extends HopperVisitor {
 
     visitBreakStmt()    { return BreakStmt(); }
     visitContinueStmt() { return ContinueStmt(); }
+
+    // templateParam alternatives — handled inline in visitTemplateDecl, not visited directly
+    visitFreeParam()  { return null; }
+    visitFixedParam() { return null; }
+
+    // ── compile-time contract stubs (not yet implemented) ──────────────────
+    // requires / ensures / invariant / constrain are reserved and parsed
+    // but silently ignored until the constraint system is built.
+    visitRequiresClause()  { return null; }
+    visitEnsuresClause()   { return null; }
+    visitInvariantClause() { return null; }
+    visitConstrainClause() { return null; }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
         return ReturnStmt(expr);
     }
-    visitDeferStmt(ctx)  { return DeferStmt(this.visit(ctx.expression())); }
-    visitExprStmt(ctx)   { return ExprStmt(this.visit(ctx.expression())); }
+    visitDeferStmt(ctx)      { return DeferStmt(this.visit(ctx.expression())); }
+    visitDeallocateStmt(ctx) { return DeallocateStmt(this.visit(ctx.expression())); }
+    visitExprStmt(ctx)       { return ExprStmt(this.visit(ctx.expression())); }
 
     // ── expressions ────────────────────────────────────────────────────────
 
@@ -526,8 +602,9 @@ export class AstBuilder extends HopperVisitor {
 
     visitUnary(ctx) {
         if (ctx.primary()) return this.visit(ctx.primary());
-        const op = ctx.children[0].getText(); // '!', '-', '~', or 'cast'
-        if (op === "cast") return CastExpr(this.visit(ctx.unary()));
+        const op = ctx.children[0].getText(); // '!', '-', '~', 'cast', or 'allocate'
+        if (op === "cast")     return CastExpr(this.visit(ctx.unary()));
+        if (op === "allocate") return AllocateExpr(this.visit(ctx.unary()));
         return Unary(op, this.visit(ctx.unary()));
     }
 
@@ -635,6 +712,14 @@ export class AstBuilder extends HopperVisitor {
             const ids = ctx.Identifier();
             if (Array.isArray(ids) && ids.length === 1) return Var(ids[0].getText());
             if (ids && !Array.isArray(ids)) return Var(ids.getText());
+        }
+
+        // String template constructor call: String(cap)
+        if (childTexts[0] === 'String' && childTexts.includes('(')) {
+            const args = ctx.argList && ctx.argList()
+                ? ctx.argList().expression().map(e => this.visit(e))
+                : [];
+            return Call("String", args);
         }
 
         // parenthesised expression

@@ -1,65 +1,243 @@
-// Hopper LLVM wrapper
-// Wraps the LLVM C API so the Hopper compiler can emit IR using Hopper code.
-// All C dependencies are isolated here. Once Hopper has its own IR (Hopper IR),
-// this wrapper is the only file that needs to change — the compiler above stays clean.
+// Hopper LLVM C API wrapper
+// Wraps the LLVM C API so the Hopper compiler can emit IR from Hopper code.
+// All LLVM dependencies are isolated here — the compiler above stays clean.
+// All handles are opaque addresses. LLVM manages the memory.
 
-// LLVM C API — opaque handles
-extern function LLVMModuleCreateWithName(String name) address
-extern function LLVMDisposeModule(address module)
 
+// ── Context and module ────────────────────────────────────────────────────────
 extern function LLVMContextCreate() address
 extern function LLVMContextDispose(address ctx)
+extern function LLVMModuleCreateWithName(string name) address
+extern function LLVMModuleCreateWithNameInContext(string name, address ctx) address
+extern function LLVMDisposeModule(address module)
+extern function LLVMGetModuleIdentifier(address module, address len) string
+extern function LLVMSetModuleIdentifier(address module, string ident, int len)
+extern function LLVMDumpModule(address module)
 
-extern function LLVMInt64TypeInContext(address ctx) address
-extern function LLVMInt8TypeInContext(address ctx) address
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+// Integer types — widths the compiler actually uses
 extern function LLVMInt1TypeInContext(address ctx) address
+extern function LLVMInt8TypeInContext(address ctx) address
+extern function LLVMInt16TypeInContext(address ctx) address
+extern function LLVMInt32TypeInContext(address ctx) address
+extern function LLVMInt64TypeInContext(address ctx) address
+
+// Float types
+extern function LLVMFloatTypeInContext(address ctx) address
 extern function LLVMDoubleTypeInContext(address ctx) address
+
+// Other types
 extern function LLVMVoidTypeInContext(address ctx) address
 extern function LLVMPointerType(address elementType, int addressSpace) address
-
-extern function LLVMAddFunction(address module, String name, address funcType) address
 extern function LLVMFunctionType(address returnType, address paramTypes, int paramCount, int isVarArg) address
-extern function LLVMAppendBasicBlockInContext(address ctx, address fn, String name) address
+extern function LLVMArrayType(address elemType, int count) address
+extern function LLVMStructTypeInContext(address ctx, address elementTypes, int elementCount, int packed) address
+extern function LLVMStructCreateNamed(address ctx, string name) address
+extern function LLVMStructSetBody(address structType, address elementTypes, int count, int packed)
 
+
+// ── Functions ─────────────────────────────────────────────────────────────────
+extern function LLVMAddFunction(address module, string name, address funcType) address
+extern function LLVMGetNamedFunction(address module, string name) address
+extern function LLVMGetFirstFunction(address module) address
+extern function LLVMGetNextFunction(address fn) address
+extern function LLVMDeleteFunction(address fn)
+extern function LLVMCountParams(address fn) int
+extern function LLVMGetParam(address fn, int index) address
+extern function LLVMGetReturnType(address fnType) address
+
+// Linkage — pass as int literal:
+//   LLVMExternalLinkage  = 0
+//   LLVMInternalLinkage  = 8
+//   LLVMPrivateLinkage   = 9
+extern function LLVMGetLinkage(address global) int
+extern function LLVMSetLinkage(address global, int linkage)
+
+// Calling convention — pass as int literal:
+//   LLVMCCallConv        = 0
+//   LLVMFastCallConv     = 8
+//   LLVMColdCallConv     = 9
+//   LLVMX86StdcallCallConv = 64
+extern function LLVMGetFunctionCallConv(address fn) int
+extern function LLVMSetFunctionCallConv(address fn, int cc)
+
+// Function attributes
+extern function LLVMAddAttributeAtIndex(address fn, int idx, address attr)
+extern function LLVMCreateEnumAttribute(address ctx, int kindId, int val) address
+extern function LLVMGetEnumAttributeKindForName(string name, int len) int
+
+
+// ── Basic blocks ──────────────────────────────────────────────────────────────
+extern function LLVMAppendBasicBlockInContext(address ctx, address fn, string name) address
+extern function LLVMInsertBasicBlockInContext(address ctx, address block, string name) address
+extern function LLVMDeleteBasicBlock(address block)
+extern function LLVMGetBasicBlockParent(address block) address
+extern function LLVMGetFirstBasicBlock(address fn) address
+extern function LLVMGetNextBasicBlock(address block) address
+
+
+// ── Builder ───────────────────────────────────────────────────────────────────
 extern function LLVMCreateBuilderInContext(address ctx) address
 extern function LLVMDisposeBuilder(address builder)
 extern function LLVMPositionBuilderAtEnd(address builder, address block)
+extern function LLVMPositionBuilderBefore(address builder, address instr)
+extern function LLVMGetInsertBlock(address builder) address
 
+
+// ── Memory ────────────────────────────────────────────────────────────────────
+extern function LLVMBuildAlloca(address builder, address type, string name) address
+extern function LLVMBuildArrayAlloca(address builder, address type, address val, string name) address
+extern function LLVMBuildLoad2(address builder, address type, address ptr, string name) address
+extern function LLVMBuildStore(address builder, address val, address ptr) address
+extern function LLVMBuildGEP2(address builder, address type, address ptr, address indices, int numIndices, string name) address
+extern function LLVMBuildInBoundsGEP2(address builder, address type, address ptr, address indices, int numIndices, string name) address
+extern function LLVMBuildStructGEP2(address builder, address type, address ptr, int idx, string name) address
+extern function LLVMSetVolatile(address memInst, int isVolatile)
+extern function LLVMSetAlignment(address val, int bytes)
+extern function LLVMBuildMemCpy(address builder, address dst, int dstAlign, address src, int srcAlign, address size) address
+extern function LLVMBuildMemSet(address builder, address ptr, address val, address len, int align) address
+
+
+// ── Integer arithmetic ────────────────────────────────────────────────────────
+extern function LLVMBuildAdd(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildNSWAdd(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildSub(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildMul(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildSDiv(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildUDiv(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildSRem(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildURem(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildNeg(address builder, address val, string name) address
+
+
+// ── Bitwise ───────────────────────────────────────────────────────────────────
+extern function LLVMBuildAnd(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildOr(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildXor(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildNot(address builder, address val, string name) address
+extern function LLVMBuildShl(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildLShr(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildAShr(address builder, address lhs, address rhs, string name) address
+
+
+// ── Float arithmetic ──────────────────────────────────────────────────────────
+extern function LLVMBuildFAdd(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildFSub(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildFMul(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildFDiv(address builder, address lhs, address rhs, string name) address
+extern function LLVMBuildFNeg(address builder, address val, string name) address
+
+
+// ── Comparison ────────────────────────────────────────────────────────────────
+// ICmp predicates (pass as int literal):
+//   LLVMIntEQ=32 LLVMIntNE=33 LLVMIntSGT=38 LLVMIntSGE=39 LLVMIntSLT=40 LLVMIntSLE=41
+//   LLVMIntUGT=34 LLVMIntUGE=35 LLVMIntULT=36 LLVMIntULE=37
+// FCmp predicates (pass as int literal):
+//   LLVMRealOEQ=1 LLVMRealONE=6 LLVMRealOGT=2 LLVMRealOGE=3 LLVMRealOLT=4 LLVMRealOLE=5
+extern function LLVMBuildICmp(address builder, int op, address lhs, address rhs, string name) address
+extern function LLVMBuildFCmp(address builder, int op, address lhs, address rhs, string name) address
+
+
+// ── Casts ─────────────────────────────────────────────────────────────────────
+extern function LLVMBuildTrunc(address builder, address val, address destType, string name) address
+extern function LLVMBuildZExt(address builder, address val, address destType, string name) address
+extern function LLVMBuildSExt(address builder, address val, address destType, string name) address
+extern function LLVMBuildFPToSI(address builder, address val, address destType, string name) address
+extern function LLVMBuildFPToUI(address builder, address val, address destType, string name) address
+extern function LLVMBuildSIToFP(address builder, address val, address destType, string name) address
+extern function LLVMBuildUIToFP(address builder, address val, address destType, string name) address
+extern function LLVMBuildFPTrunc(address builder, address val, address destType, string name) address
+extern function LLVMBuildFPExt(address builder, address val, address destType, string name) address
+extern function LLVMBuildBitCast(address builder, address val, address destType, string name) address
+extern function LLVMBuildPtrToInt(address builder, address val, address destType, string name) address
+extern function LLVMBuildIntToPtr(address builder, address val, address destType, string name) address
+
+
+// ── Control flow ──────────────────────────────────────────────────────────────
 extern function LLVMBuildRet(address builder, address val) address
 extern function LLVMBuildRetVoid(address builder) address
-extern function LLVMBuildCall2(address builder, address fnType, address fn, address args, int argCount, String name) address
-extern function LLVMBuildAlloca(address builder, address type, String name) address
-extern function LLVMBuildStore(address builder, address val, address ptr) address
-extern function LLVMBuildLoad2(address builder, address type, address ptr, String name) address
-extern function LLVMBuildAdd(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildSub(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildMul(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildSDiv(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildICmp(address builder, int op, address lhs, address rhs, String name) address
 extern function LLVMBuildBr(address builder, address block) address
 extern function LLVMBuildCondBr(address builder, address cond, address thenBlock, address elseBlock) address
-extern function LLVMBuildGEP2(address builder, address type, address ptr, address indices, int numIndices, String name) address
-extern function LLVMBuildGlobalStringPtr(address builder, String str, String name) address
-extern function LLVMBuildFAdd(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildFSub(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildFMul(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildFDiv(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildFCmp(address builder, int op, address lhs, address rhs, String name) address
-extern function LLVMBuildSIToFP(address builder, address val, address destType, String name) address
-extern function LLVMBuildFPToSI(address builder, address val, address destType, String name) address
-extern function LLVMBuildTrunc(address builder, address val, address destType, String name) address
-extern function LLVMBuildSExt(address builder, address val, address destType, String name) address
-extern function LLVMBuildXor(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildAnd(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildOr(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildShl(address builder, address lhs, address rhs, String name) address
-extern function LLVMBuildLShr(address builder, address lhs, address rhs, String name) address
+extern function LLVMBuildSwitch(address builder, address val, address defaultBlock, int numCases) address
+extern function LLVMAddCase(address switch_, address onVal, address destBlock)
+extern function LLVMBuildUnreachable(address builder) address
+extern function LLVMBuildPhi(address builder, address type, string name) address
+extern function LLVMAddIncoming(address phi, address vals, address blocks, int count)
 
+
+// ── Function calls ────────────────────────────────────────────────────────────
+extern function LLVMBuildCall2(address builder, address fnType, address fn, address args, int argCount, string name) address
+extern function LLVMBuildTailCall2(address builder, address fnType, address fn, address args, int argCount, string name) address
+
+
+// ── Inline assembly ───────────────────────────────────────────────────────────
+// Produces an address representing an inline asm snippet — pass to LLVMBuildCall2
+extern function LLVMGetInlineAsm(address fnType, string asmStr, int asmLen, string constraints, int constraintsLen, int hasSideEffects, int isAlignStack, int dialect, int canThrow) address
+
+
+// ── Aggregate operations ──────────────────────────────────────────────────────
+extern function LLVMBuildExtractValue(address builder, address agg, int index, string name) address
+extern function LLVMBuildInsertValue(address builder, address agg, address val, int index, string name) address
+
+
+// ── Global variables ──────────────────────────────────────────────────────────
+extern function LLVMAddGlobal(address module, address type, string name) address
+extern function LLVMGetNamedGlobal(address module, string name) address
+extern function LLVMSetInitializer(address global, address val)
+extern function LLVMSetGlobalConstant(address global, int isConstant)
+extern function LLVMSetExternallyInitialized(address global, int isExtInit)
+extern function LLVMBuildGlobalString(address builder, string str, string name) address
+extern function LLVMBuildGlobalStringPtr(address builder, string str, string name) address
+
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 extern function LLVMConstInt(address type, int val, int signExtend) address
 extern function LLVMConstReal(address type, float val) address
 extern function LLVMConstNull(address type) address
+extern function LLVMConstAllOnes(address type) address
+extern function LLVMConstArray(address elemType, address vals, int len) address
+extern function LLVMConstStruct(address vals, int count, int packed) address
+extern function LLVMConstNamedStruct(address structType, address vals, int count) address
+extern function LLVMConstBitCast(address val, address toType) address
+extern function LLVMGetUndef(address type) address
 
+
+// ── Value inspection ──────────────────────────────────────────────────────────
+extern function LLVMTypeOf(address val) address
+extern function LLVMGetValueName2(address val, address len) string
+extern function LLVMSetValueName2(address val, string name, int len)
+extern function LLVMIsConstant(address val) int
+extern function LLVMIsNull(address val) int
+extern function LLVMIsUndef(address val) int
+
+
+// ── Pass manager ──────────────────────────────────────────────────────────────
+// Legacy pass manager — still widely supported
+extern function LLVMCreatePassManager() address
+extern function LLVMCreateFunctionPassManagerForModule(address module) address
+extern function LLVMDisposePassManager(address pm)
+extern function LLVMRunPassManager(address pm, address module) int
+extern function LLVMInitializeFunctionPassManager(address fpm) int
+extern function LLVMRunFunctionPassManager(address fpm, address fn) int
+extern function LLVMFinalizeFunctionPassManager(address fpm) int
+extern function LLVMAddInstructionCombiningPass(address pm)
+extern function LLVMAddReassociatePass(address pm)
+extern function LLVMAddGVNPass(address pm)
+extern function LLVMAddCFGSimplificationPass(address pm)
+extern function LLVMAddPromoteMemoryToRegisterPass(address pm)
+extern function LLVMAddDeadStoreEliminationPass(address pm)
+extern function LLVMAddAggressiveDCEPass(address pm)
+
+
+// ── Verification and output ───────────────────────────────────────────────────
+// LLVMVerifyModule action (pass as int literal):
+//   LLVMAbortProcessAction  = 0
+//   LLVMPrintMessageAction  = 1
+//   LLVMReturnStatusAction  = 2
 extern function LLVMVerifyModule(address module, int action, address outMsg) int
-extern function LLVMPrintModuleToString(address module) String
-extern function LLVMWriteBitcodeToFile(address module, String path) int
-extern function LLVMDisposeMessage(String msg)
+extern function LLVMVerifyFunction(address fn, int action) int
+extern function LLVMPrintModuleToString(address module) string
+extern function LLVMPrintValueToString(address val) string
+extern function LLVMWriteBitcodeToFile(address module, string path) int
+extern function LLVMDisposeMessage(string msg)

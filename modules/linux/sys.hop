@@ -1,17 +1,45 @@
-// Linux process/system — direct syscalls, no libc
+// Linux process/system — direct asm syscalls, no libc
 
 function exit(int code) {
-    syscall(60, code)
+    asm {
+        rax = 60
+        rdi = code
+        syscall
+    }
 }
 
 function fork() int {
-    return syscall(57)
+    int result
+    asm {
+        rax = 57
+        syscall
+        result = rax
+    }
+    return result
 }
 
 function execve(string filename, string[] argv, string[] envp) int {
-    return syscall(59, filename, argv, envp)
+    int result
+    asm {
+        rax = 59
+        rdi = filename
+        rsi = argv
+        rdx = envp
+        syscall
+        result = rax
+    }
+    return result
 }
 
 function waitpid(int pid, address wstatus, int options) int {
-    return syscall(61, pid, wstatus, options, null)
+    int result
+    asm {
+        rax = 61
+        rdi = pid
+        rsi = wstatus
+        rdx = options
+        syscall
+        result = rax
+    }
+    return result
 }
