@@ -1,0 +1,14 @@
+// Tests that entry points can be named anything, not just main.
+// Compiled with -nostartfiles -e bootloader so the OS calls bootloader()
+// directly — no C runtime. exit() must be called explicitly.
+// EXPECT: booting
+// EXPECT: done
+
+extern function printf(String fmt, ...) int
+extern function exit(int code)
+
+entry bootloader {
+    printf("booting\n")
+    printf("done\n")
+    exit(0)
+}
