@@ -5,6 +5,7 @@ import { buildAstFromSource } from "./astBuilder.js";
 const stringConstants    = new Map();   // raw value  → @.str.N
 const structTypes        = new Map();   // name       → { fields: [{name,type,isPad,size}] }
 const classTypes         = new Map();   // name       → { fields: [{name,type}], methods, operators }
+const interfaceDefs      = new Map();   // name       → { methods: [{name, params, returnType}] }
 const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
@@ -18,6 +19,7 @@ function resetAll() {
     stringConstants.clear();
     structTypes.clear();
     classTypes.clear();
+    interfaceDefs.clear();
     moduleConstants.clear();
     typeAliases.clear();
     functionReturnTypes.clear();
@@ -39,6 +41,21 @@ function registerStruct(name, fields) {
 
 function registerClass(name, fields, methods, operators) {
     classTypes.set(name, { fields, methods, operators });
+}
+
+function checkImplements(cls) {
+    for (const ifaceName of cls.interfaces || []) {
+        const iface = interfaceDefs.get(ifaceName);
+        if (!iface) throw new Error(`Interface '${ifaceName}' not found (required by class '${cls.name}')`);
+        for (const req of iface.methods) {
+            const found = (cls.methods || []).find(m => m.name === req.name);
+            if (!found) {
+                throw new Error(
+                    `Class '${cls.name}' does not implement '${ifaceName}.${req.name}' — add a '${req.name}' method`
+                );
+            }
+        }
+    }
 }
 
 // ── template helpers ───────────────────────────────────────────────────────
@@ -192,7 +209,7 @@ function instantiateTemplate(typeStr) {
     for (const op of concreteClass.operators || []) {
         const ns = operatorNameSafe(op.op);
         functionReturnTypes.set(`${concreteClass.name}_op_${ns}`, {
-            returnType: op.returnType, isVariadic: false, params: [op.param]
+            returnType: op.returnType, isVariadic: false, params: op.param ? [op.param] : []
         });
     }
     if (concreteClass.constructor) {
@@ -283,6 +300,11 @@ function operatorNameSafe(op) {
 function llvmType(t) {
     if (!t) return "void";
     if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
+    // Check class/struct registries before hard-coded keywords so that
+    // user-defined classes named 'String' take priority over the i8* fallback.
+    if (classTypes.has(t))    return `%class.${t}`;
+    if (structTypes.has(t))   return `%struct.${t}`;
+    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
     if (t === "bit")          return "i1";
@@ -290,13 +312,10 @@ function llvmType(t) {
     if (t === "float")        return "double";
     if (t === "string[]")     return "i8**";
     if (t === "string")       return "i8*";
-    if (t === "String")       return "i8*";
+    if (t === "String")       return "i8*";   // fallback: bare String with no class registered
     if (t === "address")      return "i8*";
     if (t === "unsignedint")  return "i64";
     if (t === "unsignedbyte") return "i8";
-    if (structTypes.has(t))   return `%struct.${t}`;
-    if (classTypes.has(t))    return `%class.${t}`;
-    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
     if (t.includes('<')) {
         const m = mangleTemplate(t);
@@ -352,7 +371,6 @@ function sizeOfType(t) {
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
     if (t === "string")  return 8;
-    if (t === "String")  return 8;
     if (t === "address") return 8;
     if (bitfieldTypes.has(t)) {
         const { totalBits } = bitfieldLayout(bitfieldTypes.get(t));
@@ -362,6 +380,10 @@ function sizeOfType(t) {
         return structTypes.get(t).fields.reduce((s, f) =>
             s + (f.isPad ? f.size : sizeOfType(f.type)), 0);
     }
+    if (classTypes.has(t)) {
+        return classTypes.get(t).fields.reduce((acc, f) => acc + sizeOfType(f.type), 0);
+    }
+    if (t === "String")  return 8;   // bare String fallback (pointer size)
     throw new Error(`Unknown type for sizeof: ${t}`);
 }
 
@@ -406,6 +428,14 @@ function getFieldType(typeName, fieldName) {
     const f = ti.info.fields.find(f => !f.isPad && f.name === fieldName);
     if (!f) throw new Error(`Unknown field '${fieldName}' in ${ti.kind} '${typeName}'`);
     return f.type;
+}
+
+// Return the appropriate LLVM zero-value literal for a given LLVM type string.
+function llvmZeroValue(llType) {
+    if (llType === "double") return "0.0";
+    if (llType.endsWith("*")) return "null";
+    if (llType.startsWith("%class.") || llType.startsWith("%struct.")) return "zeroinitializer";
+    return "0";
 }
 
 // ── IRBuilder ──────────────────────────────────────────────────────────────
@@ -482,6 +512,21 @@ function emitCast(ir, srcVal, srcType, targetType) {
         }
         return { value: tmp, type: targetType };
     }
+    // string and address are both i8* in LLVM — no instruction needed
+    if ((srcType === "string" && targetType === "address") ||
+        (srcType === "address" && targetType === "string")) {
+        return { value: srcVal, type: targetType };
+    }
+    // int ↔ address (inttoptr / ptrtoint) — natural in systems code
+    if ((srcType === "int" || srcType === "unsignedint") && targetType === "address") {
+        ir.emit(`${tmp} = inttoptr i64 ${srcVal} to i8*`);
+        return { value: tmp, type: "address" };
+    }
+    if (srcType === "address" && (targetType === "int" || targetType === "unsignedint")) {
+        ir.emit(`${tmp} = ptrtoint i8* ${srcVal} to i64`);
+        return { value: tmp, type: targetType };
+    }
+
     if (srcType === "bool" && (targetType === "int" || targetType === "unsignedint")) {
         ir.emit(`${tmp} = zext i1 ${srcVal} to i64`);
         return { value: tmp, type: targetType };
@@ -605,7 +650,7 @@ function genExpr(ir, expr) {
                 return { value: result, type: fieldType };
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf) {
+            if (classTypes.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
                 );
@@ -645,6 +690,22 @@ function genExpr(ir, expr) {
         case "ArrayAccess": {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+
+            // Dispatch to class [] operator if defined
+            if (classTypes.has(v.hType)) {
+                const cls = classTypes.get(v.hType);
+                const idxOp = (cls.operators || []).find(o => o.op === '[]');
+                if (idxOp) {
+                    const indexVal = genExpr(ir, expr.index);
+                    const fnName = `${v.hType}_op_idx`;
+                    const selfType = `%class.${v.hType}*`;
+                    const paramType = llvmType(idxOp.param.type);
+                    const retType = idxOp.returnType;
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${v.ptr}, ${paramType} ${indexVal.value})`);
+                    return { value: tmp, type: retType };
+                }
+            }
 
             // string[] (argv) indexing — i8** pointer, each element is i8*
             if (v.hType === "string[]") {
@@ -732,6 +793,35 @@ function genExpr(ir, expr) {
         }
 
         case "Binary": {
+            // Dispatch to class operator if left operand is a class with this operator defined
+            if (expr.left.kind === "Var") {
+                const lv = ir.vars.get(expr.left.name);
+                if (lv && classTypes.has(lv.hType)) {
+                    const cls = classTypes.get(lv.hType);
+                    const matchingOp = (cls.operators || []).find(o => o.op === expr.op && o.param);
+                    if (matchingOp) {
+                        const ns = operatorNameSafe(expr.op);
+                        const fnName = `${lv.hType}_op_${ns}`;
+                        const selfType = `%class.${lv.hType}*`;
+                        const paramNormT = normalizeType(matchingOp.param.type);
+                        const retType = matchingOp.returnType;
+                        const tmp = ir.newTmp();
+                        let rightArgStr;
+                        if (classTypes.has(paramNormT) && expr.right.kind === "Var") {
+                            const rv = ir.vars.get(expr.right.name);
+                            if (rv && classTypes.has(rv.hType)) {
+                                rightArgStr = `%class.${paramNormT}* ${rv.ptr}`;
+                            }
+                        }
+                        if (!rightArgStr) {
+                            const right = genExpr(ir, expr.right);
+                            rightArgStr = `${llvmType(matchingOp.param.type)} ${right.value}`;
+                        }
+                        ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${lv.ptr}, ${rightArgStr})`);
+                        return { value: tmp, type: retType };
+                    }
+                }
+            }
             const left  = genExpr(ir, expr.left);
             const right = genExpr(ir, expr.right);
             const lt    = llvmType(left.type);
@@ -878,16 +968,28 @@ function genExpr(ir, expr) {
             const mangled    = `${typeName}_${expr.method}`;
             const mInfo      = functionReturnTypes.get(mangled);
             const retType    = mInfo ? mInfo.returnType : "int";
-            const rawArgs    = (expr.args || []).map(a => genExpr(ir, a));
-            // Coerce each argument to the declared parameter type so the LLVM
-            // call instruction types match the function signature exactly.
+            // Generate args — class-type params are passed by pointer (not by value)
+            const rawArgs = (expr.args || []).map((a, i) => {
+                const expectedNormT = mInfo && mInfo.params[i] ? normalizeType(mInfo.params[i].type) : null;
+                if (expectedNormT && classTypes.has(expectedNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar && classTypes.has(argVar.hType)) {
+                        return { value: argVar.ptr, type: argVar.hType, isClassPtr: true };
+                    }
+                }
+                return genExpr(ir, a);
+            });
             const coercedArgs = rawArgs.map((a, i) => {
+                if (a.isClassPtr) return a;
                 const expectedType = mInfo && mInfo.params[i] ? mInfo.params[i].type : null;
                 if (!expectedType || expectedType === a.type) return a;
                 try { return emitCast(ir, a.value, a.type, expectedType); } catch { return a; }
             });
-            const selfArg    = `${llTypeName}* ${v.ptr}`;
-            const otherArgs  = coercedArgs.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+            const selfArg   = `${llTypeName}* ${v.ptr}`;
+            const otherArgs = coercedArgs.map(a => {
+                if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
+                return `${llvmType(a.type)} ${a.value}`;
+            }).join(", ");
             const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             if (retType === null) {
                 ir.emit(`call void @${mangled}(${argStr})`);
@@ -956,6 +1058,12 @@ function genStmt(ir, stmt, retType) {
                     const inner = genExpr(ir, stmt.init.expr);
                     init = emitCast(ir, inner.value, inner.type, stmt.type);
                     hType = normType;
+                } else if (stmt.init.kind === "Deref" && !ir.returnType) {
+                    // 'byte b = ptr::value' — use the declared type as the load width
+                    const savedRet = ir.returnType;
+                    ir.returnType = stmt.type;
+                    init = genExpr(ir, stmt.init);
+                    ir.returnType = savedRet;
                 } else {
                     init = genExpr(ir, stmt.init);
                     if (stmt.type === "address" && init.type.startsWith("address:"))
@@ -1366,7 +1474,7 @@ function genFunction(fn) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
+        ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
@@ -1375,6 +1483,7 @@ function genFunction(fn) {
 function genMethod(typeName, method, isClass = true) {
     const ir         = new IRBuilder();
     ir.returnType    = method.returnType;
+    ir.currentClass  = typeName;
     const isVoid     = method.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
     const mangled    = `${typeName}_${method.name}`;
@@ -1383,7 +1492,11 @@ function genMethod(typeName, method, isClass = true) {
     const paramParts = [`${llTypeName}* %self`];
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
-        paramParts.push(`${llvmType(normT)} %p${i}`);
+        if (classTypes.has(normT)) {
+            paramParts.push(`%class.${normT}* %p${i}`);
+        } else {
+            paramParts.push(`${llvmType(normT)} %p${i}`);
+        }
     });
     ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")}) {`);
     ir.emit("entry:");
@@ -1397,11 +1510,16 @@ function genMethod(typeName, method, isClass = true) {
 
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
-        const lt    = llvmType(normT);
-        const ptr   = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${lt}`);
-        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        if (classTypes.has(normT)) {
+            // Class params passed by pointer — store directly, no alloca needed
+            ir.vars.set(p.name, { ptr: `%p${i}`, type: `%class.${normT}`, hType: normT });
+        } else {
+            const lt  = llvmType(normT);
+            const ptr = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${lt}`);
+            ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+            ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        }
     });
 
     genBlock(ir, method.body, method.returnType);
@@ -1409,7 +1527,7 @@ function genMethod(typeName, method, isClass = true) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
+        ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
     return ir.lines.join("\n");
@@ -1419,7 +1537,7 @@ function genOperator(className, op) {
     const nameSafe = operatorNameSafe(op.op);
     const pseudoMethod = {
         name:       `op_${nameSafe}`,
-        params:     [op.param],
+        params:     op.param ? [op.param] : [],
         returnType: op.returnType,
         body:       op.body
     };
@@ -1437,7 +1555,6 @@ function typeSize(hType) {
     if (t === "address" || t.startsWith("address:")) return 8;
     if (t === "string[]")     return 8;
     if (t === "string")       return 8;
-    if (t === "String")       return 8;
     if (t === "unsignedint")  return 8;
     if (t === "unsignedbyte") return 1;
     if (structTypes.has(t)) {
@@ -1447,6 +1564,7 @@ function typeSize(hType) {
     if (classTypes.has(t)) {
         return classTypes.get(t).fields.reduce((acc, f) => acc + typeSize(f.type), 0);
     }
+    if (t === "String")       return 8;   // bare String fallback (pointer size)
     throw new Error(`Cannot compute ::size of unknown type: ${t}`);
 }
 
@@ -1577,6 +1695,11 @@ function emitClassIR(cls, out, fnCode) {
 function genModule(ast) {
     resetAll();
 
+    // Interfaces — registered before classes so implements checking can find them
+    for (const iface of ast.interfaces || []) {
+        interfaceDefs.set(iface.name, { methods: iface.methods });
+    }
+
     // Aliases and constants
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
     for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
@@ -1607,6 +1730,9 @@ function genModule(ast) {
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);
     for (const c of ast.classes  || []) registerClass(c.name, c.fields, c.methods, c.operators);
 
+    // Verify interface conformance for all classes that declare 'implements'
+    for (const c of ast.classes || []) checkImplements(c);
+
     // Scan all type usages and instantiate every template type found
     for (const typeStr of collectTypeUsages(ast)) instantiateTemplate(typeStr);
 
@@ -1622,7 +1748,7 @@ function genModule(ast) {
         }
         for (const op of cls.operators || []) {
             const ns = operatorNameSafe(op.op);
-            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: [op.param] });
+            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: op.param ? [op.param] : [] });
         }
         if (cls.constructor) {
             functionReturnTypes.set(`${cls.name}_constructor`, { returnType: null, isVariadic: false, params: cls.constructor.params });

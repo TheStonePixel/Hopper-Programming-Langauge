@@ -1,0 +1,173 @@
+// EXPECT: Hello, Lenny
+// EXPECT: equals: true
+// EXPECT: not equal: true
+// EXPECT: indexOf H: 0
+// EXPECT: indexOf y: 11
+// EXPECT: indexOf z: -1
+// EXPECT: contains comma: true
+// EXPECT: startsWith: true
+// EXPECT: endsWith: true
+// EXPECT: upper: HELLO, LENNY
+// EXPECT: lower: hello, lenny
+// EXPECT: trim: hello
+// EXPECT: reverse: ynneL ,olleH
+// EXPECT: slice: Lenny
+// EXPECT: find sub: 7
+import String from ascii
+import io from linux
+
+function println(String s) {
+    write(1, s.pointer(), s.length())
+    write(1, "\n", 1)
+}
+
+entry main {
+    String s = String(32)
+    s.appendLiteral("Hello, Lenny")
+
+    String label = String(32)
+    String result = String(32)
+
+    // appendLiteral + print
+    result.appendString(s)
+    result.append('\n')
+    write(1, result.pointer(), result.length())
+    result.clear()
+
+    // equals
+    String copy = String(32)
+    copy.appendLiteral("Hello, Lenny")
+    label.appendLiteral("equals: ")
+    if (s.equals(copy)) {
+        label.appendLiteral("true")
+    }
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // != operator
+    String other = String(32)
+    other.appendLiteral("Hello, World")
+    label.appendLiteral("not equal: ")
+    if (s != other) {
+        label.appendLiteral("true")
+    }
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // indexOfByte
+    byte hh = 'H'
+    int idx = s.indexOfByte(hh)
+    label.appendLiteral("indexOf H: ")
+    label.appendNumber(idx)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    byte yy = 'y'
+    idx = s.indexOfByte(yy)
+    label.appendLiteral("indexOf y: ")
+    label.appendNumber(idx)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    byte zz = 'z'
+    idx = s.indexOfByte(zz)
+    label.appendLiteral("indexOf z: ")
+    label.appendNumber(idx)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // contains
+    byte comma = ','
+    label.appendLiteral("contains comma: ")
+    if (s.contains(comma)) {
+        label.appendLiteral("true")
+    }
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // startsWith
+    String prefix = String(8)
+    prefix.appendLiteral("Hello")
+    label.appendLiteral("startsWith: ")
+    if (s.startsWith(prefix)) {
+        label.appendLiteral("true")
+    }
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // endsWith
+    String suffix = String(8)
+    suffix.appendLiteral("Lenny")
+    label.appendLiteral("endsWith: ")
+    if (s.endsWith(suffix)) {
+        label.appendLiteral("true")
+    }
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // toUpperCase
+    String up = String(32)
+    s.copyInto(up)
+    up.toUpperCase()
+    label.appendLiteral("upper: ")
+    label.appendString(up)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // toLowerCase
+    String lo = String(32)
+    s.copyInto(lo)
+    lo.toLowerCase()
+    label.appendLiteral("lower: ")
+    label.appendString(lo)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // trim
+    String padded = String(16)
+    padded.appendLiteral("  hello  ")
+    padded.trim()
+    label.appendLiteral("trim: ")
+    label.appendString(padded)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // reverse
+    String rev = String(32)
+    s.copyInto(rev)
+    rev.reverse()
+    label.appendLiteral("reverse: ")
+    label.appendString(rev)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // sliceInto — "Lenny" starts at index 7
+    String sl = String(16)
+    s.sliceInto(sl, 7, 12)
+    label.appendLiteral("slice: ")
+    label.appendString(sl)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+    label.clear()
+
+    // indexOf substring
+    String needle = String(8)
+    needle.appendLiteral("Lenny")
+    int found = s.indexOf(needle)
+    label.appendLiteral("find sub: ")
+    label.appendNumber(found)
+    label.append('\n')
+    write(1, label.pointer(), label.length())
+}

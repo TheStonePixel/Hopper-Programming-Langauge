@@ -18,6 +18,7 @@ topLevelDecl
     | bindDecl
     | strictDecl
     | bitfieldDecl
+    | interfaceDecl
     ;
 
 importDecl
@@ -47,7 +48,7 @@ entryDecl
     ;
 
 constDecl
-    : 'const' Identifier '=' literal
+    : 'const' Identifier '=' '-'? literal
     ;
 
 aliasDecl
@@ -118,16 +119,38 @@ templateParam
     | 'unsigned' 'byte' # FixedParam
     ;
 
+// interface = compile-time contract: a set of method signatures a class must implement
+interfaceDecl
+    : 'interface' Identifier '{' NEWLINE* (interfaceMember (NEWLINE+ interfaceMember)* NEWLINE*)? '}'
+    ;
+
+interfaceMember
+    : 'function' Identifier '(' paramList? ')' type   # InterfaceFunc
+    | 'function' Identifier '(' paramList? ')'        # InterfaceProc
+    ;
+
 // class = data + behavior, compiler-optimized layout
+// Optional 'implements' list for compile-time interface conformance checking
 classDecl
-    : 'class' Identifier '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'class' className implementsList? '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+// className allows 'String' as a class name in addition to plain identifiers
+className
+    : Identifier
+    | 'String'
+    ;
+
+// implements — list of interfaces the class must conform to
+implementsList
+    : 'implements' Identifier (',' Identifier)*
     ;
 
 classMember
     : type fieldName                                            # ClassField
     | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
     | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
-    | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
+    | 'operator' operatorSymbol '(' Identifier (',' param)? ')' type block   # ClassOperator
     | 'constructor' '(' paramList? ')' block                   # ClassConstructor
     | 'destructor' '(' ')' block                               # ClassDestructor
     ;
@@ -275,6 +298,8 @@ unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
 primary
     : IntegerLiteral
     | HexLiteral
+    | CharLiteral
+    | UnicodeLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -303,6 +328,8 @@ argList
 literal
     : IntegerLiteral
     | HexLiteral
+    | CharLiteral
+    | UnicodeLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -314,9 +341,10 @@ literal
 
 IntegerLiteral  : [0-9]+ ;
 HexLiteral      : '0x' [0-9a-fA-F]+ ;
+CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
+UnicodeLiteral  : 'U+' [0-9a-fA-F]+ ;
 FloatLiteral    : [0-9]+ '.' [0-9]+ ;
 StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
-// CharLiteral removed — characters are byte values, e.g. 72 not 'H'
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
 
 // keep newlines as real tokens (for statement separation)

@@ -1,4 +1,3 @@
-// Tests linux/fs.hop — open and close
 // EXPECT: 1
 
 import fs from linux

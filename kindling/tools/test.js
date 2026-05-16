@@ -2,15 +2,19 @@
 /**
  * Hopper Test Runner
  *
- * Convention inside each .hop test file:
+ * Discovers tests from two locations:
+ *   modules/<name>/tests/*.hop  — module tests, grouped by module name
+ *   toolchain/tests/*.hop        — language/compiler tests
  *
+ * Conventions inside each .hop test file:
  *   // EXPECT: <line>       — expected stdout line (one per expected line)
  *   // COMPILE_ONLY         — only verify the file compiles, don't run
  *   // EXPECT_ERROR: <msg>  — compilation should fail with a message containing <msg>
  *
  * Usage:
  *   node tools/test.js              — run all tests
- *   node tools/test.js bitwise      — run tests whose filename contains "bitwise"
+ *   node tools/test.js linux        — run modules/linux/tests/ only
+ *   node tools/test.js toolchain    — run toolchain/tests/ only
  */
 
 import { readFileSync, mkdirSync, existsSync, readdirSync } from "fs";
@@ -21,10 +25,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const ROOT       = path.resolve(__dirname, "..", "..");
-const TESTS_DIR  = path.join(ROOT, "toolchain", "tests");
 const BUILD_DIR  = path.join(ROOT, "build", "tests");
 
-// ── ANSI colours ─────────────────────────────────────────────────────────────
 const G    = "\x1b[32m";
 const R    = "\x1b[31m";
 const Y    = "\x1b[33m";
@@ -32,7 +34,43 @@ const DIM  = "\x1b[2m";
 const BOLD = "\x1b[1m";
 const RST  = "\x1b[0m";
 
-// ── Parse metadata from test file comments ────────────────────────────────────
+// ── Test discovery ─────────────────────────────────────────────────────────────
+
+function discoverGroups(filter) {
+    const groups = [];
+
+    // modules/<name>/tests/*.hop
+    const modulesDir = path.join(ROOT, "modules");
+    if (existsSync(modulesDir)) {
+        for (const mod of readdirSync(modulesDir).sort()) {
+            if (filter && mod !== filter) continue;
+            const testsDir = path.join(modulesDir, mod, "tests");
+            if (!existsSync(testsDir)) continue;
+            const files = readdirSync(testsDir)
+                .filter(f => f.endsWith(".hop"))
+                .sort()
+                .map(f => path.join(testsDir, f));
+            if (files.length) groups.push({ name: mod, files });
+        }
+    }
+
+    // toolchain/tests/*.hop
+    if (!filter || filter === "toolchain") {
+        const toolchainDir = path.join(ROOT, "toolchain", "tests");
+        if (existsSync(toolchainDir)) {
+            const files = readdirSync(toolchainDir)
+                .filter(f => f.endsWith(".hop"))
+                .sort()
+                .map(f => path.join(toolchainDir, f));
+            if (files.length) groups.push({ name: "toolchain", files });
+        }
+    }
+
+    return groups;
+}
+
+// ── Metadata parsing ───────────────────────────────────────────────────────────
+
 function parseMeta(source) {
     const expected      = [];
     let   compileOnly   = false;
@@ -51,22 +89,22 @@ function parseMeta(source) {
     return { expected, compileOnly, expectedError };
 }
 
-// ── Run a single test ─────────────────────────────────────────────────────────
-function runTest(testFile) {
+// ── Run a single test ──────────────────────────────────────────────────────────
+
+function runTest(testFile, group) {
     const name   = path.basename(testFile, ".hop");
     const source = readFileSync(testFile, "utf8");
     const { expected, compileOnly, expectedError } = parseMeta(source);
-    const exePath = path.join(BUILD_DIR, name);
+    const exePath = path.join(BUILD_DIR, `${group}__${name}`);
 
-    // Compile
     const build = spawnSync(
         "node",
         ["kindling/hopper", "-c", testFile, "-o", exePath],
         { cwd: ROOT, encoding: "utf8" }
     );
 
-    const compileFailed  = build.status !== 0;
-    const compileOutput  = (build.stderr || "") + (build.stdout || "");
+    const compileFailed = build.status !== 0;
+    const compileOutput = (build.stderr || "") + (build.stdout || "");
 
     if (compileFailed) {
         if (expectedError) {
@@ -86,7 +124,6 @@ function runTest(testFile) {
     if (compileOnly)
         return { name, status: "PASS", note: "compile only" };
 
-    // Run binary
     const run    = spawnSync(exePath, [], { encoding: "utf8" });
     const actual = (run.stdout || "").trimEnd();
 
@@ -103,49 +140,47 @@ function runTest(testFile) {
     };
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────────────────────────
+
 if (!existsSync(BUILD_DIR)) mkdirSync(BUILD_DIR, { recursive: true });
 
-const filter = process.argv[2];
+const filter = process.argv[2] || null;
+const groups = discoverGroups(filter);
 
-const files = readdirSync(TESTS_DIR)
-    .filter(f => f.endsWith(".hop") && (!filter || f.includes(filter)))
-    .map(f => path.join(TESTS_DIR, f))
-    .sort();
-
-if (files.length === 0) {
-    console.log(`${Y}No test files found${RST}${filter ? ` matching "${filter}"` : ""}`);
+if (groups.length === 0) {
+    console.log(`${Y}no tests found${RST}${filter ? ` for "${filter}"` : ""}`);
     process.exit(0);
 }
 
 console.log(`\n${BOLD}Hopper Test Suite${RST}`);
-console.log(`${DIM}${"─".repeat(50)}${RST}\n`);
 
-const results = [];
+let totalPass = 0;
+let totalFail = 0;
 
-for (const f of files) {
-    const result = runTest(f);
-    results.push(result);
+for (const { name, files } of groups) {
+    console.log(`\n${BOLD}${name}${RST}  ${DIM}(${files.length})${RST}`);
+    console.log(`${DIM}${"─".repeat(50)}${RST}`);
 
-    const icon  = result.status === "PASS" ? `${G}✓${RST}` : `${R}✗${RST}`;
-    const note  = result.note   ? ` ${DIM}${result.note.split("\n")[0]}${RST}` : "";
-    console.log(`  ${icon}  ${result.name}${note}`);
+    for (const f of files) {
+        const result = runTest(f, name);
+        const icon   = result.status === "PASS" ? `${G}✓${RST}` : `${R}✗${RST}`;
+        const note   = result.note ? ` ${DIM}${result.note.split("\n")[0]}${RST}` : "";
+        console.log(`  ${icon}  ${result.name}${note}`);
 
-    if (result.status === "FAIL" && result.note.includes("\n")) {
-        const detail = result.note.split("\n").slice(1).map(l => `       ${l}`).join("\n");
-        console.log(`${R}${detail}${RST}`);
+        if (result.status === "FAIL" && result.note.includes("\n")) {
+            const detail = result.note.split("\n").slice(1).map(l => `       ${l}`).join("\n");
+            console.log(`${R}${detail}${RST}`);
+        }
+
+        result.status === "PASS" ? totalPass++ : totalFail++;
     }
 }
 
-// ── Summary ───────────────────────────────────────────────────────────────────
-const passed = results.filter(r => r.status === "PASS").length;
-const failed = results.filter(r => r.status === "FAIL").length;
-const total  = results.length;
-
+const total  = totalPass + totalFail;
+const colour = totalFail === 0 ? G : R;
 console.log(`\n${DIM}${"─".repeat(50)}${RST}`);
-const colour = passed === total ? G : R;
-console.log(`${BOLD}${colour}${passed}/${total} passed${RST}`);
-if (failed > 0) console.log(`${R}${failed} test${failed > 1 ? "s" : ""} failed${RST}`);
+console.log(`${BOLD}${colour}${totalPass}/${total} passed${RST}`);
+if (totalFail > 0) console.log(`${R}${totalFail} test${totalFail > 1 ? "s" : ""} failed${RST}`);
 console.log();
 
-process.exit(failed > 0 ? 1 : 0);
+process.exit(totalFail > 0 ? 1 : 0);

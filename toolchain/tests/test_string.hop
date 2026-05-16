@@ -5,6 +5,7 @@
 // EXPECT: 0
 
 import string from ds
+import io from linux
 
 entry main {
     String<byte> s = String(8)
@@ -14,20 +15,20 @@ entry main {
     s.append(108)
     s.append(111)
     s.append(10)
-    s.print(1)
+    write(1, s.pointer(), s.length())
 
     String<byte> n = String(16)
-    n.append_int(42)
+    n.appendNumber(42)
     n.append(10)
-    n.print(1)
+    write(1, n.pointer(), n.length())
 
     String<byte> h = String(16)
-    h.append_hex(255)
+    h.appendHex(255)
     h.append(10)
-    h.print(1)
+    write(1, h.pointer(), h.length())
 
     String<byte> z = String(4)
-    z.append_int(0)
+    z.appendNumber(0)
     z.append(10)
-    z.print(1)
+    write(1, z.pointer(), z.length())
 }

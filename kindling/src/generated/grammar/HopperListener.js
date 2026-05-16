@@ -257,12 +257,57 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#interfaceDecl.
+	enterInterfaceDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#interfaceDecl.
+	exitInterfaceDecl(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#InterfaceFunc.
+	enterInterfaceFunc(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#InterfaceFunc.
+	exitInterfaceFunc(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#InterfaceProc.
+	enterInterfaceProc(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#InterfaceProc.
+	exitInterfaceProc(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#classDecl.
 	enterClassDecl(ctx) {
 	}
 
 	// Exit a parse tree produced by HopperParser#classDecl.
 	exitClassDecl(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#className.
+	enterClassName(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#className.
+	exitClassName(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#implementsList.
+	enterImplementsList(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#implementsList.
+	exitImplementsList(ctx) {
 	}
 
 

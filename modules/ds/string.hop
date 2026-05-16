@@ -6,9 +6,9 @@
 //
 // Usage:
 //   String<byte> s = String(64)
-//   s.append(72)          // 'H'
-//   s.append_int(42)      // writes "42" into the string
-//   s.print(1)            // write to stdout via syscall, no libc
+//   s.append(72)               // 'H'
+//   s.appendNumber(42)         // writes "42" into the string
+//   write(1, s.pointer(), s.length())  // print via linux io
 //
 // Memory:
 //   constructor allocates heap backing.
@@ -32,21 +32,28 @@ template String<T> {
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    function len() int {
+    function length() int {
         return self.length
     }
 
-    function cap() int {
+    function capacity() int {
         return self.capacity
     }
 
-    // Raw pointer to backing buffer — for passing to write() syscall.
-    function ptr() address {
+    // Raw pointer to backing buffer — for passing to write().
+    function pointer() address {
         return self.data
     }
 
-    function empty() bool {
+    function isEmpty() bool {
         return self.length == 0
+    }
+
+    // Read the element at a given index.
+    function get(int index) T {
+        address ptr = self.data + (index * T::size)
+        T elem = ptr::value
+        return elem
     }
 
     // ── Mutation ──────────────────────────────────────────────────────────────
@@ -54,6 +61,12 @@ template String<T> {
     // Reset to empty without freeing memory.
     function clear() {
         self.length = 0
+    }
+
+    // Overwrite the element at a given index.
+    function set(int index, T c) {
+        address ptr = self.data + (index * T::size)
+        ptr::value = c
     }
 
     // Append a single character (byte value for String<byte>,
@@ -68,10 +81,10 @@ template String<T> {
     }
 
     // Append n elements from src — useful for string literals.
-    function append_raw(address src, int n) {
+    function appendRaw(address src, int n) {
         int i = 0
         while (i < n) {
-            T elem = self.copy_from(src, i)
+            T elem = self.copyFrom(src, i)
             self.append(elem)
             i = i + 1
         }
@@ -80,13 +93,13 @@ template String<T> {
     // ── Number formatting ─────────────────────────────────────────────────────
 
     // Append a signed decimal integer.
-    function append_int(int n) {
+    function appendNumber(int n) {
         if (n == 0) {
-            self.append_digit(48)
+            self.appendDigit(48)
             return
         }
         if (n < 0) {
-            self.append_digit(45)
+            self.appendDigit(45)
             n = 0 - n
         }
         int count = 0
@@ -101,7 +114,7 @@ template String<T> {
         int pos = self.length + count - 1
         while (n > 0) {
             int digit = n % 10
-            self.write_elem(pos, digit + 48)
+            self.writeElement(pos, digit + 48)
             n = n / 10
             pos = pos - 1
         }
@@ -109,9 +122,9 @@ template String<T> {
     }
 
     // Append an unsigned integer as lowercase hexadecimal (no "0x" prefix).
-    function append_hex(int n) {
+    function appendHex(int n) {
         if (n == 0) {
-            self.append_digit(48)
+            self.appendDigit(48)
             return
         }
         int count = 0
@@ -128,51 +141,33 @@ template String<T> {
             int nibble = n % 16
             int ch = nibble + 48
             if (nibble >= 10) { ch = nibble + 87 }
-            self.write_elem(pos, ch)
+            self.writeElement(pos, ch)
             n = n / 16
             pos = pos - 1
         }
         self.length = self.length + count
     }
 
-    // ── I/O ───────────────────────────────────────────────────────────────────
-
-    // Write contents to a file descriptor using the Linux write syscall.
-    // fd 1 = stdout, fd 2 = stderr.
-    function print(int fd) {
-        int bytes = self.length * T::size
-        address buf = self.data
-        int written
-        asm {
-            rax = 1
-            rdi = fd
-            rsi = buf
-            rdx = bytes
-            syscall
-            written = rax
-        }
-    }
-
     // ── Internal ──────────────────────────────────────────────────────────────
 
     // Read the element at position i from an arbitrary buffer.
     // The explicit return type T lets the codegen emit the correct load width.
-    function copy_from(address buf, int i) T {
+    function copyFrom(address buf, int i) T {
         address ptr = buf + (i * T::size)
         return ptr::value
     }
 
     // Write an int-valued character at a given position, truncating to T.
-    // Used by append_int / append_hex for direct position writes.
-    function write_elem(int pos, int ch) {
+    // Used by appendNumber / appendHex for direct position writes.
+    function writeElement(int pos, int ch) {
         address ptr = self.data + (pos * T::size)
         T typed = cast ch
         ptr::value = typed
     }
 
     // Append an int-valued character, truncating to T.
-    // Used by append_int / append_hex for the zero / minus-sign cases.
-    function append_digit(int ch) {
+    // Used by appendNumber / appendHex for the zero / minus-sign cases.
+    function appendDigit(int ch) {
         T typed = cast ch
         self.append(typed)
     }
@@ -183,7 +178,7 @@ template String<T> {
         address newData = allocate newCap * T::size
         int i = 0
         while (i < self.length) {
-            T elem = self.copy_from(self.data, i)
+            T elem = self.copyFrom(self.data, i)
             address dst = newData + (i * T::size)
             dst::value = elem
             i = i + 1
