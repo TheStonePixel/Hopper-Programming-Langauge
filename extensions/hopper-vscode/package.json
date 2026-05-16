@@ -21,9 +21,129 @@
                 "scopeName": "source.hopper",
                 "path": "./syntaxes/hopper.tmLanguage.json"
             }
-        ]
+        ],
+        "configurationDefaults": {
+            "editor.tokenColorCustomizations": {
+                "textMateRules": [
+
+                    {
+                        "comment": "Comments — muted gray, italic",
+                        "scope": "comment.line.double-slash.hopper",
+                        "settings": { "foreground": "#6A737D", "fontStyle": "italic" }
+                    },
+
+                    {
+                        "comment": "Strings — soft green",
+                        "scope": "string.quoted.double.hopper",
+                        "settings": { "foreground": "#98C379" }
+                    },
+                    {
+                        "comment": "Escape sequences inside strings — cyan",
+                        "scope": "constant.character.escape.hopper",
+                        "settings": { "foreground": "#56B6C2" }
+                    },
+
+                    {
+                        "comment": "Numbers (int, float, hex) — warm orange",
+                        "scope": [
+                            "constant.numeric.integer.hopper",
+                            "constant.numeric.float.hopper",
+                            "constant.numeric.hex.hopper"
+                        ],
+                        "settings": { "foreground": "#D19A66" }
+                    },
+
+                    {
+                        "comment": "Control flow — purple",
+                        "scope": "keyword.control.hopper",
+                        "settings": { "foreground": "#C678DD" }
+                    },
+
+                    {
+                        "comment": "Declaration keywords — blue",
+                        "scope": "keyword.declaration.hopper",
+                        "settings": { "foreground": "#61AFEF" }
+                    },
+
+                    {
+                        "comment": "Memory operations — red, signals heap access",
+                        "scope": "keyword.memory.hopper",
+                        "settings": { "foreground": "#E06C75", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "comment": "Built-in types — cyan",
+                        "scope": "storage.type.hopper",
+                        "settings": { "foreground": "#56B6C2" }
+                    },
+
+                    {
+                        "comment": "Function names in declarations — gold",
+                        "scope": "entity.name.function.hopper",
+                        "settings": { "foreground": "#E5C07B" }
+                    },
+
+                    {
+                        "comment": "Type names (struct/class/template) — green, bold",
+                        "scope": "entity.name.type.hopper",
+                        "settings": { "foreground": "#98C379", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "comment": "true, false, null — orange",
+                        "scope": "constant.language.hopper",
+                        "settings": { "foreground": "#D19A66" }
+                    },
+
+                    {
+                        "comment": "self — gold italic, distinct from regular vars",
+                        "scope": "variable.language.hopper",
+                        "settings": { "foreground": "#E5C07B", "fontStyle": "italic" }
+                    },
+
+                    {
+                        "comment": ":: scope operator — bright teal",
+                        "scope": "keyword.operator.scope.hopper",
+                        "settings": { "foreground": "#4EC9B0" }
+                    },
+
+                    {
+                        "comment": "::value ::size ::address — bright teal bold",
+                        "scope": "support.constant.hopper",
+                        "settings": { "foreground": "#4EC9B0", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "comment": "Logical operators &&, ||, ! — light",
+                        "scope": "keyword.operator.logical.hopper",
+                        "settings": { "foreground": "#ABB2BF" }
+                    },
+                    {
+                        "comment": "Comparison operators ==, !=, <, > — light",
+                        "scope": "keyword.operator.comparison.hopper",
+                        "settings": { "foreground": "#ABB2BF" }
+                    },
+                    {
+                        "comment": "Bitwise operators &, |, ^, ~, <<, >> — light",
+                        "scope": "keyword.operator.bitwise.hopper",
+                        "settings": { "foreground": "#ABB2BF" }
+                    },
+                    {
+                        "comment": "Arithmetic operators +, -, *, /, % — light",
+                        "scope": "keyword.operator.arithmetic.hopper",
+                        "settings": { "foreground": "#ABB2BF" }
+                    },
+                    {
+                        "comment": "Assignment = — cyan, visually distinct from ==",
+                        "scope": "keyword.operator.assignment.hopper",
+                        "settings": { "foreground": "#56B6C2" }
+                    }
+
+                ]
+            }
+        }
     },
     "scripts": {
-        "install:vscode": "cp -r . ~/.vscode/extensions/hopper-language-0.1.0"
+        "install:vscode": "node ../../../kindling/tools/install-ext.js"
     }
 }
