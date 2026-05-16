@@ -21,6 +21,8 @@ import {
     ClassOperator,
     ClassConstructor,
     ClassDestructor,
+    InterfaceDecl,
+    InterfaceMethod,
     ConstDecl,
     AliasDecl,
     TemplateDecl,
@@ -81,6 +83,7 @@ export class AstBuilder extends HopperVisitor {
         const binds = [];
         const stricts = [];
         const bitfields = [];
+        const interfaces = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
@@ -96,9 +99,10 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "BindDecl")       binds.push(node);
             else if (node.kind === "StrictDecl")     stricts.push(node);
             else if (node.kind === "BitfieldDecl")   bitfields.push(node);
+            else if (node.kind === "InterfaceDecl")  interfaces.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces);
     }
 
     visitTopLevelDecl(ctx) {
@@ -186,10 +190,37 @@ export class AstBuilder extends HopperVisitor {
         return BitfieldPad(bits);
     }
 
+    // ── interface ──────────────────────────────────────────────────────────
+
+    visitInterfaceDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const methods = ctx.interfaceMember ? ctx.interfaceMember().map(m => this.visit(m)) : [];
+        return InterfaceDecl(name, methods);
+    }
+
+    visitInterfaceFunc(ctx) {
+        const name = ctx.Identifier().getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
+            : [];
+        return InterfaceMethod(name, params, ctx.type().getText());
+    }
+
+    visitInterfaceProc(ctx) {
+        const name = ctx.Identifier().getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
+            : [];
+        return InterfaceMethod(name, params, null);
+    }
+
     // ── class ──────────────────────────────────────────────────────────────
 
     visitClassDecl(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.className().getText();
+        const interfaces = ctx.implementsList()
+            ? ctx.implementsList().Identifier().map(id => id.getText())
+            : [];
         const fields = [];
         const methods = [];
         const operators = [];
@@ -207,7 +238,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "ClassDestructor")  destructor = node;
         }
 
-        return ClassDecl(name, fields, methods, operators, constructor, destructor);
+        return ClassDecl(name, fields, methods, operators, constructor, destructor, interfaces);
     }
 
     visitClassField(ctx) {
@@ -804,6 +835,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             ast.templates.unshift(...importedAst.templates);
             ast.binds.unshift(...importedAst.binds);
             ast.stricts.unshift(...importedAst.stricts);
+            ast.interfaces.unshift(...importedAst.interfaces);
             // entry is never inherited from imports — only the main file sets it
         }
     }

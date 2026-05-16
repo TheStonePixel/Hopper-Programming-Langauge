@@ -1,0 +1,17 @@
+// IString — shared contract for String implementations
+//
+// Both ascii/String and utf8/String implement this interface, making them
+// interchangeable at compile time via: import String from ascii
+//                                   or import String from utf8
+//
+// Note: append() is intentionally absent — ASCII takes a byte, UTF8 takes an
+// int codepoint, so the signatures differ between implementations.
+
+interface IString {
+    function len() int
+    function empty() bool
+    function clear()
+    function print(int fd)
+    function append_int(int n)
+    function append_hex(int n)
+}

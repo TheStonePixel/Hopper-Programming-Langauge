@@ -1,0 +1,26 @@
+// EXPECT: hello
+// EXPECT: 42
+// EXPECT: Ω
+import String from utf8
+
+entry main {
+    String s = String(8)
+    s.append(104)
+    s.append(101)
+    s.append(108)
+    s.append(108)
+    s.append(111)
+    s.append(10)
+    s.print(1)
+
+    String n = String(16)
+    n.append_int(42)
+    n.append(10)
+    n.print(1)
+
+    // U+03A9 GREEK CAPITAL LETTER OMEGA — 2-byte UTF-8: 0xCE 0xA9
+    String u = String(8)
+    u.append(937)
+    u.append(10)
+    u.print(1)
+}

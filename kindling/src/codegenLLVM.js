@@ -5,6 +5,7 @@ import { buildAstFromSource } from "./astBuilder.js";
 const stringConstants    = new Map();   // raw value  → @.str.N
 const structTypes        = new Map();   // name       → { fields: [{name,type,isPad,size}] }
 const classTypes         = new Map();   // name       → { fields: [{name,type}], methods, operators }
+const interfaceDefs      = new Map();   // name       → { methods: [{name, params, returnType}] }
 const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
@@ -18,6 +19,7 @@ function resetAll() {
     stringConstants.clear();
     structTypes.clear();
     classTypes.clear();
+    interfaceDefs.clear();
     moduleConstants.clear();
     typeAliases.clear();
     functionReturnTypes.clear();
@@ -39,6 +41,21 @@ function registerStruct(name, fields) {
 
 function registerClass(name, fields, methods, operators) {
     classTypes.set(name, { fields, methods, operators });
+}
+
+function checkImplements(cls) {
+    for (const ifaceName of cls.interfaces || []) {
+        const iface = interfaceDefs.get(ifaceName);
+        if (!iface) throw new Error(`Interface '${ifaceName}' not found (required by class '${cls.name}')`);
+        for (const req of iface.methods) {
+            const found = (cls.methods || []).find(m => m.name === req.name);
+            if (!found) {
+                throw new Error(
+                    `Class '${cls.name}' does not implement '${ifaceName}.${req.name}' — add a '${req.name}' method`
+                );
+            }
+        }
+    }
 }
 
 // ── template helpers ───────────────────────────────────────────────────────
@@ -283,6 +300,11 @@ function operatorNameSafe(op) {
 function llvmType(t) {
     if (!t) return "void";
     if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
+    // Check class/struct registries before hard-coded keywords so that
+    // user-defined classes named 'String' take priority over the i8* fallback.
+    if (classTypes.has(t))    return `%class.${t}`;
+    if (structTypes.has(t))   return `%struct.${t}`;
+    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
     if (t === "bit")          return "i1";
@@ -290,13 +312,10 @@ function llvmType(t) {
     if (t === "float")        return "double";
     if (t === "string[]")     return "i8**";
     if (t === "string")       return "i8*";
-    if (t === "String")       return "i8*";
+    if (t === "String")       return "i8*";   // fallback: bare String with no class registered
     if (t === "address")      return "i8*";
     if (t === "unsignedint")  return "i64";
     if (t === "unsignedbyte") return "i8";
-    if (structTypes.has(t))   return `%struct.${t}`;
-    if (classTypes.has(t))    return `%class.${t}`;
-    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
     if (t.includes('<')) {
         const m = mangleTemplate(t);
@@ -352,7 +371,6 @@ function sizeOfType(t) {
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
     if (t === "string")  return 8;
-    if (t === "String")  return 8;
     if (t === "address") return 8;
     if (bitfieldTypes.has(t)) {
         const { totalBits } = bitfieldLayout(bitfieldTypes.get(t));
@@ -362,6 +380,10 @@ function sizeOfType(t) {
         return structTypes.get(t).fields.reduce((s, f) =>
             s + (f.isPad ? f.size : sizeOfType(f.type)), 0);
     }
+    if (classTypes.has(t)) {
+        return classTypes.get(t).fields.reduce((acc, f) => acc + sizeOfType(f.type), 0);
+    }
+    if (t === "String")  return 8;   // bare String fallback (pointer size)
     throw new Error(`Unknown type for sizeof: ${t}`);
 }
 
@@ -956,6 +978,12 @@ function genStmt(ir, stmt, retType) {
                     const inner = genExpr(ir, stmt.init.expr);
                     init = emitCast(ir, inner.value, inner.type, stmt.type);
                     hType = normType;
+                } else if (stmt.init.kind === "Deref" && !ir.returnType) {
+                    // 'byte b = ptr::value' — use the declared type as the load width
+                    const savedRet = ir.returnType;
+                    ir.returnType = stmt.type;
+                    init = genExpr(ir, stmt.init);
+                    ir.returnType = savedRet;
                 } else {
                     init = genExpr(ir, stmt.init);
                     if (stmt.type === "address" && init.type.startsWith("address:"))
@@ -1437,7 +1465,6 @@ function typeSize(hType) {
     if (t === "address" || t.startsWith("address:")) return 8;
     if (t === "string[]")     return 8;
     if (t === "string")       return 8;
-    if (t === "String")       return 8;
     if (t === "unsignedint")  return 8;
     if (t === "unsignedbyte") return 1;
     if (structTypes.has(t)) {
@@ -1447,6 +1474,7 @@ function typeSize(hType) {
     if (classTypes.has(t)) {
         return classTypes.get(t).fields.reduce((acc, f) => acc + typeSize(f.type), 0);
     }
+    if (t === "String")       return 8;   // bare String fallback (pointer size)
     throw new Error(`Cannot compute ::size of unknown type: ${t}`);
 }
 
@@ -1577,6 +1605,11 @@ function emitClassIR(cls, out, fnCode) {
 function genModule(ast) {
     resetAll();
 
+    // Interfaces — registered before classes so implements checking can find them
+    for (const iface of ast.interfaces || []) {
+        interfaceDefs.set(iface.name, { methods: iface.methods });
+    }
+
     // Aliases and constants
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
     for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
@@ -1606,6 +1639,9 @@ function genModule(ast) {
     // Register regular struct and class types first (monomorphization may reference them)
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);
     for (const c of ast.classes  || []) registerClass(c.name, c.fields, c.methods, c.operators);
+
+    // Verify interface conformance for all classes that declare 'implements'
+    for (const c of ast.classes || []) checkImplements(c);
 
     // Scan all type usages and instantiate every template type found
     for (const typeStr of collectTypeUsages(ast)) instantiateTemplate(typeStr);

@@ -1,0 +1,191 @@
+// String — UTF-8 encoded string backed by a byte buffer
+//
+// append(int codepoint) accepts a Unicode codepoint and encodes it to
+// 1-4 UTF-8 bytes before storing. This lets you mix ASCII and non-ASCII
+// characters naturally without tracking byte widths yourself.
+//
+// For ASCII-only work, import String from ascii instead — it's faster.
+//
+// Import this module with: import String from utf8
+
+import IString from string
+
+class String implements IString {
+    address data
+    int     length
+    int     capacity
+
+    constructor(int cap) {
+        self.data     = allocate cap
+        self.length   = 0
+        self.capacity = cap
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────────────
+
+    function len() int {
+        return self.length
+    }
+
+    function cap() int {
+        return self.capacity
+    }
+
+    function ptr() address {
+        return self.data
+    }
+
+    function empty() bool {
+        return self.length == 0
+    }
+
+    // ── Mutation ──────────────────────────────────────────────────────────────
+
+    function clear() {
+        self.length = 0
+    }
+
+    // Append a Unicode codepoint, encoding it as 1-4 UTF-8 bytes.
+    //   U+0000 – U+007F    → 1 byte  (0xxxxxxx)
+    //   U+0080 – U+07FF    → 2 bytes (110xxxxx 10xxxxxx)
+    //   U+0800 – U+FFFF    → 3 bytes (1110xxxx 10xxxxxx 10xxxxxx)
+    //   U+10000 – U+10FFFF → 4 bytes (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+    function append(int codepoint) {
+        if (codepoint < 128) {
+            self.appendByte(codepoint)
+        } else {
+            if (codepoint < 2048) {
+                self.appendByte(192 | (codepoint >> 6))
+                self.appendByte(128 | (codepoint & 63))
+            } else {
+                if (codepoint < 65536) {
+                    self.appendByte(224 | (codepoint >> 12))
+                    self.appendByte(128 | ((codepoint >> 6) & 63))
+                    self.appendByte(128 | (codepoint & 63))
+                } else {
+                    self.appendByte(240 | (codepoint >> 18))
+                    self.appendByte(128 | ((codepoint >> 12) & 63))
+                    self.appendByte(128 | ((codepoint >> 6) & 63))
+                    self.appendByte(128 | (codepoint & 63))
+                }
+            }
+        }
+    }
+
+    // ── Number formatting ─────────────────────────────────────────────────────
+
+    // Append a signed decimal integer.
+    function append_int(int n) {
+        if (n == 0) {
+            self.appendByte(48)
+            return
+        }
+        if (n < 0) {
+            self.appendByte(45)
+            n = 0 - n
+        }
+        int count = 0
+        int tmp = n
+        while (tmp > 0) {
+            count = count + 1
+            tmp = tmp / 10
+        }
+        while (self.length + count > self.capacity) {
+            self.grow()
+        }
+        int pos = self.length + count - 1
+        while (n > 0) {
+            int digit = n % 10
+            self.writeByte(pos, digit + 48)
+            n = n / 10
+            pos = pos - 1
+        }
+        self.length = self.length + count
+    }
+
+    // Append an unsigned integer as lowercase hexadecimal (no "0x" prefix).
+    function append_hex(int n) {
+        if (n == 0) {
+            self.appendByte(48)
+            return
+        }
+        int count = 0
+        int tmp = n
+        while (tmp > 0) {
+            count = count + 1
+            tmp = tmp / 16
+        }
+        while (self.length + count > self.capacity) {
+            self.grow()
+        }
+        int pos = self.length + count - 1
+        while (n > 0) {
+            int nibble = n % 16
+            int ch = nibble + 48
+            if (nibble >= 10) { ch = nibble + 87 }
+            self.writeByte(pos, ch)
+            n = n / 16
+            pos = pos - 1
+        }
+        self.length = self.length + count
+    }
+
+    // ── I/O ───────────────────────────────────────────────────────────────────
+
+    // Write the UTF-8 byte buffer to a file descriptor via the write syscall.
+    // fd 1 = stdout, fd 2 = stderr.
+    function print(int fd) {
+        address buf = self.data
+        int bytes = self.length
+        int written
+        asm {
+            rax = 1
+            rdi = fd
+            rsi = buf
+            rdx = bytes
+            syscall
+            written = rax
+        }
+    }
+
+    // ── Internal ──────────────────────────────────────────────────────────────
+
+    // Append a raw byte to the buffer (used by append and number formatters).
+    function appendByte(int ch) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        address ptr = self.data + self.length
+        byte b = cast ch
+        ptr::value = b
+        self.length = self.length + 1
+    }
+
+    // Write a byte at a given position (used by append_int / append_hex).
+    function writeByte(int pos, int ch) {
+        address ptr = self.data + pos
+        byte b = cast ch
+        ptr::value = b
+    }
+
+    // Double capacity.
+    function grow() {
+        int     newCap  = self.capacity * 2
+        address newData = allocate newCap
+        int i = 0
+        while (i < self.length) {
+            address src = self.data + i
+            byte b = src::value
+            address dst = newData + i
+            dst::value = b
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = newData
+        self.capacity = newCap
+    }
+}

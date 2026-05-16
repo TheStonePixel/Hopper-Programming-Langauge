@@ -18,6 +18,7 @@ topLevelDecl
     | bindDecl
     | strictDecl
     | bitfieldDecl
+    | interfaceDecl
     ;
 
 importDecl
@@ -118,9 +119,31 @@ templateParam
     | 'unsigned' 'byte' # FixedParam
     ;
 
+// interface = compile-time contract: a set of method signatures a class must implement
+interfaceDecl
+    : 'interface' Identifier '{' NEWLINE* (interfaceMember (NEWLINE+ interfaceMember)* NEWLINE*)? '}'
+    ;
+
+interfaceMember
+    : 'function' Identifier '(' paramList? ')' type   # InterfaceFunc
+    | 'function' Identifier '(' paramList? ')'        # InterfaceProc
+    ;
+
 // class = data + behavior, compiler-optimized layout
+// Optional 'implements' list for compile-time interface conformance checking
 classDecl
-    : 'class' Identifier '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'class' className implementsList? '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+// className allows 'String' as a class name in addition to plain identifiers
+className
+    : Identifier
+    | 'String'
+    ;
+
+// implements — list of interfaces the class must conform to
+implementsList
+    : 'implements' Identifier (',' Identifier)*
     ;
 
 classMember

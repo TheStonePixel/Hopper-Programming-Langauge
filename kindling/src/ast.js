@@ -1,7 +1,7 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = [], interfaces = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces };
 }
 
 // bind — linker directive: place function pointer at hardware address
@@ -56,9 +56,19 @@ export function BitfieldPad(bits) {
     return { kind: "BitfieldPad", isPad: true, bits };
 }
 
+// interface = compile-time method contract
+export function InterfaceDecl(name, methods) {
+    return { kind: "InterfaceDecl", name, methods };
+}
+
+export function InterfaceMethod(name, params, returnType) {
+    return { kind: "InterfaceMethod", name, params, returnType };
+}
+
 // class = data + behavior, compiler-optimized layout
-export function ClassDecl(name, fields, methods, operators, constructor = null, destructor = null) {
-    return { kind: "ClassDecl", name, fields, methods, operators, constructor, destructor };
+// interfaces: list of interface names the class declares conformance to
+export function ClassDecl(name, fields, methods, operators, constructor = null, destructor = null, interfaces = []) {
+    return { kind: "ClassDecl", name, fields, methods, operators, constructor, destructor, interfaces };
 }
 
 export function ClassField(name, type) {
