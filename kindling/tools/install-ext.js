@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * Install the Hopper VS Code extension into the correct extensions directory.
+ * Install the Hopper VS Code extension as a symlink into the correct
+ * extensions directory. Run once — after that, git pull + Reload Window
+ * is all you need to pick up grammar or color changes.
  *
  * - Standard VS Code (Linux/Mac):  ~/.vscode/extensions/
- * - VS Code Remote WSL:            ~/.vscode-server/extensions/
- * - VS Code Remote SSH:            ~/.vscode-server/extensions/
+ * - VS Code Remote WSL/SSH:        ~/.vscode-server/extensions/
  *
  * Usage: npm run install:ext
  */
 
-import { readFileSync, existsSync, mkdirSync, cpSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, rmSync, symlinkSync } from "fs";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
@@ -36,7 +37,6 @@ function isWSL() {
 }
 
 function pickExtDir() {
-    // VS Code Server (WSL / Remote SSH) takes priority when present
     const server = path.join(HOME, ".vscode-server", "extensions");
     if (existsSync(path.join(HOME, ".vscode-server")) || isWSL()) {
         return server;
@@ -52,12 +52,17 @@ console.log(`${DIM}  source: ${SRC}${RST}`);
 console.log(`${DIM}  dest:   ${dest}${RST}\n`);
 
 try {
-    mkdirSync(dest, { recursive: true });
-    cpSync(SRC, dest, { recursive: true });
-    console.log(`${G}Done!${RST}`);
-    console.log(`\nIn VS Code: Ctrl+Shift+P -> "Developer: Reload Window"\n`);
+    if (existsSync(dest)) {
+        rmSync(dest, { recursive: true, force: true });
+    }
+    mkdirSync(extDir, { recursive: true });
+    symlinkSync(SRC, dest, "dir");
+
+    console.log(`${G}Linked!${RST}`);
+    console.log(`\nFrom now on: git pull + Reload Window is all you need.`);
+    console.log(`In VS Code: Ctrl+Shift+P -> "Developer: Reload Window"\n`);
 } catch (e) {
     console.error(`${R}Install failed:${RST} ${e.message}`);
-    console.error(`\nTry manually:\n  cp -r ${SRC} ${dest}\n`);
+    console.error(`\nTry manually:\n  ln -s "${SRC}" "${dest}"\n`);
     process.exit(1);
 }
