@@ -1,0 +1,10 @@
+[project]
+name    = "sort"
+version = "0.1.0"
+entry   = "sort.hop"
+target  = "linux/x86_64"
+
+[dependencies]
+io    = "linux"
+array = "ds"
+sort  = "algo"
