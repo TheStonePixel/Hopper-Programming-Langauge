@@ -73,8 +73,8 @@ function place_ships(Array<int> g) {
 
 // ── Display ───────────────────────────────────────────────────────────────────
 
-//   🔥 hit     🌊 miss    🚢 ship    ·  unexplored
-//   Each cell is 2 terminal columns wide — emojis and '· ' both measure 2.
+//   🔥 hit     💧 miss    🚢 ship    🟦 unexplored
+//   All cells are emoji — each 2 terminal columns wide.
 
 function print_grid(Array<int> g, bool reveal) {
     print("\x1b[2m   0 1 2 3 4 5 6 7 8 9\x1b[0m\n")
@@ -87,11 +87,11 @@ function print_grid(Array<int> g, bool reveal) {
         while (c < 10) {
             int v = g[r * 10 + c]
             if (v == 2) { print("🔥") }
-            if (v == 3) { print("🌊") }
-            if (v == 0) { print("· ") }
+            if (v == 3) { print("💧") }
+            if (v == 0) { print("🟦") }
             if (v == 1) {
                 if (reveal)  { print("🚢") }
-                if (!reveal) { print("· ") }
+                if (!reveal) { print("🟦") }
             }
             c = c + 1
         }
@@ -134,7 +134,7 @@ function player_turn(Array<int> g) bool {
             if (v == 3) { println("\x1b[33m  Already fired there — try again.\x1b[0m") }
             if (v == 0) {
                 g[row * 10 + col] = 3
-                println("\x1b[2m  🌊 Miss — nothing but water.\x1b[0m")
+                println("\x1b[2m  💧 Miss — nothing but water.\x1b[0m")
                 valid = true
             }
             if (v == 1) {
@@ -157,7 +157,7 @@ function computer_turn(Array<int> g) bool {
         int v = g[r * 10 + c]
         if (v == 0) {
             g[r * 10 + c] = 3
-            print("\x1b[2m  🌊 Computer fires at ")
+            print("\x1b[2m  💧 Computer fires at ")
             printInt(r)
             print(" ")
             printInt(c)
