@@ -1,0 +1,12 @@
+const name    = "htop"
+const version = "0.1.0"
+const entry   = "htop.hop"
+const target  = "linux/x86_64"
+
+import io     from linux
+import fs     from linux
+import mem    from linux
+import sys    from linux
+import string from ds
+import array  from ds
+import hash   from ds
