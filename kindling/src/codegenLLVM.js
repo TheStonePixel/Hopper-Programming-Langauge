@@ -10,6 +10,7 @@ const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
 const templateDefs       = new Map();   // template name → TemplateDecl
+const templateInstances  = new Set();   // mangled names produced by monomorphization — public fields
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
 const bitfieldTypes      = new Map();   // name → BitfieldDecl
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
@@ -24,6 +25,7 @@ function resetAll() {
     typeAliases.clear();
     functionReturnTypes.clear();
     templateDefs.clear();
+    templateInstances.clear();
     mmioBindings.clear();
     bitfieldTypes.clear();
     instantiatedClasses = [];
@@ -198,8 +200,10 @@ function instantiateTemplate(typeStr) {
     const tmpl         = templateDefs.get(baseName);
     const concreteClass = monomorphize(tmpl, typeArgs);
 
-    // Register before recursing to prevent infinite loops
+    // Register before recursing to prevent infinite loops.
+    // Mark as a template instance so fields remain publicly accessible (like structs).
     registerClass(concreteClass.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+    templateInstances.add(concreteClass.name);
     instantiatedClasses.push(concreteClass);
 
     // Register return types for all methods so call sites can resolve them
@@ -653,7 +657,7 @@ function genExpr(ir, expr) {
                 return { value: result, type: fieldType };
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
+            if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
                 );
@@ -1268,7 +1272,7 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf) {
+            if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf) {
                 throw new Error(
                     `Access failure: cannot assign field '${stmt.field}' of class '${v.hType}' directly. Use a mutator method.`
                 );
