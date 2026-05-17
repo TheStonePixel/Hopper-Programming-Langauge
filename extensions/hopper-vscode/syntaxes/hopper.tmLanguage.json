@@ -36,11 +36,7 @@
 
         "char-literals": {
             "name": "constant.character.hopper",
-            "begin": "'",
-            "end": "'",
-            "patterns": [
-                { "name": "constant.character.escape.hopper", "match": "\\\\." }
-            ]
+            "match": "'(?:[^'\\\\]|\\\\.)*'"
         },
 
         "strings": {
