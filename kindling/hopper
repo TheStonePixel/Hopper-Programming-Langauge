@@ -41,7 +41,8 @@ function toObject(file) {
 function link(results, outFile, ldFlags = [], extraObjs = []) {
     const objs   = results.map(r => `"${r.objFile}"`).join(" ");
     const extra  = extraObjs.map(o => `"${o}"`).join(" ");
-    const flags  = ldFlags.join(" ");
+    // Escape $ so execSync's shell doesn't expand $ORIGIN etc.
+    const flags  = ldFlags.map(f => f.replace(/\$/g, "\\$")).join(" ");
     execSync(`clang ${objs} ${extra} -o "${outFile}" ${flags}`, { stdio: "inherit" });
     return outFile;
 }

@@ -20,9 +20,10 @@ $(BUILD)/hopper: $(HOP_SRCS) $(RT_OBJ) $(PARSER_SO)
 	$(KINDLING) build $(HOP_SRCS) -o $(BUILD)/hopper \
 	    $(RT_OBJ) \
 	    -L$(PARSER_DIR) -lhopperparse -lantlr4-runtime -lstdc++ \
-	    "-Wl,-rpath,\$$ORIGIN/../kindling/src/parser_c_api"
+	    '-Wl,-rpath,$$ORIGIN'
+	cp $(PARSER_SO) $(BUILD)/libhopperparse.so
 
 clean:
-	rm -f $(BUILD)/hopper $(RT_OBJ)
+	rm -f $(BUILD)/hopper $(BUILD)/libhopperparse.so $(RT_OBJ)
 
 .PHONY: all clean
