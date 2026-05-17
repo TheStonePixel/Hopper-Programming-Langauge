@@ -1,0 +1,55 @@
+// EXPECT: root exists: true
+// EXPECT: root is dir: true
+// EXPECT: root is file: false
+// EXPECT: cwd is absolute: true
+// EXPECT: mkdir: true
+// EXPECT: new dir is dir: true
+// EXPECT: listed root: true
+
+import io from io
+import path from path
+import fs from fs
+
+entry main(int argc, address argv) {
+    FileSystem fsys = FileSystem()
+
+    // Existence and type checks against guaranteed paths
+    Path root = Path("/")
+    print("root exists: ")
+    print(fsys.exists(root))
+    newline()
+
+    print("root is dir: ")
+    print(fsys.isDirectory(root))
+    newline()
+
+    print("root is file: ")
+    print(fsys.isFile(root))
+    newline()
+
+    // cwd must be an absolute path
+    Path cwd = fsys.cwd()
+    print("cwd is absolute: ")
+    print(cwd.isAbsolute())
+    newline()
+
+    // Create a directory under /tmp — succeeds on first run, safe to ignore on repeat
+    Path newDir = Path("/tmp/hopper_fs_test")
+    fsys.makeDirectory(newDir)
+    print("mkdir: ")
+    print(fsys.exists(newDir))
+    newline()
+
+    print("new dir is dir: ")
+    print(fsys.isDirectory(newDir))
+    newline()
+
+    // List root — always has entries (bin, etc, usr, tmp ...)
+    Directory dir = Directory(root)
+    Path first = dir.next()
+    bool listed = first.length() > 0
+    dir.close()
+    print("listed root: ")
+    print(listed)
+    newline()
+}

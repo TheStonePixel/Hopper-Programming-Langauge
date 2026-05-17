@@ -1267,9 +1267,21 @@ function genStmt(ir, stmt, retType) {
 
                 const ctorName = `${typeName}_constructor`;
                 if (functionReturnTypes.has(ctorName)) {
-                    const args      = (stmt.init.args || []).map(a => genExpr(ir, a));
+                    const ctorInfo = functionReturnTypes.get(ctorName);
+                    const args = (stmt.init.args || []).map((a, i) => {
+                        const paramNormT = ctorInfo.params && ctorInfo.params[i]
+                            ? normalizeType(ctorInfo.params[i].type) : null;
+                        if (paramNormT && classTypes.has(paramNormT) && a.kind === "Var") {
+                            const argVar = ir.vars.get(a.name);
+                            if (argVar) return { value: argVar.ptr, type: paramNormT, isClassPtr: true };
+                        }
+                        return genExpr(ir, a);
+                    });
                     const selfArg   = `${llType}* ${ptr}`;
-                    const otherArgs = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+                    const otherArgs = args.map(a =>
+                        a.isClassPtr ? `${llvmType(a.type)}* ${a.value}`
+                                     : `${a.type.startsWith("address:") ? "i8*" : llvmType(a.type)} ${a.value}`
+                    ).join(", ");
                     const argStr    = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
                     ir.emit(`call void @${ctorName}(${argStr})`);
                 }
