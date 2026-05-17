@@ -1,0 +1,53 @@
+// Smoke test: call the ANTLR C++ parser from Hopper via extern function.
+
+extern function hopper_parse(string src, int len) address
+extern function hopper_parse_free(address h)
+extern function hopper_parse_error(address h) string
+extern function hopper_parse_root(address h) address
+extern function hopper_node_child_count(address n) int
+extern function hopper_node_child(address n, int i) address
+extern function hopper_node_is_terminal(address n) int
+extern function hopper_node_type(address n) int
+extern function hopper_rule_program() int
+extern function printf(String fmt, ...) int
+
+entry main {
+    string src = "extern function add(int a, int b) int\n"
+    int    len = 38
+
+    address h   = hopper_parse(src, len)
+    string  err = hopper_parse_error(h)
+
+    if (err == null) {
+        address root     = hopper_parse_root(h)
+        int     nkids    = hopper_node_child_count(root)
+        int     progRule = hopper_rule_program()
+        int     rootType = hopper_node_type(root)
+
+        printf("root is program: %lld\n", rootType == progRule)
+        printf("root children:   %lld\n", nkids)
+
+        // walk children, print first rule node's type
+        int i    = 0
+        int done = 0
+        while (i < nkids) {
+            if (done == 0) {
+                address child = hopper_node_child(root, i)
+                int isTerm    = hopper_node_is_terminal(child)
+                if (isTerm == 0) {
+                    printf("first rule child: %lld\n", hopper_node_type(child))
+                    done = 1
+                }
+            }
+            i = i + 1
+        }
+
+        printf("done\n")
+    }
+
+    if (err != null) {
+        printf("parse error: %s\n", err)
+    }
+
+    hopper_parse_free(h)
+}

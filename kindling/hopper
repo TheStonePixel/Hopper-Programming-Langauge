@@ -38,15 +38,16 @@ function toObject(file) {
     return { objFile, entryName: ast.entry?.name ?? "main" };
 }
 
-function link(results, outFile) {
-    const objs = results.map(r => `"${r.objFile}"`).join(" ");
-    execSync(`clang ${objs} -o "${outFile}"`, { stdio: "inherit" });
+function link(results, outFile, ldFlags = []) {
+    const objs   = results.map(r => `"${r.objFile}"`).join(" ");
+    const flags  = ldFlags.join(" ");
+    execSync(`clang ${objs} -o "${outFile}" ${flags}`, { stdio: "inherit" });
     return outFile;
 }
 
-function compile(files, outFile) {
+function compile(files, outFile, ldFlags = []) {
     const results = files.map(toObject);
-    link(results, outFile);
+    link(results, outFile, ldFlags);
     return outFile;
 }
 
@@ -68,15 +69,29 @@ function cmdBuild(args) {
         args.splice(outputIdx, 2);
     }
 
-    const files = args.length ? args : ["main.hop"];
-    const missing = files.filter(f => !fs.existsSync(f));
+    // Extract -L<dir>, -l<lib>, and -rpath flags to pass through to the linker.
+    const ldFlags = [];
+    const files   = [];
+    for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a.startsWith("-L") || a.startsWith("-l") || a.startsWith("-Wl,")) {
+            ldFlags.push(a);
+        } else if ((a === "-L" || a === "-l") && i + 1 < args.length) {
+            ldFlags.push(a, args[++i]);
+        } else {
+            files.push(a);
+        }
+    }
+
+    const hopFiles = files.length ? files : ["main.hop"];
+    const missing = hopFiles.filter(f => !fs.existsSync(f));
     if (missing.length) {
         console.error(`hopper: file not found: ${missing.join(", ")}`);
         process.exit(1);
     }
 
-    const outFile = output || path.join(BUILD_DIR, baseName(files[0]));
-    compile(files, outFile);
+    const outFile = output || path.join(BUILD_DIR, baseName(hopFiles[0]));
+    compile(hopFiles, outFile, ldFlags);
     console.log(`built: ${outFile}`);
 }
 
@@ -237,7 +252,7 @@ function usage() {
         "",
         "  Hopper  — systems programming language",
         "",
-        "  hopper build [file.hop] [-o out]   compile to executable (default: main.hop)",
+        "  hopper build [file.hop] [-o out] [-L dir] [-l lib]   compile to executable",
         "  hopper build module <name>          scaffold modules/<name>/ with tests/ dir",
         "  hopper run [file.hop]               compile and run      (default: main.hop)",
         "  hopper run dev [file.hop]           watch mode — rebuild and rerun on changes",
