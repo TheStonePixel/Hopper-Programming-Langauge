@@ -1,0 +1,12 @@
+// walker.hop — AST tree walker
+//
+// Walks the parsed JSON AST and drives the codegen.
+// Each walk function dispatches on the node kind field.
+
+function walkProgram(address node)
+function walkFunction(address node)
+function walkEntry(address node)
+function walkBlock(address node)
+function walkStatement(address node)
+function walkExpression(address node)
+function walkDecl(address node)

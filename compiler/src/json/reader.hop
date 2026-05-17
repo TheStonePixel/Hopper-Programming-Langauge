@@ -1,0 +1,11 @@
+// reader.hop — JSON parser
+//
+// Reads a JSON string and produces a tree of JsonNode values.
+// Used by hcc to consume the AST produced by kindling.
+
+function parseJson(string src) // -> JsonNode
+function parseObject(string src, int pos) // -> JsonNode
+function parseArray(string src, int pos)  // -> JsonNode
+function parseString(string src, int pos) // -> string
+function parseNumber(string src, int pos) // -> int
+function skipWhitespace(string src, int pos) // -> int
