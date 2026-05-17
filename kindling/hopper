@@ -81,7 +81,7 @@ function cmdBuild(args) {
             ldFlags.push(a);
         } else if ((a === "-L" || a === "-l") && i + 1 < args.length) {
             ldFlags.push(a, args[++i]);
-        } else if (a.endsWith(".o")) {
+        } else if (a.endsWith(".o") || a.endsWith(".a")) {
             extraObjs.push(a);
         } else {
             files.push(a);
