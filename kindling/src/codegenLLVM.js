@@ -496,6 +496,7 @@ class IRBuilder {
     }
 
     emit(line)              { this.lines.push(line); }
+    isTerminated()          { const l = this.lines[this.lines.length - 1]; return l && /^\s*(ret|br)\b/.test(l); }
     newTmp()                { return `%t${this.tmp++}`; }
     newLabel(prefix)        { return `${prefix}${this.label++}`; }
     getVar(name) {
@@ -2001,7 +2002,7 @@ function genEntry(entry) {
         }
         genBlock(ir, entry.body, "int");
         emitDeferred(ir);
-        ir.emit("ret i64 0");
+        if (!ir.isTerminated()) ir.emit("ret i64 0");
         ir.emit("}");
         // Non-main entries: emit a @main stub so the C runtime initialises
         // normally (libc, stdio, etc.). @main calls the named entry and exits.
