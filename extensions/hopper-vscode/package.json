@@ -2,9 +2,8 @@
     "name": "hopper-language",
     "displayName": "Hopper Language",
     "description": "Syntax highlighting for the Hopper programming language (.hop)",
-    "version": "0.2.0",
-    "publisher": "hopper",
-    "engines": { "vscode": "^1.70.0" },
+    "version": "1.0.0",
+    "engines": { "vscode": "^1.75.0" },
     "categories": ["Programming Languages"],
     "contributes": {
         "languages": [
@@ -22,153 +21,12 @@
                 "path": "./syntaxes/hopper.tmLanguage.json"
             }
         ],
-        "configurationDefaults": {
-            "editor.tokenColorCustomizations": {
-                "textMateRules": [
-
-                    {
-                        "comment": "=== MEMORY (red bold) ===",
-                        "comment2": "allocate, deallocate, ::, ::value, ::size, ::address",
-                        "scope": "keyword.memory.hopper",
-                        "settings": { "foreground": "#E06C75", "fontStyle": "bold" }
-                    },
-
-                    {
-                        "comment": "=== OOP / CLASSES (amber) ===",
-                        "comment2": "class, constructor, destructor, operator, self, class names, .method() calls",
-                        "scope": [
-                            "keyword.class.hopper",
-                            "entity.name.type.class.hopper",
-                            "variable.language.self.hopper",
-                            "support.function.method.hopper"
-                        ],
-                        "settings": { "foreground": "#E5A550" }
-                    },
-                    {
-                        "comment": "self — italic to distinguish from regular identifiers",
-                        "scope": "variable.language.self.hopper",
-                        "settings": { "foreground": "#E5A550", "fontStyle": "italic" }
-                    },
-                    {
-                        "comment": "class type names — bold",
-                        "scope": "entity.name.type.class.hopper",
-                        "settings": { "foreground": "#E5A550", "fontStyle": "bold" }
-                    },
-
-                    {
-                        "comment": "=== TEMPLATES (purple) ===",
-                        "comment2": "template keyword + template type names",
-                        "scope": [
-                            "keyword.template.hopper",
-                            "entity.name.type.template.hopper"
-                        ],
-                        "settings": { "foreground": "#C678DD" }
-                    },
-                    {
-                        "comment": "template type names — bold",
-                        "scope": "entity.name.type.template.hopper",
-                        "settings": { "foreground": "#C678DD", "fontStyle": "bold" }
-                    },
-
-                    {
-                        "comment": "=== STRUCTS (sage green) ===",
-                        "comment2": "struct keyword + struct type names",
-                        "scope": [
-                            "keyword.struct.hopper",
-                            "entity.name.type.struct.hopper"
-                        ],
-                        "settings": { "foreground": "#98C379" }
-                    },
-                    {
-                        "comment": "struct type names — bold",
-                        "scope": "entity.name.type.struct.hopper",
-                        "settings": { "foreground": "#98C379", "fontStyle": "bold" }
-                    },
-
-                    {
-                        "comment": "=== CONTROL FLOW (sky blue) ===",
-                        "comment2": "if, else, while, for, break, continue, return, defer",
-                        "scope": "keyword.control.hopper",
-                        "settings": { "foreground": "#4FC1FF" }
-                    },
-
-                    {
-                        "comment": "=== FUNCTIONS (blue) ===",
-                        "comment2": "function, entry, extern keywords",
-                        "scope": "keyword.function.hopper",
-                        "settings": { "foreground": "#61AFEF" }
-                    },
-                    {
-                        "comment": "function/entry names in declarations — gold",
-                        "scope": "entity.name.function.hopper",
-                        "settings": { "foreground": "#E5C07B" }
-                    },
-
-                    {
-                        "comment": "=== BUILT-IN TYPES (cyan) ===",
-                        "comment2": "int, bool, float, byte, bit, string, String, address",
-                        "scope": "storage.type.hopper",
-                        "settings": { "foreground": "#56B6C2" }
-                    },
-
-                    {
-                        "comment": "=== OTHER KEYWORDS (muted blue-gray) ===",
-                        "comment2": "import, from, const, alias, cast, asm, etc.",
-                        "scope": "keyword.other.hopper",
-                        "settings": { "foreground": "#7A9EC2" }
-                    },
-
-                    {
-                        "comment": "=== LITERALS (orange) ===",
-                        "comment2": "numbers, true, false, null",
-                        "scope": [
-                            "constant.language.hopper",
-                            "constant.character.hopper",
-                            "constant.numeric.integer.hopper",
-                            "constant.numeric.float.hopper",
-                            "constant.numeric.hex.hopper"
-                        ],
-                        "settings": { "foreground": "#D19A66" }
-                    },
-
-                    {
-                        "comment": "=== STRINGS (soft green) ===",
-                        "scope": "string.quoted.double.hopper",
-                        "settings": { "foreground": "#98C379" }
-                    },
-                    {
-                        "comment": "escape sequences inside strings",
-                        "scope": "constant.character.escape.hopper",
-                        "settings": { "foreground": "#56B6C2" }
-                    },
-
-                    {
-                        "comment": "=== COMMENTS (gray italic) ===",
-                        "scope": "comment.line.double-slash.hopper",
-                        "settings": { "foreground": "#5C6370", "fontStyle": "italic" }
-                    },
-
-                    {
-                        "comment": "=== OPERATORS (light gray) ===",
-                        "scope": [
-                            "keyword.operator.logical.hopper",
-                            "keyword.operator.comparison.hopper",
-                            "keyword.operator.bitwise.hopper",
-                            "keyword.operator.arithmetic.hopper"
-                        ],
-                        "settings": { "foreground": "#ABB2BF" }
-                    },
-                    {
-                        "comment": "assignment = slightly distinct from ==",
-                        "scope": "keyword.operator.assignment.hopper",
-                        "settings": { "foreground": "#56B6C2" }
-                    }
-
-                ]
+        "themes": [
+            {
+                "label": "Hopper Dark",
+                "uiTheme": "vs-dark",
+                "path": "./themes/hopper-dark.json"
             }
-        }
-    },
-    "scripts": {
-        "install:vscode": "node ../../../kindling/tools/install-ext.js"
+        ]
     }
 }

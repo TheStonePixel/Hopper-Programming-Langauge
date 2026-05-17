@@ -4,9 +4,14 @@
     "scopeName": "source.hopper",
     "fileTypes": ["hop"],
     "patterns": [
+        { "include": "#comments" },
         { "include": "#char-literals" }
     ],
     "repository": {
+        "comments": {
+            "name": "comment.line.hopper",
+            "match": "//.*$"
+        },
         "char-literals": {
             "patterns": [
                 {

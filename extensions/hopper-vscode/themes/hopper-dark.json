@@ -1,0 +1,47 @@
+{
+    "name": "Hopper Dark",
+    "type": "dark",
+    "colors": {},
+    "tokenColors": [
+        {
+            "scope": "comment.line.hopper",
+            "settings": { "foreground": "#5C6370", "fontStyle": "italic" }
+        },
+        {
+            "scope": "constant.character.hopper",
+            "settings": { "foreground": "#D19A66" }
+        },
+        {
+            "scope": "string.quoted.double.hopper",
+            "settings": { "foreground": "#98C379" }
+        },
+        {
+            "scope": ["keyword.control.hopper", "keyword.function.hopper"],
+            "settings": { "foreground": "#C678DD" }
+        },
+        {
+            "scope": "keyword.other.hopper",
+            "settings": { "foreground": "#56B6C2" }
+        },
+        {
+            "scope": "storage.type.hopper",
+            "settings": { "foreground": "#E06C75" }
+        },
+        {
+            "scope": "entity.name.function.hopper",
+            "settings": { "foreground": "#61AFEF" }
+        },
+        {
+            "scope": "entity.name.type.hopper",
+            "settings": { "foreground": "#E5C07B" }
+        },
+        {
+            "scope": "constant.numeric.hopper",
+            "settings": { "foreground": "#D19A66" }
+        },
+        {
+            "scope": "constant.language.hopper",
+            "settings": { "foreground": "#D19A66" }
+        }
+    ]
+}
