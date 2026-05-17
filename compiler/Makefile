@@ -1,4 +1,5 @@
-KINDLING   := node ../kindling/hopper
+NODE       := $(shell which node 2>/dev/null || echo node)
+KINDLING   := $(NODE) ../kindling/hopper
 PARSER_DIR := ../kindling/src/parser_c_api
 RT_DIR     := ../kindling/src/compiler_rt
 BUILD      := ../build
