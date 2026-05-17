@@ -94,12 +94,12 @@ template Unique<T> {
     // After swap: self owns other's previous allocation, other owns self's.
     // Use with a local Unique<T> for RAII-style buffer replacement.
     function swap(Unique<T> other) {
-        address tmpData  = other.data
-        int     tmpCount = other.count
+        address temporaryData  = other.data
+        int     temporaryCount = other.count
         other.data  = self.data
         other.count = self.count
-        self.data   = tmpData
-        self.count  = tmpCount
+        self.data   = temporaryData
+        self.count  = temporaryCount
     }
 
     // Free managed data and reset to empty. Safe to call multiple times.

@@ -1,0 +1,73 @@
+// Pointer<T> — owning pointer to a single heap-allocated value of type T.
+//
+// Unlike Unique<T> (which manages an array of T), Pointer<T> holds exactly
+// one T. Construct with an initial value; the destructor frees it.
+// Use move() to transfer ownership, swap() to exchange, destroy() for
+// explicit cleanup when auto-destruction is unavailable.
+//
+// Usage:
+//   Pointer<int> p = Pointer(42)
+//   int v = p.get()              // 42
+//   p.set(99)
+//   bool nil = p.isNull()        // false
+//
+//   Pointer<int> q = Pointer(0)
+//   p.move(q)                    // q owns 99, p.data = null
+//   q.destroy()                  // explicit free
+
+template Pointer<T> {
+    address data
+
+    constructor(T val) {
+        self.data = allocate T::size
+        address p = self.data
+        p::value = val
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    // Read the stored value.
+    function get() T {
+        address p = self.data
+        return p::value
+    }
+
+    // Overwrite the stored value.
+    function set(T val) {
+        address p = self.data
+        p::value = val
+    }
+
+    // Raw address of the stored value.
+    function ptr() address {
+        return self.data
+    }
+
+    // True after move() or destroy() — the allocation is gone.
+    function isNull() bool {
+        return self.data == null
+    }
+
+    // Transfer ownership to dst. Frees dst's current value first.
+    // After: self.data = null, dst holds the original allocation.
+    function move(Pointer<T> dst) {
+        deallocate dst.data
+        dst.data  = self.data
+        self.data = null
+    }
+
+    // Atomically exchange allocations with another Pointer<T>.
+    function swap(Pointer<T> other) {
+        address tmp = other.data
+        other.data  = self.data
+        self.data   = tmp
+    }
+
+    // Free and null the pointer. Safe to call multiple times.
+    function destroy() {
+        deallocate self.data
+        self.data = null
+    }
+}

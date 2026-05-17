@@ -7,15 +7,15 @@
 // Usage:
 //   import path from path
 //
-//   Path p = Path("/usr/local/bin")
-//   p.join("clang")               // "/usr/local/bin/clang"
-//   address b = p.basename()      // "clang"          (caller deallocates)
-//   address d = p.dirname()       // "/usr/local/bin" (caller deallocates)
-//   address e = p.ext()           // ""               (caller deallocates)
-//   bool abs  = p.isAbsolute()    // true
-//   deallocate b
-//   deallocate d
-//   deallocate e
+//   Path path = Path("/usr/local/bin")
+//   path.join("clang")               // "/usr/local/bin/clang"
+//   address base = path.basename()   // "clang"          (caller deallocates)
+//   address dir  = path.dirname()    // "/usr/local/bin" (caller deallocates)
+//   address ext  = path.ext()        // ""               (caller deallocates)
+//   bool absolute = path.isAbsolute() // true
+//   deallocate base
+//   deallocate dir
+//   deallocate ext
 
 import unique from Pointer
 
@@ -24,30 +24,30 @@ class Path {
     int len
     int cap
 
-    constructor(address s) {
-        int slen = 0
+    constructor(address source) {
+        int sourceLength = 0
         while (true) {
-            address p = s + slen
-            byte b = p::value
-            int bi = cast b
-            if (bi == 0) { break }
-            slen = slen + 1
+            address cursor = source + sourceLength
+            byte character = cursor::value
+            int charCode = cast character
+            if (charCode == 0) { break }
+            sourceLength = sourceLength + 1
         }
-        int initCap = 64
-        if (slen + 1 > initCap) { initCap = slen + 1 }
-        self.buf = Unique(initCap)
-        self.cap = initCap
+        int initialCapacity = 64
+        if (sourceLength + 1 > initialCapacity) { initialCapacity = sourceLength + 1 }
+        self.buf = Unique(initialCapacity)
+        self.cap = initialCapacity
         self.len = 0
-        int i = 0
-        while (i < slen) {
-            address p = s + i
-            byte b = p::value
-            self.buf.set(i, b)
-            i = i + 1
+        int index = 0
+        while (index < sourceLength) {
+            address cursor = source + index
+            byte character = cursor::value
+            self.buf.set(index, character)
+            index = index + 1
         }
-        self.len = slen
-        byte nul = cast 0
-        self.buf.set(slen, nul)
+        self.len = sourceLength
+        byte nullByte = cast 0
+        self.buf.set(sourceLength, nullByte)
     }
 
     destructor() {
@@ -57,47 +57,47 @@ class Path {
     // Double capacity, preserving existing bytes and null terminator.
     // Uses swap() to exchange buffers — the old block is freed via destroy().
     function grow() {
-        int newCap = self.cap * 2
-        Unique<byte> tmp = Unique(newCap)
-        int i = 0
-        while (i < self.len) {
-            byte b = self.buf.get(i)
-            tmp.set(i, b)
-            i = i + 1
+        int newCapacity = self.cap * 2
+        Unique<byte> newBuffer = Unique(newCapacity)
+        int index = 0
+        while (index < self.len) {
+            byte character = self.buf.get(index)
+            newBuffer.set(index, character)
+            index = index + 1
         }
-        byte nul = cast 0
-        tmp.set(self.len, nul)
-        self.buf.swap(tmp)
-        self.cap = newCap
-        tmp.destroy()
+        byte nullByte = cast 0
+        newBuffer.set(self.len, nullByte)
+        self.buf.swap(newBuffer)
+        self.cap = newCapacity
+        newBuffer.destroy()
     }
 
-    // Ensure at least n bytes of spare capacity, growing as needed.
-    function ensureRoom(int n) {
-        while (self.len + n >= self.cap) {
+    // Ensure at least needed bytes of spare capacity, growing as needed.
+    function ensureRoom(int needed) {
+        while (self.len + needed >= self.cap) {
             self.grow()
         }
     }
 
     // Append a single byte and maintain null terminator.
-    function appendByte(byte c) {
+    function appendByte(byte character) {
         self.ensureRoom(2)
-        self.buf.set(self.len, c)
+        self.buf.set(self.len, character)
         self.len = self.len + 1
-        byte nul = cast 0
-        self.buf.set(self.len, nul)
+        byte nullByte = cast 0
+        self.buf.set(self.len, nullByte)
     }
 
     // Append a null-terminated string.
-    function appendStr(address s) {
-        int i = 0
+    function appendStr(address source) {
+        int index = 0
         while (true) {
-            address p = s + i
-            byte b = p::value
-            int bi = cast b
-            if (bi == 0) { break }
-            self.appendByte(b)
-            i = i + 1
+            address cursor = source + index
+            byte character = cursor::value
+            int charCode = cast character
+            if (charCode == 0) { break }
+            self.appendByte(character)
+            index = index + 1
         }
     }
 
@@ -114,9 +114,9 @@ class Path {
     // True if the path begins with '/'.
     function isAbsolute() bool {
         if (self.len == 0) { return false }
-        byte first = self.buf.get(0)
-        int fi = cast first
-        return fi == '/'
+        byte firstByte = self.buf.get(0)
+        int firstCode = cast firstByte
+        return firstCode == '/'
     }
 
     // Append a path segment, inserting a '/' separator if needed.
@@ -126,29 +126,29 @@ class Path {
             self.appendStr(segment)
             return
         }
-        byte last = self.buf.get(self.len - 1)
-        int li = cast last
-        if (li != '/') {
+        byte lastByte = self.buf.get(self.len - 1)
+        int lastCode = cast lastByte
+        if (lastCode != '/') {
             byte slash = cast '/'
             self.appendByte(slash)
         }
-        address seg = segment
-        byte segFirst = seg::value
-        int sfi = cast segFirst
-        if (sfi == '/') {
-            seg = seg + 1
+        address segmentCursor = segment
+        byte segmentFirst = segmentCursor::value
+        int segmentFirstCode = cast segmentFirst
+        if (segmentFirstCode == '/') {
+            segmentCursor = segmentCursor + 1
         }
-        self.appendStr(seg)
+        self.appendStr(segmentCursor)
     }
 
     // Byte offset of the start of the final path component (past the last '/').
     function basenameStart() int {
-        int i = self.len - 1
-        while (i >= 0) {
-            byte b = self.buf.get(i)
-            int bi = cast b
-            if (bi == '/') { return i + 1 }
-            i = i - 1
+        int index = self.len - 1
+        while (index >= 0) {
+            byte character = self.buf.get(index)
+            int charCode = cast character
+            if (charCode == '/') { return index + 1 }
+            index = index - 1
         }
         return 0
     }
@@ -156,13 +156,13 @@ class Path {
     // Byte offset of the extension dot in the basename, or -1 if none.
     // A leading dot (hidden file like ".bashrc") does not count as an extension.
     function extStart() int {
-        int base = self.basenameStart()
-        int i = self.len - 1
-        while (i > base) {
-            byte b = self.buf.get(i)
-            int bi = cast b
-            if (bi == '.') { return i }
-            i = i - 1
+        int basenameOffset = self.basenameStart()
+        int index = self.len - 1
+        while (index > basenameOffset) {
+            byte character = self.buf.get(index)
+            int charCode = cast character
+            if (charCode == '.') { return index }
+            index = index - 1
         }
         return -1
     }
@@ -170,76 +170,76 @@ class Path {
     // Return an allocated copy of the final path component. Caller must deallocate.
     function basename() address {
         int start = self.basenameStart()
-        int blen = self.len - start
-        address out = allocate (blen + 1)
-        int i = 0
-        while (i < blen) {
-            byte b = self.buf.get(start + i)
-            address p = out + i
-            p::value = b
-            i = i + 1
+        int componentLength = self.len - start
+        address result = allocate (componentLength + 1)
+        int index = 0
+        while (index < componentLength) {
+            byte character = self.buf.get(start + index)
+            address cursor = result + index
+            cursor::value = character
+            index = index + 1
         }
-        address end = out + blen
-        byte nul = cast 0
-        end::value = nul
-        return out
+        address terminator = result + componentLength
+        byte nullByte = cast 0
+        terminator::value = nullByte
+        return result
     }
 
     // Return an allocated copy of the directory portion. Caller must deallocate.
     // Returns "/" for root-level paths, "." for paths with no directory component.
     function dirname() address {
-        int base = self.basenameStart()
-        int dlen = base - 1
-        if (dlen <= 0) {
-            address out = allocate 2
+        int basenameOffset = self.basenameStart()
+        int dirLength = basenameOffset - 1
+        if (dirLength <= 0) {
+            address result = allocate 2
             if (self.isAbsolute()) {
                 byte slash = cast '/'
-                out::value = slash
+                result::value = slash
             } else {
                 byte dot = cast '.'
-                out::value = dot
+                result::value = dot
             }
-            address nulp = out + 1
-            byte nul = cast 0
-            nulp::value = nul
-            return out
+            address terminator = result + 1
+            byte nullByte = cast 0
+            terminator::value = nullByte
+            return result
         }
-        address out = allocate (dlen + 1)
-        int i = 0
-        while (i < dlen) {
-            byte b = self.buf.get(i)
-            address p = out + i
-            p::value = b
-            i = i + 1
+        address result = allocate (dirLength + 1)
+        int index = 0
+        while (index < dirLength) {
+            byte character = self.buf.get(index)
+            address cursor = result + index
+            cursor::value = character
+            index = index + 1
         }
-        address end = out + dlen
-        byte nul = cast 0
-        end::value = nul
-        return out
+        address terminator = result + dirLength
+        byte nullByte = cast 0
+        terminator::value = nullByte
+        return result
     }
 
     // Return an allocated copy of the extension including the dot, or "" if none.
     // Caller must deallocate.
     function ext() address {
-        int start = self.extStart()
-        if (start == -1) {
-            address out = allocate 1
-            byte nul = cast 0
-            out::value = nul
-            return out
+        int extensionStart = self.extStart()
+        if (extensionStart == -1) {
+            address result = allocate 1
+            byte nullByte = cast 0
+            result::value = nullByte
+            return result
         }
-        int elen = self.len - start
-        address out = allocate (elen + 1)
-        int i = 0
-        while (i < elen) {
-            byte b = self.buf.get(start + i)
-            address p = out + i
-            p::value = b
-            i = i + 1
+        int extensionLength = self.len - extensionStart
+        address result = allocate (extensionLength + 1)
+        int index = 0
+        while (index < extensionLength) {
+            byte character = self.buf.get(extensionStart + index)
+            address cursor = result + index
+            cursor::value = character
+            index = index + 1
         }
-        address end = out + elen
-        byte nul = cast 0
-        end::value = nul
-        return out
+        address terminator = result + extensionLength
+        byte nullByte = cast 0
+        terminator::value = nullByte
+        return result
     }
 }
