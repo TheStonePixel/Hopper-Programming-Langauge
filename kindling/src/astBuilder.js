@@ -158,6 +158,7 @@ export class AstBuilder extends HopperVisitor {
             return { value: parseInt(text, 10), type: "int" };
         if (ctx.StringLiteral && ctx.StringLiteral()) {
             const raw = text.slice(1, -1)
+                .replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
                 .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
                 .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
             return { value: raw, type: "string" };
@@ -694,6 +695,7 @@ export class AstBuilder extends HopperVisitor {
         // String literal
         if (ctx.StringLiteral && ctx.StringLiteral()) {
             const raw = ctx.StringLiteral().getText().slice(1, -1)
+                .replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
                 .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
                 .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
             return StringLiteral(raw);

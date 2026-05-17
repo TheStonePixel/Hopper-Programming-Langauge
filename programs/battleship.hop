@@ -9,18 +9,21 @@
 // Ships: Carrier(5), Battleship(4), Cruiser(3), Submarine(3), Destroyer(2)
 // Ships are placed randomly. Player fires manually; computer fires randomly.
 
-import array  from ds
-import io     from core
+import array from ds
+import io    from core
 
 extern function scanf(String fmt, ...) int
 extern function rand() int
 extern function srand(int seed)
 extern function time(int t) int
 
-// --- Ship placement ---
+// ── ANSI helpers ──────────────────────────────────────────────────────────────
+//   \x1b[0m  reset     \x1b[1m  bold      \x1b[2m  dim
+//   \x1b[31m red       \x1b[32m green     \x1b[33m yellow
+//   \x1b[36m cyan      \x1b[37m white
 
-// Returns true if a ship of given length fits at (r,c).
-// dir 0 = horizontal (growing c), dir 1 = vertical (growing r).
+// ── Ship placement ────────────────────────────────────────────────────────────
+
 function can_place(Array<int> g, int r, int c, int len, int dir) bool {
     bool ok = true
     int i = 0
@@ -68,24 +71,27 @@ function place_ships(Array<int> g) {
     place_ship(g, 2)
 }
 
-// --- Display ---
+// ── Display ───────────────────────────────────────────────────────────────────
 
-// reveal = show ships (your own board) or hide them (enemy board)
+//   🔥 hit     🌊 miss    🚢 ship    ·  unexplored
+//   Each cell is 2 terminal columns wide — emojis and '· ' both measure 2.
+
 function print_grid(Array<int> g, bool reveal) {
-    println("  0 1 2 3 4 5 6 7 8 9")
+    print("\x1b[2m   0 1 2 3 4 5 6 7 8 9\x1b[0m\n")
     int r = 0
     while (r < 10) {
+        print("\x1b[2m")
         printInt(r)
-        print(" ")
+        print("\x1b[0m ")
         int c = 0
         while (c < 10) {
             int v = g[r * 10 + c]
-            if (v == 2) { print("X ") }
-            if (v == 3) { print(". ") }
-            if (v == 0) { print("~ ") }
+            if (v == 2) { print("🔥") }
+            if (v == 3) { print("🌊") }
+            if (v == 0) { print("· ") }
             if (v == 1) {
-                if (reveal)  { print("S ") }
-                if (!reveal) { print("~ ") }
+                if (reveal)  { print("🚢") }
+                if (!reveal) { print("· ") }
             }
             c = c + 1
         }
@@ -94,7 +100,6 @@ function print_grid(Array<int> g, bool reveal) {
     }
 }
 
-// Count remaining unhit ship cells.
 function ships_left(Array<int> g) int {
     int count = 0
     int i = 0
@@ -105,38 +110,36 @@ function ships_left(Array<int> g) int {
     return count
 }
 
-// --- Turns ---
+// ── Turns ─────────────────────────────────────────────────────────────────────
 
-// Ask player for a shot. Loops until a valid, unfired cell is chosen.
-// Returns true on hit.
 function player_turn(Array<int> g) bool {
     bool hit   = false
     bool valid = false
     int row = 0
     int col = 0
     while (!valid) {
-        print("Your shot (row col): ")
+        print("\x1b[1m\x1b[36m  🎯 Your shot (row col): \x1b[0m")
         scanf("%lld %lld", row::address, col::address)
         bool ok = true
-        if (row < 0)  { ok = false }
-        if (col < 0)  { ok = false }
+        if (row < 0)   { ok = false }
+        if (col < 0)   { ok = false }
         if (row >= 10) { ok = false }
         if (col >= 10) { ok = false }
         if (!ok) {
-            println("Out of bounds - enter row and col 0-9.")
+            println("\x1b[33m  ⚠  Out of bounds — enter row and col 0–9.\x1b[0m")
         }
         if (ok) {
             int v = g[row * 10 + col]
-            if (v == 2) { println("Already hit there - try again.") }
-            if (v == 3) { println("Already fired there - try again.") }
+            if (v == 2) { println("\x1b[33m  Already hit there — try again.\x1b[0m") }
+            if (v == 3) { println("\x1b[33m  Already fired there — try again.\x1b[0m") }
             if (v == 0) {
                 g[row * 10 + col] = 3
-                println("Miss.")
+                println("\x1b[2m  🌊 Miss — nothing but water.\x1b[0m")
                 valid = true
             }
             if (v == 1) {
                 g[row * 10 + col] = 2
-                println("HIT!")
+                println("\x1b[1m\x1b[31m  🔥 Direct hit!\x1b[0m")
                 hit   = true
                 valid = true
             }
@@ -145,7 +148,6 @@ function player_turn(Array<int> g) bool {
     return hit
 }
 
-// Computer fires at a random unfired cell. Returns true on hit.
 function computer_turn(Array<int> g) bool {
     bool hit  = false
     bool done = false
@@ -155,20 +157,20 @@ function computer_turn(Array<int> g) bool {
         int v = g[r * 10 + c]
         if (v == 0) {
             g[r * 10 + c] = 3
-            print("Computer fires at ")
+            print("\x1b[2m  🌊 Computer fires at ")
             printInt(r)
             print(" ")
             printInt(c)
-            println(": Miss.")
+            println(" — miss.\x1b[0m")
             done = true
         }
         if (v == 1) {
             g[r * 10 + c] = 2
-            print("Computer fires at ")
+            print("\x1b[1m\x1b[31m  🔥 Computer hits your ship at ")
             printInt(r)
             print(" ")
             printInt(c)
-            println(": HIT!")
+            println("!\x1b[0m")
             hit  = true
             done = true
         }
@@ -176,7 +178,7 @@ function computer_turn(Array<int> g) bool {
     return hit
 }
 
-// --- Entry point ---
+// ── Entry point ───────────────────────────────────────────────────────────────
 
 entry main {
     srand(time(0))
@@ -194,18 +196,26 @@ entry main {
     place_ships(player)
     place_ships(computer)
 
-    println("=== BATTLESHIP ===")
-    println("17 ship cells each. Sink them all to win!")
+    print("\n")
+    println("\x1b[1m\x1b[33m  🚢  B A T T L E S H I P  🚢\x1b[0m")
+    println("\x1b[2m  Sink all 17 enemy ship cells to win.\x1b[0m")
 
     bool game_over   = false
     bool player_wins = false
 
     while (!game_over) {
         print("\n")
-        println("--- Your fleet ---")
+        print("\x1b[1m\x1b[36m── Your Fleet ")
+        print("\x1b[2m(")
+        printInt(ships_left(player))
+        println(" remaining)\x1b[0m")
         print_grid(player, true)
+
         print("\n")
-        println("--- Enemy waters ---")
+        print("\x1b[1m\x1b[36m── Enemy Waters ")
+        print("\x1b[2m(")
+        printInt(ships_left(computer))
+        println(" remaining)\x1b[0m")
         print_grid(computer, false)
         print("\n")
 
@@ -225,12 +235,19 @@ entry main {
     }
 
     print("\n")
-    println("--- Final state ---")
-    println("Your fleet:")
+    println("\x1b[1m\x1b[36m── Final State\x1b[0m")
+    print("\x1b[2mYour fleet:\x1b[0m\n")
     print_grid(player, true)
-    println("Enemy fleet:")
+    print("\n")
+    print("\x1b[2mEnemy fleet:\x1b[0m\n")
     print_grid(computer, true)
+    print("\n")
 
-    if (player_wins)  { println("\nYou win! All enemy ships sunk!") }
-    if (!player_wins) { println("\nComputer wins! Your fleet is destroyed!") }
+    if (player_wins) {
+        println("\x1b[1m\x1b[32m  🏆 Victory! All enemy ships sunk!\x1b[0m")
+    }
+    if (!player_wins) {
+        println("\x1b[1m\x1b[31m  💀 Defeated. Your fleet is gone.\x1b[0m")
+    }
+    print("\n")
 }
