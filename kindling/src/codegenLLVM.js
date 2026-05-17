@@ -1555,7 +1555,13 @@ function genStmt(ir, stmt, retType) {
                     ir.emit(`ret ${llvmType(retType)} ${coerced.value}`);
                 }
             } else {
-                ir.emit(`ret void`);
+                // Bare `return` in a non-void context emits a zero return value
+                // so the IR type matches the function signature.
+                if (retType && retType !== "void" && retType !== null) {
+                    ir.emit(`ret ${llvmType(retType)} 0`);
+                } else {
+                    ir.emit(`ret void`);
+                }
             }
             break;
         }

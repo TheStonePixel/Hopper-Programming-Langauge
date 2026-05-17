@@ -38,16 +38,17 @@ function toObject(file) {
     return { objFile, entryName: ast.entry?.name ?? "main" };
 }
 
-function link(results, outFile, ldFlags = []) {
+function link(results, outFile, ldFlags = [], extraObjs = []) {
     const objs   = results.map(r => `"${r.objFile}"`).join(" ");
+    const extra  = extraObjs.map(o => `"${o}"`).join(" ");
     const flags  = ldFlags.join(" ");
-    execSync(`clang ${objs} -o "${outFile}" ${flags}`, { stdio: "inherit" });
+    execSync(`clang ${objs} ${extra} -o "${outFile}" ${flags}`, { stdio: "inherit" });
     return outFile;
 }
 
-function compile(files, outFile, ldFlags = []) {
+function compile(files, outFile, ldFlags = [], extraObjs = []) {
     const results = files.map(toObject);
-    link(results, outFile, ldFlags);
+    link(results, outFile, ldFlags, extraObjs);
     return outFile;
 }
 
@@ -69,15 +70,18 @@ function cmdBuild(args) {
         args.splice(outputIdx, 2);
     }
 
-    // Extract -L<dir>, -l<lib>, and -rpath flags to pass through to the linker.
-    const ldFlags = [];
-    const files   = [];
+    // Extract -L<dir>, -l<lib>, -Wl, flags and extra .o files for the linker.
+    const ldFlags   = [];
+    const extraObjs = [];
+    const files     = [];
     for (let i = 0; i < args.length; i++) {
         const a = args[i];
         if (a.startsWith("-L") || a.startsWith("-l") || a.startsWith("-Wl,")) {
             ldFlags.push(a);
         } else if ((a === "-L" || a === "-l") && i + 1 < args.length) {
             ldFlags.push(a, args[++i]);
+        } else if (a.endsWith(".o")) {
+            extraObjs.push(a);
         } else {
             files.push(a);
         }
@@ -91,7 +95,7 @@ function cmdBuild(args) {
     }
 
     const outFile = output || path.join(BUILD_DIR, baseName(hopFiles[0]));
-    compile(hopFiles, outFile, ldFlags);
+    compile(hopFiles, outFile, ldFlags, extraObjs);
     console.log(`built: ${outFile}`);
 }
 
