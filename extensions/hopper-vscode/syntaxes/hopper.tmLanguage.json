@@ -41,7 +41,7 @@
 
         "strings": {
             "name": "string.quoted.double.hopper",
-            "begin": "\"",
+            "begin": "(?<!['\\\\])\"",
             "end": "\"",
             "patterns": [
                 { "name": "constant.character.escape.hopper", "match": "\\\\." }
