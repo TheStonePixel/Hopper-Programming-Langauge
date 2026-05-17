@@ -1201,13 +1201,21 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
-            // callback(T,T)R var = functionName  OR  = cast addressVar
-            if (normType.startsWith("callback(") && stmt.init) {
+            // callback(T,T)R var = functionName  OR  bare 'callback var = functionName'  OR  = cast addressVar
+            if ((normType === "callback" || normType.startsWith("callback(")) && stmt.init) {
                 let raw;
+                let resolvedType = normType;
                 if (stmt.init.kind === "Var") {
-                    // direct function name: bitcast fn ptr to i8*
                     const fnName = stmt.init.name;
-                    const fnSig  = callbackFnTypeSig(normType);
+                    // Infer type from function signature when bare 'callback' keyword used
+                    if (resolvedType === "callback") {
+                        const fnInfo = functionReturnTypes.get(fnName);
+                        if (!fnInfo) throw new Error(`Cannot infer callback type: unknown function '${fnName}'`);
+                        const retT    = fnInfo.returnType || "void";
+                        const paramTs = (fnInfo.params || []).map(p => normalizeType(p.type)).join(",");
+                        resolvedType  = `callback(${paramTs})${retT}`;
+                    }
+                    const fnSig = callbackFnTypeSig(resolvedType);
                     raw = ir.newTmp();
                     ir.emit(`${raw} = bitcast ${fnSig}* @${fnName} to i8*`);
                 } else if (stmt.init.kind === "CastExpr") {
@@ -1221,7 +1229,7 @@ function genStmt(ir, stmt, retType) {
                 const ptr = ir.newTmp();
                 ir.emit(`${ptr} = alloca i8*`);
                 ir.emit(`store i8* ${raw}, i8** ${ptr}`);
-                ir.vars.set(stmt.name, { ptr, type: "i8*", hType: normType });
+                ir.vars.set(stmt.name, { ptr, type: "i8*", hType: resolvedType });
                 break;
             }
 
