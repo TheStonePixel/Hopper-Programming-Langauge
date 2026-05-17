@@ -2,8 +2,9 @@
     "name": "hopper-language",
     "displayName": "Hopper Language",
     "description": "Syntax highlighting for the Hopper programming language (.hop)",
-    "version": "1.1.0",
-    "engines": { "vscode": "^1.75.0" },
+    "version": "1.2.0",
+    "publisher": "hopper",
+    "engines": { "vscode": "^1.70.0" },
     "categories": ["Programming Languages"],
     "contributes": {
         "languages": [
@@ -21,12 +22,140 @@
                 "path": "./syntaxes/hopper.tmLanguage.json"
             }
         ],
-        "themes": [
-            {
-                "label": "Hopper Dark",
-                "uiTheme": "vs-dark",
-                "path": "./themes/hopper-dark.json"
+        "configurationDefaults": {
+            "editor.tokenColorCustomizations": {
+                "textMateRules": [
+
+                    {
+                        "scope": "keyword.memory.hopper",
+                        "settings": { "foreground": "#E06C75", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "scope": [
+                            "keyword.class.hopper",
+                            "entity.name.type.class.hopper",
+                            "variable.language.self.hopper",
+                            "support.function.method.hopper"
+                        ],
+                        "settings": { "foreground": "#E5A550" }
+                    },
+                    {
+                        "scope": "variable.language.self.hopper",
+                        "settings": { "foreground": "#E5A550", "fontStyle": "italic" }
+                    },
+                    {
+                        "scope": "entity.name.type.class.hopper",
+                        "settings": { "foreground": "#E5A550", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "scope": [
+                            "keyword.template.hopper",
+                            "entity.name.type.template.hopper"
+                        ],
+                        "settings": { "foreground": "#C678DD" }
+                    },
+                    {
+                        "scope": "entity.name.type.template.hopper",
+                        "settings": { "foreground": "#C678DD", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "scope": [
+                            "keyword.struct.hopper",
+                            "entity.name.type.struct.hopper"
+                        ],
+                        "settings": { "foreground": "#98C379" }
+                    },
+                    {
+                        "scope": "entity.name.type.struct.hopper",
+                        "settings": { "foreground": "#98C379", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "scope": [
+                            "keyword.interface.hopper",
+                            "entity.name.type.interface.hopper"
+                        ],
+                        "settings": { "foreground": "#56B6C2" }
+                    },
+                    {
+                        "scope": "entity.name.type.interface.hopper",
+                        "settings": { "foreground": "#56B6C2", "fontStyle": "bold" }
+                    },
+
+                    {
+                        "scope": "keyword.control.hopper",
+                        "settings": { "foreground": "#4FC1FF" }
+                    },
+
+                    {
+                        "scope": "keyword.function.hopper",
+                        "settings": { "foreground": "#61AFEF" }
+                    },
+                    {
+                        "scope": "entity.name.function.hopper",
+                        "settings": { "foreground": "#E5C07B" }
+                    },
+
+                    {
+                        "scope": "storage.type.hopper",
+                        "settings": { "foreground": "#56B6C2" }
+                    },
+
+                    {
+                        "scope": "keyword.other.hopper",
+                        "settings": { "foreground": "#7A9EC2" }
+                    },
+
+                    {
+                        "scope": [
+                            "constant.language.hopper",
+                            "constant.numeric.integer.hopper",
+                            "constant.numeric.float.hopper",
+                            "constant.numeric.hex.hopper",
+                            "constant.character.hopper"
+                        ],
+                        "settings": { "foreground": "#D19A66" }
+                    },
+
+                    {
+                        "scope": "string.quoted.double.hopper",
+                        "settings": { "foreground": "#98C379" }
+                    },
+                    {
+                        "scope": "constant.character.escape.hopper",
+                        "settings": { "foreground": "#56B6C2" }
+                    },
+
+                    {
+                        "scope": "comment.line.double-slash.hopper",
+                        "settings": { "foreground": "#5C6370", "fontStyle": "italic" }
+                    },
+
+                    {
+                        "scope": [
+                            "keyword.operator.comparison.hopper",
+                            "keyword.operator.assignment.hopper",
+                            "keyword.operator.bitwise.hopper"
+                        ],
+                        "settings": { "foreground": "#56B6C2" }
+                    },
+                    {
+                        "scope": "keyword.operator.logical.hopper",
+                        "settings": { "foreground": "#C678DD" }
+                    },
+                    {
+                        "scope": "keyword.operator.arithmetic.hopper",
+                        "settings": { "foreground": "#ABB2BF" }
+                    }
+
+                ]
             }
-        ]
+        }
+    },
+    "scripts": {
+        "install:vscode": "node ../../../kindling/tools/install-ext.js"
     }
 }
