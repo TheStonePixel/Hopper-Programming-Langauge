@@ -1,14 +1,22 @@
-// Battleship 3 — smart pointer memory control
+// Battleship 3 — safe (smart pointers only)
 //
-// Same game as Battleship 1 but Unique<T> owns every heap allocation.
-// There is no allocate or deallocate anywhere in this file.
+// Every allocation is owned by a Unique<T>. There is no allocate,
+// no deallocate, and no raw :: operators (::value, ::address, ::size)
+// anywhere in this file.
 //
-// Compare to Battleship 1 (raw C-level):
-//   Gone: boardAlloc, boardFree — Unique<int> constructor/destructor take over
-//   Gone: boardInit loop — Unique<int>.zero() fills 800 bytes in one call
-//   Gone: cellGet, cellSet, cellGetFlat — board.get() and board.set()
-//         replace all manual  (r * 10 + c) * 8  pointer arithmetic
-//   Gone: allocate 64 / deallocate buf — Unique<byte> owns the input buffer
+// How each unsafe pattern from Battleship 1 was replaced:
+//
+//   boardAlloc / boardFree      → Unique<int>(100), auto-freed at scope exit
+//   cellGet / cellSet           → board.get(idx) / board.set(idx, val)
+//   rng::address threading      → Unique<int>(1) holds state; load() / store()
+//   allocate 64 / deallocate    → Unique<byte>(64), buf.destroy() at end
+//   p::value byte reads         → buf.get(i) — safe typed element access
+//   parseInt + raw address math → parseDigits reads buf.get(i) directly
+//   row::address / col::address → inlined; no output-pointer parameters
+//
+// buf.ptr() appears once to pass the buffer address to readLine (a syscall
+// wrapper). That is the smart pointer's intentional interop method — not a
+// raw :: operation.
 //
 // Board layout: Unique<int> of 100 elements (800 bytes internally)
 //   Cell values:  0 = water   1 = ship   2 = hit   3 = miss
@@ -20,17 +28,17 @@ import unique from Pointer
 import sys    from linux
 
 // ── RNG ───────────────────────────────────────────────────────────────────────
-// Same LCG as Battleship 1 — state threaded through address, no global.
+// Unique<int> holds the LCG state. load() / store() replace ::value.
 
-function rngStep(address state) int {
-    int s = state::value
+function rngStep(Unique<int> state) int {
+    int s = state.load()
     s = s * 1664525 + 1013904223
-    state::value = s
+    state.store(s)
     int r = s & 0x7FFFFFFF
     return r
 }
 
-function rngMod(address state, int n) int {
+function rngMod(Unique<int> state, int n) int {
     return rngStep(state) % n
 }
 
@@ -54,7 +62,7 @@ function canPlace(Unique<int> board, int r, int c, int len, int dir) bool {
     return ok
 }
 
-function placeShip(Unique<int> board, int len, address rng) {
+function placeShip(Unique<int> board, int len, Unique<int> rng) {
     bool placed = false
     while (!placed) {
         int r   = rngMod(rng, 10)
@@ -75,7 +83,7 @@ function placeShip(Unique<int> board, int len, address rng) {
     }
 }
 
-function placeFleet(Unique<int> board, address rng) {
+function placeFleet(Unique<int> board, Unique<int> rng) {
     placeShip(board, 5, rng)
     placeShip(board, 4, rng)
     placeShip(board, 3, rng)
@@ -119,31 +127,24 @@ function shipsLeft(Unique<int> board) int {
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────────
-// buf is a Unique<byte> created once per call, reused across loop iterations.
-// No allocate. No deallocate. buf.destroy() at the end releases ownership.
+// buf.get(i) reads typed bytes — no p::value, no raw address arithmetic.
+// parseDigits replaces parseInt so we never touch a raw address for parsing.
 
-function parseShot(address buf, int n, address rowOut, address colOut) bool {
-    int spaceIdx = -1
-    int i = 0
-    while (i < n) {
-        address p = buf + i
-        byte ch = p::value
-        int chi = cast ch
-        if (chi == 32) {
-            spaceIdx = i
-            i = n
+function parseDigits(Unique<byte> buf, int start, int count) int {
+    int result = 0
+    int i = start
+    while (i < start + count) {
+        byte ch = buf.get(i)
+        int d = cast ch
+        d = d - 48
+        if (d >= 0) {
+            if (d <= 9) {
+                result = result * 10 + d
+            }
         }
         i = i + 1
     }
-    if (spaceIdx <= 0) { return false }
-
-    int row = parseInt(buf, spaceIdx)
-    address rest = buf + spaceIdx + 1
-    int col = parseInt(rest, n - spaceIdx - 1)
-
-    rowOut::value = row
-    colOut::value = col
-    return true
+    return result
 }
 
 function playerTurn(Unique<int> board) {
@@ -152,39 +153,50 @@ function playerTurn(Unique<int> board) {
     while (!valid) {
         print("  Your shot (row col): ")
         int n = readLine(buf.ptr(), 64)
-        int row = 0
-        int col = 0
-        bool ok = parseShot(buf.ptr(), n, row::address, col::address)
-        if (!ok) {
+
+        int spaceIdx = -1
+        int i = 0
+        while (i < n) {
+            byte ch = buf.get(i)
+            int chi = cast ch
+            if (chi == 32) {
+                spaceIdx = i
+                i = n
+            }
+            i = i + 1
+        }
+
+        if (spaceIdx <= 0) {
             println("  Invalid — enter two numbers separated by a space.")
         }
-        if (ok) {
-            if (row < 0)   { ok = false }
-            if (col < 0)   { ok = false }
+        if (spaceIdx > 0) {
+            int row = parseDigits(buf, 0, spaceIdx)
+            int col = parseDigits(buf, spaceIdx + 1, n - spaceIdx - 1)
+            bool ok = true
             if (row >= 10) { ok = false }
             if (col >= 10) { ok = false }
             if (!ok) { println("  Out of bounds — row and col must be 0 to 9.") }
-        }
-        if (ok) {
-            int v = board.get(row * 10 + col)
-            if (v == 2) { println("  Already hit there — try again.") }
-            if (v == 3) { println("  Already fired there — try again.") }
-            if (v == 0) {
-                board.set(row * 10 + col, 3)
-                println("  o  Miss.")
-                valid = true
-            }
-            if (v == 1) {
-                board.set(row * 10 + col, 2)
-                println("  X  Direct hit!")
-                valid = true
+            if (ok) {
+                int v = board.get(row * 10 + col)
+                if (v == 2) { println("  Already hit there — try again.") }
+                if (v == 3) { println("  Already fired there — try again.") }
+                if (v == 0) {
+                    board.set(row * 10 + col, 3)
+                    println("  o  Miss.")
+                    valid = true
+                }
+                if (v == 1) {
+                    board.set(row * 10 + col, 2)
+                    println("  X  Direct hit!")
+                    valid = true
+                }
             }
         }
     }
     buf.destroy()
 }
 
-function computerTurn(Unique<int> board, address rng) {
+function computerTurn(Unique<int> board, Unique<int> rng) {
     bool done = false
     while (!done) {
         int r = rngMod(rng, 10)
@@ -212,11 +224,13 @@ function computerTurn(Unique<int> board, address rng) {
 }
 
 // ── Entry ─────────────────────────────────────────────────────────────────────
-// Unique<int>(100) allocates 800 bytes. zero() clears all cells.
-// Both boards release their memory when main returns.
+// Unique<int>(1)   — single-element allocation holds the RNG state
+// Unique<int>(100) — 800 bytes for each board; zero() clears all cells
+// All three release their memory when main returns.
 
 entry main {
-    int rng = getpid()
+    Unique<int> rng = Unique(1)
+    rng.store(getpid())
 
     Unique<int> playerBoard   = Unique(100)
     Unique<int> computerBoard = Unique(100)
@@ -224,11 +238,11 @@ entry main {
     playerBoard.zero()
     computerBoard.zero()
 
-    placeFleet(playerBoard,   rng::address)
-    placeFleet(computerBoard, rng::address)
+    placeFleet(playerBoard,   rng)
+    placeFleet(computerBoard, rng)
 
     print("\n")
-    println("  BATTLESHIP 3  —  smart pointers")
+    println("  BATTLESHIP 3  —  safe (smart pointers)")
     println("  Sink all 17 enemy ship cells to win.")
     println("  X hit   o miss   . water   # ship")
 
@@ -257,7 +271,7 @@ entry main {
         }
 
         if (!gameOver) {
-            computerTurn(playerBoard, rng::address)
+            computerTurn(playerBoard, rng)
             if (shipsLeft(playerBoard) == 0) {
                 gameOver = true
             }
