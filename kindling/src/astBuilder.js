@@ -78,14 +78,15 @@ import {
 } from "./ast.js";
 
 // Decode Hopper string escape sequences to raw bytes.
-// Handles: \n \t \r \\ \" and \xNN hex escapes.
+// Handles: \n \t \r \\ \" \' and \xNN hex escapes.
 function unescapeHopperString(s) {
-    return s.replace(/\\(\\|n|t|r|"|x[0-9a-fA-F]{2})/g, (_, seq) => {
+    return s.replace(/\\(\\|n|t|r|"|'|x[0-9a-fA-F]{2})/g, (_, seq) => {
         if (seq === 'n')  return '\n';
         if (seq === 't')  return '\t';
         if (seq === 'r')  return '\r';
         if (seq === '\\') return '\\';
         if (seq === '"')  return '"';
+        if (seq === "'")  return "'";
         return String.fromCharCode(parseInt(seq.slice(1), 16));
     });
 }
