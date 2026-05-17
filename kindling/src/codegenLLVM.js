@@ -1310,7 +1310,13 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
-            const val = genExpr(ir, stmt.expr);
+            let val;
+            if (stmt.expr.kind === "CastExpr") {
+                const inner = genExpr(ir, stmt.expr.expr);
+                val = emitCast(ir, inner.value, inner.type, fieldType);
+            } else {
+                val = genExpr(ir, stmt.expr);
+            }
             ir.emit(`store ${llFieldType} ${val.value}, ${llFieldType}* ${fieldPtr}`);
             break;
         }

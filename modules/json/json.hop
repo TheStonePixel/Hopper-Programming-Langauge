@@ -193,7 +193,7 @@ class JsonReader {
         node.numVal   = 0
         node.strVal   = ""
         node.children = childPtr
-        node.keys     = 0
+        node.keys     = null
 
         address ptr = allocate JsonNode::size
         ptr::value  = node
@@ -248,8 +248,8 @@ class JsonReader {
         node.kind     = JsonKind.STRING
         node.numVal   = 0
         node.strVal   = s
-        node.children = 0
-        node.keys     = 0
+        node.children = null
+        node.keys     = null
 
         address ptr = allocate JsonNode::size
         ptr::value  = node
@@ -286,8 +286,8 @@ class JsonReader {
         node.kind     = JsonKind.INT
         node.numVal   = n
         node.strVal   = ""
-        node.children = 0
-        node.keys     = 0
+        node.children = null
+        node.keys     = null
 
         address ptr = allocate JsonNode::size
         ptr::value  = node
@@ -305,8 +305,8 @@ class JsonReader {
         node.kind     = JsonKind.BOOL
         node.numVal   = 1
         node.strVal   = ""
-        node.children = 0
-        node.keys     = 0
+        node.children = null
+        node.keys     = null
 
         address ptr = allocate JsonNode::size
         ptr::value  = node
@@ -325,8 +325,8 @@ class JsonReader {
         node.kind     = JsonKind.BOOL
         node.numVal   = 0
         node.strVal   = ""
-        node.children = 0
-        node.keys     = 0
+        node.children = null
+        node.keys     = null
 
         address ptr = allocate JsonNode::size
         ptr::value  = node
@@ -344,8 +344,8 @@ class JsonReader {
         node.kind     = JsonKind.NONE
         node.numVal   = 0
         node.strVal   = ""
-        node.children = 0
-        node.keys     = 0
+        node.children = null
+        node.keys     = null
 
         address ptr = allocate JsonNode::size
         ptr::value  = node

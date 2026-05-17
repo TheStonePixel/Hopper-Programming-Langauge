@@ -917,6 +917,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             ast.structs.unshift(...importedAst.structs);
             ast.classes.unshift(...importedAst.classes);
             ast.consts.unshift(...importedAst.consts);
+            ast.enums.unshift(...(importedAst.enums || []));
             ast.aliases.unshift(...importedAst.aliases);
             ast.templates.unshift(...importedAst.templates);
             ast.binds.unshift(...importedAst.binds);
