@@ -7,7 +7,7 @@
 
 ---
 
-Hopper is a strongly typed, bare-metal systems language that compiles to LLVM IR.
+Hopper is a clean, strongly typed systems language designed for hardware-level programming. It compiles to LLVM IR and targets bare-metal first.
 
 ---
 
@@ -15,24 +15,20 @@ Hopper is a strongly typed, bare-metal systems language that compiles to LLVM IR
 
 **The toolchain is complicated because the language failed. Fix the language, and the toolchain becomes simple.**
 
-Every bare-metal C project ships with a linker script, a startup file, a Makefile, and a handful of `#pragma` hacks. That complexity isn't accidental — it's the bill that comes due for every design decision C couldn't make cleanly. Decades of duct tape on top of duct tape.
-
-C has no way to describe hardware, so you need a linker script. C has no entry point concept, so you need a startup file. C has no first-class hardware access story, so you get `volatile` buried in a type declaration and `__attribute__((section(...)))` buried in a pragma. Bitfields require a union of structs and a page of macros just to toggle a single bit.
-
-Hopper's answer is to make those things part of the language itself — not flags, not instructions to the toolchain, just code that describes what exists:
+A hardware-level language should be able to describe hardware directly. The entry point, the interrupt vector table, the memory-mapped registers — these are part of the program, not instructions handed to an external tool. Hopper treats them as first-class declarations:
 
 ```hopper
 // interrupt vector table — burned into flash
 bind 0x00000004 = reset::address
 bind 0x0000003c = timer::address
 
-// hardware registers — volatile by definition
+// hardware register — volatile by definition
 bitfield UartCR1 {
     pad 3
-    bit te          // bit 3: transmitter enable
-    bit re          // bit 4: receiver enable
+    bit te      // bit 3: transmitter enable
+    bit re      // bit 4: receiver enable
     pad 8
-    bit ue          // bit 13: USART enable
+    bit ue      // bit 13: USART enable
     pad 18
 }
 
@@ -45,7 +41,7 @@ entry main {
 }
 ```
 
-No linker script. No startup assembly. No CMSIS headers. No volatile casts. It's all code.
+No linker script. No startup assembly. No header files. It's all code.
 
 ---
 
@@ -57,13 +53,13 @@ No linker script. No startup assembly. No CMSIS headers. No volatile casts. It's
 
 **The language and the linker speak the same language.** `bind`, `strict`, and `entry` are not directives to an external tool. They are declarations in the same language as the rest of your program.
 
-**It's all code, not instructions.** You don't tell the toolchain how to operate. You describe what exists, and the toolchain figures out the rest.
+**It's all code, not instructions.** Describe what exists. The toolchain figures out the rest.
 
-**Lowercase is primitive, uppercase is object.** `int`, `byte`, `float`, `bool`, `bit`, `string`, `address` are machine primitives. `Int`, `String`, `Array<T>` are managed objects. The naming convention makes the cost visible.
+**Lowercase is primitive, uppercase is object.** `int`, `byte`, `float`, `bool`, `bit`, `string`, `address` are machine primitives. `String`, `Array<T>`, `HashMap<K,V>` are managed objects. The naming convention makes the cost visible at a glance.
 
 ---
 
-## Language Features
+## Language
 
 ### Types
 
@@ -71,13 +67,13 @@ No linker script. No startup assembly. No CMSIS headers. No volatile casts. It's
 |------|-------|-------|
 | `int` | 64-bit signed | General-purpose integer |
 | `unsigned int` | 64-bit unsigned | |
-| `byte` | 8-bit unsigned | Memory, I/O, protocol buffers |
-| `unsigned byte` | 8-bit unsigned | Alias for byte |
+| `byte` | 8-bit | Memory, I/O, protocol buffers |
+| `char` | 8-bit | Character data |
 | `float` | 64-bit | IEEE 754 double |
-| `bool` | 1-bit logical | `true` / `false` |
-| `bit` | 1-bit | Used in bitfields; same concept as `string` is to `i8*` |
-| `string` | raw `i8*` | C-compatible pointer to character data |
-| `address` | raw pointer | Untyped machine address |
+| `bool` | logical | `true` / `false` |
+| `bit` | 1-bit | Used inside bitfields |
+| `string` | raw `i8*` | C-compatible string literal pointer |
+| `address` | untyped pointer | Raw machine address |
 
 ```hopper
 int    x   = 42
@@ -85,16 +81,17 @@ float  pi  = 3.14
 byte   b   = 0xFF
 bool   ok  = true
 string msg = "hello"
+address p  = null
 ```
 
 ### Structs
 
-Memory-layout-only aggregates. `pad N` skips N bytes for alignment or reserved fields.
+Memory-layout aggregates. `pad N` skips N bytes for alignment or reserved fields.
 
 ```hopper
 struct PacketHeader {
     int  version
-    pad  4          // reserved, skip 4 bytes
+    pad  4
     int  length
     byte checksum
 }
@@ -102,7 +99,7 @@ struct PacketHeader {
 
 ### Classes
 
-Full objects with fields, methods, operator overloading, constructor, and destructor.
+Fields, methods, operator overloading, constructor, and destructor.
 
 ```hopper
 class Counter {
@@ -120,55 +117,55 @@ class Counter {
     operator ==(Counter other) bool {
         return self.value == other.value
     }
+
+    destructor() { }
 }
 ```
 
 ### Templates
 
-Monomorphized generics. Free type parameters use `<T>` at the use site. Fixed-type parameters lock the concrete type at declaration — no `<>` at the use site.
+Monomorphized generics — no runtime overhead. Free type parameters use `<T>` at the call site. Fixed-type parameters lock the type at declaration.
 
 ```hopper
 // free parameter — caller specifies T
 template Box<T> {
     T value
     constructor(T v) { self.value = v }
+    function get() T { return self.value }
 }
 
 Box<int>   n = Box<int>(42)
 Box<float> f = Box<float>(3.14)
 
-// fixed parameter — always byte, no <> at use site
+// fixed parameter — concrete type baked in, no <> at use site
 template String<byte> {
     byte value
     // ...
 }
 
-String name    // not String<byte> name
+String name
 ```
 
 ### Bitfields
 
-Bit-packed structures where fields are laid out sequentially from the LSB. Any primitive type can be a field. `bit name[N]` is an N-bit field — no special cases, same array syntax as `int arr[5]`. `pad N` skips N bits.
+Bit-packed structures laid out from the LSB. `bit field[N]` is an N-bit field. `pad N` skips N bits. The container type (i8/i16/i32/i64) is selected automatically.
 
 ```hopper
 bitfield StatusReg {
-    bit  ready          // bit 0: single bit
+    bit  ready          // bit 0
     bit  error          // bit 1
     bit  mode[2]        // bits 2–3: two-bit field
-    byte data           // bits 4–11: full byte
+    byte data           // bits 4–11
 }
 
 StatusReg reg
 reg.ready = 1
 reg.mode  = 3
-reg.data  = 255
 ```
 
-The container type (i8/i16/i32/i64) is chosen automatically from total bit count.
+### Hardware Register Access
 
-### Strict Bitfields — Hardware Register Access
-
-`strict` attaches a bitfield (or any type) to a fixed hardware address. All reads and writes are automatically volatile — no macros, no casts, no manual shift/mask.
+`strict` binds a type to a fixed hardware address. All reads and writes are automatically volatile — no casts, no manual shift/mask.
 
 ```hopper
 bitfield GpioModer {
@@ -177,7 +174,7 @@ bitfield GpioModer {
     bit mode2[2]
     bit mode3[2]
     bit mode4[2]
-    bit mode5[2]    // PA5 — LED on Nucleo boards
+    bit mode5[2]    // PA5
     bit mode6[2]
     bit mode7[2]
     pad 16
@@ -185,36 +182,22 @@ bitfield GpioModer {
 
 strict GpioModer gpioa = 0x48000000
 
-gpioa.mode5 = 1   // set PA5 to output: volatile load → clear → set → volatile store
+gpioa.mode5 = 1   // volatile load → clear bits 10–11 → set → volatile store
 ```
-
-This replaces entire CMSIS/HAL register macro ecosystems with readable, type-safe declarations.
 
 ### Memory Model
 
-Hopper exposes the machine's address space directly with `::` operators:
-
 ```hopper
-int n = 99
-address ptr = n::address    // take address of n
+int    n   = 99
+address ptr = n::address    // take address
+int    sz  = n::size        // byte size of variable (8 for int)
 
-ptr::value = 42             // write through pointer (modifies n)
+ptr::value = 42             // write through pointer
 int copy = ptr::value       // read through pointer
 
-int sz = n::size            // byte size of the variable (8 for int)
+address next = ptr + 1      // pointer arithmetic
 
-// pointer arithmetic — automatically scaled to element size
-address next = ptr + 1
-
-// array element address
 address elem = arr[2]::address
-```
-
-`null` is a valid literal for address types:
-
-```hopper
-address p = null
-if (p == null) { ... }
 ```
 
 ### Control Flow
@@ -234,26 +217,7 @@ for (int i = 0; i < 10; i = i + 1) {
     // ...
 }
 
-break
-continue
-return value
-defer cleanup()    // executes before function exit
-```
-
-### Arithmetic, Bitwise, and Logic
-
-Full operator set with standard precedence:
-
-```hopper
-int a = (x + y) * z
-int b = flags & 0xFF
-int c = val | 0x80
-int d = reg ^ mask
-int e = bits << 3
-int f = bits >> 1
-int g = ~mask
-bool h = (a == b) && (c != d)
-float r = cast x          // context-inferred cast (int→float or float→int)
+defer cleanup()     // executes before function exit
 ```
 
 ### Functions and Extern
@@ -263,48 +227,28 @@ function add(int a, int b) int {
     return a + b
 }
 
-function log(string msg) {
-    // procedure — no return type
-}
-
-extern function printf(string fmt, ...) int    // variadic C functions
+extern function printf(string fmt, ...) int
 ```
 
-### Entry, Bind, and Strict
-
-Three keywords that replace the linker script, startup assembly, and volatile macro patterns:
+### Entry, Bind, Strict
 
 ```hopper
-// entry — the unambiguous program entry point
-entry main {
-    // ...
-}
+entry main { }                          // bare program entry
+entry main(int argc, string[] argv) { } // with arguments
+entry main = startup::address           // bind to existing function
 
-// with arguments (OS or loader passes argc/argv)
-entry main(int argc, string[] argv) {
-    // ...
-}
-
-// address form — entry point is an existing function
-entry main = startup::address
-
-// bind — place a function pointer at a hardware address (interrupt vector table)
-bind 0x00000004 = reset::address
+bind 0x00000004 = reset::address        // interrupt vector slot
 bind 0x0000003c = timer::address
 
-// strict — name a memory-mapped hardware address
-strict int uart_dr = 0x40021000
-strict int uart_sr = 0x40021004
+strict int uart_dr = 0x40013804         // memory-mapped register
 ```
 
 ### Inline Assembly
 
-Direct register-level control inside a function body:
-
 ```hopper
 function write(int fd, string buf, int len) {
     asm {
-        rax = 1       // syscall: write
+        rax = 1
         rdi = fd
         rsi = buf
         rdx = len
@@ -313,17 +257,42 @@ function write(int fd, string buf, int len) {
 }
 ```
 
-### Import System
+### Enums
 
 ```hopper
-import io from linux        // io module from the linux stdlib
-import io, fs, sys from linux
-import MyLib                // standalone module
+enum Direction {
+    NORTH = 0
+    SOUTH = 1
+    EAST  = 2
+    WEST  = 3
+}
 ```
 
-### Compile-Time Contracts *(reserved — not yet implemented)*
+### Interfaces
 
-Grammar is in place; semantics are planned for a future release.
+Compile-time contracts on classes.
+
+```hopper
+interface IString {
+    function length() int
+    function get(int index) byte
+    function isEmpty() bool
+}
+
+class MyString implements IString {
+    // must implement all three methods
+}
+```
+
+### Imports
+
+```hopper
+import io from linux
+import io, fs, sys from linux
+import array from ds
+```
+
+### Contracts *(reserved — not yet implemented)*
 
 ```hopper
 function divide(int a, int b) int
@@ -333,45 +302,88 @@ function divide(int a, int b) int
     return a / b
 }
 
-while (i < n) invariant i >= 0 {
-    // ...
-}
-
-int x = input constrain [byte]    // compiler checks x fits in a byte
+int x = input constrain [byte]
 ```
 
 ---
 
 ## Standard Library
 
-### `modules/linux`
+### `linux` — Syscall Wrappers
 
-Pure syscall wrappers — no libc, no glibc dependency.
+Direct kernel interface. No libc.
 
 ```hopper
 import io, fs, sys from linux
 
-print("hello\n", 6)               // write to stdout
-error("failed\n", 7)              // write to stderr
-int n = read(0, buf, 256)         // read from stdin
-
 int fd = open("data.bin", O_RDONLY, 0)
 int n  = read(fd, buf, 1024)
 close(fd)
-
 exit(0)
-fork()
-execve("/bin/sh", argv, envp)
-waitpid(pid, status::address, 0)
 ```
 
-File open flags: `O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREAT`, `O_TRUNC`, `O_APPEND`
+Submodules: `io`, `fs`, `sys`, `mem`, `thread`, `net`, `timer`, `random`, `msg`, `sem`, `shm`, `poll`, `tty`, `ptrace`, `io_uring`
 
-### `modules/ds`
+File flags: `O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREAT`, `O_TRUNC`, `O_APPEND`, `O_NONBLOCK`, `O_CLOEXEC`
 
-#### Heap — Bump Allocator
+### `io` — High-Level I/O
 
-Bring-your-own-buffer allocator designed for embedded and constrained environments. No per-block overhead, no fragmentation. Reset clears all allocations at once.
+```hopper
+import io from io
+
+print("hello")
+println("world")
+newline()
+
+int n = readLine(buf, 256)
+int v = parseInt(buf, n)
+
+FileReader r = FileReader(path)
+FileWriter w = FileWriter(path)
+```
+
+### `core` — Target-Neutral Output
+
+```hopper
+import io from core
+
+print("msg")
+println("msg")
+eprint("err")
+printInt(42)
+```
+
+### `ds` — Data Structures
+
+All containers are monomorphized templates.
+
+```hopper
+import array, stack, queue, hashmap from ds
+
+Array<int>      arr  = Array<int>(16)
+Stack<address>  stk  = Stack<address>(8)
+Queue<int>      q    = Queue<int>(8)
+HashMap<int,int> map = HashMap<int,int>(32)
+```
+
+| Container | Methods |
+|-----------|---------|
+| `Array<T>` | `get`, `set`, `push`, `pop`, `len`, `cap`, `indexOf`, `contains`, `remove`, `insert` |
+| `Stack<T>` | `push`, `pop`, `peek`, `len`, `empty` |
+| `Queue<T>` | `enqueue`, `dequeue`, `front`, `back`, `len`, `empty` |
+| `Deque<T>` | `pushFront`, `pushBack`, `popFront`, `popBack`, `front`, `back` |
+| `LinkedList<T>` | `prepend`, `append`, `removeFirst`, `removeLast`, `get` |
+| `DoublyLinkedList<T>` | `prepend`, `append`, `remove`, `get` |
+| `HashMap<K,V>` | `get`, `set`, `remove`, `contains`, `len`, `cap` |
+| `Set<T>` | `add`, `remove`, `contains`, `len` |
+| `MinHeap<T>` | `insert`, `extractMin`, `peek`, `len` |
+| `MaxHeap<T>` | `insert`, `extractMax`, `peek`, `len` |
+| `BST<T>` | `insert`, `contains`, `remove` |
+| `Trie` | `insert`, `contains`, `startsWith` |
+| `Graph` | `addEdge`, `bfs`, `dfs` |
+| `StringBuilder` | `append`, `appendLiteral`, `toString` |
+
+#### `Heap` — Bump Allocator
 
 ```hopper
 import Heap from ds
@@ -379,38 +391,234 @@ import Heap from ds
 byte buf[4096]
 Heap h = Heap(buf::address, 4096)
 
-address ptr = h.alloc(64)         // returns null if out of space
-int left    = h.remaining()
-h.reset()                         // free everything
+address ptr = h.alloc(64)
+int     rem = h.remaining()
+h.reset()
 ```
 
-### `modules/llvm`
+### `stream` — Stream Views
 
-Full LLVM C API bindings — used by the Hopper compiler itself to emit IR. Covers module/context lifecycle, type construction, IR builder, and verification.
+Non-owning view over contiguous data.
+
+```hopper
+import stream from stream
+
+Stream<byte> s = Stream<byte>(data, len)
+byte b = s.peek()
+s.advance()
+int left = s.remaining()
+```
+
+### `Pointer` — Smart Pointers
+
+```hopper
+import unique from Pointer
+
+Unique<byte> buf = Unique(1024)   // allocates 1024 bytes
+address ptr = buf.ptr()
+buf.destroy()
+```
+
+| Type | Semantics |
+|------|-----------|
+| `Pointer<T>` | Single-value owning pointer; `get`, `set`, `ptr`, `destroy` |
+| `Unique<T>` | Unique ownership; `ptr`, `get`, `destroy` |
+| `Shared<T>` | Reference counted; `ptr`, `get`, `addRef`, `release` |
+
+### `ascii` — ASCII String
+
+```hopper
+import String from ascii
+
+String s = String(64)
+s.appendLiteral("hello")
+int len = s.length()
+byte c  = s.get(0)
+```
+
+### `math` — Integer Math
+
+```hopper
+import math from math
+
+int v = math.abs(-5)
+int m = math.max(a, b)
+int g = math.gcd(12, 8)
+int p = math.pow(2, 10)
+```
+
+Functions: `abs`, `min`, `max`, `clamp`, `pow`, `factorial`, `gcd`, `lcm`, `fib`, `isqrt`
+
+### `algo` — Algorithms
+
+```hopper
+import sort from algo
+
+sort.quickSort(arr, ascending)
+sort.mergeSort(arr, descending)
+sort.insertionSort(arr, ascending)
+```
+
+### `json` — JSON Parser
+
+```hopper
+import reader from json
+
+JsonReader r = JsonReader(src, len)
+address node = r.parseValue()
+JsonNode v   = node::value
+
+if (v.kind == JsonKind.INT) {
+    int n = v.numVal
+}
+```
+
+Kinds: `JsonKind.NONE`, `BOOL`, `INT`, `STRING`, `ARRAY`, `OBJECT`
+
+### `path` — Path Manipulation
+
+```hopper
+import path from path
+
+Path p = Path("/usr/local/bin")
+Path b = p.basename()
+Path d = p.dirname()
+bool abs = p.isAbsolute()
+p.join("file.txt")
+```
+
+### `fs` — File System
+
+```hopper
+import fs from fs
+
+FileSystem fsys = FileSystem()
+bool exists = fsys.exists(Path("/tmp"))
+bool isDir  = fsys.isDirectory(Path("/usr"))
+fsys.makeDirectory(Path("/tmp/myproject"))
+
+Directory dir = Directory(Path("/tmp"))
+while (true) {
+    Path entry = dir.next()
+    if (entry.length() == 0) { break }
+}
+dir.close()
+```
+
+### `linux` (Architecture Variants)
+
+`x86_64` provides the syscall implementations. `target` selects the active architecture. `llvm` provides full LLVM C API bindings used by the Hopper compiler itself.
 
 ---
 
-## A Complete Example
+## CLI
 
-A bare-metal UART boot sequence on ARM Cortex-M, written entirely in Hopper:
+Install via the `kindling` Node.js compiler frontend.
+
+```
+hopper init <name>                    scaffold a new project
+hopper build [file.hop] [-o out]      compile to executable
+hopper build module <name>            scaffold modules/<name>/ with tests/
+hopper run [binary]                   execute a built binary
+hopper run test [module]              run test suite
+hopper install [module...]            install from stdlib or registry
+hopper uninstall <module...>          remove installed packages
+hopper publish [name]                 publish to registry
+hopper revoke [name]                  remove from registry
+hopper check [file.hop] [flags]       compile with sanitizers
+hopper debug [file.hop]               debug support (coming soon)
+hopper profile [file.hop]             profiling support (coming soon)
+hopper format [-w] <file.hop...>      reformat source files
+hopper test [module]                  run tests
+hopper ir <file.hop>                  print LLVM IR
+hopper ast <file.hop>                 print AST as JSON
+```
+
+### Project Structure
+
+`hopper init myproject` creates:
+
+```
+myproject/
+  main.hop
+  hopper.json
+  src/
+  modules/
+  .gitignore
+```
+
+`hopper.json`:
+
+```json
+{
+  "name": "myproject",
+  "version": "0.1.0",
+  "entry": "main.hop",
+  "dependencies": {}
+}
+```
+
+### Package Registry
+
+Packages are hosted under the [HopperLangauge](https://github.com/HopperLangauge) GitHub organization. `hopper install` checks the local stdlib first, then fetches from the registry.
+
+```
+hopper install json       # install json module
+hopper publish            # publish current project to registry
+hopper revoke mypackage   # permanently remove from registry
+```
+
+Publish and revoke require `HOPPER_TOKEN` or `GITHUB_TOKEN` env var.
+
+---
+
+## Tests
+
+Tests live in `modules/<name>/tests/` as `.hop` files. Directives in comments drive the runner:
 
 ```hopper
-// interrupt vector table
+// TEST: parse integer
+// EXPECT: int ok
+
+entry main {
+    // ...
+    println("int ok")
+}
+```
+
+| Directive | Meaning |
+|-----------|---------|
+| `// TEST: name` | Named test section |
+| `// EXPECT: line` | Assert this line appears in stdout |
+| `// COMPILE_ONLY` | Verify compilation, don't run |
+| `// EXPECT_ERROR: msg` | Compilation should fail with this message |
+| `// XFAIL` | Expected failure — shown but not counted |
+
+```
+hopper test          # run all tests
+hopper test ds       # run modules/ds/tests/ only
+```
+
+---
+
+## Complete Example
+
+Bare-metal UART boot on ARM Cortex-M:
+
+```hopper
 bind 0x00000004 = reset::address
 bind 0x00000008 = nmi::address
 bind 0x0000000c = hardfault::address
 
-// UART control register — STM32F4
 bitfield UartCR1 {
     pad 3
-    bit te      // bit 3: transmitter enable
-    bit re      // bit 4: receiver enable
+    bit te
+    bit re
     pad 8
-    bit ue      // bit 13: USART enable
+    bit ue
     pad 18
 }
 
-// GPIO mode register — GPIOA
 bitfield GpioModer {
     bit mode0[2]
     bit mode1[2]
@@ -435,8 +643,8 @@ function reset() {
     uart_cr1.ue = 1
     uart_cr1.te = 1
     uart_cr1.re = 1
-    gpioa.mode5 = 1    // PA5 → output (LED)
-    uart_send(65)      // 'A'
+    gpioa.mode5 = 1
+    uart_send(65)
 }
 
 function nmi()       { }
@@ -445,49 +653,15 @@ function hardfault() { }
 entry main = reset::address
 ```
 
-No linker script. No CMSIS. No startup file. The hardware layout is the program.
-
----
-
-## Roadmap
-
-### Now — Language Core *(complete)*
-- Full type system: `int`, `byte`, `float`, `bool`, `bit`, `string`, `address`, `unsigned` variants
-- Structs with `pad`, classes with methods and operators, monomorphized templates
-- Bitfields — bit-packed structures with shift/mask codegen
-- `strict` bitfields — volatile hardware register access with automatic shift/mask
-- `entry`, `bind`, `strict` — program structure without toolchain directives
-- Memory model — `::address`, `::value`, `::size`, pointer arithmetic
-- Inline assembly
-- Full expression system including `cast`, bitwise, logical operators
-- Import system
-- Linux syscall stdlib (`io`, `fs`, `sys`)
-- Bump allocator (`Heap`)
-- LLVM IR backend
-- 26 passing tests
-
-### Next — Data Structures
-- `Array<T>` — growable heap-allocated array
-- `String` — managed string via `template String<byte>`
-- `Stack<T>`, `Queue<T>`, `LinkedList<T>`, `Deque<T>`
-- `HashMap<K,V>`, `Set<T>`
-- `MinHeap<T>`, `MaxHeap<T>`
-- `Ring<T>` — fixed-capacity circular buffer for interrupt/I/O use
-- `BitVec` — packed bit array
-
-### Then — Toolchain
-- Build tool — one command from `.hop` to ELF
-- Linker script generator from `bind` declarations
-- Startup file written in Hopper
-- ARM Cortex-M and RISC-V targets
-
-### Goal
-Write an Arduino program in Hopper. One command. No C toolchain. No header files.
-
 ---
 
 ## Status
 
-Version 0.1 — prototype. Syntax and APIs will change. Nothing is stable yet.
+Version 0.1 — active development. Syntax and APIs will change.
 
-The compiler frontend parses a full ANTLR4 grammar and generates LLVM IR. A complete bare-metal toolchain is the target.
+- **425 tests passing**, 2 expected failures
+- Full CLI — init, build, run, install, publish, check, format, test
+- Complete standard library — data structures, I/O, filesystem, JSON, math, algorithms, smart pointers
+- LLVM IR backend via `kindling` (Node.js)
+- ARM Cortex-M and RISC-V targets planned
+- Self-hosted compiler is a long-term goal
