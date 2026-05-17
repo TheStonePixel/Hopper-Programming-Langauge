@@ -42,6 +42,11 @@ template Array<T> {
         return self.capacity
     }
 
+    // Raw pointer to backing store — use for passing to C or manual deallocation.
+    function ptr() address {
+        return self.data
+    }
+
     // Get element at index i. No bounds check — caller ensures i < len().
     function get(int i) T {
         address ptr = self.data + (i * T::size)

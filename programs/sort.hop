@@ -163,7 +163,7 @@ entry main(int argc, address argv) {
 
     // ── quicksort with swappable comparator ───────────────────────────────────
 
-    callback(int, int) bool cmp = intAscending
+    callback cmp = intAscending(int, int) bool
     quickSort(nums, 0, nums.len() - 1, cmp)
     printf("ascending:  ")
     printArr(nums)

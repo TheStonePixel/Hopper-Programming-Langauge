@@ -33,7 +33,7 @@ entry main(int argc, address argv) {
     printf("ascending(3,5)=%d  descending(3,5)=%d\n", r1, r2)
 
     // Test 2: store callback in a variable and call it
-    callback(int, int) bool cmp = ascending
+    callback cmp = ascending(int, int) bool
     bool r3 = cmp(10, 20)
     printf("cmp(10,20)=%d (should be 1)\n", r3)
 
@@ -43,7 +43,7 @@ entry main(int argc, address argv) {
     printf("cmp(10,20) after reassign=%d (should be 0)\n", r4)
 
     // Test 4: callback returning int
-    callback(int) int fn = addOne
+    callback fn = addOne(int) int
     int r5 = fn(41)
     printf("addOne(41)=%d (should be 42)\n", r5)
 

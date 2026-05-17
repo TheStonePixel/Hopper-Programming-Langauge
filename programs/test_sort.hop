@@ -69,7 +69,7 @@ entry main(int argc, address argv) {
     printArr(c)
 
     // ── callback variable ─────────────────────────────────────────────────────
-    callback cmp = ascending
+    callback cmp = ascending(int, int) bool
     Array<int> d = Array(4)
     d.push(10)
     d.push(3)

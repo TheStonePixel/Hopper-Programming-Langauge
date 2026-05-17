@@ -1201,20 +1201,14 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
-            // callback(T,T)R var = functionName  OR  bare 'callback var = functionName'  OR  = cast addressVar
-            if ((normType === "callback" || normType.startsWith("callback(")) && stmt.init) {
+            // callback(T,T)R var = functionName  OR  = cast addressVar
+            // Variable declarations use CallbackDeclTyped syntax: callback name = fn(types) ret
+            // This path handles the VarDecl produced by that statement rule.
+            if (normType.startsWith("callback(") && stmt.init) {
                 let raw;
-                let resolvedType = normType;
+                const resolvedType = normType;
                 if (stmt.init.kind === "Var") {
                     const fnName = stmt.init.name;
-                    // Infer type from function signature when bare 'callback' keyword used
-                    if (resolvedType === "callback") {
-                        const fnInfo = functionReturnTypes.get(fnName);
-                        if (!fnInfo) throw new Error(`Cannot infer callback type: unknown function '${fnName}'`);
-                        const retT    = fnInfo.returnType || "void";
-                        const paramTs = (fnInfo.params || []).map(p => normalizeType(p.type)).join(",");
-                        resolvedType  = `callback(${paramTs})${retT}`;
-                    }
                     const fnSig = callbackFnTypeSig(resolvedType);
                     raw = ir.newTmp();
                     ir.emit(`${raw} = bitcast ${fnSig}* @${fnName} to i8*`);

@@ -208,8 +208,7 @@ type
     | 'address'
     | 'unsigned' 'int'
     | 'unsigned' 'byte'
-    | 'callback' '(' (type (',' type)*)? ')' type   // typed function pointer: callback(int,bool) int
-    | 'callback'                                     // inferred function pointer: compiler deduces signature from RHS
+    | 'callback' '(' (type (',' type)*)? ')' type   // function pointer type for parameters: callback(int,bool) int
     | Identifier '<' type (',' type)* '>'   // template instantiation: List<int>, Map<String,int>
     | Identifier    // user-defined types (structs, classes)
     ;
