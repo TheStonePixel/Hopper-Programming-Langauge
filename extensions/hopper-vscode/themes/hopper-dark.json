@@ -1,47 +1,139 @@
 {
     "name": "Hopper Dark",
     "type": "dark",
-    "colors": {},
+    "colors": {
+        "editor.background":          "#1E2127",
+        "editor.foreground":          "#ABB2BF",
+        "editorCursor.foreground":    "#528BFF",
+        "editor.lineHighlightBackground": "#2C313A",
+        "editor.selectionBackground": "#3E4451",
+        "editorLineNumber.foreground":   "#4B5263",
+        "editorLineNumber.activeForeground": "#ABB2BF"
+    },
     "tokenColors": [
+
         {
+            "name": "Comments",
             "scope": "comment.line.hopper",
             "settings": { "foreground": "#5C6370", "fontStyle": "italic" }
         },
+
         {
-            "scope": "constant.character.hopper",
-            "settings": { "foreground": "#D19A66" }
-        },
-        {
+            "name": "Strings",
             "scope": "string.quoted.double.hopper",
             "settings": { "foreground": "#98C379" }
         },
+
         {
-            "scope": ["keyword.control.hopper", "keyword.function.hopper"],
+            "name": "Character literals",
+            "scope": "constant.character.hopper",
+            "settings": { "foreground": "#D19A66" }
+        },
+
+        {
+            "name": "Numbers",
+            "scope": [
+                "constant.numeric.integer.hopper",
+                "constant.numeric.float.hopper",
+                "constant.numeric.hex.hopper"
+            ],
+            "settings": { "foreground": "#D19A66" }
+        },
+
+        {
+            "name": "Language constants (true false null)",
+            "scope": "constant.language.hopper",
+            "settings": { "foreground": "#D19A66" }
+        },
+
+        {
+            "name": "Control flow keywords",
+            "scope": "keyword.control.hopper",
             "settings": { "foreground": "#C678DD" }
         },
+
         {
-            "scope": "keyword.other.hopper",
-            "settings": { "foreground": "#56B6C2" }
+            "name": "Function keywords (function entry extern)",
+            "scope": "keyword.function.hopper",
+            "settings": { "foreground": "#C678DD" }
         },
+
         {
+            "name": "Class struct interface template keywords",
+            "scope": "keyword.class.hopper",
+            "settings": { "foreground": "#C678DD" }
+        },
+
+        {
+            "name": "Other keywords (import cast const enum etc)",
+            "scope": "keyword.other.hopper",
+            "settings": { "foreground": "#C678DD" }
+        },
+
+        {
+            "name": "Memory keywords (allocate deallocate)",
+            "scope": "keyword.memory.hopper",
+            "settings": { "foreground": "#E06C75" }
+        },
+
+        {
+            "name": "Built-in types",
             "scope": "storage.type.hopper",
             "settings": { "foreground": "#E06C75" }
         },
+
         {
+            "name": "Function names",
             "scope": "entity.name.function.hopper",
             "settings": { "foreground": "#61AFEF" }
         },
+
         {
+            "name": "Type names (class struct template)",
             "scope": "entity.name.type.hopper",
             "settings": { "foreground": "#E5C07B" }
         },
+
         {
-            "scope": "constant.numeric.hopper",
-            "settings": { "foreground": "#D19A66" }
+            "name": "self",
+            "scope": "variable.language.hopper",
+            "settings": { "foreground": "#E06C75", "fontStyle": "italic" }
         },
+
         {
-            "scope": "constant.language.hopper",
-            "settings": { "foreground": "#D19A66" }
+            "name": "Scope operator (::)",
+            "scope": "keyword.operator.scope.hopper",
+            "settings": { "foreground": "#56B6C2" }
+        },
+
+        {
+            "name": "Logical operators",
+            "scope": "keyword.operator.logical.hopper",
+            "settings": { "foreground": "#C678DD" }
+        },
+
+        {
+            "name": "Comparison operators",
+            "scope": "keyword.operator.comparison.hopper",
+            "settings": { "foreground": "#56B6C2" }
+        },
+
+        {
+            "name": "Arithmetic operators",
+            "scope": "keyword.operator.arithmetic.hopper",
+            "settings": { "foreground": "#ABB2BF" }
+        },
+
+        {
+            "name": "Bitwise operators",
+            "scope": "keyword.operator.bitwise.hopper",
+            "settings": { "foreground": "#56B6C2" }
+        },
+
+        {
+            "name": "Assignment operator",
+            "scope": "keyword.operator.assignment.hopper",
+            "settings": { "foreground": "#56B6C2" }
         }
     ]
 }
