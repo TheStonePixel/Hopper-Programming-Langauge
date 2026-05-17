@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { execSync, spawn } from "node:child_process";
 import { buildAstFromSource } from "./src/astBuilder.js";
@@ -104,9 +105,16 @@ function cmdBuildModule(args) {
 }
 
 function cmdRun(args) {
-    if (args[0] === "dev") {
-        cmdDev(args.slice(1));
-        return;
+    if (args[0] === "dev") { cmdDev(args.slice(1)); return; }
+
+    // Named script from hopper.json: hopper run <script>
+    if (args[0] && !args[0].endsWith(".hop")) {
+        const manifest = readManifest();
+        const script = manifest && manifest.scripts && manifest.scripts[args[0]];
+        if (script) {
+            execSync(script, { stdio: "inherit", shell: true });
+            return;
+        }
     }
 
     const files = args.length ? args : ["main.hop"];
@@ -193,49 +201,80 @@ function writeManifest(obj) {
     fs.writeFileSync("hopper.json", JSON.stringify(obj, null, 2) + "\n", "utf8");
 }
 
-function cmdInit(args) {
+async function cmdInit(args) {
     if (!args[0]) {
         console.error("hopper: init requires a project name  —  hopper init <name>");
         process.exit(1);
     }
 
-    const name = args[0];
-    const safe = name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const projectDir = path.resolve(process.cwd(), safe);
+    const rawName  = args[0];
+    const safeName = rawName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const projectDir = path.resolve(process.cwd(), safeName);
 
     if (fs.existsSync(projectDir)) {
-        console.error(`hopper: '${safe}' already exists`);
+        console.error(`hopper: '${safeName}' already exists`);
         process.exit(1);
     }
 
-    fs.mkdirSync(path.join(projectDir, "src"), { recursive: true });
+    const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q, def) => new Promise(resolve =>
+        rl.question(`${q}: ${def ? `(${def}) ` : ""}`, ans => resolve(ans.trim() || def || ""))
+    );
+
+    console.log("\nThis utility will walk you through creating a hopper.json file.\n");
+
+    const name        = await ask("name",        safeName);
+    const version     = await ask("version",     "0.1.0");
+    const description = await ask("description", "");
+    const license     = await ask("license",     "MIT");
+
+    const manifest = {
+        name, version, description, license,
+        entry: "main.hop",
+        scripts: {
+            build:  "hopper build",
+            run:    "hopper run",
+            test:   "hopper test",
+            check:  "hopper check",
+            format: "hopper format -w main.hop",
+        },
+        dependencies: {},
+    };
+
+    console.log(`\n${JSON.stringify(manifest, null, 2)}\n`);
+
+    const confirm = await ask("Is this ok?", "yes");
+    rl.close();
+
+    if (confirm !== "yes" && confirm !== "y") {
+        console.log("aborted.");
+        process.exit(0);
+    }
+
+    fs.mkdirSync(path.join(projectDir, "src"),     { recursive: true });
     fs.mkdirSync(path.join(projectDir, "modules"), { recursive: true });
 
     fs.writeFileSync(path.join(projectDir, "main.hop"), [
         `import io from io`,
         ``,
         `entry main {`,
-        `    print("Hello from ${safe}!")`,
+        `    print("Hello from ${name}!")`,
         `    newline()`,
         `}`,
         ``,
     ].join("\n"), "utf8");
 
-    fs.writeFileSync(path.join(projectDir, "hopper.json"), JSON.stringify({
-        name: safe,
-        version: "0.1.0",
-        entry: "main.hop",
-        dependencies: {},
-    }, null, 2) + "\n", "utf8");
+    fs.writeFileSync(path.join(projectDir, "hopper.json"),
+        JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
     fs.writeFileSync(path.join(projectDir, ".gitignore"), "build/\n", "utf8");
 
-    console.log(`created project '${safe}'/`);
-    console.log(`  ${safe}/main.hop`);
-    console.log(`  ${safe}/hopper.json`);
-    console.log(`  ${safe}/src/`);
-    console.log(`  ${safe}/modules/`);
-    console.log(`  cd ${safe} && hopper run`);
+    console.log(`\ncreated ${safeName}/`);
+    console.log(`  ${safeName}/main.hop`);
+    console.log(`  ${safeName}/hopper.json`);
+    console.log(`  ${safeName}/src/`);
+    console.log(`  ${safeName}/modules/`);
+    console.log(`\n  cd ${safeName} && hopper run`);
 }
 
 function cmdInstall(args) {
@@ -616,17 +655,17 @@ if (argv[0] === "--parse") { cmdParse(argv.slice(1)); process.exit(0); }
 const [sub, ...rest] = argv;
 
 switch (sub) {
-    case "build":   cmdBuild(rest);   break;
-    case "run":     cmdRun(rest);     break;
-    case "dev":     cmdDev(rest);     break;
-    case "init":    cmdInit(rest);    break;
-    case "install": cmdInstall(rest); break;
-    case "check":   cmdCheck(rest);   break;
-    case "debug":   cmdDebug(rest);   break;
-    case "format":  cmdFormat(rest);  break;
-    case "test":    cmdTest(rest);    break;
-    case "ir":      cmdIR(rest);      break;
-    case "ast":     cmdAST(rest);     break;
-    case "parse":   cmdParse(rest);   break;
+    case "build":   cmdBuild(rest);        break;
+    case "run":     cmdRun(rest);          break;
+    case "dev":     cmdDev(rest);          break;
+    case "init":    cmdInit(rest);         break;  // async — returns promise, node awaits on exit
+    case "install": cmdInstall(rest);      break;
+    case "check":   cmdCheck(rest);        break;
+    case "debug":   cmdDebug(rest);        break;
+    case "format":  cmdFormat(rest);       break;
+    case "test":    cmdTest(rest);         break;
+    case "ir":      cmdIR(rest);           break;
+    case "ast":     cmdAST(rest);          break;
+    case "parse":   cmdParse(rest);        break;
     default:        usage();
 }
