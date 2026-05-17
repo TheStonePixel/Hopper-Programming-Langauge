@@ -129,9 +129,10 @@ function substStmt(s, subst) {
         case "DeallocateStmt": return { ...s, expr: substExpr(s.expr, subst) };
         case "ExprStmt":       return { ...s, expr: substExpr(s.expr, subst) };
         case "ReturnStmt":     return { ...s, expr: substExpr(s.expr, subst) };
-        case "FieldAssign":    return { ...s, expr: substExpr(s.expr, subst) };
-        case "Assign":         return { ...s, expr: substExpr(s.expr, subst) };
-        case "DerefAssign":    return { ...s, expr: substExpr(s.expr, subst) };
+        case "FieldAssign":       return { ...s, expr: substExpr(s.expr, subst) };
+        case "NestedFieldAssign": return { ...s, expr: substExpr(s.expr, subst) };
+        case "Assign":            return { ...s, expr: substExpr(s.expr, subst) };
+        case "DerefAssign":       return { ...s, expr: substExpr(s.expr, subst) };
         default: return s;
     }
 }
@@ -157,7 +158,7 @@ function monomorphize(tmpl, typeArgs) {
     function substOperator(op) {
         return {
             ...op,
-            param:      substParam(op.param, subst),
+            param:      op.param ? substParam(op.param, subst) : null,
             params:     (op.params || []).map(p => substParam(p, subst)),
             returnType: substTypeStr(op.returnType, subst),
             body:       substBlock(op.body, subst),
@@ -961,6 +962,78 @@ function genExpr(ir, expr) {
             return { value: tmp, type: retType };
         }
 
+        case "ChainedMethodCall": {
+            // obj.field.method(args) — get pointer to the field, call method on it
+            const v = ir.vars.get(expr.object);
+            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!classTypes.has(v.hType))
+                throw new Error(`ChainedMethodCall: '${expr.object}' is not a class`);
+            const outerIdx   = getFieldIndex(v.hType, expr.field);
+            const fieldType  = normalizeType(getFieldType(v.hType, expr.field));
+            const outerLL    = llvmType(v.hType);
+            const fieldPtr   = ir.newTmp();
+            ir.emit(`${fieldPtr} = getelementptr ${outerLL}, ${outerLL}* ${v.ptr}, i32 0, i32 ${outerIdx}`);
+            if (!classTypes.has(fieldType))
+                throw new Error(`ChainedMethodCall: field '${expr.field}' is not a class (type: ${fieldType})`);
+            const mangled  = `${fieldType}_${expr.method}`;
+            const mInfo    = functionReturnTypes.get(mangled);
+            const retType  = mInfo ? mInfo.returnType : "int";
+            const fieldLL  = `%class.${fieldType}`;
+            const rawArgs  = (expr.args || []).map((a, i) => {
+                const expectedNormT = mInfo && mInfo.params[i] ? normalizeType(mInfo.params[i].type) : null;
+                if (expectedNormT && classTypes.has(expectedNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar && classTypes.has(argVar.hType)) {
+                        return { value: argVar.ptr, type: argVar.hType, isClassPtr: true };
+                    }
+                }
+                return genExpr(ir, a);
+            });
+            const coercedArgs = rawArgs.map((a, i) => {
+                if (a.isClassPtr) return a;
+                const expectedType = mInfo && mInfo.params[i] ? mInfo.params[i].type : null;
+                if (!expectedType || expectedType === a.type) return a;
+                try { return emitCast(ir, a.value, a.type, expectedType); } catch { return a; }
+            });
+            const selfArg   = `${fieldLL}* ${fieldPtr}`;
+            const otherArgs = coercedArgs.map(a => {
+                if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
+                return `${llvmType(a.type)} ${a.value}`;
+            }).join(", ");
+            const argStr = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+            if (retType === null) {
+                ir.emit(`call void @${mangled}(${argStr})`);
+                return { value: "0", type: "int" };
+            }
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(retType)} @${mangled}(${argStr})`);
+            return { value: tmp, type: retType };
+        }
+
+        case "FieldIndexAccess": {
+            // obj.field[i] — get pointer to field, call its [] operator
+            const v = ir.vars.get(expr.object);
+            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!classTypes.has(v.hType))
+                throw new Error(`FieldIndexAccess: '${expr.object}' is not a class`);
+            const outerIdx  = getFieldIndex(v.hType, expr.field);
+            const fieldType = normalizeType(getFieldType(v.hType, expr.field));
+            const outerLL   = llvmType(v.hType);
+            const fieldPtr  = ir.newTmp();
+            ir.emit(`${fieldPtr} = getelementptr ${outerLL}, ${outerLL}* ${v.ptr}, i32 0, i32 ${outerIdx}`);
+            if (!classTypes.has(fieldType))
+                throw new Error(`FieldIndexAccess: field '${expr.field}' is not a class (type: ${fieldType})`);
+            const cls      = classTypes.get(fieldType);
+            const idxOp    = (cls.operators || []).find(o => o.op === '[]');
+            if (!idxOp) throw new Error(`FieldIndexAccess: '${fieldType}' has no [] operator`);
+            const indexVal = genExpr(ir, expr.index);
+            const fnName   = `${fieldType}_op_idx`;
+            const fieldLL  = `%class.${fieldType}`;
+            const tmp      = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(idxOp.returnType)} @${fnName}(${fieldLL}* ${fieldPtr}, ${llvmType(idxOp.param.type)} ${indexVal.value})`);
+            return { value: tmp, type: idxOp.returnType };
+        }
+
         case "MethodCall": {
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
@@ -1201,16 +1274,57 @@ function genStmt(ir, stmt, retType) {
                 );
             }
 
-            const typeName    = v.hType;
-            const fieldIdx    = getFieldIndex(typeName, stmt.field);
-            const fieldType   = getFieldType(typeName, stmt.field);
-            const llFieldType = llvmType(fieldType);
-            const llSelfType  = llvmType(typeName);
+            const typeName      = v.hType;
+            const fieldIdx      = getFieldIndex(typeName, stmt.field);
+            const fieldType     = getFieldType(typeName, stmt.field);
+            const normFieldType = normalizeType(fieldType);
+            const llFieldType   = llvmType(normFieldType);
+            const llSelfType    = llvmType(typeName);
 
             const fieldPtr = ir.newTmp();
             ir.emit(`${fieldPtr} = getelementptr ${llSelfType}, ${llSelfType}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
+
+            // Constructor-call in-place: self.field = FieldType(args)
+            const baseFieldName = fieldType.includes('<') ? fieldType.split('<')[0] : null;
+            if (classTypes.has(normFieldType) && stmt.expr.kind === "Call"
+                && (stmt.expr.callee === fieldType || stmt.expr.callee === normFieldType || stmt.expr.callee === baseFieldName)) {
+                const ctorName = `${normFieldType}_constructor`;
+                if (functionReturnTypes.has(ctorName)) {
+                    const args      = (stmt.expr.args || []).map(a => genExpr(ir, a));
+                    const selfArg   = `%class.${normFieldType}* ${fieldPtr}`;
+                    const otherArgs = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+                    const argStr    = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+                    ir.emit(`call void @${ctorName}(${argStr})`);
+                }
+                break;
+            }
+
             const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llFieldType} ${val.value}, ${llFieldType}* ${fieldPtr}`);
+            break;
+        }
+
+        case "NestedFieldAssign": {
+            // obj.outerField.innerField = expr
+            // Resolves to: GEP into outer, GEP into inner, store.
+            const v = ir.vars.get(stmt.object);
+            if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
+            if (!classTypes.has(v.hType))
+                throw new Error(`NestedFieldAssign: '${stmt.object}' is not a class type`);
+            const outerIdx    = getFieldIndex(v.hType, stmt.outerField);
+            const outerFType  = normalizeType(getFieldType(v.hType, stmt.outerField));
+            const outerLLType = llvmType(v.hType);
+            const outerPtr    = ir.newTmp();
+            ir.emit(`${outerPtr} = getelementptr ${outerLLType}, ${outerLLType}* ${v.ptr}, i32 0, i32 ${outerIdx}`);
+            if (!classTypes.has(outerFType))
+                throw new Error(`NestedFieldAssign: field '${stmt.outerField}' is not a class type (type: ${outerFType})`);
+            const innerIdx    = getFieldIndex(outerFType, stmt.innerField);
+            const innerFType  = getFieldType(outerFType, stmt.innerField);
+            const innerLLOuter = llvmType(outerFType);
+            const innerPtr    = ir.newTmp();
+            ir.emit(`${innerPtr} = getelementptr ${innerLLOuter}, ${innerLLOuter}* ${outerPtr}, i32 0, i32 ${innerIdx}`);
+            const val = genExpr(ir, stmt.expr);
+            ir.emit(`store ${llvmType(innerFType)} ${val.value}, ${llvmType(innerFType)}* ${innerPtr}`);
             break;
         }
 

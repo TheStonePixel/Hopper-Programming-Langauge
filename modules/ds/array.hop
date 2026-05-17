@@ -158,4 +158,5 @@ template Array<T> {
         self.data     = newData
         self.capacity = newCap
     }
+
 }
