@@ -123,6 +123,7 @@
                         "comment2": "numbers, true, false, null",
                         "scope": [
                             "constant.language.hopper",
+                            "constant.character.hopper",
                             "constant.numeric.integer.hopper",
                             "constant.numeric.float.hopper",
                             "constant.numeric.hex.hopper"

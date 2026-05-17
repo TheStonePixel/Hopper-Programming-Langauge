@@ -5,6 +5,7 @@
     "fileTypes": ["hop"],
     "patterns": [
         { "include": "#comments" },
+        { "include": "#char-literals" },
         { "include": "#strings" },
         { "include": "#extern-function-decl" },
         { "include": "#function-decl" },
@@ -31,6 +32,12 @@
         "comments": {
             "name": "comment.line.double-slash.hopper",
             "match": "//.*$"
+        },
+
+        "char-literals": {
+            "comment": "Single-quoted character literal: 'x' or '\\n' etc.",
+            "name": "constant.character.hopper",
+            "match": "'(?:\\\\.|[^'\\\\])'"
         },
 
         "strings": {
@@ -128,12 +135,12 @@
 
         "other-keywords": {
             "name": "keyword.other.hopper",
-            "match": "\\b(import|from|const|alias|bind|strict|bitfield|asm|pad|cast|requires|ensures|invariant|constrain|unsigned)\\b"
+            "match": "\\b(import|from|const|enum|alias|bind|strict|bitfield|asm|pad|cast|requires|ensures|invariant|constrain|unsigned)\\b"
         },
 
         "types": {
             "name": "storage.type.hopper",
-            "match": "\\b(int|bool|float|byte|bit|string|String|address)\\b"
+            "match": "\\b(int|bool|float|byte|char|bit|string|String|address)\\b"
         },
 
         "self": {
