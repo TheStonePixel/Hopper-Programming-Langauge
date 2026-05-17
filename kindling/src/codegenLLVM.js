@@ -14,6 +14,7 @@ const templateDefs       = new Map();   // template name → TemplateDecl
 const templateInstances  = new Set();   // mangled names from monomorphization — fields are public
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
 const bitfieldTypes      = new Map();   // name → BitfieldDecl
+const enumTypes          = new Map();   // enum name → Map(variantName → int value)
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
 
@@ -30,6 +31,7 @@ function resetAll() {
     templateInstances.clear();
     mmioBindings.clear();
     bitfieldTypes.clear();
+    enumTypes.clear();
     instantiatedClasses = [];
     stringCounter = 0;
 }
@@ -669,6 +671,13 @@ function genExpr(ir, expr) {
         }
 
         case "FieldAccess": {
+            // Enum access: ErrorCode.NOT_FOUND → integer literal
+            if (enumTypes.has(expr.object)) {
+                const variants = enumTypes.get(expr.object);
+                if (!variants.has(expr.field))
+                    throw new Error(`Unknown enum variant: ${expr.object}.${expr.field}`);
+                return { value: String(variants.get(expr.field)), type: "int" };
+            }
             // Check MMIO (strict) bitfield first — uses volatile load
             const mmioFA = mmioBindings.get(expr.object);
             if (mmioFA && bitfieldTypes.has(mmioFA.hType)) {
@@ -2137,6 +2146,12 @@ function genModule(ast) {
 
     // Register bitfield types — stored as their integer container (i8/i16/i32/i64)
     for (const bf of ast.bitfields || []) bitfieldTypes.set(bf.name, bf);
+
+    for (const en of ast.enums || []) {
+        const variants = new Map();
+        for (const v of en.variants) variants.set(v.name, v.value);
+        enumTypes.set(en.name, variants);
+    }
 
     // Register regular struct and class types first (monomorphization may reference them)
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);
