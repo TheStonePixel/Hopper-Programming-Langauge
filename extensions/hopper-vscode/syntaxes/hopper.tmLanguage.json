@@ -37,12 +37,14 @@
         "char-literals": {
             "patterns": [
                 {
+                    "comment": "escape sequences: '\\n' '\\t' '\\\"' '\\'' '\\\\'",
                     "name": "constant.character.hopper",
                     "match": "'\\\\.'"
                 },
                 {
+                    "comment": "single char literals: 'A' '\"' '{' etc — anything except ' and \\",
                     "name": "constant.character.hopper",
-                    "match": "'.'"
+                    "match": "'[^'\\\\]'"
                 }
             ]
         },
