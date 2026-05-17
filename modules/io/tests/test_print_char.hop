@@ -1,0 +1,14 @@
+// EXPECT: A
+// EXPECT: z
+// EXPECT: !
+
+import io from io
+
+entry main(int argc, address argv) {
+    printChar(65)
+    newline()
+    printChar(122)
+    newline()
+    printChar(33)
+    newline()
+}
