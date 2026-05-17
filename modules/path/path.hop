@@ -1,24 +1,23 @@
 // path.hop — path manipulation backed by a Unique<byte> buffer.
 //
-// The Path class owns its storage; Unique<byte>.swap() enables
-// zero-copy buffer replacement in grow().
+// Unique<byte> owns the storage and tracks capacity via buf.len().
+// swap() enables zero-copy buffer replacement in grow().
 //
 // Usage:
 //   import path from path
 //
-//   Path path = Path("/usr/local/bin")
-//   path.join("clang")              // "/usr/local/bin/clang"
-//   Path base = path.basename()     // Path("clang")
-//   Path dir  = path.dirname()      // Path("/usr/local/bin")
-//   Path ext  = path.ext()          // Path("") or Path(".hop")
-//   bool absolute = path.isAbsolute() // true
+//   Path p = Path("/usr/local/bin")
+//   p.join("clang")               // "/usr/local/bin/clang"
+//   Path base = p.basename()      // Path("clang")
+//   Path dir  = p.dirname()       // Path("/usr/local/bin")
+//   Path ext  = p.ext()           // Path(".hop") or Path("")
+//   bool absolute = p.isAbsolute() // true
 
 import unique from Pointer
 
 class Path {
     Unique<byte> buf
     int len
-    int cap
 
     constructor(address source) {
         int sourceLength = 0
@@ -32,7 +31,6 @@ class Path {
         int initialCapacity = 64
         if (sourceLength + 1 > initialCapacity) { initialCapacity = sourceLength + 1 }
         self.buf = Unique(initialCapacity)
-        self.cap = initialCapacity
         self.len = 0
         int index = 0
         while (index < sourceLength) {
@@ -51,9 +49,8 @@ class Path {
     }
 
     // Double capacity, preserving existing bytes and null terminator.
-    // Uses swap() to exchange buffers — the old block is freed via destroy().
     function grow() {
-        int newCapacity = self.cap * 2
+        int newCapacity = self.buf.len() * 2
         Unique<byte> newBuffer = Unique(newCapacity)
         int index = 0
         while (index < self.len) {
@@ -64,18 +61,17 @@ class Path {
         byte nullByte = cast 0
         newBuffer.set(self.len, nullByte)
         self.buf.swap(newBuffer)
-        self.cap = newCapacity
         newBuffer.destroy()
     }
 
     // Ensure at least needed bytes of spare capacity, growing as needed.
     function ensureRoom(int needed) {
-        while (self.len + needed >= self.cap) {
+        while (self.len + needed >= self.buf.len()) {
             self.grow()
         }
     }
 
-    // Append a single byte and maintain null terminator.
+    // Append a single byte and maintain the null terminator.
     function appendByte(byte character) {
         self.ensureRoom(2)
         self.buf.set(self.len, character)
@@ -167,19 +163,17 @@ class Path {
     function basename() Path {
         int start = self.basenameStart()
         int componentLength = self.len - start
-        address rawStr = allocate (componentLength + 1)
+        Unique<byte> scratch = Unique(componentLength + 1)
         int index = 0
         while (index < componentLength) {
             byte character = self.buf.get(start + index)
-            address cursor = rawStr + index
-            cursor::value = character
+            scratch.set(index, character)
             index = index + 1
         }
-        address terminator = rawStr + componentLength
         byte nullByte = cast 0
-        terminator::value = nullByte
-        Path result = Path(rawStr)
-        deallocate rawStr
+        scratch.set(componentLength, nullByte)
+        Path result = Path(scratch.ptr())
+        scratch.destroy()
         return result
     }
 
@@ -189,63 +183,58 @@ class Path {
         int basenameOffset = self.basenameStart()
         int dirLength = basenameOffset - 1
         if (dirLength <= 0) {
-            address rawStr = allocate 2
+            Unique<byte> scratch = Unique(2)
             if (self.isAbsolute()) {
                 byte slash = cast '/'
-                rawStr::value = slash
+                scratch.set(0, slash)
             } else {
                 byte dot = cast '.'
-                rawStr::value = dot
+                scratch.set(0, dot)
             }
-            address terminator = rawStr + 1
             byte nullByte = cast 0
-            terminator::value = nullByte
-            Path result = Path(rawStr)
-            deallocate rawStr
+            scratch.set(1, nullByte)
+            Path result = Path(scratch.ptr())
+            scratch.destroy()
             return result
         }
-        address rawStr = allocate (dirLength + 1)
+        Unique<byte> scratch = Unique(dirLength + 1)
         int index = 0
         while (index < dirLength) {
             byte character = self.buf.get(index)
-            address cursor = rawStr + index
-            cursor::value = character
+            scratch.set(index, character)
             index = index + 1
         }
-        address terminator = rawStr + dirLength
         byte nullByte = cast 0
-        terminator::value = nullByte
-        Path result = Path(rawStr)
-        deallocate rawStr
+        scratch.set(dirLength, nullByte)
+        Path result = Path(scratch.ptr())
+        scratch.destroy()
         return result
     }
 
-    // Return a new Path containing the extension (including the dot), or an empty Path if none.
+    // Return a new Path containing the extension including the dot, or an empty Path if none.
     // A leading dot (hidden file like ".bashrc") does not count as an extension.
     function ext() Path {
         int extensionStart = self.extStart()
         if (extensionStart == -1) {
-            address rawStr = allocate 1
+            Unique<byte> scratch = Unique(1)
             byte nullByte = cast 0
-            rawStr::value = nullByte
-            Path result = Path(rawStr)
-            deallocate rawStr
+            scratch.set(0, nullByte)
+            Path result = Path(scratch.ptr())
+            scratch.destroy()
             return result
         }
         int extensionLength = self.len - extensionStart
-        address rawStr = allocate (extensionLength + 1)
+        Unique<byte> scratch = Unique(extensionLength + 1)
         int index = 0
         while (index < extensionLength) {
             byte character = self.buf.get(extensionStart + index)
-            address cursor = rawStr + index
-            cursor::value = character
+            scratch.set(index, character)
             index = index + 1
         }
-        address terminator = rawStr + extensionLength
         byte nullByte = cast 0
-        terminator::value = nullByte
-        Path result = Path(rawStr)
-        deallocate rawStr
+        scratch.set(extensionLength, nullByte)
+        Path result = Path(scratch.ptr())
+        scratch.destroy()
         return result
     }
 }
