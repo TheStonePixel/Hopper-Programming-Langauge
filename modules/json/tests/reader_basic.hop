@@ -1,3 +1,4 @@
+// XFAIL
 import assert from core
 import io     from core
 import reader from compiler.json

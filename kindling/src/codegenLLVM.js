@@ -11,6 +11,7 @@ const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
 const overloadGroups     = new Map();   // baseName → [{mangledName, params, returnType}]
 const templateDefs       = new Map();   // template name → TemplateDecl
+const templateInstances  = new Set();   // mangled names from monomorphization — fields are public
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
 const bitfieldTypes      = new Map();   // name → BitfieldDecl
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
@@ -26,6 +27,7 @@ function resetAll() {
     functionReturnTypes.clear();
     overloadGroups.clear();
     templateDefs.clear();
+    templateInstances.clear();
     mmioBindings.clear();
     bitfieldTypes.clear();
     instantiatedClasses = [];
@@ -218,6 +220,7 @@ function instantiateTemplate(typeStr) {
 
     // Register before recursing to prevent infinite loops
     registerClass(concreteClass.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+    templateInstances.add(concreteClass.name);
     instantiatedClasses.push(concreteClass);
 
     // Register return types for all methods so call sites can resolve them
@@ -349,7 +352,7 @@ function llvmType(t) {
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
     if (t === "bit")          return "i1";
-    if (t === "byte")         return "i8";
+    if (t === "byte" || t === "char")         return "i8";
     if (t === "float")        return "double";
     if (t === "string[]")     return "i8**";
     if (t === "string")       return "i8*";
@@ -368,14 +371,14 @@ function llvmType(t) {
 }
 
 function isFloatType(t) { return t === "float"; }
-function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "bit" || t === "unsignedint" || t === "unsignedbyte"; }
+function isIntType(t)   { return t === "int" || t === "byte" || t === "char" || t === "bool" || t === "bit" || t === "unsignedint" || t === "unsignedbyte"; }
 function isUnsigned(t)  { return t === "unsignedint" || t === "unsignedbyte"; }
 
 // Number of BITS a type occupies (used for bitfield layout)
 function bitWidth(type, count = 1) {
     if (type === "bit")          return 1 * count;
     if (type === "bool")         return 1 * count;
-    if (type === "byte")         return 8 * count;
+    if (type === "byte" || type === "char") return 8 * count;
     if (type === "unsignedbyte") return 8 * count;
     if (type === "int")          return 64 * count;
     if (type === "unsignedint")  return 64 * count;
@@ -408,7 +411,7 @@ function bitfieldLLType(bf) {
 
 function sizeOfType(t) {
     if (t === "int")     return 8;
-    if (t === "byte")    return 1;
+    if (t === "byte" || t === "char")    return 1;
     if (t === "bit")     return 1;  // stored as i8 minimum when standalone
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
@@ -530,7 +533,7 @@ function emitCast(ir, srcVal, srcType, targetType) {
         ir.emit(`${tmp} = fptosi double ${srcVal} to i64`);
         return { value: tmp, type: targetType };
     }
-    if (isFloatType(srcType) && (targetType === "byte" || targetType === "unsignedbyte")) {
+    if (isFloatType(srcType) && (targetType === "byte" || targetType === "char" || targetType === "unsignedbyte")) {
         ir.emit(`${tmp} = fptosi double ${srcVal} to i8`);
         return { value: tmp, type: targetType };
     }
@@ -538,21 +541,24 @@ function emitCast(ir, srcVal, srcType, targetType) {
         ir.emit(`${tmp} = sitofp i64 ${srcVal} to double`);
         return { value: tmp, type: targetType };
     }
-    if ((srcType === "byte" || srcType === "unsignedbyte") && isFloatType(targetType)) {
+    if ((srcType === "byte" || srcType === "char" || srcType === "unsignedbyte") && isFloatType(targetType)) {
         ir.emit(`${tmp} = sitofp i8 ${srcVal} to double`);
         return { value: tmp, type: targetType };
     }
-    if ((srcType === "int" || srcType === "unsignedint") && (targetType === "byte" || targetType === "unsignedbyte")) {
+    if ((srcType === "int" || srcType === "unsignedint") && (targetType === "byte" || targetType === "char" || targetType === "unsignedbyte")) {
         ir.emit(`${tmp} = trunc i64 ${srcVal} to i8`);
         return { value: tmp, type: targetType };
     }
-    if ((srcType === "byte" || srcType === "unsignedbyte") && (targetType === "int" || targetType === "unsignedint")) {
+    if ((srcType === "byte" || srcType === "char" || srcType === "unsignedbyte") && (targetType === "int" || targetType === "unsignedint")) {
         if (unsigned || isUnsigned(srcType)) {
             ir.emit(`${tmp} = zext i8 ${srcVal} to i64`);
         } else {
             ir.emit(`${tmp} = sext i8 ${srcVal} to i64`);
         }
         return { value: tmp, type: targetType };
+    }
+    if ((srcType === "char" && targetType === "byte") || (srcType === "byte" && targetType === "char")) {
+        return { value: srcVal, type: targetType };
     }
     // string and address are both i8* in LLVM — no instruction needed
     if ((srcType === "string" && targetType === "address") ||
@@ -595,6 +601,9 @@ function genExpr(ir, expr) {
     switch (expr.kind) {
 
         case "IntLiteral":
+            return { value: String(expr.value), type: "int" };
+
+        case "CharLiteral":
             return { value: String(expr.value), type: "int" };
 
         case "HexLiteral":
@@ -704,7 +713,7 @@ function genExpr(ir, expr) {
                 return { value: result, type: fieldType };
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
+            if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
                 );
@@ -1482,7 +1491,7 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
+            if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot assign field '${stmt.field}' of class '${v.hType}' directly. Use a mutator method.`
                 );
@@ -1928,7 +1937,7 @@ function typeSize(hType) {
     if (t === "int")          return 8;
     if (t === "float")        return 8;
     if (t === "bool")         return 1;
-    if (t === "byte")         return 1;
+    if (t === "byte" || t === "char")         return 1;
     if (t === "address" || t.startsWith("address:")) return 8;
     if (t === "string[]")     return 8;
     if (t === "string")       return 8;
