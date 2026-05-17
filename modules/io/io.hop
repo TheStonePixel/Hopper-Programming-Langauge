@@ -66,6 +66,14 @@ function print(bool b) {
     }
 }
 
+// Print a single character.
+function print(byte c) {
+    address buf = allocate 1
+    buf::value = c
+    write(1, buf, 1)
+    deallocate buf
+}
+
 // Print a null-terminated string.
 function print(address s) {
     int len = 0
@@ -92,6 +100,11 @@ function println(int n) {
 
 function println(bool b) {
     print(b)
+    newline()
+}
+
+function println(byte c) {
+    print(c)
     newline()
 }
 
