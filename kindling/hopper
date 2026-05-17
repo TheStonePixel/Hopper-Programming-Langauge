@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import https from "node:https";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { execSync, spawn } from "node:child_process";
@@ -13,6 +14,10 @@ const __dirname   = path.dirname(__filename);
 const ROOT        = path.resolve(__dirname, "..");
 const BUILD_DIR   = path.join(ROOT, "build");
 const MODULES_DIR = path.join(ROOT, "modules");
+
+// ── registry ───────────────────────────────────────────────────────────────
+const REGISTRY_ORG = "HopperLangauge";               // github.com/HopperLangauge/<pkg>
+const REGISTRY_URL = `https://github.com/${REGISTRY_ORG}`;  // swap for thestonepixel.com/hopper later
 
 if (!fs.existsSync(BUILD_DIR)) fs.mkdirSync(BUILD_DIR, { recursive: true });
 
@@ -104,29 +109,31 @@ function cmdBuildModule(args) {
     }
 }
 
+// hopper run — execute binaries and tests, NOT a compiler
 function cmdRun(args) {
-    if (args[0] === "dev") { cmdDev(args.slice(1)); return; }
+    // hopper run test [module]
+    if (args[0] === "test") { cmdTest(args.slice(1)); return; }
 
-    // Named script from hopper.json: hopper run <script>
-    if (args[0] && !args[0].endsWith(".hop")) {
-        const manifest = readManifest();
-        const script = manifest && manifest.scripts && manifest.scripts[args[0]];
-        if (script) {
-            execSync(script, { stdio: "inherit", shell: true });
-            return;
+    // hopper run <binary>  — execute a specific binary
+    if (args[0]) {
+        const bin = path.resolve(args[0]);
+        if (!fs.existsSync(bin)) {
+            console.error(`hopper: binary not found: ${args[0]}`);
+            process.exit(1);
         }
+        execSync(bin, { stdio: "inherit" });
+        return;
     }
 
-    const files = args.length ? args : ["main.hop"];
-    const missing = files.filter(f => !fs.existsSync(f));
-    if (missing.length) {
-        console.error(`hopper: file not found: ${missing.join(", ")}`);
+    // hopper run — execute the project's built entry binary from build/
+    const manifest = readManifest();
+    const entry    = manifest ? baseName(manifest.entry || "main.hop") : "main";
+    const bin      = path.join(BUILD_DIR, entry);
+    if (!fs.existsSync(bin)) {
+        console.error(`hopper: no binary found at ${bin} — run 'hopper build' first`);
         process.exit(1);
     }
-
-    const outFile = path.join(BUILD_DIR, baseName(files[0]));
-    compile(files, outFile);
-    execSync(outFile, { stdio: "inherit" });
+    execSync(bin, { stdio: "inherit" });
 }
 
 function cmdDev(args) {
@@ -277,65 +284,214 @@ async function cmdInit(args) {
     console.log(`\n  cd ${safeName} && hopper run`);
 }
 
-function cmdInstall(args) {
-    const STDLIB_DIR = path.join(__dirname, "..", "modules");
+// ── package helpers ────────────────────────────────────────────────────────
+
+function fetchTarball(url, destDir) {
+    return new Promise((resolve, reject) => {
+        const tmp = path.join(BUILD_DIR, `_pkg_${Date.now()}.tar.gz`);
+        const file = fs.createWriteStream(tmp);
+
+        function get(url) {
+            https.get(url, { headers: { "User-Agent": "hopper-cli" } }, res => {
+                if (res.statusCode === 301 || res.statusCode === 302) {
+                    get(res.headers.location);
+                    return;
+                }
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode} fetching ${url}`));
+                    return;
+                }
+                res.pipe(file);
+                file.on("finish", () => {
+                    file.close();
+                    fs.mkdirSync(destDir, { recursive: true });
+                    try {
+                        execSync(`tar -xz -f "${tmp}" -C "${destDir}" --strip-components=1`, { stdio: "pipe" });
+                        fs.unlinkSync(tmp);
+                        resolve();
+                    } catch (e) { reject(e); }
+                });
+            }).on("error", reject);
+        }
+        get(url);
+    });
+}
+
+async function cmdInstall(args) {
     const LOCAL_MODULES = path.join(process.cwd(), "modules");
-
-    if (!fs.existsSync(STDLIB_DIR)) {
-        console.error("hopper: standard library not found — is hopper installed correctly?");
-        process.exit(1);
-    }
-
-    // Collect module names to install
+    const STDLIB_DIR    = path.join(__dirname, "..", "modules");
     let names = args.filter(a => !a.startsWith("-"));
 
-    // If no names given, read from hopper.json
+    // No args — reinstall everything from hopper.json
     if (names.length === 0) {
         const manifest = readManifest();
         if (!manifest) {
-            console.error("hopper: no hopper.json found and no module names given");
+            console.error("hopper: no hopper.json and no package names given");
             process.exit(1);
         }
         const deps = manifest.dependencies || {};
-        names = Object.entries(deps)
-            .filter(([, src]) => src === "stdlib")
-            .map(([n]) => n);
-        if (names.length === 0) {
-            console.log("hopper: nothing to install");
-            return;
-        }
+        if (Object.keys(deps).length === 0) { console.log("hopper: nothing to install"); return; }
+        names = Object.keys(deps);
     }
 
     fs.mkdirSync(LOCAL_MODULES, { recursive: true });
-
-    const installed = [];
-    const skipped   = [];
-    const missing   = [];
+    if (!fs.existsSync(BUILD_DIR)) fs.mkdirSync(BUILD_DIR, { recursive: true });
 
     for (const name of names) {
-        const src  = path.join(STDLIB_DIR, name);
         const dest = path.join(LOCAL_MODULES, name);
+        if (fs.existsSync(dest)) { console.log(`already installed: ${name}`); continue; }
 
-        if (!fs.existsSync(src)) { missing.push(name); continue; }
-        if (fs.existsSync(dest)) { skipped.push(name); continue; }
+        // Try stdlib first
+        const stdlibSrc = path.join(STDLIB_DIR, name);
+        if (fs.existsSync(stdlibSrc)) {
+            copyDir(stdlibSrc, dest);
+            console.log(`installed: ${name}  (stdlib)`);
+            updateDep(name, "stdlib");
+            continue;
+        }
 
-        copyDir(src, dest);
-        installed.push(name);
+        // Fetch from registry (GitHub org)
+        const tarUrl = `https://codeload.github.com/${REGISTRY_ORG}/${name}/tar.gz/refs/heads/main`;
+        console.log(`installing: ${name}  from ${REGISTRY_URL}/${name}`);
+        try {
+            const tmp = path.join(LOCAL_MODULES, `_${name}_tmp`);
+            await fetchTarball(tarUrl, tmp);
+            // Package must have a modules/<name>/ folder — move it into place
+            const inner = path.join(tmp, "modules", name);
+            if (fs.existsSync(inner)) {
+                fs.renameSync(inner, dest);
+                fs.rmSync(tmp, { recursive: true, force: true });
+            } else {
+                // Repo root IS the module
+                fs.renameSync(tmp, dest);
+            }
+            console.log(`installed: ${name}  ✓`);
+            updateDep(name, `${REGISTRY_ORG}/${name}`);
+        } catch (e) {
+            console.error(`failed: ${name}  — ${e.message}`);
+            process.exit(1);
+        }
     }
+}
 
-    // Update hopper.json dependencies
-    if (installed.length > 0) {
-        let manifest = readManifest() || { name: path.basename(process.cwd()), version: "0.1.0", entry: "main.hop", dependencies: {} };
-        for (const n of installed) manifest.dependencies[n] = "stdlib";
-        writeManifest(manifest);
+function updateDep(name, source) {
+    const manifest = readManifest() || { name: path.basename(process.cwd()), version: "0.1.0", entry: "main.hop", dependencies: {} };
+    manifest.dependencies[name] = source;
+    writeManifest(manifest);
+}
+
+function cmdUninstall(args) {
+    if (!args[0]) { console.error("hopper: uninstall requires a package name"); process.exit(1); }
+    const LOCAL_MODULES = path.join(process.cwd(), "modules");
+
+    for (const name of args) {
+        const dest = path.join(LOCAL_MODULES, name);
+        if (!fs.existsSync(dest)) { console.log(`not installed: ${name}`); continue; }
+        fs.rmSync(dest, { recursive: true, force: true });
+        const manifest = readManifest();
+        if (manifest && manifest.dependencies) {
+            delete manifest.dependencies[name];
+            writeManifest(manifest);
+        }
+        console.log(`uninstalled: ${name}`);
     }
+}
 
-    if (installed.length) console.log(`installed: ${installed.join(", ")}`);
-    if (skipped.length)   console.log(`already installed: ${skipped.join(", ")}`);
-    if (missing.length) {
-        console.error(`not found in stdlib: ${missing.join(", ")}`);
+function githubAPI(method, endpoint, body, token) {
+    return new Promise((resolve, reject) => {
+        const data = body ? JSON.stringify(body) : null;
+        const opts = {
+            hostname: "api.github.com",
+            path: endpoint,
+            method,
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "User-Agent": "hopper-cli",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                ...(data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}),
+            },
+        };
+        const req = https.request(opts, res => {
+            let buf = "";
+            res.on("data", chunk => buf += chunk);
+            res.on("end", () => {
+                let parsed = null;
+                try { parsed = buf ? JSON.parse(buf) : null; } catch { parsed = null; }
+                resolve({ status: res.statusCode, body: parsed });
+            });
+        });
+        req.on("error", reject);
+        if (data) req.write(data);
+        req.end();
+    });
+}
+
+function requireToken() {
+    const token = process.env.HOPPER_TOKEN || process.env.GITHUB_TOKEN;
+    if (!token) {
+        console.error("hopper: publish/revoke requires HOPPER_TOKEN or GITHUB_TOKEN env var");
         process.exit(1);
     }
+    return token;
+}
+
+async function cmdPublish(args) {
+    const manifest = readManifest();
+    if (!manifest) { console.error("hopper: no hopper.json found"); process.exit(1); }
+
+    const name    = args[0] || manifest.name;
+    const version = manifest.version || "0.1.0";
+    const repoUrl = `${REGISTRY_URL}/${name}`;
+    const token   = requireToken();
+
+    try { execSync("git rev-parse --git-dir", { stdio: "pipe" }); }
+    catch { console.error("hopper: publish requires a git repository"); process.exit(1); }
+
+    console.log(`publishing: ${name}@${version}  →  ${repoUrl}`);
+
+    const res = await githubAPI("POST", `/orgs/${REGISTRY_ORG}/repos`, { name, private: false }, token);
+    if (res.status !== 201 && res.status !== 422) {
+        console.error(`hopper: failed to create registry repo — ${res.body?.message || res.status}`);
+        process.exit(1);
+    }
+
+    try {
+        execSync(`git remote add registry ${repoUrl}.git 2>/dev/null; true`, { stdio: "pipe", shell: true });
+        execSync(`git push registry main`, { stdio: "inherit" });
+    } catch (e) {
+        console.error(`hopper: publish failed — ${e.message}`);
+        process.exit(1);
+    }
+
+    console.log(`published: ${name}@${version}  ✓`);
+    console.log(`  ${repoUrl}`);
+    console.log(`  hopper install ${name}`);
+}
+
+async function cmdRevoke(args) {
+    const manifest = readManifest();
+    const name     = args[0] || (manifest && manifest.name);
+    if (!name) { console.error("hopper: revoke requires a package name"); process.exit(1); }
+
+    const token = requireToken();
+
+    const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q) => new Promise(resolve => rl.question(q, ans => resolve(ans.trim())));
+
+    console.log(`\n  This will delete ${REGISTRY_ORG}/${name} from the registry permanently.`);
+    console.log(`  Anyone who has not installed it yet will no longer be able to.\n`);
+    const confirm = await ask(`  type the package name to confirm: `);
+    rl.close();
+
+    if (confirm !== name) { console.log("aborted."); process.exit(0); }
+
+    const res = await githubAPI("DELETE", `/repos/${REGISTRY_ORG}/${name}`, null, token);
+    if (res.status !== 204) {
+        console.error(`hopper: revoke failed — ${res.body?.message || res.status}`);
+        process.exit(1);
+    }
+    console.log(`revoked: ${name}  — registry entry deleted`);
 }
 
 function copyDir(src, dest) {
@@ -346,6 +502,12 @@ function copyDir(src, dest) {
         if (entry.isDirectory()) copyDir(s, d);
         else fs.copyFileSync(s, d);
     }
+}
+
+// ── profile: coming soon ──────────────────────────────────────────────────
+
+function cmdProfile(_args) {
+    console.log("hopper: profile support coming soon");
 }
 
 // ── check: compile with sanitizers ────────────────────────────────────────
@@ -378,41 +540,10 @@ function cmdCheck(args) {
     console.log(`run with: ${outFile}`);
 }
 
-// ── debug: emit DWARF and launch lldb ─────────────────────────────────────
+// ── debug: coming soon ────────────────────────────────────────────────────
 
-function toObjectDebug(file) {
-    const src     = fs.readFileSync(file, "utf8");
-    const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    const ir      = genModule(ast);
-    const llFile  = path.join(BUILD_DIR, `${baseName(file)}.debug.ll`);
-    const objFile = path.join(BUILD_DIR, `${baseName(file)}.debug.o`);
-    fs.writeFileSync(llFile, ir, "utf8");
-    execSync(`llc -filetype=obj -relocation-model=pic "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
-    return { objFile };
-}
-
-function cmdDebug(args) {
-    const files   = args.length ? args : ["main.hop"];
-    const missing = files.filter(f => !fs.existsSync(f));
-    if (missing.length) {
-        console.error(`hopper: file not found: ${missing.join(", ")}`);
-        process.exit(1);
-    }
-
-    const outFile = path.join(BUILD_DIR, baseName(files[0]) + ".debug");
-    const results = files.map(toObjectDebug);
-    const objs    = results.map(r => `"${r.objFile}"`).join(" ");
-    execSync(`clang ${objs} -g -o "${outFile}"`, { stdio: "inherit" });
-    console.log(`debug build: ${outFile}`);
-
-    const debugger_ = ["lldb", "gdb"].find(d => {
-        try { execSync(`which ${d}`, { stdio: "pipe" }); return true; } catch { return false; }
-    });
-    if (!debugger_) {
-        console.log("note: lldb/gdb not found — run the binary manually with your debugger");
-        return;
-    }
-    execSync(`${debugger_} "${outFile}"`, { stdio: "inherit" });
+function cmdDebug(_args) {
+    console.log("hopper: debug support coming soon");
 }
 
 // ── format: reformat source files via the AST ─────────────────────────────
@@ -622,16 +753,20 @@ function usage() {
         "",
         "  Hopper  — systems programming language",
         "",
-        "  hopper init [name]                  scaffold a new project in the current dir",
+        "  hopper init <name>                  scaffold a new project",
         "  hopper build [file.hop] [-o out]    compile to executable (default: main.hop)",
         "  hopper build module <name>          scaffold modules/<name>/ with tests/ dir",
-        "  hopper run [file.hop]               compile and run       (default: main.hop)",
-        "  hopper run dev [file.hop]           watch mode — rebuild and rerun on changes",
-        "  hopper install [module...]          install stdlib modules into project",
+        "  hopper run [binary]                 execute a built binary (default: build/<entry>)",
+        "  hopper run test [module]            run tests (all, or a specific module)",
+        "  hopper install [module...]          install packages from stdlib or registry",
+        "  hopper uninstall <module...>        remove installed packages",
+        "  hopper publish [name]               publish this package to the registry",
+        "  hopper revoke [name]                permanently delete a package from the registry",
         "  hopper check [file.hop] [--asan|--tsan|--ubsan|--msan]",
         "                                      compile with sanitizers (default: --asan)",
-        "  hopper debug [file.hop]             emit DWARF symbols and launch lldb/gdb",
-        "  hopper format [-w] <file.hop...>    reformat source files (--write to edit in place)",
+        "  hopper debug [file.hop]             debug support (coming soon)",
+        "  hopper profile [file.hop]           performance profiling (coming soon)",
+        "  hopper format [-w] <file.hop...>    reformat source files (-w to edit in place)",
         "  hopper test [module]                run tests (all, or a specific module)",
         "  hopper ir <file.hop>                print LLVM IR",
         "  hopper ast <file.hop>               print AST as JSON",
@@ -654,18 +789,29 @@ if (argv[0] === "--parse") { cmdParse(argv.slice(1)); process.exit(0); }
 
 const [sub, ...rest] = argv;
 
-switch (sub) {
-    case "build":   cmdBuild(rest);        break;
-    case "run":     cmdRun(rest);          break;
-    case "dev":     cmdDev(rest);          break;
-    case "init":    cmdInit(rest);         break;  // async — returns promise, node awaits on exit
-    case "install": cmdInstall(rest);      break;
-    case "check":   cmdCheck(rest);        break;
-    case "debug":   cmdDebug(rest);        break;
-    case "format":  cmdFormat(rest);       break;
-    case "test":    cmdTest(rest);         break;
-    case "ir":      cmdIR(rest);           break;
-    case "ast":     cmdAST(rest);          break;
-    case "parse":   cmdParse(rest);        break;
-    default:        usage();
+const asyncCmds = {
+    init:      () => cmdInit(rest),
+    install:   () => cmdInstall(rest),
+    publish:   () => cmdPublish(rest),
+    revoke:    () => cmdRevoke(rest),
+};
+
+if (asyncCmds[sub]) {
+    asyncCmds[sub]().catch(e => { console.error(`hopper: ${e.message}`); process.exit(1); });
+} else {
+    switch (sub) {
+        case "build":     cmdBuild(rest);    break;
+        case "run":       cmdRun(rest);      break;
+        case "dev":       cmdDev(rest);      break;
+        case "uninstall": cmdUninstall(rest); break;
+        case "check":     cmdCheck(rest);    break;
+        case "debug":     cmdDebug(rest);    break;
+        case "profile":   cmdProfile(rest);  break;
+        case "format":    cmdFormat(rest);   break;
+        case "test":      cmdTest(rest);     break;
+        case "ir":        cmdIR(rest);       break;
+        case "ast":       cmdAST(rest);      break;
+        case "parse":     cmdParse(rest);    break;
+        default:          usage();
+    }
 }
