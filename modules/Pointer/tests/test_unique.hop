@@ -4,6 +4,8 @@
 // EXPECT: after zero: buf[0]=0
 // EXPECT: via ptr(): 99
 // EXPECT: move: dst[0]=111 dst[1]=222 src.len=0
+// EXPECT: swap: a[0]=333 b[0]=111 b[1]=222 b.len=2
+// EXPECT: destroy: count=0
 // EXPECT: all tests passed
 
 import io from linux
@@ -63,6 +65,28 @@ entry main(int argc, address argv) {
     int mv1 = dst.get(1)
     int srcCount = src.len()
     printf("move: dst[0]=%d dst[1]=%d src.len=%d\n", mv0, mv1, srcCount)
+
+    // Test 7: swap() — exchange ownership between two Unique<int>
+    Unique<int> sa = Unique(2)
+    sa.set(0, 111)
+    sa.set(1, 222)
+    Unique<int> sb = Unique(1)
+    sb.set(0, 333)
+    sa.swap(sb)
+    int s0 = sa.get(0)
+    int s1 = sb.get(0)
+    int s2 = sb.get(1)
+    int sbLen = sb.len()
+    printf("swap: a[0]=%d b[0]=%d b[1]=%d b.len=%d\n", s0, s1, s2, sbLen)
+
+    // Test 8: destroy() — free data, safe to call twice (deallocate null is no-op)
+    Unique<byte> ud = Unique(16)
+    byte udVal = cast 99
+    ud.set(0, udVal)
+    ud.destroy()
+    int udCount = ud.len()
+    ud.destroy()
+    printf("destroy: count=%d\n", udCount)
 
     printf("all tests passed\n")
 }

@@ -1,0 +1,245 @@
+// path.hop — path manipulation backed by a Unique<byte> buffer.
+//
+// The Path class owns its storage; Unique<byte>.swap() enables
+// zero-copy buffer replacement in grow(). Caller is responsible for
+// deallocating strings returned by basename(), dirname(), and ext().
+//
+// Usage:
+//   import path from path
+//
+//   Path p = Path("/usr/local/bin")
+//   p.join("clang")               // "/usr/local/bin/clang"
+//   address b = p.basename()      // "clang"          (caller deallocates)
+//   address d = p.dirname()       // "/usr/local/bin" (caller deallocates)
+//   address e = p.ext()           // ""               (caller deallocates)
+//   bool abs  = p.isAbsolute()    // true
+//   deallocate b
+//   deallocate d
+//   deallocate e
+
+import unique from Pointer
+
+class Path {
+    Unique<byte> buf
+    int len
+    int cap
+
+    constructor(address s) {
+        int slen = 0
+        while (true) {
+            address p = s + slen
+            byte b = p::value
+            int bi = cast b
+            if (bi == 0) { break }
+            slen = slen + 1
+        }
+        int initCap = 64
+        if (slen + 1 > initCap) { initCap = slen + 1 }
+        self.buf = Unique(initCap)
+        self.cap = initCap
+        self.len = 0
+        int i = 0
+        while (i < slen) {
+            address p = s + i
+            byte b = p::value
+            self.buf.set(i, b)
+            i = i + 1
+        }
+        self.len = slen
+        byte nul = cast 0
+        self.buf.set(slen, nul)
+    }
+
+    destructor() {
+        self.buf.destroy()
+    }
+
+    // Double capacity, preserving existing bytes and null terminator.
+    // Uses swap() to exchange buffers — the old block is freed via destroy().
+    function grow() {
+        int newCap = self.cap * 2
+        Unique<byte> tmp = Unique(newCap)
+        int i = 0
+        while (i < self.len) {
+            byte b = self.buf.get(i)
+            tmp.set(i, b)
+            i = i + 1
+        }
+        byte nul = cast 0
+        tmp.set(self.len, nul)
+        self.buf.swap(tmp)
+        self.cap = newCap
+        tmp.destroy()
+    }
+
+    // Ensure at least n bytes of spare capacity, growing as needed.
+    function ensureRoom(int n) {
+        while (self.len + n >= self.cap) {
+            self.grow()
+        }
+    }
+
+    // Append a single byte and maintain null terminator.
+    function appendByte(byte c) {
+        self.ensureRoom(2)
+        self.buf.set(self.len, c)
+        self.len = self.len + 1
+        byte nul = cast 0
+        self.buf.set(self.len, nul)
+    }
+
+    // Append a null-terminated string.
+    function appendStr(address s) {
+        int i = 0
+        while (true) {
+            address p = s + i
+            byte b = p::value
+            int bi = cast b
+            if (bi == 0) { break }
+            self.appendByte(b)
+            i = i + 1
+        }
+    }
+
+    // Raw pointer to the null-terminated path string. Valid until next mutation.
+    function str() address {
+        return self.buf.ptr()
+    }
+
+    // Current byte length (not including null terminator).
+    function length() int {
+        return self.len
+    }
+
+    // True if the path begins with '/'.
+    function isAbsolute() bool {
+        if (self.len == 0) { return false }
+        byte first = self.buf.get(0)
+        int fi = cast first
+        return fi == '/'
+    }
+
+    // Append a path segment, inserting a '/' separator if needed.
+    // A leading '/' on segment is stripped to avoid double slashes.
+    function join(address segment) {
+        if (self.len == 0) {
+            self.appendStr(segment)
+            return
+        }
+        byte last = self.buf.get(self.len - 1)
+        int li = cast last
+        if (li != '/') {
+            byte slash = cast '/'
+            self.appendByte(slash)
+        }
+        address seg = segment
+        byte segFirst = seg::value
+        int sfi = cast segFirst
+        if (sfi == '/') {
+            seg = seg + 1
+        }
+        self.appendStr(seg)
+    }
+
+    // Byte offset of the start of the final path component (past the last '/').
+    function basenameStart() int {
+        int i = self.len - 1
+        while (i >= 0) {
+            byte b = self.buf.get(i)
+            int bi = cast b
+            if (bi == '/') { return i + 1 }
+            i = i - 1
+        }
+        return 0
+    }
+
+    // Byte offset of the extension dot in the basename, or -1 if none.
+    // A leading dot (hidden file like ".bashrc") does not count as an extension.
+    function extStart() int {
+        int base = self.basenameStart()
+        int i = self.len - 1
+        while (i > base) {
+            byte b = self.buf.get(i)
+            int bi = cast b
+            if (bi == '.') { return i }
+            i = i - 1
+        }
+        return -1
+    }
+
+    // Return an allocated copy of the final path component. Caller must deallocate.
+    function basename() address {
+        int start = self.basenameStart()
+        int blen = self.len - start
+        address out = allocate (blen + 1)
+        int i = 0
+        while (i < blen) {
+            byte b = self.buf.get(start + i)
+            address p = out + i
+            p::value = b
+            i = i + 1
+        }
+        address end = out + blen
+        byte nul = cast 0
+        end::value = nul
+        return out
+    }
+
+    // Return an allocated copy of the directory portion. Caller must deallocate.
+    // Returns "/" for root-level paths, "." for paths with no directory component.
+    function dirname() address {
+        int base = self.basenameStart()
+        int dlen = base - 1
+        if (dlen <= 0) {
+            address out = allocate 2
+            if (self.isAbsolute()) {
+                byte slash = cast '/'
+                out::value = slash
+            } else {
+                byte dot = cast '.'
+                out::value = dot
+            }
+            address nulp = out + 1
+            byte nul = cast 0
+            nulp::value = nul
+            return out
+        }
+        address out = allocate (dlen + 1)
+        int i = 0
+        while (i < dlen) {
+            byte b = self.buf.get(i)
+            address p = out + i
+            p::value = b
+            i = i + 1
+        }
+        address end = out + dlen
+        byte nul = cast 0
+        end::value = nul
+        return out
+    }
+
+    // Return an allocated copy of the extension including the dot, or "" if none.
+    // Caller must deallocate.
+    function ext() address {
+        int start = self.extStart()
+        if (start == -1) {
+            address out = allocate 1
+            byte nul = cast 0
+            out::value = nul
+            return out
+        }
+        int elen = self.len - start
+        address out = allocate (elen + 1)
+        int i = 0
+        while (i < elen) {
+            byte b = self.buf.get(start + i)
+            address p = out + i
+            p::value = b
+            i = i + 1
+        }
+        address end = out + elen
+        byte nul = cast 0
+        end::value = nul
+        return out
+    }
+}

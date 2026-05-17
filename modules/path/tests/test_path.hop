@@ -1,0 +1,94 @@
+// EXPECT: abs: true
+// EXPECT: len: 16
+// EXPECT: base: baz.hop
+// EXPECT: dir: /foo/bar
+// EXPECT: ext: .hop
+// EXPECT: rel: false
+// EXPECT: rbase: main.hop
+// EXPECT: rdir: src
+// EXPECT: rext: .hop
+// EXPECT: joined: /output/tokens.txt
+// EXPECT: noext:
+// EXPECT: rootdir: /
+// EXPECT: hidden ext:
+
+import io from io
+import path from path
+
+entry main(int argc, address argv) {
+    // Absolute path: /foo/bar/baz.hop (16 bytes)
+    Path p1 = Path("/foo/bar/baz.hop")
+    print("abs: ")
+    print(p1.isAbsolute())
+    newline()
+    print("len: ")
+    print(p1.length())
+    newline()
+    address bn = p1.basename()
+    print("base: ")
+    print(bn)
+    newline()
+    deallocate bn
+    address dn = p1.dirname()
+    print("dir: ")
+    print(dn)
+    newline()
+    deallocate dn
+    address ex = p1.ext()
+    print("ext: ")
+    print(ex)
+    newline()
+    deallocate ex
+
+    // Relative path: src/main.hop
+    Path p2 = Path("src/main.hop")
+    print("rel: ")
+    print(p2.isAbsolute())
+    newline()
+    address rbn = p2.basename()
+    print("rbase: ")
+    print(rbn)
+    newline()
+    deallocate rbn
+    address rdn = p2.dirname()
+    print("rdir: ")
+    print(rdn)
+    newline()
+    deallocate rdn
+    address rex = p2.ext()
+    print("rext: ")
+    print(rex)
+    newline()
+    deallocate rex
+
+    // join: /output + tokens.txt → /output/tokens.txt
+    Path p3 = Path("/output")
+    p3.join("tokens.txt")
+    print("joined: ")
+    print(p3.str())
+    newline()
+
+    // No extension: /etc/hosts
+    Path p4 = Path("/etc/hosts")
+    address noex = p4.ext()
+    print("noext: ")
+    print(noex)
+    newline()
+    deallocate noex
+
+    // Root-level file: /foo → dirname should be /
+    Path p5 = Path("/foo")
+    address rootdn = p5.dirname()
+    print("rootdir: ")
+    print(rootdn)
+    newline()
+    deallocate rootdn
+
+    // Hidden file: .bashrc → no extension (leading dot doesn't count)
+    Path p6 = Path(".bashrc")
+    address hex = p6.ext()
+    print("hidden ext: ")
+    print(hex)
+    newline()
+    deallocate hex
+}

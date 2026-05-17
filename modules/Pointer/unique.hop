@@ -89,4 +89,24 @@ template Unique<T> {
             i = i + 1
         }
     }
+
+    // Atomically exchange data and count with another Unique<T>.
+    // After swap: self owns other's previous allocation, other owns self's.
+    // Use with a local Unique<T> for RAII-style buffer replacement.
+    function swap(Unique<T> other) {
+        address tmpData  = other.data
+        int     tmpCount = other.count
+        other.data  = self.data
+        other.count = self.count
+        self.data   = tmpData
+        self.count  = tmpCount
+    }
+
+    // Free managed data and reset to empty. Safe to call multiple times.
+    // Useful for explicit cleanup when auto-destruction is not available.
+    function destroy() {
+        deallocate self.data
+        self.data  = null
+        self.count = 0
+    }
 }

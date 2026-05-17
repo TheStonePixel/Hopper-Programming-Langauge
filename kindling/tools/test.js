@@ -171,7 +171,7 @@ function runTest(testFile, group) {
         .filter(s => s.expected.length > 0)
         .map(s => {
             const assertions = s.expected.map(exp => {
-                const got = lineIndex < actualLines.length ? actualLines[lineIndex++] : "(missing)";
+                const got = lineIndex < actualLines.length ? actualLines[lineIndex++].trimEnd() : "(missing)";
                 return { label: exp, status: got === exp ? "PASS" : "FAIL",
                     received: got === exp ? null : got };
             });
