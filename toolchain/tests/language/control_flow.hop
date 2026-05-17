@@ -1,0 +1,70 @@
+import assert from core
+import io     from core
+
+// TEST: while break
+// EXPECT: while break ok
+
+// TEST: while continue
+// EXPECT: while continue ok
+
+// TEST: nested break
+// EXPECT: nested break ok
+
+// TEST: if else chain
+// EXPECT: if else ok
+
+entry main {
+    // — while break ————————————————————————————————————————
+    int x = 0
+    while (true) {
+        x = x + 1
+        if (x == 5) { break }
+    }
+    soft(x == 5, "while break: expected x == 5\n")
+    println("while break ok")
+
+    // — while continue —————————————————————————————————————
+    int evens = 0
+    int i = 0
+    while (i < 10) {
+        i = i + 1
+        if (i % 2 != 0) { continue }
+        evens = evens + 1
+    }
+    soft(evens == 5, "while continue: expected 5 evens\n")
+    println("while continue ok")
+
+    // — break only exits innermost loop ———————————————————
+    int outer = 0
+    int inner_breaks = 0
+    while (outer < 3) {
+        int j = 0
+        while (true) {
+            j = j + 1
+            if (j == 2) { break }
+        }
+        inner_breaks = inner_breaks + 1
+        outer = outer + 1
+    }
+    soft(inner_breaks == 3, "nested break: expected 3 inner breaks\n")
+    println("nested break ok")
+
+    // — if / else if / else ————————————————————————————————
+    int score = 75
+    int grade = 0
+    if (score >= 90) {
+        grade = 4
+    } else {
+        if (score >= 80) {
+            grade = 3
+        } else {
+            if (score >= 70) {
+                grade = 2
+            } else {
+                grade = 1
+            }
+        }
+    }
+    soft(grade == 2, "if else chain: expected grade == 2\n")
+    println("if else ok")
+}

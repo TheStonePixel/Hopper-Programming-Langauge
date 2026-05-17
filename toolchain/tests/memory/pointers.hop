@@ -1,0 +1,66 @@
+import assert from core
+import io     from core
+
+// TEST: read write
+// EXPECT: read write ok
+
+// TEST: size
+// EXPECT: size ok
+
+// TEST: arithmetic
+// EXPECT: arithmetic ok
+
+// TEST: array element address
+// EXPECT: array address ok
+
+struct Vec2 {
+    int x
+    int y
+}
+
+entry main {
+    // — read write ——————————————————————————————————————————
+    int n = 42
+    address p = n::address
+    soft(p::value == 42, "pointer read: expected 42\n")
+    p::value = 99
+    soft(n == 99, "pointer write: expected n == 99\n")
+    println("read write ok")
+
+    // — size ————————————————————————————————————————————————
+    int   iv = 0
+    byte  bv = 0
+    bool  bl = false
+    soft(iv::size == 8, "int size != 8\n")
+    soft(bv::size == 1, "byte size != 1\n")
+    soft(bl::size == 1, "bool size != 1\n")
+    soft(p::size  == 8, "address size != 8\n")
+    Vec2 v2
+    soft(v2::size == 16, "Vec2 size != 16\n")
+    println("size ok")
+
+    // — arithmetic: write through offset ptr ———————————————
+    int pair[2]
+    pair[0] = 10
+    pair[1] = 20
+    address base = pair[0]::address
+    // advance one int (8 bytes) and read
+    address next = base + 8
+    soft(next::value == 20, "offset read != 20\n")
+    // write through offset
+    next::value = 99
+    soft(pair[1] == 99, "offset write failed\n")
+    println("arithmetic ok")
+
+    // — array element address ———————————————————————————————
+    int arr[4]
+    arr[0] = 100
+    arr[1] = 200
+    arr[2] = 300
+    arr[3] = 400
+    address e1 = arr[1]::address
+    soft(e1::value == 200, "arr[1] address read failed\n")
+    e1::value = 999
+    soft(arr[1] == 999, "arr[1] address write failed\n")
+    println("array address ok")
+}

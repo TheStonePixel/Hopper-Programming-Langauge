@@ -1,0 +1,95 @@
+import assert from core
+import io     from core
+import array  from ds
+
+// TEST: chained method call
+// EXPECT: chained ok
+
+// TEST: field subscript
+// EXPECT: subscript ok
+
+// TEST: nested class fields
+// EXPECT: nested fields ok
+
+class Stack {
+    Array<int> items
+
+    constructor() {
+        self.items = Array(8)
+    }
+
+    function push(int v) {
+        self.items.push(v)
+    }
+
+    function pop() int {
+        return self.items.pop()
+    }
+
+    function size() int {
+        return self.items.len()
+    }
+
+    function get(int i) int {
+        return self.items.get(i)
+    }
+}
+
+class Matrix {
+    Array<int> data
+    int        rows
+    int        cols
+
+    constructor(int r, int c) {
+        self.data = Array(r * c)
+        self.rows = r
+        self.cols = c
+        int i = 0
+        while (i < r * c) {
+            self.data.push(0)
+            i = i + 1
+        }
+    }
+
+    function set(int r, int c, int v) {
+        self.data.set(r * self.cols + c, v)
+    }
+
+    function get(int r, int c) int {
+        return self.data.get(r * self.cols + c)
+    }
+}
+
+entry main {
+    // — chained method call: self.field.method() ——————————
+    Stack s = Stack()
+    s.push(10)
+    s.push(20)
+    s.push(30)
+    soft(s.size()   == 3,  "stack size != 3\n")
+    soft(s.get(0)   == 10, "stack[0] != 10\n")
+    soft(s.get(2)   == 30, "stack[2] != 30\n")
+    soft(s.pop()    == 30, "pop != 30\n")
+    soft(s.size()   == 2,  "stack size after pop != 2\n")
+    println("chained ok")
+
+    // — field subscript: self.field[i] ————————————————————
+    Stack s2 = Stack()
+    s2.push(5)
+    s2.push(15)
+    s2.push(25)
+    // access via the embedded Array directly through the class
+    soft(s2.items.get(1) == 15, "field subscript[1] != 15\n")
+    println("subscript ok")
+
+    // — nested class composition —————————————————————————
+    Matrix m = Matrix(3, 3)
+    m.set(0, 0, 1)
+    m.set(1, 1, 5)
+    m.set(2, 2, 9)
+    soft(m.get(0, 0) == 1, "matrix[0,0] != 1\n")
+    soft(m.get(1, 1) == 5, "matrix[1,1] != 5\n")
+    soft(m.get(2, 2) == 9, "matrix[2,2] != 9\n")
+    soft(m.get(0, 1) == 0, "matrix[0,1] != 0\n")
+    println("nested fields ok")
+}
