@@ -1,24 +1,23 @@
-// Battleship 3 — generics step
+// Battleship 3 — smart pointer memory control
 //
-// Same game as Battleship 1 but the board is Array<int> instead of a raw
-// heap block. No allocate or deallocate for the board. No pointer arithmetic
-// for cell reads and writes. Array<int> handles its own memory.
+// Same game as Battleship 1 but Unique<T> owns every heap allocation.
+// There is no allocate or deallocate anywhere in this file.
 //
-// Compare to Battleship 1:
-//   Gone: boardAlloc, boardFree, cellGet, cellSet, cellGetFlat  (5 functions)
-//   Gone: address arithmetic  (r * 10 + c) * 8  and  board + idx * 8
-//   Gone: 800-byte manual layout — replaced by Array(100) with typed access
-//   Same: LCG RNG with address threading, ship placement, ASCII display,
-//         manual input buffer, game loop structure
+// Compare to Battleship 1 (raw C-level):
+//   Gone: boardAlloc, boardFree — Unique<int> constructor/destructor take over
+//   Gone: boardInit loop — Unique<int>.zero() fills 800 bytes in one call
+//   Gone: cellGet, cellSet, cellGetFlat — board.get() and board.set()
+//         replace all manual  (r * 10 + c) * 8  pointer arithmetic
+//   Gone: allocate 64 / deallocate buf — Unique<byte> owns the input buffer
 //
-// Board layout: Array<int> of 100 elements
+// Board layout: Unique<int> of 100 elements (800 bytes internally)
 //   Cell values:  0 = water   1 = ship   2 = hit   3 = miss
 //   Display:      . = water   # = ship   X = hit   o = miss
 
-import array from ds
-import io    from core
-import io    from io
-import sys   from linux
+import io     from core
+import io     from io
+import unique from Pointer
+import sys    from linux
 
 // ── RNG ───────────────────────────────────────────────────────────────────────
 // Same LCG as Battleship 1 — state threaded through address, no global.
@@ -35,21 +34,9 @@ function rngMod(address state, int n) int {
     return rngStep(state) % n
 }
 
-// ── Board initialization ──────────────────────────────────────────────────────
-// Array<int> allocates and frees its own backing store.
-// All we do here is push the 100 zero cells.
-
-function boardInit(Array<int> board) {
-    int i = 0
-    while (i < 100) {
-        board.push(0)
-        i = i + 1
-    }
-}
-
 // ── Ship placement ────────────────────────────────────────────────────────────
 
-function canPlace(Array<int> board, int r, int c, int len, int dir) bool {
+function canPlace(Unique<int> board, int r, int c, int len, int dir) bool {
     bool ok = true
     int i = 0
     while (i < len) {
@@ -67,7 +54,7 @@ function canPlace(Array<int> board, int r, int c, int len, int dir) bool {
     return ok
 }
 
-function placeShip(Array<int> board, int len, address rng) {
+function placeShip(Unique<int> board, int len, address rng) {
     bool placed = false
     while (!placed) {
         int r   = rngMod(rng, 10)
@@ -88,7 +75,7 @@ function placeShip(Array<int> board, int len, address rng) {
     }
 }
 
-function placeFleet(Array<int> board, address rng) {
+function placeFleet(Unique<int> board, address rng) {
     placeShip(board, 5, rng)
     placeShip(board, 4, rng)
     placeShip(board, 3, rng)
@@ -98,7 +85,7 @@ function placeFleet(Array<int> board, address rng) {
 
 // ── Display ───────────────────────────────────────────────────────────────────
 
-function printGrid(Array<int> board, bool reveal) {
+function printGrid(Unique<int> board, bool reveal) {
     println("   0 1 2 3 4 5 6 7 8 9")
     int r = 0
     while (r < 10) {
@@ -121,7 +108,7 @@ function printGrid(Array<int> board, bool reveal) {
     }
 }
 
-function shipsLeft(Array<int> board) int {
+function shipsLeft(Unique<int> board) int {
     int count = 0
     int i = 0
     while (i < 100) {
@@ -132,7 +119,8 @@ function shipsLeft(Array<int> board) int {
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────────
-// Still manual — Unique<byte> and Result<int> are Battleship 2 features.
+// buf is a Unique<byte> created once per call, reused across loop iterations.
+// No allocate. No deallocate. buf.destroy() at the end releases ownership.
 
 function parseShot(address buf, int n, address rowOut, address colOut) bool {
     int spaceIdx = -1
@@ -158,17 +146,15 @@ function parseShot(address buf, int n, address rowOut, address colOut) bool {
     return true
 }
 
-// ── Turns ─────────────────────────────────────────────────────────────────────
-
-function playerTurn(Array<int> board) {
+function playerTurn(Unique<int> board) {
     bool valid = false
-    address buf = allocate 64
+    Unique<byte> buf = Unique(64)
     while (!valid) {
         print("  Your shot (row col): ")
-        int n = readLine(buf, 64)
+        int n = readLine(buf.ptr(), 64)
         int row = 0
         int col = 0
-        bool ok = parseShot(buf, n, row::address, col::address)
+        bool ok = parseShot(buf.ptr(), n, row::address, col::address)
         if (!ok) {
             println("  Invalid — enter two numbers separated by a space.")
         }
@@ -195,10 +181,10 @@ function playerTurn(Array<int> board) {
             }
         }
     }
-    deallocate buf
+    buf.destroy()
 }
 
-function computerTurn(Array<int> board, address rng) {
+function computerTurn(Unique<int> board, address rng) {
     bool done = false
     while (!done) {
         int r = rngMod(rng, 10)
@@ -226,21 +212,23 @@ function computerTurn(Array<int> board, address rng) {
 }
 
 // ── Entry ─────────────────────────────────────────────────────────────────────
+// Unique<int>(100) allocates 800 bytes. zero() clears all cells.
+// Both boards release their memory when main returns.
 
 entry main {
     int rng = getpid()
 
-    Array<int> playerBoard   = Array(100)
-    Array<int> computerBoard = Array(100)
+    Unique<int> playerBoard   = Unique(100)
+    Unique<int> computerBoard = Unique(100)
 
-    boardInit(playerBoard)
-    boardInit(computerBoard)
+    playerBoard.zero()
+    computerBoard.zero()
 
     placeFleet(playerBoard,   rng::address)
     placeFleet(computerBoard, rng::address)
 
     print("\n")
-    println("  BATTLESHIP 3  —  generics")
+    println("  BATTLESHIP 3  —  smart pointers")
     println("  Sink all 17 enemy ship cells to win.")
     println("  X hit   o miss   . water   # ship")
 
