@@ -1,0 +1,15 @@
+// EXPECT: 5 0 10 0 10
+
+import io   from linux
+import math from math
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, address argv) {
+    printf("%d %d %d %d %d\n",
+        clamp(5, 0, 10),
+        clamp(-1, 0, 10),
+        clamp(15, 0, 10),
+        clamp(0, 0, 10),
+        clamp(10, 0, 10))
+}
