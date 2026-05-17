@@ -182,6 +182,17 @@ function cmdDev(args) {
     }
 }
 
+function readManifest() {
+    const mf = "hopper.json";
+    if (!fs.existsSync(mf)) return null;
+    try { return JSON.parse(fs.readFileSync(mf, "utf8")); }
+    catch (e) { console.error(`hopper: bad hopper.json — ${e.message}`); process.exit(1); }
+}
+
+function writeManifest(obj) {
+    fs.writeFileSync("hopper.json", JSON.stringify(obj, null, 2) + "\n", "utf8");
+}
+
 function cmdInit(args) {
     const name = args[0] || path.basename(process.cwd());
     const safe = name.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -193,17 +204,346 @@ function cmdInit(args) {
     }
 
     fs.writeFileSync(mainFile, [
-        `import io from linux`,
+        `import io from io`,
         ``,
         `entry main {`,
-        `    io.print("Hello from ${safe}!\\n")`,
+        `    print("Hello from ${safe}!")`,
+        `    newline()`,
         `}`,
         ``,
     ].join("\n"), "utf8");
 
+    if (!fs.existsSync("hopper.json")) {
+        writeManifest({
+            name: safe,
+            version: "0.1.0",
+            entry: mainFile,
+            dependencies: {},
+        });
+    }
+
+    if (!fs.existsSync(".gitignore")) {
+        fs.writeFileSync(".gitignore", "build/\n", "utf8");
+    }
+
     console.log(`initialized project '${safe}'`);
     console.log(`  created: ${mainFile}`);
+    console.log(`  created: hopper.json`);
     console.log(`  run with: hopper run`);
+}
+
+function cmdInstall(args) {
+    const STDLIB_DIR = path.join(__dirname, "..", "modules");
+    const LOCAL_MODULES = path.join(process.cwd(), "modules");
+
+    if (!fs.existsSync(STDLIB_DIR)) {
+        console.error("hopper: standard library not found — is hopper installed correctly?");
+        process.exit(1);
+    }
+
+    // Collect module names to install
+    let names = args.filter(a => !a.startsWith("-"));
+
+    // If no names given, read from hopper.json
+    if (names.length === 0) {
+        const manifest = readManifest();
+        if (!manifest) {
+            console.error("hopper: no hopper.json found and no module names given");
+            process.exit(1);
+        }
+        const deps = manifest.dependencies || {};
+        names = Object.entries(deps)
+            .filter(([, src]) => src === "stdlib")
+            .map(([n]) => n);
+        if (names.length === 0) {
+            console.log("hopper: nothing to install");
+            return;
+        }
+    }
+
+    fs.mkdirSync(LOCAL_MODULES, { recursive: true });
+
+    const installed = [];
+    const skipped   = [];
+    const missing   = [];
+
+    for (const name of names) {
+        const src  = path.join(STDLIB_DIR, name);
+        const dest = path.join(LOCAL_MODULES, name);
+
+        if (!fs.existsSync(src)) { missing.push(name); continue; }
+        if (fs.existsSync(dest)) { skipped.push(name); continue; }
+
+        copyDir(src, dest);
+        installed.push(name);
+    }
+
+    // Update hopper.json dependencies
+    if (installed.length > 0) {
+        let manifest = readManifest() || { name: path.basename(process.cwd()), version: "0.1.0", entry: "main.hop", dependencies: {} };
+        for (const n of installed) manifest.dependencies[n] = "stdlib";
+        writeManifest(manifest);
+    }
+
+    if (installed.length) console.log(`installed: ${installed.join(", ")}`);
+    if (skipped.length)   console.log(`already installed: ${skipped.join(", ")}`);
+    if (missing.length) {
+        console.error(`not found in stdlib: ${missing.join(", ")}`);
+        process.exit(1);
+    }
+}
+
+function copyDir(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        const s = path.join(src, entry.name);
+        const d = path.join(dest, entry.name);
+        if (entry.isDirectory()) copyDir(s, d);
+        else fs.copyFileSync(s, d);
+    }
+}
+
+// ── check: compile with sanitizers ────────────────────────────────────────
+
+function cmdCheck(args) {
+    const sanitizers = [];
+    const rest = [];
+    for (const a of args) {
+        if (a === "--asan")   { sanitizers.push("address");       continue; }
+        if (a === "--tsan")   { sanitizers.push("thread");        continue; }
+        if (a === "--ubsan")  { sanitizers.push("undefined");     continue; }
+        if (a === "--msan")   { sanitizers.push("memory");        continue; }
+        rest.push(a);
+    }
+    if (sanitizers.length === 0) sanitizers.push("address");
+
+    const files   = rest.length ? rest : ["main.hop"];
+    const missing = files.filter(f => !fs.existsSync(f));
+    if (missing.length) {
+        console.error(`hopper: file not found: ${missing.join(", ")}`);
+        process.exit(1);
+    }
+
+    const outFile = path.join(BUILD_DIR, baseName(files[0]) + ".check");
+    const results = files.map(toObject);
+    const objs    = results.map(r => `"${r.objFile}"`).join(" ");
+    const san     = sanitizers.join(",");
+    execSync(`clang ${objs} -fsanitize=${san} -o "${outFile}"`, { stdio: "inherit" });
+    console.log(`check build: ${outFile}  (sanitizers: ${san})`);
+    console.log(`run with: ${outFile}`);
+}
+
+// ── debug: emit DWARF and launch lldb ─────────────────────────────────────
+
+function toObjectDebug(file) {
+    const src     = fs.readFileSync(file, "utf8");
+    const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
+    const ir      = genModule(ast);
+    const llFile  = path.join(BUILD_DIR, `${baseName(file)}.debug.ll`);
+    const objFile = path.join(BUILD_DIR, `${baseName(file)}.debug.o`);
+    fs.writeFileSync(llFile, ir, "utf8");
+    execSync(`llc -filetype=obj -relocation-model=pic "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    return { objFile };
+}
+
+function cmdDebug(args) {
+    const files   = args.length ? args : ["main.hop"];
+    const missing = files.filter(f => !fs.existsSync(f));
+    if (missing.length) {
+        console.error(`hopper: file not found: ${missing.join(", ")}`);
+        process.exit(1);
+    }
+
+    const outFile = path.join(BUILD_DIR, baseName(files[0]) + ".debug");
+    const results = files.map(toObjectDebug);
+    const objs    = results.map(r => `"${r.objFile}"`).join(" ");
+    execSync(`clang ${objs} -g -o "${outFile}"`, { stdio: "inherit" });
+    console.log(`debug build: ${outFile}`);
+
+    const debugger_ = ["lldb", "gdb"].find(d => {
+        try { execSync(`which ${d}`, { stdio: "pipe" }); return true; } catch { return false; }
+    });
+    if (!debugger_) {
+        console.log("note: lldb/gdb not found — run the binary manually with your debugger");
+        return;
+    }
+    execSync(`${debugger_} "${outFile}"`, { stdio: "inherit" });
+}
+
+// ── format: reformat source files via the AST ─────────────────────────────
+
+function formatNode(node, indent) {
+    // Minimal formatter — emits canonical Hopper source from the AST.
+    // Handles the most common statement and expression forms.
+    const I = "    ".repeat(indent);
+    const I1 = "    ".repeat(indent + 1);
+
+    function fmtType(t) { return t; }
+    function fmtExpr(e) {
+        if (!e) return "";
+        switch (e.kind) {
+            case "Int":
+            case "IntLiteral":   return String(e.value);
+            case "Float":
+            case "FloatLiteral": return String(e.value);
+            case "Bool":
+            case "BoolLiteral":  return String(e.value);
+            case "Str":
+            case "StringLiteral": return `"${e.value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
+            case "Char":
+            case "CharLiteral":  return `'${e.value}'`;
+            case "Null":     return "null";
+            case "Var":      return e.name;
+            case "Self":     return "self";
+            case "CastExpr": return `cast ${fmtExpr(e.expr)}`;
+            case "Deref":    return `${fmtExpr(e.expr)}::value`;
+            case "AddressOf": return `${e.name}::address`;
+            case "FieldAccess": return `${e.object}.${e.field}`;
+            case "Unary":    return `${e.op}${fmtExpr(e.operand)}`;
+            case "Binary":   return `${fmtExpr(e.left)} ${e.op} ${fmtExpr(e.right)}`;
+            case "Call":     return `${e.callee}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "MethodCall": return `${e.object}.${e.method}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "ChainedMethodCall": return `${fmtExpr(e.receiver)}.${e.method}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "ArrayAccess": return `${e.name}[${fmtExpr(e.index)}]`;
+            case "New":      return `new ${e.type}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "SizeOf":   return `sizeof(${e.type})`;
+            default:         return `/* ${e.kind} */`;
+        }
+    }
+    function fmtStmts(stmts, ind) {
+        return (stmts || []).map(s => fmtStmt(s, ind)).join("\n");
+    }
+    function fmtStmt(s, ind) {
+        const Pi  = "    ".repeat(ind);
+        const Pi1 = "    ".repeat(ind + 1);
+        if (!s) return "";
+        switch (s.kind) {
+            case "VarDecl":
+                return s.init
+                    ? `${Pi}${fmtType(s.type)} ${s.name} = ${fmtExpr(s.init)}`
+                    : `${Pi}${fmtType(s.type)} ${s.name}`;
+            case "AssignStmt":
+            case "Assign":
+                return `${Pi}${fmtExpr(s.target || s.lhs)} = ${fmtExpr(s.value || s.rhs)}`;
+            case "ExprStmt":
+                return `${Pi}${fmtExpr(s.expr)}`;
+            case "ReturnStmt":
+            case "Return":
+                return s.expr ? `${Pi}return ${fmtExpr(s.expr)}` : `${Pi}return`;
+            case "IfStmt":
+            case "If": {
+                const cond = s.cond || s.condition;
+                const then_ = getStmts(s.thenBlock || s.then);
+                const else_ = getStmts(s.elseBlock || s.else_);
+                let out = `${Pi}if (${fmtExpr(cond)}) {\n${fmtStmts(then_, ind + 1)}\n${Pi}}`;
+                if (else_.length) out += ` else {\n${fmtStmts(else_, ind + 1)}\n${Pi}}`;
+                return out;
+            }
+            case "WhileStmt":
+            case "While": {
+                const cond = s.cond || s.condition;
+                return `${Pi}while (${fmtExpr(cond)}) {\n${fmtStmts(getStmts(s.body), ind + 1)}\n${Pi}}`;
+            }
+            case "ForStmt":
+            case "For":
+                return `${Pi}for (${fmtStmt(s.init, 0).trim()}; ${fmtExpr(s.cond || s.condition)}; ${fmtStmt(s.update, 0).trim()}) {\n${fmtStmts(getStmts(s.body), ind + 1)}\n${Pi}}`;
+            case "BreakStmt":
+            case "Break":    return `${Pi}break`;
+            case "ContinueStmt":
+            case "Continue": return `${Pi}continue`;
+            case "Defer":    return `${Pi}defer ${fmtStmt(s.stmt, 0).trim()}`;
+            default:         return `${Pi}/* ${s.kind} */`;
+        }
+    }
+    return fmtStmt(node, indent);
+}
+
+function getStmts(body) {
+    if (!body) return [];
+    if (Array.isArray(body)) return body;
+    if (body.kind === "Block") return body.statements || [];
+    return [body];
+}
+
+function formatSource(ast, originalSource) {
+    // Reconstruct imports from the original source (they're stripped before AST build)
+    const importLines = [];
+    for (const line of originalSource.split("\n")) {
+        if (/^\s*import\s+/.test(line)) importLines.push(line.trim());
+    }
+
+    const parts = [];
+    if (importLines.length) parts.push(importLines.join("\n") + "\n");
+
+    for (const c of (ast.consts || [])) {
+        parts.push(`const ${c.type} ${c.name} = ${c.value}`);
+    }
+
+    for (const fn of (ast.functions || [])) {
+        if (fn.isBuiltin || fn.isImported || fn.isExtern) continue;
+        const params = (fn.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+        const ret    = fn.returnType ? ` ${fn.returnType}` : "";
+        const body   = getStmts(fn.body).map(s => formatNode(s, 1)).join("\n");
+        parts.push(`function ${fn.name}(${params})${ret} {\n${body}\n}`);
+    }
+
+    for (const cls of (ast.classes || [])) {
+        if (cls.isBuiltin) continue;
+        const lines = [`class ${cls.name} {`];
+        for (const f of (cls.fields || [])) lines.push(`    ${f.type} ${f.name}`);
+        if (cls.constructor) {
+            const params = (cls.constructor.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+            const body   = getStmts(cls.constructor.body).map(s => formatNode(s, 2)).join("\n");
+            lines.push(`\n    constructor(${params}) {\n${body}\n    }`);
+        }
+        for (const m of (cls.methods || [])) {
+            const params  = (m.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+            const ret     = m.returnType ? ` ${m.returnType}` : "";
+            const body    = getStmts(m.body).map(s => formatNode(s, 2)).join("\n");
+            lines.push(`\n    function ${m.name}(${params})${ret} {\n${body}\n    }`);
+        }
+        if (cls.destructor) {
+            const body = getStmts(cls.destructor.body).map(s => formatNode(s, 2)).join("\n");
+            lines.push(`\n    destructor() {\n${body}\n    }`);
+        }
+        lines.push("}");
+        parts.push(lines.join("\n"));
+    }
+
+    if (ast.entry) {
+        const params = (ast.entry.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+        const body   = getStmts(ast.entry.body).map(s => formatNode(s, 1)).join("\n");
+        const sig    = params.length ? `(${params})` : "";
+        parts.push(`entry ${ast.entry.name}${sig} {\n${body}\n}`);
+    }
+
+    return parts.join("\n\n") + "\n";
+}
+
+function cmdFormat(args) {
+    const inPlace = args.includes("--write") || args.includes("-w");
+    const files   = args.filter(a => a.endsWith(".hop"));
+
+    if (files.length === 0) {
+        console.error("hopper: format requires at least one .hop file");
+        process.exit(1);
+    }
+
+    for (const file of files) {
+        if (!fs.existsSync(file)) {
+            console.error(`hopper: file not found: ${file}`);
+            process.exit(1);
+        }
+        const src = fs.readFileSync(file, "utf8");
+        const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), noImports: true });
+        const formatted = formatSource(ast, src);
+        if (inPlace) {
+            fs.writeFileSync(file, formatted, "utf8");
+            console.log(`formatted: ${file}`);
+        } else {
+            process.stdout.write(formatted);
+        }
+    }
 }
 
 function cmdIR(args) {
@@ -237,11 +577,16 @@ function usage() {
         "",
         "  Hopper  — systems programming language",
         "",
-        "  hopper build [file.hop] [-o out]   compile to executable (default: main.hop)",
-        "  hopper build module <name>          scaffold modules/<name>/ with tests/ dir",
-        "  hopper run [file.hop]               compile and run      (default: main.hop)",
-        "  hopper run dev [file.hop]           watch mode — rebuild and rerun on changes",
         "  hopper init [name]                  scaffold a new project in the current dir",
+        "  hopper build [file.hop] [-o out]    compile to executable (default: main.hop)",
+        "  hopper build module <name>          scaffold modules/<name>/ with tests/ dir",
+        "  hopper run [file.hop]               compile and run       (default: main.hop)",
+        "  hopper run dev [file.hop]           watch mode — rebuild and rerun on changes",
+        "  hopper install [module...]          install stdlib modules into project",
+        "  hopper check [file.hop] [--asan|--tsan|--ubsan|--msan]",
+        "                                      compile with sanitizers (default: --asan)",
+        "  hopper debug [file.hop]             emit DWARF symbols and launch lldb/gdb",
+        "  hopper format [-w] <file.hop...>    reformat source files (--write to edit in place)",
         "  hopper test [module]                run tests (all, or a specific module)",
         "  hopper ir <file.hop>                print LLVM IR",
         "  hopper ast <file.hop>               print AST as JSON",
@@ -265,13 +610,17 @@ if (argv[0] === "--parse") { cmdParse(argv.slice(1)); process.exit(0); }
 const [sub, ...rest] = argv;
 
 switch (sub) {
-    case "build": cmdBuild(rest); break;
-    case "run":   cmdRun(rest);   break;
-    case "dev":   cmdDev(rest);   break;
-    case "init":  cmdInit(rest);  break;
-    case "test":  cmdTest(rest);  break;
-    case "ir":    cmdIR(rest);    break;
-    case "ast":   cmdAST(rest);   break;
-    case "parse": cmdParse(rest); break;
-    default:      usage();
+    case "build":   cmdBuild(rest);   break;
+    case "run":     cmdRun(rest);     break;
+    case "dev":     cmdDev(rest);     break;
+    case "init":    cmdInit(rest);    break;
+    case "install": cmdInstall(rest); break;
+    case "check":   cmdCheck(rest);   break;
+    case "debug":   cmdDebug(rest);   break;
+    case "format":  cmdFormat(rest);  break;
+    case "test":    cmdTest(rest);    break;
+    case "ir":      cmdIR(rest);      break;
+    case "ast":     cmdAST(rest);     break;
+    case "parse":   cmdParse(rest);   break;
+    default:        usage();
 }

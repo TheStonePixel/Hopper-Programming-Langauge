@@ -839,9 +839,11 @@ export class AstBuilder extends HopperVisitor {
 
 // ── import resolution ──────────────────────────────────────────────────────
 
-// Find modules/ directory by walking up from baseDir, then fall back to built-ins.
+// Hopper stdlib location — the modules/ dir next to kindling/src/
+const STDLIB_DIR = path.resolve(__dirname, "..", "..", "modules");
+
+// Find modules/ directory by walking up from baseDir, then fall back to stdlib.
 function resolveModuleFiles(moduleName, names, baseDir) {
-    // Walk up from baseDir looking for modules/<moduleName>/
     let dir = baseDir || process.cwd();
     while (true) {
         const candidate = path.join(dir, "modules", moduleName);
@@ -851,6 +853,11 @@ function resolveModuleFiles(moduleName, names, baseDir) {
         const parent = path.dirname(dir);
         if (parent === dir) break;
         dir = parent;
+    }
+    // Fall back to the Hopper standard library
+    const stdlibCandidate = path.join(STDLIB_DIR, moduleName);
+    if (fs.existsSync(stdlibCandidate)) {
+        return filesToLoad(stdlibCandidate, names);
     }
     throw new Error(`Module '${moduleName}' not found`);
 }
@@ -867,7 +874,7 @@ function filesToLoad(moduleDir, names) {
     }
 }
 
-export function buildAstFromSource(source, { baseDir = null, visited = new Set() } = {}) {
+export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false } = {}) {
     // Strip import lines before ANTLR sees them, collect import requests
     const imports = [];
     const strippedSource = source.replace(
@@ -889,6 +896,8 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     parser.buildParseTrees = true;
     const tree = parser.program();
     const ast  = new AstBuilder().visit(tree);
+
+    if (noImports) return ast;
 
     for (const { module: moduleName, names } of imports) {
         const files = resolveModuleFiles(moduleName, names, baseDir);
