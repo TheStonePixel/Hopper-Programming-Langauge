@@ -1,0 +1,194 @@
+// HashMap<K, V> — open-addressing hash map with linear probing
+//
+// Three parallel flat arrays: keys, values, states.
+// Slot states (byte): 0=empty  1=occupied  2=deleted (tombstone)
+//
+// Grows 2× when load factor exceeds 70%.
+// Initial capacity should be a power of two.
+//
+// Usage:
+//   HashMap<int, int> m = HashMap(16)
+//   m.set(42, 100)
+//   bool ok = m.contains(42)   // true
+//   int  v  = m.get(42)        // 100
+//   m.remove(42)
+
+template HashMap<K, V> {
+    address keys      // flat K[] backing store
+    address values    // flat V[] backing store
+    address states    // flat byte[] — 0=empty 1=occupied 2=deleted
+    int     used      // occupied slot count
+    int     capacity  // total allocated slots
+
+    constructor(int cap) {
+        self.keys     = allocate cap * K::size
+        self.values   = allocate cap * V::size
+        self.states   = allocate cap
+        self.used     = 0
+        self.capacity = cap
+        int i = 0
+        while (i < cap) {
+            address sp = self.states + i
+            byte z = cast 0
+            sp::value = z
+            i = i + 1
+        }
+    }
+
+    destructor() {
+        deallocate self.keys
+        deallocate self.values
+        deallocate self.states
+    }
+
+    function len() int {
+        return self.used
+    }
+
+    function cap() int {
+        return self.capacity
+    }
+
+    function contains(K key) bool {
+        int slot = self.find(key)
+        return slot >= 0
+    }
+
+    // Returns value for key, or zero-value if key is absent.
+    function get(K key) V {
+        int slot = self.find(key)
+        if (slot < 0) {
+            V zero = cast 0
+            return zero
+        }
+        address vp = self.values + (slot * V::size)
+        return vp::value
+    }
+
+    // Insert or update key → val. Grows if load > 70%.
+    function set(K key, V val) {
+        if (self.used * 10 >= self.capacity * 7) {
+            self.grow()
+        }
+        int slot = self.probe(key)
+        address sp = self.states + slot
+        byte sb = sp::value
+        int st = cast sb
+        if (st != 1) {
+            self.used = self.used + 1
+        }
+        address kp = self.keys + (slot * K::size)
+        kp::value = key
+        address vp = self.values + (slot * V::size)
+        vp::value = val
+        byte one = cast 1
+        sp::value = one
+    }
+
+    function remove(K key) {
+        int slot = self.find(key)
+        if (slot < 0) { return }
+        address sp = self.states + slot
+        byte two = cast 2
+        sp::value = two
+        self.used = self.used - 1
+    }
+
+    // Returns slot index of key, or -1 if not found.
+    function find(K key) int {
+        int cap = self.capacity
+        int h   = self.hash(key)
+        int i   = 0
+        while (i < cap) {
+            int slot = (h + i) % cap
+            address sp = self.states + slot
+            byte sb = sp::value
+            int st = cast sb
+            if (st == 0) { return -1 }
+            if (st == 1) {
+                address kp = self.keys + (slot * K::size)
+                K k = kp::value
+                if (k == key) { return slot }
+            }
+            i = i + 1
+        }
+        return -1
+    }
+
+    // Returns best slot for insertion: existing slot for key, first tombstone,
+    // or first empty slot — whichever comes first in the probe sequence.
+    function probe(K key) int {
+        int cap   = self.capacity
+        int h     = self.hash(key)
+        int first = -1
+        int i     = 0
+        while (i < cap) {
+            int slot = (h + i) % cap
+            address sp = self.states + slot
+            byte sb = sp::value
+            int st = cast sb
+            if (st == 0) {
+                if (first >= 0) { return first }
+                return slot
+            }
+            if (st == 1) {
+                address kp = self.keys + (slot * K::size)
+                K k = kp::value
+                if (k == key) { return slot }
+            }
+            if (st == 2) {
+                if (first < 0) { first = slot }
+            }
+            i = i + 1
+        }
+        if (first >= 0) { return first }
+        return 0
+    }
+
+    function hash(K key) int {
+        int h = cast key
+        if (h < 0) { h = 0 - h }
+        return h % self.capacity
+    }
+
+    function grow() {
+        int     oldCap    = self.capacity
+        int     newCap    = oldCap * 2
+        address oldKeys   = self.keys
+        address oldValues = self.values
+        address oldStates = self.states
+
+        self.keys     = allocate newCap * K::size
+        self.values   = allocate newCap * V::size
+        self.states   = allocate newCap
+        self.capacity = newCap
+        self.used     = 0
+
+        int i = 0
+        while (i < newCap) {
+            address sp = self.states + i
+            byte z = cast 0
+            sp::value = z
+            i = i + 1
+        }
+
+        i = 0
+        while (i < oldCap) {
+            address sp = oldStates + i
+            byte sb = sp::value
+            int st = cast sb
+            if (st == 1) {
+                address kp = oldKeys   + (i * K::size)
+                address vp = oldValues + (i * V::size)
+                K k = kp::value
+                V v = vp::value
+                self.set(k, v)
+            }
+            i = i + 1
+        }
+
+        deallocate oldKeys
+        deallocate oldValues
+        deallocate oldStates
+    }
+}

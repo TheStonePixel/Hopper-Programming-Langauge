@@ -1132,7 +1132,7 @@ function genStmt(ir, stmt, retType) {
                     const inner = genExpr(ir, stmt.init.expr);
                     init = emitCast(ir, inner.value, inner.type, stmt.type);
                     hType = normType;
-                } else if (stmt.init.kind === "Deref" && !ir.returnType) {
+                } else if (stmt.init.kind === "Deref") {
                     // 'byte b = ptr::value' — use the declared type as the load width
                     const savedRet = ir.returnType;
                     ir.returnType = stmt.type;
@@ -1328,10 +1328,8 @@ function genStmt(ir, stmt, retType) {
             let pointedTo;
             if (v.hType.startsWith("address:")) {
                 pointedTo = v.hType.substring(8);
-            } else if (v.hType === "address" && ir.returnType) {
-                pointedTo = ir.returnType;
             } else if (v.hType === "address") {
-                pointedTo = val.type; // infer from RHS
+                pointedTo = val.type; // infer store width from RHS type
             } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
             }
