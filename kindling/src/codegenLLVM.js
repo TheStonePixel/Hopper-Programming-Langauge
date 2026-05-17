@@ -297,6 +297,26 @@ function operatorNameSafe(op) {
         .replace('&','band').replace('|','bor').replace('^','bxor');
 }
 
+// ── callback type helpers ─────────────────────────────────────────────────
+
+// "callback(int,int)bool" → { params: ["int","int"], ret: "bool" }
+function parseCallbackType(t) {
+    const openP  = t.indexOf('(');
+    const closeP = t.lastIndexOf(')');
+    const paramsStr = t.substring(openP + 1, closeP).trim();
+    const ret       = t.substring(closeP + 1).trim();
+    const params    = paramsStr ? paramsStr.split(',').map(p => p.trim()) : [];
+    return { params, ret };
+}
+
+// "callback(int,int)bool" → "i1 (i64, i64)"  (LLVM function type, no trailing *)
+function callbackFnTypeSig(t) {
+    const { params, ret } = parseCallbackType(t);
+    const retLl    = ret ? llvmType(ret) : "void";
+    const paramLls = params.map(p => llvmType(p)).join(", ");
+    return `${retLl} (${paramLls})`;
+}
+
 // ── type helpers ───────────────────────────────────────────────────────────
 
 function llvmType(t) {
@@ -319,6 +339,7 @@ function llvmType(t) {
     if (t === "unsignedint")  return "i64";
     if (t === "unsignedbyte") return "i8";
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
+    if (t.startsWith("callback(")) return "i8*";  // stored as opaque pointer
     if (t.includes('<')) {
         const m = mangleTemplate(t);
         if (classTypes.has(m)) return `%class.${m}`;
@@ -600,7 +621,19 @@ function genExpr(ir, expr) {
             }
 
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) {
+                // Function name used as a value (e.g. passed as callback argument)
+                if (functionReturnTypes.has(expr.name)) {
+                    const fnInfo  = functionReturnTypes.get(expr.name);
+                    const retLl   = fnInfo.returnType ? llvmType(fnInfo.returnType) : "void";
+                    const paramLls = (fnInfo.params || []).map(p => llvmType(p.type)).join(", ");
+                    const fnSig   = `${retLl} (${paramLls})`;
+                    const tmp     = ir.newTmp();
+                    ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
+                    return { value: tmp, type: "address" };
+                }
+                throw new Error(`Unknown variable: ${expr.name}`);
+            }
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${v.type}, ${v.type}* ${v.ptr}`);
             return { value: tmp, type: v.hType };
@@ -673,7 +706,19 @@ function genExpr(ir, expr) {
 
         case "AddressOf": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) {
+                // Function name used as address: fnName::address
+                if (functionReturnTypes.has(expr.name)) {
+                    const fnInfo   = functionReturnTypes.get(expr.name);
+                    const retLl    = fnInfo.returnType ? llvmType(fnInfo.returnType) : "void";
+                    const paramLls = (fnInfo.params || []).map(p => llvmType(p.type)).join(", ");
+                    const fnSig    = `${retLl} (${paramLls})`;
+                    const tmp      = ir.newTmp();
+                    ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
+                    return { value: tmp, type: "address" };
+                }
+                throw new Error(`Unknown variable: ${expr.name}`);
+            }
             if (v.hType.startsWith("array:")) {
                 const elemType = v.hType.split(":")[1];
                 const elemPtr  = ir.newTmp();
@@ -939,10 +984,42 @@ function genExpr(ir, expr) {
         }
 
         case "Call": {
-            const args     = (expr.args || []).map(a => genExpr(ir, a));
-            // address:T values are normalized to i8* — use i8* as LLVM type in call args
-            const argStr   = args.map(v => `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`).join(", ");
+            // Indirect call through a callback variable
+            const cbVar = ir.vars.get(expr.callee);
+            if (cbVar && cbVar.hType && cbVar.hType.startsWith("callback(")) {
+                const args    = (expr.args || []).map(a => genExpr(ir, a));
+                const argStr  = args.map(v => `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`).join(", ");
+                const fnSig   = callbackFnTypeSig(cbVar.hType);
+                const fnPtrLl = `${fnSig}*`;
+                const { ret } = parseCallbackType(cbVar.hType);
+                const fnRaw   = ir.newTmp();
+                ir.emit(`${fnRaw} = load i8*, i8** ${cbVar.ptr}`);
+                const fnTyped = ir.newTmp();
+                ir.emit(`${fnTyped} = bitcast i8* ${fnRaw} to ${fnPtrLl}`);
+                if (!ret || ret === "void" || ret === "null") {
+                    ir.emit(`call ${fnSig} ${fnTyped}(${argStr})`);
+                    return { value: "0", type: "int" };
+                }
+                const tmp = ir.newTmp();
+                ir.emit(`${tmp} = call ${fnSig} ${fnTyped}(${argStr})`);
+                return { value: tmp, type: ret };
+            }
+
             const fnInfo   = functionReturnTypes.get(expr.callee);
+            const args     = (expr.args || []).map((a, i) => {
+                const paramNormT = fnInfo && fnInfo.params && fnInfo.params[i]
+                    ? normalizeType(fnInfo.params[i].type) : null;
+                if (paramNormT && classTypes.has(paramNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar) return { value: argVar.ptr, type: paramNormT, isClassPtr: true };
+                }
+                return genExpr(ir, a);
+            });
+            // address:T values are normalized to i8* — use i8* as LLVM type in call args
+            const argStr   = args.map(v => {
+                if (v.isClassPtr) return `${llvmType(v.type)}* ${v.value}`;
+                return `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`;
+            }).join(", ");
             const retType  = fnInfo ? fnInfo.returnType : "int";
             const isVararg = fnInfo && fnInfo.isVariadic;
             if (retType === null) {
@@ -1124,6 +1201,30 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
+            // callback(T,T)R var = functionName  OR  = cast addressVar
+            if (normType.startsWith("callback(") && stmt.init) {
+                let raw;
+                if (stmt.init.kind === "Var") {
+                    // direct function name: bitcast fn ptr to i8*
+                    const fnName = stmt.init.name;
+                    const fnSig  = callbackFnTypeSig(normType);
+                    raw = ir.newTmp();
+                    ir.emit(`${raw} = bitcast ${fnSig}* @${fnName} to i8*`);
+                } else if (stmt.init.kind === "CastExpr") {
+                    // cast address → callback: both are i8*, evaluate inner and use as-is
+                    const inner = genExpr(ir, stmt.init.expr);
+                    raw = inner.value; // already i8*
+                } else {
+                    // fallthrough to general path
+                    break;
+                }
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = alloca i8*`);
+                ir.emit(`store i8* ${raw}, i8** ${ptr}`);
+                ir.vars.set(stmt.name, { ptr, type: "i8*", hType: normType });
+                break;
+            }
+
             let hType = normType;
             let init  = null;
 
@@ -1175,6 +1276,18 @@ function genStmt(ir, stmt, retType) {
 
             const v   = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+
+            // callback var = functionName — reassign to a different function
+            if (v.hType && v.hType.startsWith("callback(") && stmt.expr.kind === "Var") {
+                const fnName  = stmt.expr.name;
+                const fnSig   = callbackFnTypeSig(v.hType);
+                const fnPtrLl = `${fnSig}*`;
+                const raw     = ir.newTmp();
+                ir.emit(`${raw} = bitcast ${fnPtrLl} @${fnName} to i8*`);
+                ir.emit(`store i8* ${raw}, i8** ${v.ptr}`);
+                break;
+            }
+
             let val;
             if (stmt.expr.kind === "CastExpr") {
                 const inner = genExpr(ir, stmt.expr.expr);
@@ -1568,7 +1681,11 @@ function genFunction(fn) {
     ir.returnType    = fn.returnType;
     const isVoid     = fn.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(fn.returnType);
-    const paramSig   = fn.params.map((p, i) => `${llvmType(normalizeType(p.type))} %p${i}`).join(", ");
+    const paramSig   = fn.params.map((p, i) => {
+        const normT = normalizeType(p.type);
+        const lt    = llvmType(normT);
+        return classTypes.has(normT) ? `${lt}* %p${i}` : `${lt} %p${i}`;
+    }).join(", ");
 
     ir.emit(`define ${retLlType} @${fn.name}(${paramSig}) {`);
     ir.emit("entry:");
@@ -1576,10 +1693,15 @@ function genFunction(fn) {
     fn.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
         const lt    = llvmType(normT);
-        const ptr   = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${lt}`);
-        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        if (classTypes.has(normT)) {
+            // Class/template types: passed by reference — %p_i is already a pointer
+            ir.vars.set(p.name, { ptr: `%p${i}`, type: lt, hType: normT });
+        } else {
+            const ptr = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${lt}`);
+            ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+            ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        }
     });
 
     genBlock(ir, fn.body, fn.returnType);

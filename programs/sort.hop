@@ -1,0 +1,255 @@
+// sort.hop — generic sort with callback comparators
+//
+// Demonstrates:
+//   - callback types as parameters and stored variables
+//   - dispatch table (array of callbacks)
+//   - higher-order functions: filter, map, reduce, forEach
+//   - swapping sort algorithms at runtime
+
+import io from linux
+import array from ds
+
+extern function printf(String fmt, ...) int
+
+// ── comparators ───────────────────────────────────────────────────────────────
+
+function intAscending(int a, int b) bool {
+    return a < b
+}
+
+function intDescending(int a, int b) bool {
+    return a > b
+}
+
+function absAscending(int a, int b) bool {
+    int aa = a
+    if (aa < 0) { aa = 0 - aa }
+    int ab = b
+    if (ab < 0) { ab = 0 - ab }
+    return aa < ab
+}
+
+function isEven(int n) bool {
+    return (n % 2) == 0
+}
+
+function squared(int n) int {
+    return n * n
+}
+
+function sumAcc(int acc, int n) int {
+    return acc + n
+}
+
+// ── algorithms ────────────────────────────────────────────────────────────────
+
+// In-place insertion sort — O(n²), stable.
+function insertionSort(Array<int> arr, callback(int, int) bool less) {
+    int n = arr.len()
+    int i = 1
+    while (i < n) {
+        int key = arr.get(i)
+        int j   = i
+        while (j > 0) {
+            int prev = arr.get(j - 1)
+            if (less(prev, key)) { break }
+            arr.set(j, prev)
+            j = j - 1
+        }
+        arr.set(j, key)
+        i = i + 1
+    }
+}
+
+// Partition step for quicksort (Lomuto scheme).
+function partition(Array<int> arr, int lo, int hi, callback(int, int) bool less) int {
+    int pivot = arr.get(hi)
+    int i     = lo - 1
+    int j     = lo
+    while (j < hi) {
+        int elem = arr.get(j)
+        if (less(elem, pivot)) {
+            i = i + 1
+            int tmp = arr.get(i)
+            arr.set(i, elem)
+            arr.set(j, tmp)
+        }
+        j = j + 1
+    }
+    int tmp = arr.get(i + 1)
+    arr.set(i + 1, arr.get(hi))
+    arr.set(hi, tmp)
+    return i + 1
+}
+
+// Recursive quicksort.
+function quickSort(Array<int> arr, int lo, int hi, callback(int, int) bool less) {
+    if (lo < hi) {
+        int p = partition(arr, lo, hi, less)
+        quickSort(arr, lo, p - 1, less)
+        quickSort(arr, p + 1, hi, less)
+    }
+}
+
+// ── higher-order helpers ──────────────────────────────────────────────────────
+
+function forEach(Array<int> arr, callback(int) int fn) {
+    int i = 0
+    while (i < arr.len()) {
+        int v = arr.get(i)
+        fn(v)
+        i = i + 1
+    }
+}
+
+function filter(Array<int> src, Array<int> dst, callback(int) bool pred) {
+    dst.reset()
+    int i = 0
+    while (i < src.len()) {
+        int v = src.get(i)
+        if (pred(v)) { dst.push(v) }
+        i = i + 1
+    }
+}
+
+function map(Array<int> src, Array<int> dst, callback(int) int fn) {
+    dst.reset()
+    int i = 0
+    while (i < src.len()) {
+        int v = src.get(i)
+        dst.push(fn(v))
+        i = i + 1
+    }
+}
+
+function reduce(Array<int> arr, int initial, callback(int, int) int fn) int {
+    int acc = initial
+    int i   = 0
+    while (i < arr.len()) {
+        acc = fn(acc, arr.get(i))
+        i = i + 1
+    }
+    return acc
+}
+
+// ── print helpers ─────────────────────────────────────────────────────────────
+
+function printArr(Array<int> arr) {
+    printf("[")
+    int i = 0
+    while (i < arr.len()) {
+        if (i > 0) { printf(", ") }
+        printf("%d", arr.get(i))
+        i = i + 1
+    }
+    printf("]\n")
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main(int argc, address argv) {
+    Array<int> nums = Array(16)
+    nums.push(5)
+    nums.push(-3)
+    nums.push(8)
+    nums.push(1)
+    nums.push(-7)
+    nums.push(4)
+    nums.push(2)
+    nums.push(-6)
+
+    printf("original: ")
+    printArr(nums)
+
+    // ── quicksort with swappable comparator ───────────────────────────────────
+
+    callback(int, int) bool cmp = intAscending
+    quickSort(nums, 0, nums.len() - 1, cmp)
+    printf("ascending:  ")
+    printArr(nums)
+
+    cmp = intDescending
+    quickSort(nums, 0, nums.len() - 1, cmp)
+    printf("descending: ")
+    printArr(nums)
+
+    cmp = absAscending
+    quickSort(nums, 0, nums.len() - 1, cmp)
+    printf("abs order:  ")
+    printArr(nums)
+
+    // ── insertion sort (stable, different algorithm, same comparator API) ──────
+
+    Array<int> small = Array(8)
+    small.push(9)
+    small.push(3)
+    small.push(6)
+    small.push(1)
+    small.push(4)
+
+    insertionSort(small, intAscending)
+    printf("insertionSort: ")
+    printArr(small)
+
+    // ── higher-order: filter, map, reduce ─────────────────────────────────────
+
+    Array<int> src = Array(8)
+    src.push(1)
+    src.push(2)
+    src.push(3)
+    src.push(4)
+    src.push(5)
+    src.push(6)
+
+    Array<int> evens = Array(8)
+    filter(src, evens, isEven)
+    printf("evens: ")
+    printArr(evens)
+
+    Array<int> squares = Array(8)
+    map(src, squares, squared)
+    printf("squares: ")
+    printArr(squares)
+
+    int total = reduce(src, 0, sumAcc)
+    printf("sum(1..6) = %d\n", total)
+
+    // ── dispatch table: array of comparators ──────────────────────────────────
+    //
+    // Hopper stores callbacks as address, so we use Array<address> as a dispatch
+    // table and alias each slot to the right callback type at the call site.
+
+    printf("\ndispatch table demo:\n")
+    Array<address> sortModes = Array(4)
+    address ascAddr  = intAscending::address
+    address descAddr = intDescending::address
+    address absAddr  = absAscending::address
+    sortModes.push(ascAddr)
+    sortModes.push(descAddr)
+    sortModes.push(absAddr)
+
+    Array<int> demo = Array(8)
+    demo.push(7)
+    demo.push(-2)
+    demo.push(5)
+    demo.push(-9)
+    demo.push(3)
+
+    int m = 0
+    while (m < sortModes.len()) {
+        // Restore demo order
+        demo.reset()
+        demo.push(7)
+        demo.push(-2)
+        demo.push(5)
+        demo.push(-9)
+        demo.push(3)
+
+        address fnAddr = sortModes.get(m)
+        callback(int, int) bool sorter = cast fnAddr
+        quickSort(demo, 0, demo.len() - 1, sorter)
+        printf("mode %d: ", m)
+        printArr(demo)
+        m = m + 1
+    }
+}
