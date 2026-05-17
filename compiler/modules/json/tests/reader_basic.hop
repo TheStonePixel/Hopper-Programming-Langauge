@@ -1,0 +1,124 @@
+import assert from core
+import io     from core
+import reader from compiler.json
+
+extern function printf(String fmt, ...) int
+
+// TEST: parse null
+// EXPECT: null ok
+
+// TEST: parse bool true
+// EXPECT: bool true ok
+
+// TEST: parse bool false
+// EXPECT: bool false ok
+
+// TEST: parse integer
+// EXPECT: int ok
+
+// TEST: parse negative integer
+// EXPECT: negative int ok
+
+// TEST: parse string
+// EXPECT: string ok
+
+// TEST: parse empty array
+// EXPECT: empty array ok
+
+// TEST: parse integer array
+// EXPECT: int array ok
+
+// TEST: parse flat object
+// EXPECT: flat object ok
+
+entry main {
+    // — null ——————————————————————————————————————————————
+    JsonReader r0 = JsonReader("null", 4)
+    address n0 = r0.parseValue()
+    JsonNode v0 = n0::value
+    soft(v0.kind == JSON_NULL, "null: wrong kind\n")
+    println("null ok")
+
+    // — bool true —————————————————————————————————————————
+    JsonReader r1 = JsonReader("true", 4)
+    address n1 = r1.parseValue()
+    JsonNode v1 = n1::value
+    soft(v1.kind   == JSON_BOOL, "bool true: wrong kind\n")
+    soft(v1.numVal == 1,         "bool true: numVal should be 1\n")
+    println("bool true ok")
+
+    // — bool false ————————————————————————————————————————
+    JsonReader r2 = JsonReader("false", 5)
+    address n2 = r2.parseValue()
+    JsonNode v2 = n2::value
+    soft(v2.kind   == JSON_BOOL, "bool false: wrong kind\n")
+    soft(v2.numVal == 0,         "bool false: numVal should be 0\n")
+    println("bool false ok")
+
+    // — integer ———————————————————————————————————————————
+    JsonReader r3 = JsonReader("42", 2)
+    address n3 = r3.parseValue()
+    JsonNode v3 = n3::value
+    soft(v3.kind   == JSON_INT, "int: wrong kind\n")
+    soft(v3.numVal == 42,       "int: expected 42\n")
+    println("int ok")
+
+    // — negative integer ——————————————————————————————————
+    JsonReader r4 = JsonReader("-7", 2)
+    address n4 = r4.parseValue()
+    JsonNode v4 = n4::value
+    soft(v4.kind   == JSON_INT, "negative int: wrong kind\n")
+    soft(v4.numVal == -7,       "negative int: expected -7\n")
+    println("negative int ok")
+
+    // — string ————————————————————————————————————————————
+    JsonReader r5 = JsonReader("\"hello\"", 7)
+    address n5 = r5.parseValue()
+    JsonNode v5 = n5::value
+    soft(v5.kind == JSON_STRING, "string: wrong kind\n")
+    println("string ok")
+
+    // — empty array ———————————————————————————————————————
+    JsonReader r6 = JsonReader("[]", 2)
+    address n6 = r6.parseValue()
+    JsonNode v6 = n6::value
+    soft(v6.kind == JSON_ARRAY, "empty array: wrong kind\n")
+    Array<address> ch6 = v6.children::value
+    soft(ch6.len() == 0, "empty array: expected 0 children\n")
+    println("empty array ok")
+
+    // — integer array ————————————————————————————————————
+    JsonReader r7 = JsonReader("[1, 2, 3]", 9)
+    address n7 = r7.parseValue()
+    JsonNode v7 = n7::value
+    soft(v7.kind == JSON_ARRAY, "int array: wrong kind\n")
+    Array<address> ch7 = v7.children::value
+    soft(ch7.len() == 3, "int array: expected 3 children\n")
+    address c0 = ch7.get(0)
+    address c1 = ch7.get(1)
+    address c2 = ch7.get(2)
+    JsonNode e0 = c0::value
+    JsonNode e1 = c1::value
+    JsonNode e2 = c2::value
+    soft(e0.numVal == 1, "int array[0]: expected 1\n")
+    soft(e1.numVal == 2, "int array[1]: expected 2\n")
+    soft(e2.numVal == 3, "int array[2]: expected 3\n")
+    println("int array ok")
+
+    // — flat object ——————————————————————————————————————
+    JsonReader r8 = JsonReader("{\"x\": 10, \"y\": 20}", 18)
+    address n8 = r8.parseValue()
+    JsonNode v8 = n8::value
+    soft(v8.kind == JSON_OBJECT, "flat object: wrong kind\n")
+    Array<address> ch8 = v8.children::value
+    Array<string>  ks8 = v8.keys::value
+    soft(ch8.len() == 2, "flat object: expected 2 children\n")
+    soft(ks8.len() == 2, "flat object: expected 2 keys\n")
+    address oc0 = ch8.get(0)
+    address oc1 = ch8.get(1)
+    JsonNode ov0 = oc0::value
+    JsonNode ov1 = oc1::value
+    soft(ov0.numVal == 10, "flat object x: expected 10\n")
+    soft(ov1.numVal == 20, "flat object y: expected 20\n")
+    println("flat object ok")
+}

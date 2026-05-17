@@ -1,9 +1,16 @@
-// reader.hop — JSON parser
+// reader.hop — JSON parser built on Stream<byte>
 //
 // Reads a JSON string and produces a tree of JsonNode values.
 // Used by hcc to consume the AST produced by kindling.
+//
+// Usage:
+//   JsonReader r = JsonReader(src, len)
+//   address root = r.parseValue()      // returns heap JsonNode*
+//   JsonNode n = root::value
+//   if (n.kind == JSON_OBJECT) { ... }
 
-import array from ds
+import array  from ds
+import stream from stream
 
 // ── JsonNode kinds ────────────────────────────────────────────────────────────
 
@@ -16,49 +23,330 @@ const int JSON_OBJECT = 5
 
 // ── JsonNode ──────────────────────────────────────────────────────────────────
 //
-// A single JSON value. kind tells you what it is.
-// Only the relevant fields are set depending on kind:
-//   JSON_NULL   — nothing
-//   JSON_BOOL   — numVal (0=false, 1=true)
-//   JSON_INT    — numVal
-//   JSON_STRING — strVal
-//   JSON_ARRAY  — children (Array<address> of JsonNode*)
-//   JSON_OBJECT — children (Array<address> of JsonNode*) + keys (Array<string>)
+// Tagged value. Only the fields relevant to kind are set:
+//   JSON_NULL              — nothing
+//   JSON_BOOL              — numVal (0=false, 1=true)
+//   JSON_INT               — numVal
+//   JSON_STRING            — strVal
+//   JSON_ARRAY  / _OBJECT  — children (heap Array<address> of JsonNode*)
+//   JSON_OBJECT only       — keys     (heap Array<string>)
 
 struct JsonNode {
     int     kind
     int     numVal
     string  strVal
-    address children    // Array<address> — values for array and object
-    address keys        // Array<string>  — keys for object only
+    address children    // points to heap-allocated Array<address>
+    address keys        // points to heap-allocated Array<string> (object only)
 }
 
 // ── JsonReader ────────────────────────────────────────────────────────────────
 
 class JsonReader {
-    string src
-    int    pos
-    int    len
+    address data    // pointer to raw JSON source bytes
+    int     pos     // current byte offset
+    int     len     // total bytes
 
     constructor(string src, int len) {
-        self.src = src
-        self.len = len
-        self.pos = 0
+        self.data = cast src
+        self.len  = len
+        self.pos  = 0
     }
 
-    function peek() byte { }
+    // Current byte without advancing.
+    function peek() byte {
+        address ptr = self.data + self.pos
+        return ptr::value
+    }
 
-    function advance() byte { }
+    // Current byte, then advance.
+    function advance() byte {
+        address ptr = self.data + self.pos
+        byte b = ptr::value
+        self.pos = self.pos + 1
+        return b
+    }
 
-    function skipWhitespace() { }
+    // Skip space (32), tab (9), newline (10), carriage return (13).
+    function skipWhitespace() {
+        while (self.pos < self.len) {
+            byte b  = self.peek()
+            int  c  = cast b
+            if (c == 32 || c == 9 || c == 10 || c == 13) {
+                self.advance()
+            } else {
+                break
+            }
+        }
+    }
 
-    function parseValue() address { }
+    // Dispatch to the right parse function based on the next non-whitespace byte.
+    function parseValue() address {
+        self.skipWhitespace()
+        byte b = self.peek()
+        int  c = cast b
 
-    function parseObject() address { }
+        if (c == 123) { return self.parseObject() }     // '{'
+        if (c == 91)  { return self.parseArray() }      // '['
+        if (c == 34)  { return self.parseStringNode() } // '"'
+        if (c == 116) { return self.parseTrue() }       // 't'
+        if (c == 102) { return self.parseFalse() }      // 'f'
+        if (c == 110) { return self.parseNull() }       // 'n'
+        return self.parseIntNode()                      // digit or '-'
+    }
 
-    function parseArray() address { }
+    // Parse a JSON object { "key": value, ... }
+    function parseObject() address {
+        self.advance()  // consume '{'
 
-    function parseString() string { }
+        Array<address> children = Array(8)
+        Array<string>  keys     = Array(8)
 
-    function parseNumber() int { }
+        self.skipWhitespace()
+        byte first = self.peek()
+        int  fc    = cast first
+
+        if (fc != 125) {  // not '}'
+            while (true) {
+                self.skipWhitespace()
+
+                // key
+                string key = self.parseString()
+                keys.push(key)
+
+                self.skipWhitespace()
+                self.advance()  // consume ':'
+                self.skipWhitespace()
+
+                // value
+                address child = self.parseValue()
+                children.push(child)
+
+                self.skipWhitespace()
+                byte sep = self.peek()
+                int  sc  = cast sep
+                if (sc == 44) {     // ','
+                    self.advance()
+                } else {
+                    break
+                }
+            }
+        }
+
+        self.skipWhitespace()
+        self.advance()  // consume '}'
+
+        // Move children and keys arrays to the heap so JsonNode can hold addresses.
+        address childPtr = allocate Array_address::size
+        childPtr::value  = children
+        address keysPtr  = allocate Array_string::size
+        keysPtr::value   = keys
+
+        JsonNode node
+        node.kind     = JSON_OBJECT
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = childPtr
+        node.keys     = keysPtr
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    // Parse a JSON array [ value, value, ... ]
+    function parseArray() address {
+        self.advance()  // consume '['
+
+        Array<address> children = Array(8)
+
+        self.skipWhitespace()
+        byte first = self.peek()
+        int  fc    = cast first
+
+        if (fc != 93) {  // not ']'
+            while (true) {
+                self.skipWhitespace()
+                address child = self.parseValue()
+                children.push(child)
+
+                self.skipWhitespace()
+                byte sep = self.peek()
+                int  sc  = cast sep
+                if (sc == 44) {     // ','
+                    self.advance()
+                } else {
+                    break
+                }
+            }
+        }
+
+        self.skipWhitespace()
+        self.advance()  // consume ']'
+
+        address childPtr = allocate Array_address::size
+        childPtr::value  = children
+
+        JsonNode node
+        node.kind     = JSON_ARRAY
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = childPtr
+        node.keys     = 0
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    // Parse a quoted JSON string. Returns the raw string value (no enclosing quotes).
+    // Handles \" and \\ escapes. Other \X sequences pass the char through.
+    function parseString() string {
+        self.advance()  // consume opening '"'
+
+        // Collect bytes into a growable buffer.
+        Array<byte> buf = Array(64)
+
+        while (self.pos < self.len) {
+            byte b = self.advance()
+            int  c = cast b
+
+            if (c == 34) { break }  // closing '"'
+
+            if (c == 92) {          // '\'
+                byte esc = self.advance()
+                int  ec  = cast esc
+                if (ec == 110) {    // 'n' → newline
+                    byte nl = 10
+                    buf.push(nl)
+                } else {
+                    if (ec == 116) { // 't' → tab
+                        byte tb = 9
+                        buf.push(tb)
+                    } else {
+                        buf.push(esc)  // \" → "   \\ → \
+                    }
+                }
+            } else {
+                buf.push(b)
+            }
+        }
+
+        // Null-terminate and return as string.
+        byte nul = 0
+        buf.push(nul)
+        string result = cast buf.data
+        return result
+    }
+
+    // Wrap a parsed string in a JsonNode on the heap.
+    function parseStringNode() address {
+        string s = self.parseString()
+
+        JsonNode node
+        node.kind     = JSON_STRING
+        node.numVal   = 0
+        node.strVal   = s
+        node.children = 0
+        node.keys     = 0
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    // Parse a JSON integer (no floats — kindling AST uses integers only).
+    // Handles optional leading '-'.
+    function parseInt() int {
+        int sign = 1
+        byte b   = self.peek()
+        int  c   = cast b
+        if (c == 45) {  // '-'
+            sign = -1
+            self.advance()
+        }
+
+        int val = 0
+        while (self.pos < self.len) {
+            b = self.peek()
+            c = cast b
+            if (c < 48 || c > 57) { break }  // not 0-9
+            self.advance()
+            val = val * 10 + (c - 48)
+        }
+        return sign * val
+    }
+
+    // Wrap a parsed integer in a JsonNode on the heap.
+    function parseIntNode() address {
+        int n = self.parseInt()
+
+        JsonNode node
+        node.kind     = JSON_INT
+        node.numVal   = n
+        node.strVal   = ""
+        node.children = 0
+        node.keys     = 0
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    // Consume the literal "true" and return a bool JsonNode.
+    function parseTrue() address {
+        self.advance()  // t
+        self.advance()  // r
+        self.advance()  // u
+        self.advance()  // e
+
+        JsonNode node
+        node.kind     = JSON_BOOL
+        node.numVal   = 1
+        node.strVal   = ""
+        node.children = 0
+        node.keys     = 0
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    // Consume the literal "false" and return a bool JsonNode.
+    function parseFalse() address {
+        self.advance()  // f
+        self.advance()  // a
+        self.advance()  // l
+        self.advance()  // s
+        self.advance()  // e
+
+        JsonNode node
+        node.kind     = JSON_BOOL
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = 0
+        node.keys     = 0
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    // Consume the literal "null" and return a null JsonNode.
+    function parseNull() address {
+        self.advance()  // n
+        self.advance()  // u
+        self.advance()  // l
+        self.advance()  // l
+
+        JsonNode node
+        node.kind     = JSON_NULL
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = 0
+        node.keys     = 0
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
 }
