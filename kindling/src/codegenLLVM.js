@@ -490,6 +490,8 @@ class IRBuilder {
         this.vars       = new Map();
         this.loopStack  = [];
         this.deferStack = [];
+        this.sretPtr    = null;   // hidden sret param name when method returns a class
+        this.sretHType  = null;   // Hopper type name of the sret class
     }
 
     emit(line)              { this.lines.push(line); }
@@ -871,7 +873,7 @@ function genExpr(ir, expr) {
                         const selfType = `%class.${lv.hType}*`;
                         const paramNormT = normalizeType(matchingOp.param.type);
                         const retType = matchingOp.returnType;
-                        const tmp = ir.newTmp();
+                        const normRetT = retType ? normalizeType(retType) : null;
                         let rightArgStr;
                         if (classTypes.has(paramNormT) && expr.right.kind === "Var") {
                             const rv = ir.vars.get(expr.right.name);
@@ -883,6 +885,14 @@ function genExpr(ir, expr) {
                             const right = genExpr(ir, expr.right);
                             rightArgStr = `${llvmType(matchingOp.param.type)} ${right.value}`;
                         }
+                        if (normRetT && classTypes.has(normRetT)) {
+                            // Operator returns a class — use sret convention.
+                            const resultPtr = ir.newTmp();
+                            ir.emit(`${resultPtr} = alloca %class.${normRetT}`);
+                            ir.emit(`call void @${fnName}(${selfType} ${lv.ptr}, %class.${normRetT}* ${resultPtr}, ${rightArgStr})`);
+                            return { value: resultPtr, type: normRetT, isClassPtr: true };
+                        }
+                        const tmp = ir.newTmp();
                         ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${lv.ptr}, ${rightArgStr})`);
                         return { value: tmp, type: retType };
                     }
@@ -1119,6 +1129,17 @@ function genExpr(ir, expr) {
                 if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
                 return `${llvmType(a.type)} ${a.value}`;
             }).join(", ");
+            const normRetT = retType ? normalizeType(retType) : null;
+            if (normRetT && classTypes.has(normRetT)) {
+                const resultPtr = ir.newTmp();
+                ir.emit(`${resultPtr} = alloca %class.${normRetT}`);
+                const sretArgStr = `%class.${normRetT}* ${resultPtr}`;
+                const fullArgStr = otherArgs
+                    ? `${selfArg}, ${sretArgStr}, ${otherArgs}`
+                    : `${selfArg}, ${sretArgStr}`;
+                ir.emit(`call void @${mangled}(${fullArgStr})`);
+                return { value: resultPtr, type: normRetT, isClassPtr: true };
+            }
             const argStr = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             if (retType === null) {
                 ir.emit(`call void @${mangled}(${argStr})`);
@@ -1184,6 +1205,18 @@ function genExpr(ir, expr) {
                 if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
                 return `${llvmType(a.type)} ${a.value}`;
             }).join(", ");
+            const normRetT = retType ? normalizeType(retType) : null;
+            if (normRetT && classTypes.has(normRetT)) {
+                // Class return via sret: alloca result, pass as hidden second arg, call as void.
+                const resultPtr = ir.newTmp();
+                ir.emit(`${resultPtr} = alloca %class.${normRetT}`);
+                const sretArgStr = `%class.${normRetT}* ${resultPtr}`;
+                const fullArgStr = otherArgs
+                    ? `${selfArg}, ${sretArgStr}, ${otherArgs}`
+                    : `${selfArg}, ${sretArgStr}`;
+                ir.emit(`call void @${mangled}(${fullArgStr})`);
+                return { value: resultPtr, type: normRetT, isClassPtr: true };
+            }
             const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             if (retType === null) {
                 ir.emit(`call void @${mangled}(${argStr})`);
@@ -1242,6 +1275,19 @@ function genStmt(ir, stmt, retType) {
                     ir.emit(`call void @${ctorName}(${argStr})`);
                 }
                 break;
+            }
+
+            // Class-returning expr: MyClass x = obj.method() / obj.field.method() / a + b (operator)
+            // genExpr for these returns { isClassPtr: true, value: allocaPtr } — reuse that alloca.
+            if (classTypes.has(normType) && stmt.init
+                && (stmt.init.kind === "MethodCall"
+                    || stmt.init.kind === "ChainedMethodCall"
+                    || stmt.init.kind === "Binary")) {
+                const result = genExpr(ir, stmt.init);
+                if (result.isClassPtr) {
+                    ir.vars.set(stmt.name, { ptr: result.value, type: `%class.${normType}`, hType: normType });
+                    break;
+                }
             }
 
             // callback(T,T)R var = functionName  OR  = cast addressVar
@@ -1699,7 +1745,30 @@ function genStmt(ir, stmt, retType) {
 
         case "ReturnStmt": {
             emitDeferred(ir);
-            if (stmt.expr) {
+            if (ir.sretPtr) {
+                // Class-returning method: write result into sret pointer, then ret void.
+                if (stmt.expr) {
+                    let srcPtr = null;
+                    if (stmt.expr.kind === "Var") {
+                        const varEntry = ir.vars.get(stmt.expr.name);
+                        if (varEntry && classTypes.has(varEntry.hType)) {
+                            srcPtr = varEntry.ptr;
+                        }
+                    } else {
+                        const result = genExpr(ir, stmt.expr);
+                        if (result.isClassPtr) srcPtr = result.value;
+                    }
+                    if (srcPtr) {
+                        const size   = typeSize(ir.sretHType);
+                        const dstI8  = ir.newTmp();
+                        const srcI8  = ir.newTmp();
+                        ir.emit(`${dstI8} = bitcast %class.${ir.sretHType}* ${ir.sretPtr} to i8*`);
+                        ir.emit(`${srcI8} = bitcast %class.${ir.sretHType}* ${srcPtr} to i8*`);
+                        ir.emit(`call i8* @memcpy(i8* ${dstI8}, i8* ${srcI8}, i64 ${size})`);
+                    }
+                }
+                ir.emit(`ret void`);
+            } else if (stmt.expr) {
                 if (stmt.expr.kind === "CastExpr") {
                     const inner = genExpr(ir, stmt.expr.expr);
                     const casted = emitCast(ir, inner.value, inner.type, retType);
@@ -1783,15 +1852,22 @@ function genFunction(fn) {
 }
 
 function genMethod(typeName, method, isClass = true) {
-    const ir         = new IRBuilder();
-    ir.returnType    = method.returnType;
-    ir.currentClass  = typeName;
-    const isVoid     = method.returnType === null;
-    const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
-    const mangled    = `${typeName}_${method.name}`;
-    const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
+    const ir          = new IRBuilder();
+    ir.returnType     = method.returnType;
+    ir.currentClass   = typeName;
+    const normRetType = method.returnType ? normalizeType(method.returnType) : null;
+    const isClassReturn = normRetType && classTypes.has(normRetType);
+    const isVoid      = method.returnType === null || isClassReturn;
+    const retLlType   = isVoid ? "void" : llvmType(normRetType);
+    const mangled     = `${typeName}_${method.name}`;
+    const llTypeName  = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
 
     const paramParts = [`${llTypeName}* %self`];
+    if (isClassReturn) {
+        paramParts.push(`%class.${normRetType}* %sret`);
+        ir.sretPtr   = "%sret";
+        ir.sretHType = normRetType;
+    }
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
         if (classTypes.has(normT)) {
@@ -2132,7 +2208,8 @@ function genModule(ast) {
 
     // Runtime heap declarations — backing allocate/deallocate directives
     out += `declare i8* @malloc(i64)\n`;
-    out += `declare void @free(i8*)\n\n`;
+    out += `declare void @free(i8*)\n`;
+    out += `declare i8* @memcpy(i8*, i8*, i64)\n\n`;
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 

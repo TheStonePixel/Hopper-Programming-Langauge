@@ -1,21 +1,17 @@
 // path.hop — path manipulation backed by a Unique<byte> buffer.
 //
 // The Path class owns its storage; Unique<byte>.swap() enables
-// zero-copy buffer replacement in grow(). Caller is responsible for
-// deallocating strings returned by basename(), dirname(), and ext().
+// zero-copy buffer replacement in grow().
 //
 // Usage:
 //   import path from path
 //
 //   Path path = Path("/usr/local/bin")
-//   path.join("clang")               // "/usr/local/bin/clang"
-//   address base = path.basename()   // "clang"          (caller deallocates)
-//   address dir  = path.dirname()    // "/usr/local/bin" (caller deallocates)
-//   address ext  = path.ext()        // ""               (caller deallocates)
+//   path.join("clang")              // "/usr/local/bin/clang"
+//   Path base = path.basename()     // Path("clang")
+//   Path dir  = path.dirname()      // Path("/usr/local/bin")
+//   Path ext  = path.ext()          // Path("") or Path(".hop")
 //   bool absolute = path.isAbsolute() // true
-//   deallocate base
-//   deallocate dir
-//   deallocate ext
 
 import unique from Pointer
 
@@ -167,79 +163,89 @@ class Path {
         return -1
     }
 
-    // Return an allocated copy of the final path component. Caller must deallocate.
-    function basename() address {
+    // Return a new Path containing only the final component of this path.
+    function basename() Path {
         int start = self.basenameStart()
         int componentLength = self.len - start
-        address result = allocate (componentLength + 1)
+        address rawStr = allocate (componentLength + 1)
         int index = 0
         while (index < componentLength) {
             byte character = self.buf.get(start + index)
-            address cursor = result + index
+            address cursor = rawStr + index
             cursor::value = character
             index = index + 1
         }
-        address terminator = result + componentLength
+        address terminator = rawStr + componentLength
         byte nullByte = cast 0
         terminator::value = nullByte
+        Path result = Path(rawStr)
+        deallocate rawStr
         return result
     }
 
-    // Return an allocated copy of the directory portion. Caller must deallocate.
+    // Return a new Path containing the directory portion of this path.
     // Returns "/" for root-level paths, "." for paths with no directory component.
-    function dirname() address {
+    function dirname() Path {
         int basenameOffset = self.basenameStart()
         int dirLength = basenameOffset - 1
         if (dirLength <= 0) {
-            address result = allocate 2
+            address rawStr = allocate 2
             if (self.isAbsolute()) {
                 byte slash = cast '/'
-                result::value = slash
+                rawStr::value = slash
             } else {
                 byte dot = cast '.'
-                result::value = dot
+                rawStr::value = dot
             }
-            address terminator = result + 1
+            address terminator = rawStr + 1
             byte nullByte = cast 0
             terminator::value = nullByte
+            Path result = Path(rawStr)
+            deallocate rawStr
             return result
         }
-        address result = allocate (dirLength + 1)
+        address rawStr = allocate (dirLength + 1)
         int index = 0
         while (index < dirLength) {
             byte character = self.buf.get(index)
-            address cursor = result + index
+            address cursor = rawStr + index
             cursor::value = character
             index = index + 1
         }
-        address terminator = result + dirLength
+        address terminator = rawStr + dirLength
         byte nullByte = cast 0
         terminator::value = nullByte
+        Path result = Path(rawStr)
+        deallocate rawStr
         return result
     }
 
-    // Return an allocated copy of the extension including the dot, or "" if none.
-    // Caller must deallocate.
-    function ext() address {
+    // Return a new Path containing the extension (including the dot), or an empty Path if none.
+    // A leading dot (hidden file like ".bashrc") does not count as an extension.
+    function ext() Path {
         int extensionStart = self.extStart()
         if (extensionStart == -1) {
-            address result = allocate 1
+            address rawStr = allocate 1
             byte nullByte = cast 0
-            result::value = nullByte
+            rawStr::value = nullByte
+            Path result = Path(rawStr)
+            deallocate rawStr
             return result
         }
         int extensionLength = self.len - extensionStart
-        address result = allocate (extensionLength + 1)
+        address rawStr = allocate (extensionLength + 1)
         int index = 0
         while (index < extensionLength) {
             byte character = self.buf.get(extensionStart + index)
-            address cursor = result + index
+            address cursor = rawStr + index
             cursor::value = character
             index = index + 1
         }
-        address terminator = result + extensionLength
+        address terminator = rawStr + extensionLength
         byte nullByte = cast 0
         terminator::value = nullByte
+        Path result = Path(rawStr)
+        deallocate rawStr
         return result
     }
 }

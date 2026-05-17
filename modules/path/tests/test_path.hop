@@ -24,42 +24,36 @@ entry main(int argc, address argv) {
     print("len: ")
     print(p1.length())
     newline()
-    address bn = p1.basename()
+    Path bn = p1.basename()
     print("base: ")
-    print(bn)
+    print(bn.str())
     newline()
-    deallocate bn
-    address dn = p1.dirname()
+    Path dn = p1.dirname()
     print("dir: ")
-    print(dn)
+    print(dn.str())
     newline()
-    deallocate dn
-    address ex = p1.ext()
+    Path ex = p1.ext()
     print("ext: ")
-    print(ex)
+    print(ex.str())
     newline()
-    deallocate ex
 
     // Relative path: src/main.hop
     Path p2 = Path("src/main.hop")
     print("rel: ")
     print(p2.isAbsolute())
     newline()
-    address rbn = p2.basename()
+    Path rbn = p2.basename()
     print("rbase: ")
-    print(rbn)
+    print(rbn.str())
     newline()
-    deallocate rbn
-    address rdn = p2.dirname()
+    Path rdn = p2.dirname()
     print("rdir: ")
-    print(rdn)
+    print(rdn.str())
     newline()
-    deallocate rdn
-    address rex = p2.ext()
+    Path rex = p2.ext()
     print("rext: ")
-    print(rex)
+    print(rex.str())
     newline()
-    deallocate rex
 
     // join: /output + tokens.txt → /output/tokens.txt
     Path p3 = Path("/output")
@@ -70,25 +64,22 @@ entry main(int argc, address argv) {
 
     // No extension: /etc/hosts
     Path p4 = Path("/etc/hosts")
-    address noex = p4.ext()
+    Path noex = p4.ext()
     print("noext: ")
-    print(noex)
+    print(noex.str())
     newline()
-    deallocate noex
 
     // Root-level file: /foo → dirname should be /
     Path p5 = Path("/foo")
-    address rootdn = p5.dirname()
+    Path rootdn = p5.dirname()
     print("rootdir: ")
-    print(rootdn)
+    print(rootdn.str())
     newline()
-    deallocate rootdn
 
     // Hidden file: .bashrc → no extension (leading dot doesn't count)
     Path p6 = Path(".bashrc")
-    address hex = p6.ext()
+    Path hex = p6.ext()
     print("hidden ext: ")
-    print(hex)
+    print(hex.str())
     newline()
-    deallocate hex
 }
