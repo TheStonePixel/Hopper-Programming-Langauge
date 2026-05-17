@@ -81,14 +81,14 @@ function toLower(byte c) byte {
 }
 
 // Decimal value of digit character (0-9 → 0-9). Returns -1 if not a digit.
-function digitVal(byte c) int {
+function digitValue(byte c) int {
     int ci = cast c
     if (ci >= '0' && ci <= '9') { return ci - '0' }
     return -1
 }
 
 // Value of a hex digit (0-9 → 0-9, a-f/A-F → 10-15). Returns -1 if not hex.
-function hexVal(byte c) int {
+function hexValue(byte c) int {
     int ci = cast c
     if (ci >= '0' && ci <= '9') { return ci - '0' }
     if (ci >= 'A' && ci <= 'F') { return ci - 'A' + 10 }

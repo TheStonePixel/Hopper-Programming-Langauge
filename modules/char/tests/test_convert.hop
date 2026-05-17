@@ -1,7 +1,7 @@
 // EXPECT: upper: A Z A 1
 // EXPECT: lower: a z a 1
-// EXPECT: digitVal: 0 9 -1
-// EXPECT: hexVal: 0 9 10 15 10 15 -1
+// EXPECT: digitValue: 0 9 -1
+// EXPECT: hexValue: 0 9 10 15 10 15 -1
 
 import io from io
 import char from char
@@ -35,12 +35,12 @@ entry main(int argc, address argv) {
     byte zero = cast '0'
     byte nine = cast '9'
     byte bang = cast '!'
-    print("digitVal: ")
-    print(digitVal(zero))
+    print("digitValue: ")
+    print(digitValue(zero))
     print(" ")
-    print(digitVal(nine))
+    print(digitValue(nine))
     print(" ")
-    print(digitVal(bang))
+    print(digitValue(bang))
     newline()
 
     byte hexA  = cast 'A'
@@ -48,19 +48,19 @@ entry main(int argc, address argv) {
     byte hexaf = cast 'a'
     byte hexff = cast 'f'
     byte hexX  = cast 'X'
-    print("hexVal: ")
-    print(hexVal(zero))
+    print("hexValue: ")
+    print(hexValue(zero))
     print(" ")
-    print(hexVal(nine))
+    print(hexValue(nine))
     print(" ")
-    print(hexVal(hexA))
+    print(hexValue(hexA))
     print(" ")
-    print(hexVal(hexF))
+    print(hexValue(hexF))
     print(" ")
-    print(hexVal(hexaf))
+    print(hexValue(hexaf))
     print(" ")
-    print(hexVal(hexff))
+    print(hexValue(hexff))
     print(" ")
-    print(hexVal(hexX))
+    print(hexValue(hexX))
     newline()
 }
