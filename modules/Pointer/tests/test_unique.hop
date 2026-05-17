@@ -1,3 +1,11 @@
+// EXPECT: buf[0]=72 buf[1]=105
+// EXPECT: nums: 100 200 300
+// EXPECT: counter: 42
+// EXPECT: after zero: buf[0]=0
+// EXPECT: via ptr(): 99
+// EXPECT: move: dst[0]=111 dst[1]=222 src.len=0
+// EXPECT: all tests passed
+
 import io from linux
 import unique from Pointer
 
@@ -44,6 +52,17 @@ entry main(int argc, address argv) {
     pv = pv + 99
     p::value = pv
     printf("via ptr(): %d\n", val.load())
+
+    // Test 6: move() — ownership transfer, no double-free
+    Unique<int> src = Unique(2)
+    src.set(0, 111)
+    src.set(1, 222)
+    Unique<int> dst = Unique(0)   // placeholder; move() frees this tiny alloc
+    src.move(dst)
+    int mv0 = dst.get(0)
+    int mv1 = dst.get(1)
+    int srcCount = src.len()
+    printf("move: dst[0]=%d dst[1]=%d src.len=%d\n", mv0, mv1, srcCount)
 
     printf("all tests passed\n")
 }

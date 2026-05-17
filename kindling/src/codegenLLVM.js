@@ -1418,7 +1418,7 @@ function genStmt(ir, stmt, retType) {
                 break;
             }
 
-            if (classTypes.has(v.hType) && !v.isSelf) {
+            if (classTypes.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot assign field '${stmt.field}' of class '${v.hType}' directly. Use a mutator method.`
                 );

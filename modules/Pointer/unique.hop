@@ -1,9 +1,9 @@
 // Unique<T> — sole-ownership heap pointer with automatic deallocation.
 //
 // Allocates count * T::size bytes on construction; destructor calls
-// deallocate automatically. Do NOT copy or assign a Unique<T> after
-// creation — Hopper has no move semantics, so a shallow copy produces
-// two owners that will both try to free the same block.
+// deallocate automatically. Ownership is transferred explicitly via .move().
+// Do NOT shallow-copy a Unique<T> — two instances pointing to the same block
+// will both call free() on it, causing undefined behaviour.
 //
 // Typical usage — heap buffer:
 //   Unique<byte> buf = Unique(4096)
@@ -14,11 +14,11 @@
 //   nums.set(0, 42)
 //   int v = nums.get(0)
 //
-// Single heap value (out-param helper):
-//   Unique<int> count = Unique(1)
-//   count.store(0)
-//   someFunction(count.ptr())   // pass raw address as out-param
-//   int result = count.load()
+// Ownership transfer — use move() to pass to another Unique without double-free:
+//   Unique<int> src = Unique(64)
+//   src.set(0, 99)
+//   Unique<int> dst = Unique(0)   // placeholder; move() will free this
+//   src.move(dst)                 // dst owns the data; src.data is null
 
 template Unique<T> {
     address data   // raw heap block — T[] of length count
@@ -65,6 +65,17 @@ template Unique<T> {
     function store(T val) {
         address p = self.data
         p::value = val
+    }
+
+    // Transfer ownership to dst, clearing this instance to prevent double-free.
+    // dst's current data (if any) is freed first.
+    // After move(): self.data = null, self.count = 0; dst owns the original block.
+    function move(Unique<T> dst) {
+        deallocate dst.data
+        dst.data  = self.data
+        dst.count = self.count
+        self.data  = null
+        self.count = 0
     }
 
     // Zero-fill the entire allocation.
