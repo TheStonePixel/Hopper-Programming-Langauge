@@ -35,17 +35,11 @@
         },
 
         "char-literals": {
+            "name": "constant.character.hopper",
+            "begin": "'",
+            "end": "'",
             "patterns": [
-                {
-                    "comment": "Special case: '\"' — must come before string rule or the \" fires string begin",
-                    "name": "constant.character.hopper",
-                    "match": "'\"'"
-                },
-                {
-                    "comment": "Single-quoted character literal: 'x' or '\\n' etc.",
-                    "name": "constant.character.hopper",
-                    "match": "'(?:\\\\.|[^'\"\\\\])'"
-                }
+                { "name": "constant.character.escape.hopper", "match": "\\\\." }
             ]
         },
 
