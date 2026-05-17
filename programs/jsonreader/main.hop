@@ -1,15 +1,13 @@
 // jsonreader — parse any JSON string and print its structure
 //
-// Usage: pipe JSON into this program via stdin, or drop a string literal
-// in below. Walks the parsed tree and prints every value with its kind
-// and depth so you can see exactly what the reader produced.
+// Usage: jsonreader '<json>'
+//   jsonreader '{"name": "Hopper", "version": 1, "tags": ["fast", "safe"]}'
 
 import io   from core
 import json from json
 
 extern function printf(String fmt, ...) int
 
-// Print 'depth' levels of indentation (2 spaces each).
 function indent(int depth) {
     int i = 0
     while (i < depth) {
@@ -18,7 +16,6 @@ function indent(int depth) {
     }
 }
 
-// Walk a JsonNode tree and print each node labelled by kind.
 function printNode(address nodePtr, int depth) {
     JsonNode node = nodePtr::value
 
@@ -86,10 +83,14 @@ function printNode(address nodePtr, int depth) {
     }
 }
 
-entry main {
-    // A sample JSON document — covers every value type.
-    string src = "{\"name\": \"Hopper\", \"version\": 1, \"ready\": true, \"tags\": [\"fast\", \"safe\"], \"meta\": null}"
-    int    len = 91
+entry main(int argc, string[] argv) {
+    if (argc < 2) {
+        printf("usage: jsonreader '<json>'\n")
+        return
+    }
+
+    string src = argv[1]
+    int    len = strLen(src)
 
     JsonReader r = JsonReader(src, len)
     address root = r.parseValue()
