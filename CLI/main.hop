@@ -1,0 +1,6 @@
+import io from io
+
+entry main {
+    print("Hello from CLI!")
+    newline()
+}
