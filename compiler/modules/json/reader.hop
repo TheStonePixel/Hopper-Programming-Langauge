@@ -3,9 +3,62 @@
 // Reads a JSON string and produces a tree of JsonNode values.
 // Used by hcc to consume the AST produced by kindling.
 
-function parseJson(string src) // -> JsonNode
-function parseObject(string src, int pos) // -> JsonNode
-function parseArray(string src, int pos)  // -> JsonNode
-function parseString(string src, int pos) // -> string
-function parseNumber(string src, int pos) // -> int
-function skipWhitespace(string src, int pos) // -> int
+import array from ds
+
+// ── JsonNode kinds ────────────────────────────────────────────────────────────
+
+const int JSON_NULL   = 0
+const int JSON_BOOL   = 1
+const int JSON_INT    = 2
+const int JSON_STRING = 3
+const int JSON_ARRAY  = 4
+const int JSON_OBJECT = 5
+
+// ── JsonNode ──────────────────────────────────────────────────────────────────
+//
+// A single JSON value. kind tells you what it is.
+// Only the relevant fields are set depending on kind:
+//   JSON_NULL   — nothing
+//   JSON_BOOL   — numVal (0=false, 1=true)
+//   JSON_INT    — numVal
+//   JSON_STRING — strVal
+//   JSON_ARRAY  — children (Array<address> of JsonNode*)
+//   JSON_OBJECT — children (Array<address> of JsonNode*) + keys (Array<string>)
+
+struct JsonNode {
+    int     kind
+    int     numVal
+    string  strVal
+    address children    // Array<address> — values for array and object
+    address keys        // Array<string>  — keys for object only
+}
+
+// ── JsonReader ────────────────────────────────────────────────────────────────
+
+class JsonReader {
+    string src
+    int    pos
+    int    len
+
+    constructor(string src, int len) {
+        self.src = src
+        self.len = len
+        self.pos = 0
+    }
+
+    function peek() byte { }
+
+    function advance() byte { }
+
+    function skipWhitespace() { }
+
+    function parseValue() address { }
+
+    function parseObject() address { }
+
+    function parseArray() address { }
+
+    function parseString() string { }
+
+    function parseNumber() int { }
+}
