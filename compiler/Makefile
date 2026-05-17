@@ -2,7 +2,7 @@ NODE     := $(shell which node 2>/dev/null || echo node)
 KINDLING := $(NODE) ../kindling/hopper
 BUILD    := ../build
 
-HOP_SRCS := main.hop
+HOP_SRCS := compiler.hop
 
 all: $(BUILD)/hopper
 
