@@ -194,16 +194,24 @@ function writeManifest(obj) {
 }
 
 function cmdInit(args) {
-    const name = args[0] || path.basename(process.cwd());
-    const safe = name.replace(/[^a-zA-Z0-9_-]/g, "_");
-
-    const mainFile = "main.hop";
-    if (fs.existsSync(mainFile)) {
-        console.error(`hopper: ${mainFile} already exists`);
+    if (!args[0]) {
+        console.error("hopper: init requires a project name  —  hopper init <name>");
         process.exit(1);
     }
 
-    fs.writeFileSync(mainFile, [
+    const name = args[0];
+    const safe = name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const projectDir = path.resolve(process.cwd(), safe);
+
+    if (fs.existsSync(projectDir)) {
+        console.error(`hopper: '${safe}' already exists`);
+        process.exit(1);
+    }
+
+    fs.mkdirSync(path.join(projectDir, "src"), { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "modules"), { recursive: true });
+
+    fs.writeFileSync(path.join(projectDir, "main.hop"), [
         `import io from io`,
         ``,
         `entry main {`,
@@ -213,23 +221,21 @@ function cmdInit(args) {
         ``,
     ].join("\n"), "utf8");
 
-    if (!fs.existsSync("hopper.json")) {
-        writeManifest({
-            name: safe,
-            version: "0.1.0",
-            entry: mainFile,
-            dependencies: {},
-        });
-    }
+    fs.writeFileSync(path.join(projectDir, "hopper.json"), JSON.stringify({
+        name: safe,
+        version: "0.1.0",
+        entry: "main.hop",
+        dependencies: {},
+    }, null, 2) + "\n", "utf8");
 
-    if (!fs.existsSync(".gitignore")) {
-        fs.writeFileSync(".gitignore", "build/\n", "utf8");
-    }
+    fs.writeFileSync(path.join(projectDir, ".gitignore"), "build/\n", "utf8");
 
-    console.log(`initialized project '${safe}'`);
-    console.log(`  created: ${mainFile}`);
-    console.log(`  created: hopper.json`);
-    console.log(`  run with: hopper run`);
+    console.log(`created project '${safe}'/`);
+    console.log(`  ${safe}/main.hop`);
+    console.log(`  ${safe}/hopper.json`);
+    console.log(`  ${safe}/src/`);
+    console.log(`  ${safe}/modules/`);
+    console.log(`  cd ${safe} && hopper run`);
 }
 
 function cmdInstall(args) {
