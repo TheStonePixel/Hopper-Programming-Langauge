@@ -1,0 +1,37 @@
+// stream.hop — generic stream over a contiguous block of data
+//
+// Usage:
+//   import stream from stream
+//
+//   Stream<byte> s = Stream(data, len)
+//   byte b = s.peek()
+//   byte b = s.advance()
+//   int  n = s.remaining()
+//   int  done = s.atEnd()
+
+template Stream<T> {
+    address data    // pointer to first element
+    int     pos     // current position
+    int     len     // total number of elements
+
+    constructor(address data, int len) {
+        self.data = data
+        self.len  = len
+        self.pos  = 0
+    }
+
+    // Look at current element without advancing.
+    function peek() T { }
+
+    // Return current element and advance position.
+    function advance() T { }
+
+    // Step back one position.
+    function retreat() { }
+
+    // How many elements remain from current position.
+    function remaining() int { }
+
+    // 1 if at or past end of stream.
+    function atEnd() int { }
+}
