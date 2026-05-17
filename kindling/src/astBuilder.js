@@ -75,6 +75,19 @@ import {
     BitfieldPad,
 } from "./ast.js";
 
+// Decode Hopper string escape sequences to raw bytes.
+// Handles: \n \t \r \\ \" and \xNN hex escapes.
+function unescapeHopperString(s) {
+    return s.replace(/\\(\\|n|t|r|"|x[0-9a-fA-F]{2})/g, (_, seq) => {
+        if (seq === 'n')  return '\n';
+        if (seq === 't')  return '\t';
+        if (seq === 'r')  return '\r';
+        if (seq === '\\') return '\\';
+        if (seq === '"')  return '"';
+        return String.fromCharCode(parseInt(seq.slice(1), 16));
+    });
+}
+
 // Resolve a CharLiteral token (e.g. 'H', '\n') to its integer byte value.
 function charLiteralValue(text) {
     const inner = text.slice(1, -1); // strip surrounding single quotes
@@ -160,9 +173,7 @@ export class AstBuilder extends HopperVisitor {
         if (ctx.IntegerLiteral && ctx.IntegerLiteral())
             return { value: parseInt(text, 10), type: "int" };
         if (ctx.StringLiteral && ctx.StringLiteral()) {
-            const raw = text.slice(1, -1)
-                .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-                .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+            const raw = unescapeHopperString(text.slice(1, -1));
             return { value: raw, type: "string" };
         }
         if (text === "true")  return { value: true,  type: "bool" };
@@ -704,9 +715,7 @@ export class AstBuilder extends HopperVisitor {
 
         // String literal
         if (ctx.StringLiteral && ctx.StringLiteral()) {
-            const raw = ctx.StringLiteral().getText().slice(1, -1)
-                .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-                .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+            const raw = unescapeHopperString(ctx.StringLiteral().getText().slice(1, -1));
             return StringLiteral(raw);
         }
 
