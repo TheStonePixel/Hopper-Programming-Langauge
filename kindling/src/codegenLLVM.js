@@ -9,6 +9,7 @@ const interfaceDefs      = new Map();   // name       → { methods: [{name, par
 const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
+const overloadGroups     = new Map();   // baseName → [{mangledName, params, returnType}]
 const templateDefs       = new Map();   // template name → TemplateDecl
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
 const bitfieldTypes      = new Map();   // name → BitfieldDecl
@@ -23,6 +24,7 @@ function resetAll() {
     moduleConstants.clear();
     typeAliases.clear();
     functionReturnTypes.clear();
+    overloadGroups.clear();
     templateDefs.clear();
     mmioBindings.clear();
     bitfieldTypes.clear();
@@ -56,6 +58,22 @@ function checkImplements(cls) {
             }
         }
     }
+}
+
+// ── function overload helpers ─────────────────────────────────────────────
+
+// Mangle a function name with its parameter types: print(int,bool) → print__int_bool
+function mangledFnName(name, params) {
+    if (!params || params.length === 0) return `${name}__`;
+    const sig = params.map(p => normalizeType(p.type).replace(/[^a-zA-Z0-9]/g, "_")).join("_");
+    return `${name}__${sig}`;
+}
+
+// Check whether an argument type is compatible with a parameter type for overload matching.
+// Treats string and address as interchangeable (both are i8*).
+function overloadTypeMatch(argType, paramType) {
+    const norm = t => { const n = normalizeType(t); return n === "string" ? "address" : n; };
+    return norm(argType) === norm(paramType);
 }
 
 // ── template helpers ───────────────────────────────────────────────────────
@@ -1005,6 +1023,30 @@ function genExpr(ir, expr) {
                 return { value: tmp, type: ret };
             }
 
+            // Overload resolution: if this name has multiple definitions, pick by arg types.
+            if (overloadGroups.has(expr.callee)) {
+                const preArgs = (expr.args || []).map(a => genExpr(ir, a));
+                const overloads = overloadGroups.get(expr.callee);
+                const best = overloads.find(ov => {
+                    if (ov.params.length !== preArgs.length) return false;
+                    return ov.params.every((p, i) => overloadTypeMatch(preArgs[i].type, p.type));
+                });
+                if (best) {
+                    const fi = functionReturnTypes.get(best.mangledName);
+                    const argStr = preArgs.map(v =>
+                        `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`
+                    ).join(", ");
+                    const retType = fi ? fi.returnType : null;
+                    if (retType === null) {
+                        ir.emit(`call void @${best.mangledName}(${argStr})`);
+                        return { value: "0", type: "int" };
+                    }
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = call ${llvmType(retType)} @${best.mangledName}(${argStr})`);
+                    return { value: tmp, type: retType };
+                }
+            }
+
             const fnInfo   = functionReturnTypes.get(expr.callee);
             const args     = (expr.args || []).map((a, i) => {
                 const paramNormT = fnInfo && fnInfo.params && fnInfo.params[i]
@@ -1689,7 +1731,7 @@ function genFunction(fn) {
         return classTypes.has(normT) ? `${lt}* %p${i}` : `${lt} %p${i}`;
     }).join(", ");
 
-    ir.emit(`define ${retLlType} @${fn.name}(${paramSig}) {`);
+    ir.emit(`define ${retLlType} @${fn._mangledName || fn.name}(${paramSig}) {`);
     ir.emit("entry:");
 
     fn.params.forEach((p, i) => {
@@ -1973,8 +2015,29 @@ function genModule(ast) {
     // Scan all type usages and instantiate every template type found
     for (const typeStr of collectTypeUsages(ast)) instantiateTemplate(typeStr);
 
-    // Register return types for all regular functions
+    // Detect overloaded functions — same name, potentially different param types.
+    const fnNameCount = new Map();
     for (const fn of ast.functions || []) {
+        if (!fn.isExtern) fnNameCount.set(fn.name, (fnNameCount.get(fn.name) || 0) + 1);
+    }
+
+    // Build overload groups; attach mangled LLVM names to overloaded fn nodes.
+    for (const fn of ast.functions || []) {
+        if (fn.isExtern || fnNameCount.get(fn.name) <= 1) continue;
+        const mangled = mangledFnName(fn.name, fn.params);
+        if (!overloadGroups.has(fn.name)) overloadGroups.set(fn.name, []);
+        const group = overloadGroups.get(fn.name);
+        // Skip same-signature duplicates (e.g. gettid defined in sys.hop and thread.hop).
+        if (group.find(ov => ov.mangledName === mangled)) { fn._skip = true; continue; }
+        fn._mangledName = mangled;
+        group.push({ mangledName: mangled, params: fn.params, returnType: fn.returnType });
+        functionReturnTypes.set(mangled, { returnType: fn.returnType, isVariadic: false, params: fn.params });
+    }
+
+    // Register return types: extern functions always by plain name; non-overloaded regular
+    // functions by plain name; overloaded functions already registered under mangled names.
+    for (const fn of ast.functions || []) {
+        if (fn._mangledName || fn._skip) continue;
         functionReturnTypes.set(fn.name, { returnType: fn.returnType, isVariadic: fn.isVariadic || false, params: fn.params });
     }
 
@@ -2043,7 +2106,7 @@ function genModule(ast) {
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
             const vararg = fn.isVariadic ? (params ? ", ..." : "...") : "";
             fnCode.push(`declare ${ret} @${fn.name}(${params}${vararg})\n`);
-        } else {
+        } else if (!fn._skip) {
             fnCode.push(genFunction(fn) + "\n\n");
         }
     }

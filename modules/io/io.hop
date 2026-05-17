@@ -1,51 +1,73 @@
 // io.hop — high-level platform-agnostic I/O
 //
-// Wraps linux write/read with formatted integer output and line input.
-// Import instead of printf/scanf for pure-Hopper programs.
+// Uses function overloading so programs call print() for any type.
+// No extern printf/scanf required.
 //
 // Usage:
 //   import io from io
 //
-// Output:
-//   printChar(int c)              — write one character by ASCII code
-//   printStr(address buf, int n)  — write n bytes from buf
-//   puts(address s)               — write null-terminated string
-//   printInt(int n)               — write decimal integer
-//   newline()                     — write '\n'
-//   space()                       — write ' '
-//
-// Input:
-//   readLine(address buf, int max) int   — read line from stdin; returns byte count
-//   parseInt(address buf, int len) int   — parse decimal integer from buffer
+//   print(42)          — decimal integer
+//   print("hello")     — null-terminated string
+//   print(true)        — "true" or "false"
+//   print(buf, len)    — raw byte buffer with explicit length
+//   newline()          — '\n'
+//   println(42)        — print + newline
+//   readLine(buf, max) — read line from stdin; returns byte count
+//   parseInt(buf, len) — parse decimal integer from buffer
 
 import io from linux
 
-// Write a single character to stdout.
-function printChar(int c) {
-    address buf = allocate 1
-    byte b = cast c
-    buf::value = b
-    write(1, buf, 1)
+// Print a decimal integer.
+function print(int n) {
+    if (n == 0) {
+        write(1, "0", 1)
+        return
+    }
+    address buf = allocate 25
+    int start = 0
+    int end = 0
+    if (n < 0) {
+        byte minus = cast 45
+        buf::value = minus
+        start = 1
+        end = 1
+        n = 0 - n
+    }
+    while (n > 0) {
+        int d = n % 10
+        byte db = cast (d + 48)
+        address tp = buf + end
+        tp::value = db
+        n = n / 10
+        end = end + 1
+    }
+    int lo = start
+    int hi = end - 1
+    while (lo < hi) {
+        address alo = buf + lo
+        address ahi = buf + hi
+        byte blo = alo::value
+        byte bhi = ahi::value
+        alo::value = bhi
+        ahi::value = blo
+        lo = lo + 1
+        hi = hi - 1
+    }
+    write(1, buf, end)
     deallocate buf
 }
 
-// Write a newline to stdout.
-function newline() {
-    printChar(10)
+// Print a boolean as "true" or "false".
+function print(bool b) {
+    if (b) {
+        write(1, "true", 4)
+    } else {
+        write(1, "false", 5)
+    }
 }
 
-// Write a space to stdout.
-function space() {
-    printChar(32)
-}
-
-// Write n bytes from buf to stdout.
-function printStr(address buf, int n) {
-    write(1, buf, n)
-}
-
-// Write a null-terminated string to stdout.
-function puts(address s) {
+// Print a null-terminated string.
+function print(address s) {
     int len = 0
     while (true) {
         address p = s + len
@@ -57,38 +79,25 @@ function puts(address s) {
     write(1, s, len)
 }
 
-// Write decimal representation of n to stdout.
-function printInt(int n) {
-    if (n == 0) {
-        printChar(48)
-        return
-    }
-    address tmp = allocate 24
-    int len = 0
-    int v = n
-    if (v < 0) { v = 0 - v }
-    while (v > 0) {
-        int d = v % 10
-        byte db = cast (d + 48)
-        address tp = tmp + len
-        tp::value = db
-        v = v / 10
-        len = len + 1
-    }
-    if (n < 0) {
-        printChar(45)
-    }
-    int i = 0
-    while (i < len) {
-        address tp = tmp + (len - 1 - i)
-        byte b = tp::value
-        address out = allocate 1
-        out::value = b
-        write(1, out, 1)
-        deallocate out
-        i = i + 1
-    }
-    deallocate tmp
+// Write a newline.
+function newline() {
+    write(1, "\n", 1)
+}
+
+// println — print value then newline.
+function println(int n) {
+    print(n)
+    newline()
+}
+
+function println(bool b) {
+    print(b)
+    newline()
+}
+
+function println(address s) {
+    print(s)
+    newline()
 }
 
 // Read up to maxLen bytes from stdin into buf.
