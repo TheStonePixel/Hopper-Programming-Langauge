@@ -8,25 +8,10 @@
         ["(", ")"]
     ],
     "autoClosingPairs": [
-        { "open": "{",  "close": "}" },
-        { "open": "[",  "close": "]" },
-        { "open": "(",  "close": ")" },
-        { "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
-    ],
-    "surroundingPairs": [
-        ["{", "}"],
-        ["[", "]"],
-        ["(", ")"],
-        ["\"", "\""]
-    ],
-    "indentationRules": {
-        "increaseIndentPattern": "\\{\\s*$",
-        "decreaseIndentPattern": "^\\s*\\}"
-    },
-    "onEnterRules": [
-        {
-            "beforeText": "\\{\\s*$",
-            "action": { "indent": "indent" }
-        }
+        { "open": "{", "close": "}" },
+        { "open": "[", "close": "]" },
+        { "open": "(", "close": ")" },
+        { "open": "\"", "close": "\"" },
+        { "open": "'", "close": "'" }
     ]
 }

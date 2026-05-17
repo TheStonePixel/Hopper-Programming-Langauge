@@ -24,6 +24,7 @@ import {
     InterfaceDecl,
     InterfaceMethod,
     ConstDecl,
+    EnumDecl,
     AliasDecl,
     TemplateDecl,
     EntryDecl,
@@ -53,6 +54,7 @@ import {
     FieldAccess,
     IntLiteral,
     HexLiteral,
+    CharLiteral,
     FloatLiteral,
     BoolLiteral,
     StringLiteral,
@@ -76,14 +78,15 @@ import {
 } from "./ast.js";
 
 // Decode Hopper string escape sequences to raw bytes.
-// Handles: \n \t \r \\ \" and \xNN hex escapes.
+// Handles: \n \t \r \\ \" \' and \xNN hex escapes.
 function unescapeHopperString(s) {
-    return s.replace(/\\(\\|n|t|r|"|x[0-9a-fA-F]{2})/g, (_, seq) => {
+    return s.replace(/\\(\\|n|t|r|"|'|x[0-9a-fA-F]{2})/g, (_, seq) => {
         if (seq === 'n')  return '\n';
         if (seq === 't')  return '\t';
         if (seq === 'r')  return '\r';
         if (seq === '\\') return '\\';
         if (seq === '"')  return '"';
+        if (seq === "'")  return "'";
         return String.fromCharCode(parseInt(seq.slice(1), 16));
     });
 }
@@ -111,6 +114,7 @@ export class AstBuilder extends HopperVisitor {
         const structs = [];
         const classes = [];
         const consts = [];
+        const enums = [];
         const aliases = [];
         const templates = [];
         const binds = [];
@@ -126,6 +130,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "StructDecl")     structs.push(node);
             else if (node.kind === "ClassDecl")      classes.push(node);
             else if (node.kind === "ConstDecl")      consts.push(node);
+            else if (node.kind === "EnumDecl")       enums.push(node);
             else if (node.kind === "AliasDecl")      aliases.push(node);
             else if (node.kind === "TemplateDecl")   templates.push(node);
             else if (node.kind === "EntryDecl")      entry = node;
@@ -135,7 +140,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "InterfaceDecl")  interfaces.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums);
     }
 
     visitTopLevelDecl(ctx) {
@@ -146,6 +151,26 @@ export class AstBuilder extends HopperVisitor {
 
     visitAliasDecl(ctx) {
         return AliasDecl(ctx.Identifier().getText(), ctx.type().getText());
+    }
+
+    // ── enum ───────────────────────────────────────────────────────────────
+
+    visitEnumDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const variants = [];
+        let next = 0;
+        for (const v of ctx.enumVariant()) {
+            const varName = v.Identifier().getText();
+            const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
+            if (intLit) {
+                const negative = v.children.some(c => c.getText && c.getText() === '-');
+                next = parseInt(intLit.getText(), 10);
+                if (negative) next = -next;
+            }
+            variants.push({ name: varName, value: next });
+            next += 1;
+        }
+        return EnumDecl(name, variants);
     }
 
     // ── const ──────────────────────────────────────────────────────────────
@@ -165,7 +190,7 @@ export class AstBuilder extends HopperVisitor {
         if (ctx.HexLiteral && ctx.HexLiteral())
             return { value: parseInt(text, 16), type: "int" };
         if (ctx.CharLiteral && ctx.CharLiteral())
-            return { value: charLiteralValue(text), type: "int" };
+            return { value: charLiteralValue(text), type: "char" };
         if (ctx.UnicodeLiteral && ctx.UnicodeLiteral())
             return { value: parseInt(text.slice(2), 16), type: "int" };
         if (ctx.FloatLiteral && ctx.FloatLiteral())
@@ -704,9 +729,9 @@ export class AstBuilder extends HopperVisitor {
             return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
         }
 
-        // Character literal: 'H' → 72, '\n' → 10
+        // Character literal: 'H' → 72, '\n' → 10 — produces type char
         if (ctx.CharLiteral && ctx.CharLiteral()) {
-            return IntLiteral(charLiteralValue(ctx.CharLiteral().getText()));
+            return CharLiteral(charLiteralValue(ctx.CharLiteral().getText()));
         }
 
         // Unicode literal: U+1F600 → 128512
@@ -914,6 +939,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             ast.structs.unshift(...importedAst.structs);
             ast.classes.unshift(...importedAst.classes);
             ast.consts.unshift(...importedAst.consts);
+            ast.enums.unshift(...(importedAst.enums || []));
             ast.aliases.unshift(...importedAst.aliases);
             ast.templates.unshift(...importedAst.templates);
             ast.binds.unshift(...importedAst.binds);

@@ -20,7 +20,8 @@ const __dirname  = path.dirname(__filename);
 const ROOT       = path.resolve(__dirname, "..", "..");
 const SRC        = path.join(ROOT, "extensions", "hopper-vscode");
 const HOME       = os.homedir();
-const EXT_NAME   = "hopper-language-0.1.0";
+const PKG        = JSON.parse(readFileSync(path.join(SRC, "package.json"), "utf8"));
+const EXT_NAME   = `${PKG.name}-${PKG.version}`;
 
 const G   = "\x1b[32m";
 const R   = "\x1b[31m";

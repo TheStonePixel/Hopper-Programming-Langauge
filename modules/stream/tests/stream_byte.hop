@@ -1,0 +1,110 @@
+import assert from core
+import io     from core
+import stream from stream
+
+// TEST: peek does not advance
+// EXPECT: peek ok
+
+// TEST: advance moves cursor
+// EXPECT: advance ok
+
+// TEST: remaining decrements correctly
+// EXPECT: remaining ok
+
+// TEST: atEnd triggers at end of stream
+// EXPECT: atEnd ok
+
+// TEST: retreat steps back
+// EXPECT: retreat ok
+
+// TEST: reset returns to start
+// EXPECT: reset ok
+
+// TEST: peekAt looks ahead
+// EXPECT: peekAt ok
+
+entry main {
+    string s   = "hello"
+    address ptr = cast s
+
+    // — peek does not advance ——————————————————————————————
+    Stream<byte> st = Stream(ptr, 5)
+    byte b0 = st.peek()
+    byte b1 = st.peek()
+    int  c0 = cast b0
+    int  c1 = cast b1
+    soft(c0 == 104, "peek: expected h (104)\n")   // 'h'
+    soft(c0 == c1,  "peek: should not advance\n")
+    soft(st.pos == 0, "peek: pos should stay 0\n")
+    println("peek ok")
+
+    // — advance moves cursor ———————————————————————————————
+    Stream<byte> st2 = Stream(ptr, 5)
+    byte a0 = st2.advance()   // h
+    byte a1 = st2.advance()   // e
+    byte a2 = st2.advance()   // l
+    int  ac0 = cast a0
+    int  ac1 = cast a1
+    int  ac2 = cast a2
+    soft(ac0 == 104, "advance: expected h\n")
+    soft(ac1 == 101, "advance: expected e\n")
+    soft(ac2 == 108, "advance: expected l\n")
+    soft(st2.pos == 3, "advance: pos should be 3\n")
+    println("advance ok")
+
+    // — remaining —————————————————————————————————————————
+    Stream<byte> st3 = Stream(ptr, 5)
+    soft(st3.remaining() == 5, "remaining: expected 5\n")
+    st3.advance()
+    st3.advance()
+    soft(st3.remaining() == 3, "remaining: expected 3 after 2 advances\n")
+    println("remaining ok")
+
+    // — atEnd —————————————————————————————————————————————
+    Stream<byte> st4 = Stream(ptr, 5)
+    soft(st4.atEnd() == 0, "atEnd: should not be at end\n")
+    st4.advance()
+    st4.advance()
+    st4.advance()
+    st4.advance()
+    st4.advance()
+    soft(st4.atEnd() == 1, "atEnd: should be at end\n")
+    println("atEnd ok")
+
+    // — retreat ———————————————————————————————————————————
+    Stream<byte> st5 = Stream(ptr, 5)
+    st5.advance()
+    st5.advance()
+    st5.retreat()
+    soft(st5.pos == 1, "retreat: pos should be 1\n")
+    byte rb = st5.peek()
+    int  rc = cast rb
+    soft(rc == 101, "retreat: should see e again\n")   // 'e'
+    println("retreat ok")
+
+    // — reset —————————————————————————————————————————————
+    Stream<byte> st6 = Stream(ptr, 5)
+    st6.advance()
+    st6.advance()
+    st6.advance()
+    st6.reset()
+    soft(st6.pos == 0, "reset: pos should be 0\n")
+    byte rb2 = st6.peek()
+    int  rc2 = cast rb2
+    soft(rc2 == 104, "reset: should see h again\n")
+    println("reset ok")
+
+    // — peekAt ————————————————————————————————————————————
+    Stream<byte> st7 = Stream(ptr, 5)
+    byte p0 = st7.peekAt(0)
+    byte p1 = st7.peekAt(1)
+    byte p2 = st7.peekAt(4)
+    int  pc0 = cast p0
+    int  pc1 = cast p1
+    int  pc2 = cast p2
+    soft(pc0 == 104, "peekAt(0): expected h\n")
+    soft(pc1 == 101, "peekAt(1): expected e\n")
+    soft(pc2 == 111, "peekAt(4): expected o\n")   // 'o'
+    soft(st7.pos == 0, "peekAt: pos should not change\n")
+    println("peekAt ok")
+}
