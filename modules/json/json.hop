@@ -36,9 +36,8 @@ class JsonReader {
 
     function skipWhitespace() {
         while (self.stream.atEnd() == 0) {
-            byte b = self.stream.peek()
-            int  c = cast b
-            if (c == 32 || c == 9 || c == 10 || c == 13) {
+            int character = cast self.stream.peek()
+            if (character == ' ' || character == '\t' || character == '\n' || character == '\r') {
                 self.stream.advance()
             } else {
                 break
@@ -48,15 +47,14 @@ class JsonReader {
 
     function parseValue() address {
         self.skipWhitespace()
-        byte b = self.stream.peek()
-        int  c = cast b
+        int character = cast self.stream.peek()
 
-        if (c == 123) { return self.parseObject() }     // '{'
-        if (c == 91)  { return self.parseArray() }      // '['
-        if (c == 34)  { return self.parseStringNode() } // '"'
-        if (c == 116) { return self.parseTrue() }       // 't'
-        if (c == 102) { return self.parseFalse() }      // 'f'
-        if (c == 110) { return self.parseNull() }       // 'n'
+        if (character == '{') { return self.parseObject() }
+        if (character == '[') { return self.parseArray() }
+        if (character == '"') { return self.parseStringNode() }
+        if (character == 't') { return self.parseTrue() }
+        if (character == 'f') { return self.parseFalse() }
+        if (character == 'n') { return self.parseNull() }
         return self.parseIntNode()
     }
 
@@ -67,10 +65,9 @@ class JsonReader {
         Array<string>  keys     = Array(8)
 
         self.skipWhitespace()
-        byte first = self.stream.peek()
-        int  fc    = cast first
+        int character = cast self.stream.peek()
 
-        if (fc != 125) {  // not '}'
+        if (character != '}') {
             while (true) {
                 self.skipWhitespace()
                 string key = self.parseString()
@@ -84,10 +81,9 @@ class JsonReader {
                 children.push(child)
 
                 self.skipWhitespace()
-                byte sep = self.stream.peek()
-                int  sc  = cast sep
-                if (sc == 44) {
-                    self.stream.advance()  // ','
+                character = cast self.stream.peek()
+                if (character == ',') {
+                    self.stream.advance()
                 } else {
                     break
                 }
@@ -120,20 +116,18 @@ class JsonReader {
         Array<address> children = Array(8)
 
         self.skipWhitespace()
-        byte first = self.stream.peek()
-        int  fc    = cast first
+        int character = cast self.stream.peek()
 
-        if (fc != 93) {  // not ']'
+        if (character != ']') {
             while (true) {
                 self.skipWhitespace()
                 address child = self.parseValue()
                 children.push(child)
 
                 self.skipWhitespace()
-                byte sep = self.stream.peek()
-                int  sc  = cast sep
-                if (sc == 44) {
-                    self.stream.advance()  // ','
+                character = cast self.stream.peek()
+                if (character == ',') {
+                    self.stream.advance()
                 } else {
                     break
                 }
@@ -164,23 +158,22 @@ class JsonReader {
         Array<byte> buf = Array(64)
 
         while (self.stream.atEnd() == 0) {
-            byte b = self.stream.advance()
-            int  c = cast b
+            byte b        = self.stream.advance()
+            int  character = cast b
 
-            if (c == 34) { break }  // '"'
+            if (character == '"') { break }
 
-            if (c == 92) {          // '\'
-                byte esc = self.stream.advance()
-                int  ec  = cast esc
-                if (ec == 110) {
-                    byte nl = 10
+            if (character == '\\') {
+                int escaped = cast self.stream.advance()
+                if (escaped == 'n') {
+                    byte nl = '\n'
                     buf.push(nl)
                 } else {
-                    if (ec == 116) {
-                        byte tb = 9
+                    if (escaped == 't') {
+                        byte tb = '\t'
                         buf.push(tb)
                     } else {
-                        buf.push(esc)
+                        buf.push(b)
                     }
                 }
             } else {
@@ -210,21 +203,19 @@ class JsonReader {
     }
 
     function parseInt() int {
-        int sign = 1
-        byte b   = self.stream.peek()
-        int  c   = cast b
-        if (c == 45) {
+        int sign      = 1
+        int character = cast self.stream.peek()
+        if (character == '-') {
             sign = -1
             self.stream.advance()
         }
 
         int val = 0
         while (self.stream.atEnd() == 0) {
-            b = self.stream.peek()
-            c = cast b
-            if (c < 48 || c > 57) { break }
+            character = cast self.stream.peek()
+            if (character < '0' || character > '9') { break }
             self.stream.advance()
-            val = val * 10 + (c - 48)
+            val = val * 10 + (character - '0')
         }
         return sign * val
     }
@@ -245,10 +236,10 @@ class JsonReader {
     }
 
     function parseTrue() address {
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
+        self.stream.advance()  // t
+        self.stream.advance()  // r
+        self.stream.advance()  // u
+        self.stream.advance()  // e
 
         JsonNode node
         node.kind     = JsonKind.BOOL
@@ -263,11 +254,11 @@ class JsonReader {
     }
 
     function parseFalse() address {
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
+        self.stream.advance()  // f
+        self.stream.advance()  // a
+        self.stream.advance()  // l
+        self.stream.advance()  // s
+        self.stream.advance()  // e
 
         JsonNode node
         node.kind     = JsonKind.BOOL
@@ -282,10 +273,10 @@ class JsonReader {
     }
 
     function parseNull() address {
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
-        self.stream.advance()
+        self.stream.advance()  // n
+        self.stream.advance()  // u
+        self.stream.advance()  // l
+        self.stream.advance()  // l
 
         JsonNode node
         node.kind     = JsonKind.NONE
