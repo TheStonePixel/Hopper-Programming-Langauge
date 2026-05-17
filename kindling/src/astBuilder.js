@@ -24,6 +24,7 @@ import {
     InterfaceDecl,
     InterfaceMethod,
     ConstDecl,
+    EnumDecl,
     AliasDecl,
     TemplateDecl,
     EntryDecl,
@@ -111,6 +112,7 @@ export class AstBuilder extends HopperVisitor {
         const structs = [];
         const classes = [];
         const consts = [];
+        const enums = [];
         const aliases = [];
         const templates = [];
         const binds = [];
@@ -126,6 +128,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "StructDecl")     structs.push(node);
             else if (node.kind === "ClassDecl")      classes.push(node);
             else if (node.kind === "ConstDecl")      consts.push(node);
+            else if (node.kind === "EnumDecl")       enums.push(node);
             else if (node.kind === "AliasDecl")      aliases.push(node);
             else if (node.kind === "TemplateDecl")   templates.push(node);
             else if (node.kind === "EntryDecl")      entry = node;
@@ -135,7 +138,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "InterfaceDecl")  interfaces.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums);
     }
 
     visitTopLevelDecl(ctx) {
@@ -146,6 +149,26 @@ export class AstBuilder extends HopperVisitor {
 
     visitAliasDecl(ctx) {
         return AliasDecl(ctx.Identifier().getText(), ctx.type().getText());
+    }
+
+    // ── enum ───────────────────────────────────────────────────────────────
+
+    visitEnumDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const variants = [];
+        let next = 0;
+        for (const v of ctx.enumVariant()) {
+            const varName = v.Identifier().getText();
+            const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
+            if (intLit) {
+                const negative = v.children.some(c => c.getText && c.getText() === '-');
+                next = parseInt(intLit.getText(), 10);
+                if (negative) next = -next;
+            }
+            variants.push({ name: varName, value: next });
+            next += 1;
+        }
+        return EnumDecl(name, variants);
     }
 
     // ── const ──────────────────────────────────────────────────────────────

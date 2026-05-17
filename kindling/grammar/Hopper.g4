@@ -12,6 +12,7 @@ topLevelDecl
     | classDecl
     | templateDecl
     | constDecl
+    | enumDecl
     | importDecl
     | aliasDecl
     | entryDecl
@@ -49,6 +50,17 @@ entryDecl
 
 constDecl
     : 'const' Identifier '=' '-'? literal
+    ;
+
+// enum — compile-time integer type with named variants
+// Variants may have explicit values; otherwise they increment from the previous.
+//   enum JsonKind { NONE = 0   BOOL   INT   STRING   ARRAY   OBJECT }
+enumDecl
+    : 'enum' Identifier '{' NEWLINE* (enumVariant (NEWLINE+ enumVariant)* NEWLINE*)? '}'
+    ;
+
+enumVariant
+    : Identifier ('=' '-'? IntegerLiteral)?
     ;
 
 aliasDecl

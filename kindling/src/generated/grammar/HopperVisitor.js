@@ -66,6 +66,18 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#enumDecl.
+	visitEnumDecl(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#enumVariant.
+	visitEnumVariant(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#aliasDecl.
 	visitAliasDecl(ctx) {
 	  return this.visitChildren(ctx);

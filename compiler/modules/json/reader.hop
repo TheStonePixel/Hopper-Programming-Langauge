@@ -7,29 +7,31 @@
 //   JsonReader r = JsonReader(src, len)
 //   address root = r.parseValue()      // returns heap JsonNode*
 //   JsonNode n = root::value
-//   if (n.kind == JSON_OBJECT) { ... }
+//   if (n.kind == JsonKind.OBJECT) { ... }
 
 import array  from ds
 import stream from stream
 
 // ── JsonNode kinds ────────────────────────────────────────────────────────────
 
-const int JSON_NULL   = 0
-const int JSON_BOOL   = 1
-const int JSON_INT    = 2
-const int JSON_STRING = 3
-const int JSON_ARRAY  = 4
-const int JSON_OBJECT = 5
+enum JsonKind {
+    NONE   = 0
+    BOOL   = 1
+    INT    = 2
+    STRING = 3
+    ARRAY  = 4
+    OBJECT = 5
+}
 
 // ── JsonNode ──────────────────────────────────────────────────────────────────
 //
 // Tagged value. Only the fields relevant to kind are set:
-//   JSON_NULL              — nothing
-//   JSON_BOOL              — numVal (0=false, 1=true)
-//   JSON_INT               — numVal
-//   JSON_STRING            — strVal
-//   JSON_ARRAY  / _OBJECT  — children (heap Array<address> of JsonNode*)
-//   JSON_OBJECT only       — keys     (heap Array<string>)
+//   JsonKind.NONE              — nothing
+//   JsonKind.BOOL              — numVal (0=false, 1=true)
+//   JsonKind.INT               — numVal
+//   JsonKind.STRING            — strVal
+//   JsonKind.ARRAY  / _OBJECT  — children (heap Array<address> of JsonNode*)
+//   JsonKind.OBJECT only       — keys     (heap Array<string>)
 
 struct JsonNode {
     int     kind
@@ -142,7 +144,7 @@ class JsonReader {
         keysPtr::value   = keys
 
         JsonNode node
-        node.kind     = JSON_OBJECT
+        node.kind     = JsonKind.OBJECT
         node.numVal   = 0
         node.strVal   = ""
         node.children = childPtr
@@ -187,7 +189,7 @@ class JsonReader {
         childPtr::value  = children
 
         JsonNode node
-        node.kind     = JSON_ARRAY
+        node.kind     = JsonKind.ARRAY
         node.numVal   = 0
         node.strVal   = ""
         node.children = childPtr
@@ -243,7 +245,7 @@ class JsonReader {
         string s = self.parseString()
 
         JsonNode node
-        node.kind     = JSON_STRING
+        node.kind     = JsonKind.STRING
         node.numVal   = 0
         node.strVal   = s
         node.children = 0
@@ -281,7 +283,7 @@ class JsonReader {
         int n = self.parseInt()
 
         JsonNode node
-        node.kind     = JSON_INT
+        node.kind     = JsonKind.INT
         node.numVal   = n
         node.strVal   = ""
         node.children = 0
@@ -300,7 +302,7 @@ class JsonReader {
         self.advance()  // e
 
         JsonNode node
-        node.kind     = JSON_BOOL
+        node.kind     = JsonKind.BOOL
         node.numVal   = 1
         node.strVal   = ""
         node.children = 0
@@ -320,7 +322,7 @@ class JsonReader {
         self.advance()  // e
 
         JsonNode node
-        node.kind     = JSON_BOOL
+        node.kind     = JsonKind.BOOL
         node.numVal   = 0
         node.strVal   = ""
         node.children = 0
@@ -339,7 +341,7 @@ class JsonReader {
         self.advance()  // l
 
         JsonNode node
-        node.kind     = JSON_NULL
+        node.kind     = JsonKind.NONE
         node.numVal   = 0
         node.strVal   = ""
         node.children = 0

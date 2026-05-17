@@ -612,6 +612,13 @@ function genExpr(ir, expr) {
         }
 
         case "FieldAccess": {
+            // Check enum variant: EnumName.VARIANT → compile-time integer constant.
+            const enumKey = `${expr.object}.${expr.field}`;
+            if (moduleConstants.has(enumKey)) {
+                const ec = moduleConstants.get(enumKey);
+                return { value: String(ec.value), type: ec.type };
+            }
+
             // Check MMIO (strict) bitfield first — uses volatile load
             const mmioFA = mmioBindings.get(expr.object);
             if (mmioFA && bitfieldTypes.has(mmioFA.hType)) {
@@ -1874,6 +1881,13 @@ function genModule(ast) {
     // Aliases and constants
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
     for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
+
+    // Enums — register each variant as "EnumName.VARIANT" in moduleConstants.
+    for (const e of ast.enums || []) {
+        for (const v of e.variants) {
+            moduleConstants.set(`${e.name}.${v.name}`, { value: v.value, type: "int" });
+        }
+    }
 
     // Register template definitions.
     // Fixed templates (all params are concrete types) are monomorphized immediately —

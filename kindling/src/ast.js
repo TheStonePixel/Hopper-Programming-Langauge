@@ -1,7 +1,7 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = [], interfaces = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = [], interfaces = [], enums = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums };
 }
 
 // bind — linker directive: place function pointer at hardware address
@@ -94,6 +94,12 @@ export function ClassDestructor(body) {
 // top-level constant: const NAME = literal
 export function ConstDecl(name, value, type) {
     return { kind: "ConstDecl", name, value, type };
+}
+
+// enum — named integer type with compile-time variants
+// variants: [{ name, value }]  (values assigned sequentially, or explicit)
+export function EnumDecl(name, variants) {
+    return { kind: "EnumDecl", name, variants };
 }
 
 // template = parameterized class, monomorphized per instantiation
