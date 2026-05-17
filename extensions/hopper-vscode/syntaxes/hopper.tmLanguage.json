@@ -40,12 +40,10 @@
         },
 
         "strings": {
-            "name": "string.quoted.double.hopper",
-            "begin": "(?<!['\\\\])\"",
-            "end": "\"",
-            "patterns": [
-                { "name": "constant.character.escape.hopper", "match": "\\\\." }
-            ]
+            "match": "\"(?:[^\"\\\\]|\\\\.)*\"",
+            "captures": {
+                "0": { "name": "string.quoted.double.hopper" }
+            }
         },
 
         "extern-function-decl": {
