@@ -35,8 +35,16 @@
         },
 
         "char-literals": {
-            "name": "constant.character.hopper",
-            "match": "'(?:[^'\\\\]|\\\\.)*'"
+            "patterns": [
+                {
+                    "name": "constant.character.hopper",
+                    "match": "'\\\\.'"
+                },
+                {
+                    "name": "constant.character.hopper",
+                    "match": "'.'"
+                }
+            ]
         },
 
         "strings": {
