@@ -214,6 +214,11 @@ export function HexLiteral(value) {
     return { kind: "HexLiteral", value };
 }
 
+export function CharLiteral(value) {
+    // value stored as a JS number (the byte value of the character)
+    return { kind: "CharLiteral", value };
+}
+
 export function FloatLiteral(value) {
     // value stored as a JS number
     return { kind: "FloatLiteral", value };

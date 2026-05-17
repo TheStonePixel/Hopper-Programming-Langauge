@@ -35,9 +35,18 @@
         },
 
         "char-literals": {
-            "comment": "Single-quoted character literal: 'x' or '\\n' etc.",
-            "name": "constant.character.hopper",
-            "match": "'(?:\\\\.|[^'\\\\])'"
+            "patterns": [
+                {
+                    "comment": "Special case: '\"' — must come before string rule or the \" fires string begin",
+                    "name": "constant.character.hopper",
+                    "match": "'\"'"
+                },
+                {
+                    "comment": "Single-quoted character literal: 'x' or '\\n' etc.",
+                    "name": "constant.character.hopper",
+                    "match": "'(?:\\\\.|[^'\"\\\\])'"
+                }
+            ]
         },
 
         "strings": {

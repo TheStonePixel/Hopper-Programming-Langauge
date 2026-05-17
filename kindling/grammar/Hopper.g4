@@ -123,6 +123,7 @@ templateParam
     : Identifier        # FreeParam    // free type variable: T, K, V
     | 'int'             # FixedParam   // fixed primitive types — no <> at use site
     | 'byte'            # FixedParam
+    | 'char'            # FixedParam
     | 'float'           # FixedParam
     | 'bool'            # FixedParam
     | 'string'          # FixedParam
@@ -212,6 +213,7 @@ type
     | 'bool'
     | 'float'
     | 'byte'
+    | 'char'
     | 'bit'
     | 'string' '[' ']'  // array of strings — argv type, maps to i8**
     | 'string'

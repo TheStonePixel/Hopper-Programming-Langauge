@@ -1,0 +1,31 @@
+// Tests for the char data type
+// EXPECT: A
+// EXPECT: 65
+// EXPECT: match
+// EXPECT: newline ok
+
+extern function printf(string fmt, ...) int
+
+entry main {
+    // char declaration with a character literal
+    char c = 'A'
+
+    // print the char as a character via %c
+    printf("%c\n", c)
+
+    // cast char to int to get its numeric value (65 for 'A')
+    int n = cast c
+    printf("%ld\n", n)
+
+    // comparison: if (c == 'A')
+    if (c == 'A') {
+        printf("match\n")
+    }
+
+    // escape sequence: '\n' is newline (value 10)
+    char nl = '\n'
+    int nl_val = cast nl
+    if (nl_val == 10) {
+        printf("newline ok\n")
+    }
+}

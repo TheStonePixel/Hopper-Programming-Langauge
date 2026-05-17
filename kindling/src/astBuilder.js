@@ -54,6 +54,7 @@ import {
     FieldAccess,
     IntLiteral,
     HexLiteral,
+    CharLiteral,
     FloatLiteral,
     BoolLiteral,
     StringLiteral,
@@ -188,7 +189,7 @@ export class AstBuilder extends HopperVisitor {
         if (ctx.HexLiteral && ctx.HexLiteral())
             return { value: parseInt(text, 16), type: "int" };
         if (ctx.CharLiteral && ctx.CharLiteral())
-            return { value: charLiteralValue(text), type: "int" };
+            return { value: charLiteralValue(text), type: "char" };
         if (ctx.UnicodeLiteral && ctx.UnicodeLiteral())
             return { value: parseInt(text.slice(2), 16), type: "int" };
         if (ctx.FloatLiteral && ctx.FloatLiteral())
@@ -716,9 +717,9 @@ export class AstBuilder extends HopperVisitor {
             return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
         }
 
-        // Character literal: 'H' → 72, '\n' → 10
+        // Character literal: 'H' → 72, '\n' → 10 — produces type char
         if (ctx.CharLiteral && ctx.CharLiteral()) {
-            return IntLiteral(charLiteralValue(ctx.CharLiteral().getText()));
+            return CharLiteral(charLiteralValue(ctx.CharLiteral().getText()));
         }
 
         // Unicode literal: U+1F600 → 128512
