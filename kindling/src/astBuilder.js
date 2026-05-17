@@ -66,6 +66,9 @@ import {
     ArrayAccess,
     ArrayAssign,
     ArrayElementAddress,
+    ChainedMethodCall,
+    FieldIndexAccess,
+    NestedFieldAssign,
     AsmStmt,
     BitfieldDecl,
     BitfieldField,
@@ -223,7 +226,7 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitInterfaceFunc(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
@@ -231,7 +234,7 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitInterfaceProc(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
@@ -272,7 +275,7 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitClassMethod(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         const returnType = ctx.type().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
@@ -282,16 +285,18 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitClassOperator(ctx) {
-        const op = ctx.operatorSymbol().getText();
-        const p  = ctx.param();   // null if unary, param context if binary
-        const param = p ? Param(p.paramName().getText(), p.type().getText()) : null;
-        const returnType = ctx.type().getText();
+        const op     = ctx.operatorSymbol().getText();
+        const ps     = ctx.param();
+        const params = ps ? (Array.isArray(ps) ? ps : [ps]).map(p => Param(p.paramName().getText(), p.type().getText())) : [];
+        const param  = params[0] ?? null;
+        const rawReturn  = ctx.type().getText();
+        const returnType = rawReturn === "void" ? null : rawReturn;
         const body = this.visit(ctx.block());
-        return ClassOperator(op, param, returnType, body);
+        return ClassOperator(op, param, returnType, body, params);
     }
 
     visitClassProcMethod(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
@@ -470,6 +475,14 @@ export class AstBuilder extends HopperVisitor {
         const field  = ctx.fieldName().getText();
         const expr   = this.visit(ctx.expression());
         return FieldAssign(object, field, expr);
+    }
+
+    visitNestedFieldAssign(ctx) {
+        const object     = ctx.Identifier().getText();
+        const outerField = ctx.fieldName(0).getText();
+        const innerField = ctx.fieldName(1).getText();
+        const expr       = this.visit(ctx.expression());
+        return NestedFieldAssign(object, outerField, innerField, expr);
     }
 
     visitAllocateFieldAssign(ctx) {
@@ -708,76 +721,83 @@ export class AstBuilder extends HopperVisitor {
         const children   = ctx.children || [];
         const childTexts = children.map(c => c.getText ? c.getText() : String(c));
 
+        // ctx.Identifier() returns a single TerminalNode (grammar has ≤1 Identifier per primary alt)
+        // Normalize to either a string name or null.
+        const idTok  = ctx.Identifier ? ctx.Identifier() : null;
+        const idName = idTok ? idTok.getText() : null;
+
+        // Normalize fieldName contexts to an array (for method/field name lookup)
+        const rawFns = ctx.fieldName ? ctx.fieldName() : null;
+        const fnsArr = rawFns ? (Array.isArray(rawFns) ? rawFns : [rawFns]) : [];
+
         // buffer[i]::address
         if (childTexts.includes('[') && childTexts.includes('::') && childTexts.includes('address')) {
-            const ids  = ctx.Identifier();
-            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
             const exprs = ctx.expression();
-            return ArrayElementAddress(name, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
+            return ArrayElementAddress(idName, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
         }
 
         // x::size
         if (childTexts.includes('::') && childTexts.includes('size')) {
-            const ids = ctx.Identifier();
-            return SizeOf(Array.isArray(ids) ? ids[0].getText() : ids.getText());
+            return SizeOf(idName);
         }
 
         // x::address
         if (childTexts.includes('::') && childTexts.includes('address')) {
-            const ids  = ctx.Identifier();
-            return AddressOf(Array.isArray(ids) ? ids[0].getText() : ids.getText());
+            return AddressOf(idName);
         }
 
         // p::value
         if (childTexts.includes('::') && childTexts.includes('value')) {
-            const ids  = ctx.Identifier();
-            return Deref(Array.isArray(ids) ? ids[0].getText() : ids.getText());
+            return Deref(idName);
         }
 
-        // array access: buffer[i]
-        if (childTexts.includes('[') && !childTexts.includes('::')) {
-            const ids   = ctx.Identifier();
-            const name  = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+        // array access: buffer[i]  (not obj.field[i] — that's FieldIndexAccess below)
+        if (childTexts.includes('[') && !childTexts.includes('::') && !childTexts.includes('.')) {
             const exprs = ctx.expression();
-            return ArrayAccess(name, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
+            return ArrayAccess(idName, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
         }
 
-        // method call: obj.method(args)
-        if (ctx.Identifier && childTexts.includes('.') && childTexts.includes('(')) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 2) {
+        // dotted access: method calls, field subscripts, field access
+        if (idName && childTexts.includes('.')) {
+            // chained method call: obj.field.method(args) — 2 fieldNames + '('
+            if (fnsArr.length === 2 && childTexts.includes('(')) {
                 const args = ctx.argList && ctx.argList()
                     ? ctx.argList().expression().map(e => this.visit(e))
                     : [];
-                return MethodCall(ids[0].getText(), ids[1].getText(), args);
+                return ChainedMethodCall(idName, fnsArr[0].getText(), fnsArr[1].getText(), args);
             }
-        }
 
-        // function call: name(args)
-        if (ctx.Identifier && ctx.argList !== undefined && childTexts.includes('(')) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 1) {
+            // field subscript: obj.field[i] — 1 fieldName + '[' (no '(')
+            if (fnsArr.length === 1 && childTexts.includes('[') && !childTexts.includes('(')) {
+                const exprs = ctx.expression();
+                const idx   = this.visit(Array.isArray(exprs) ? exprs[0] : exprs);
+                return FieldIndexAccess(idName, fnsArr[0].getText(), idx);
+            }
+
+            // method call: obj.method(args) — 1 fieldName + '('
+            if (fnsArr.length === 1 && childTexts.includes('(')) {
                 const args = ctx.argList && ctx.argList()
                     ? ctx.argList().expression().map(e => this.visit(e))
                     : [];
-                return Call(ids[0].getText(), args);
+                return MethodCall(idName, fnsArr[0].getText(), args);
+            }
+
+            // field access: obj.field — 1 fieldName (no '(' or '[')
+            if (fnsArr.length === 1) {
+                return FieldAccess(idName, fnsArr[0].getText());
             }
         }
 
-        // field access: obj.field (field may be a fieldName — allows 'value', 'address')
-        if (ctx.Identifier && childTexts.includes('.') && !childTexts.includes('(')) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length >= 1 && ctx.fieldName && ctx.fieldName()) {
-                return FieldAccess(ids[0].getText(), ctx.fieldName().getText());
-            }
+        // function call: name(args) — no dot
+        if (idName && childTexts.includes('(')) {
+            const args = ctx.argList && ctx.argList()
+                ? ctx.argList().expression().map(e => this.visit(e))
+                : [];
+            return Call(idName, args);
         }
 
         // plain variable
-        if (ctx.Identifier) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 1) return Var(ids[0].getText());
-            if (ids && !Array.isArray(ids)) return Var(ids.getText());
-        }
+        if (idName) return Var(idName);
 
         // String template constructor call: String(cap)
         if (childTexts[0] === 'String' && childTexts.includes('(')) {

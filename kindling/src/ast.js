@@ -79,8 +79,8 @@ export function ClassMethod(name, params, returnType, body) {
     return { kind: "ClassMethod", name, params, returnType, body };
 }
 
-export function ClassOperator(op, param, returnType, body) {
-    return { kind: "ClassOperator", op, param, returnType, body };
+export function ClassOperator(op, param, returnType, body, params = []) {
+    return { kind: "ClassOperator", op, param, returnType, body, params };
 }
 
 export function ClassConstructor(params, body) {
@@ -270,4 +270,19 @@ export function ArrayAssign(name, index, expr) {
 
 export function ArrayElementAddress(name, index) {
     return { kind: "ArrayElementAddress", name, index };
+}
+
+// obj.field.method(args)  — method call on a class field
+export function ChainedMethodCall(object, field, method, args = []) {
+    return { kind: "ChainedMethodCall", object, field, method, args };
+}
+
+// obj.field[i]  — subscript on a class field
+export function FieldIndexAccess(object, field, index) {
+    return { kind: "FieldIndexAccess", object, field, index };
+}
+
+// obj.outerField.innerField = expr  — assign to a field of a field
+export function NestedFieldAssign(object, outerField, innerField, expr) {
+    return { kind: "NestedFieldAssign", object, outerField, innerField, expr };
 }

@@ -1,0 +1,33 @@
+import array from ds
+import io    from core
+
+class Bag {
+    Array<int> items
+
+    constructor() {
+        self.items = Array(8)
+    }
+
+    function add(int v) {
+        self.items.push(v)
+    }
+
+    function get(int i) int {
+        return self.items[i]
+    }
+
+    function size() int {
+        return self.items.len()
+    }
+}
+
+entry main {
+    Bag b = Bag()
+    b.add(10)
+    b.add(20)
+    b.add(30)
+    printInt(b.size())
+    print("\n")
+    printInt(b.get(1))
+    print("\n")
+}

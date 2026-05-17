@@ -102,4 +102,12 @@ template Array<T> {
         self.data     = newData
         self.capacity = newCap
     }
+
+    operator [](self, int i) T {
+        return self.get(i)
+    }
+
+    operator []=(self, int i, T val) void {
+        self.set(i, val)
+    }
 }

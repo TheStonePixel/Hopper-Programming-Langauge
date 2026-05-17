@@ -1,0 +1,252 @@
+// Battleship 2 — OOP version showcasing class composition
+//
+// Grid class:  10×10 board, ship placement, display, firing logic
+// Game class:  two embedded Grid fields, turn management, game loop
+//
+// Cell values: 0 = water, 1 = ship, 2 = hit, 3 = miss
+
+import array from ds
+
+extern function printf(String fmt, ...) int
+extern function scanf(String fmt, ...) int
+extern function rand() int
+extern function srand(int seed)
+extern function time(int t) int
+
+// ── Grid ─────────────────────────────────────────────────────────────────────
+
+class Grid {
+    Array<int> cells
+
+    constructor() {
+        self.cells = Array(100)
+        int i = 0
+        while (i < 100) {
+            self.cells.push(0)
+            i = i + 1
+        }
+    }
+
+    destructor() {
+        // cells destructor frees heap memory automatically
+    }
+
+    function get(int r, int c) int {
+        return self.cells.get(r * 10 + c)
+    }
+
+    function set(int r, int c, int val) {
+        self.cells.set(r * 10 + c, val)
+    }
+
+    function shipsLeft() int {
+        int count = 0
+        int i = 0
+        while (i < 100) {
+            if (self.cells.get(i) == 1) { count = count + 1 }
+            i = i + 1
+        }
+        return count
+    }
+
+    function canPlace(int r, int c, int len, int dir) bool {
+        bool ok = true
+        int i = 0
+        while (i < len) {
+            int rr = r
+            int cc = c
+            if (dir == 0) { cc = c + i }
+            if (dir == 1) { rr = r + i }
+            if (rr >= 10) { ok = false }
+            if (cc >= 10) { ok = false }
+            if (ok) {
+                if (self.cells.get(rr * 10 + cc) == 1) { ok = false }
+            }
+            i = i + 1
+        }
+        return ok
+    }
+
+    function placeShip(int len) {
+        bool placed = false
+        while (!placed) {
+            int r   = rand() % 10
+            int c   = rand() % 10
+            int dir = rand() % 2
+            if (self.canPlace(r, c, len, dir)) {
+                int i = 0
+                while (i < len) {
+                    int rr = r
+                    int cc = c
+                    if (dir == 0) { cc = c + i }
+                    if (dir == 1) { rr = r + i }
+                    self.cells.set(rr * 10 + cc, 1)
+                    i = i + 1
+                }
+                placed = true
+            }
+        }
+    }
+
+    function placeFleet() {
+        self.placeShip(5)
+        self.placeShip(4)
+        self.placeShip(3)
+        self.placeShip(3)
+        self.placeShip(2)
+    }
+
+    function display(bool reveal) {
+        printf("\x1b[2m   0 1 2 3 4 5 6 7 8 9\x1b[0m\n")
+        int r = 0
+        while (r < 10) {
+            printf("\x1b[2m%lld\x1b[0m ", r)
+            int c = 0
+            while (c < 10) {
+                int v = self.cells.get(r * 10 + c)
+                if (v == 2) { printf("\xF0\x9F\x94\xA5") }
+                if (v == 3) { printf("\xF0\x9F\x92\xA7") }
+                if (v == 0) { printf("\xF0\x9F\x9F\xA6") }
+                if (v == 1) {
+                    if (reveal)  { printf("\xF0\x9F\x9A\xA2") }
+                    if (!reveal) { printf("\xF0\x9F\x9F\xA6") }
+                }
+                c = c + 1
+            }
+            printf("\n")
+            r = r + 1
+        }
+    }
+}
+
+// ── Game ─────────────────────────────────────────────────────────────────────
+
+class Game {
+    Grid player
+    Grid computer
+    bool over
+    bool win
+
+    constructor() {
+        self.player   = Grid()
+        self.computer = Grid()
+        self.over     = false
+        self.win      = false
+        self.player.placeFleet()
+        self.computer.placeFleet()
+    }
+
+    function showBoards() {
+        printf("\x1b[1m\x1b[36m-- Your Fleet \x1b[2m(%lld remaining)\x1b[0m\n", self.player.shipsLeft())
+        self.player.display(true)
+        printf("\n")
+        printf("\x1b[1m\x1b[36m-- Enemy Waters \x1b[2m(%lld remaining)\x1b[0m\n", self.computer.shipsLeft())
+        self.computer.display(false)
+        printf("\n")
+    }
+
+    function playerTurn() bool {
+        bool valid = false
+        bool hit   = false
+        int row = 0
+        int col = 0
+        while (!valid) {
+            printf("\x1b[1m\x1b[36m  Your shot (row col): \x1b[0m")
+            scanf("%lld %lld", row::address, col::address)
+            bool ok = true
+            if (row < 0)   { ok = false }
+            if (col < 0)   { ok = false }
+            if (row >= 10) { ok = false }
+            if (col >= 10) { ok = false }
+            if (!ok) {
+                printf("\x1b[33m  Out of bounds -- enter row and col 0-9.\x1b[0m\n")
+            }
+            if (ok) {
+                int v = self.computer.get(row, col)
+                if (v == 2) { printf("\x1b[33m  Already hit there -- try again.\x1b[0m\n") }
+                if (v == 3) { printf("\x1b[33m  Already fired there -- try again.\x1b[0m\n") }
+                if (v == 0) {
+                    self.computer.set(row, col, 3)
+                    printf("\x1b[2m  Miss -- nothing but water.\x1b[0m\n")
+                    valid = true
+                }
+                if (v == 1) {
+                    self.computer.set(row, col, 2)
+                    printf("\x1b[1m\x1b[31m  Direct hit!\x1b[0m\n")
+                    hit   = true
+                    valid = true
+                }
+            }
+        }
+        return hit
+    }
+
+    function computerTurn() bool {
+        bool hit  = false
+        bool done = false
+        while (!done) {
+            int r = rand() % 10
+            int c = rand() % 10
+            int v = self.player.get(r, c)
+            if (v == 0) {
+                self.player.set(r, c, 3)
+                printf("\x1b[2m  Computer fires at %lld %lld -- miss.\x1b[0m\n", r, c)
+                done = true
+            }
+            if (v == 1) {
+                self.player.set(r, c, 2)
+                printf("\x1b[1m\x1b[31m  Computer hits your ship at %lld %lld!\x1b[0m\n", r, c)
+                hit  = true
+                done = true
+            }
+        }
+        return hit
+    }
+
+    function play() {
+        printf("\n\x1b[1m\x1b[33m  BATTLESHIP 2 -- OOP Edition\x1b[0m\n")
+        printf("\x1b[2m  Sink all 17 enemy ship cells to win.\x1b[0m\n")
+
+        while (!self.over) {
+            printf("\n")
+            self.showBoards()
+
+            self.playerTurn()
+
+            if (self.computer.shipsLeft() == 0) {
+                self.over = true
+                self.win  = true
+            }
+
+            if (!self.over) {
+                self.computerTurn()
+                if (self.player.shipsLeft() == 0) {
+                    self.over = true
+                }
+            }
+        }
+
+        printf("\n\x1b[1m\x1b[36m-- Final State\x1b[0m\n")
+        printf("\x1b[2mYour fleet:\x1b[0m\n")
+        self.player.display(true)
+        printf("\n\x1b[2mEnemy fleet:\x1b[0m\n")
+        self.computer.display(true)
+        printf("\n")
+
+        if (self.win) {
+            printf("\x1b[1m\x1b[32m  Victory! All enemy ships sunk!\x1b[0m\n")
+        }
+        if (!self.win) {
+            printf("\x1b[1m\x1b[31m  Defeated. Your fleet is gone.\x1b[0m\n")
+        }
+        printf("\n")
+    }
+}
+
+// ── Entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    srand(time(0))
+    Game g = Game()
+    g.play()
+}

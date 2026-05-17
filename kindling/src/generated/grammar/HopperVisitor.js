@@ -342,6 +342,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
+	// Visit a parse tree produced by HopperParser#NestedFieldAssign.
+	visitNestedFieldAssign(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
 	// Visit a parse tree produced by HopperParser#AllocateFieldAssign.
 	visitAllocateFieldAssign(ctx) {
 	  return this.visitChildren(ctx);

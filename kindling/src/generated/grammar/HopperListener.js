@@ -509,6 +509,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#NestedFieldAssign.
+	enterNestedFieldAssign(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#NestedFieldAssign.
+	exitNestedFieldAssign(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#AllocateFieldAssign.
 	enterAllocateFieldAssign(ctx) {
 	}

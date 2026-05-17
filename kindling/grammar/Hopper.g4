@@ -125,8 +125,8 @@ interfaceDecl
     ;
 
 interfaceMember
-    : 'function' Identifier '(' paramList? ')' type   # InterfaceFunc
-    | 'function' Identifier '(' paramList? ')'        # InterfaceProc
+    : 'function' fieldName '(' paramList? ')' type   # InterfaceFunc
+    | 'function' fieldName '(' paramList? ')'        # InterfaceProc
     ;
 
 // class = data + behavior, compiler-optimized layout
@@ -147,12 +147,12 @@ implementsList
     ;
 
 classMember
-    : type fieldName                                            # ClassField
-    | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
-    | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
-    | 'operator' operatorSymbol '(' Identifier (',' param)? ')' type block   # ClassOperator
-    | 'constructor' '(' paramList? ')' block                   # ClassConstructor
-    | 'destructor' '(' ')' block                               # ClassDestructor
+    : type fieldName                                              # ClassField
+    | 'function' fieldName '(' paramList? ')' type block         # ClassMethod
+    | 'function' fieldName '(' paramList? ')' block              # ClassProcMethod
+    | 'operator' operatorSymbol '(' Identifier (',' param)* ')' type block   # ClassOperator
+    | 'constructor' '(' paramList? ')' block                     # ClassConstructor
+    | 'destructor' '(' ')' block                                 # ClassDestructor
     ;
 
 // fieldName allows keywords that are only special in :: context to be used as field names
@@ -167,6 +167,7 @@ operatorSymbol
     : '+' | '-' | '*' | '/' | '%'
     | '==' | '!=' | '<' | '<=' | '>' | '>='
     | '&' | '|' | '^' | '<<' | '>>'
+    | '[' ']' '='
     | '[' ']'
     ;
 
@@ -194,7 +195,8 @@ paramName
     ;
 
 type
-    : 'int'
+    : 'void'
+    | 'int'
     | 'bool'
     | 'float'
     | 'byte'
@@ -228,6 +230,7 @@ statement
     | Identifier '[' expression ']' '=' expression              # ArrayAssign
     | Identifier '=' 'allocate' expression                      # AllocateAssign
     | Identifier '=' expression                                 # Assign
+    | Identifier '.' fieldName '.' fieldName '=' expression     # NestedFieldAssign
     | Identifier '.' fieldName '=' 'allocate' expression        # AllocateFieldAssign
     | Identifier '.' fieldName '=' expression                   # FieldAssign
     | Identifier '::' 'value' '=' expression                    # DerefAssign
@@ -309,11 +312,13 @@ primary
     | Identifier '::' 'address'                         // address of variable/function
     | Identifier '::' 'value'                           // dereference address
     | Identifier '::' 'size'                            // byte size of variable or type
-    | Identifier '(' argList? ')'                       // function call
-    | Identifier '.' Identifier '(' argList? ')'        // method call
-    | 'String' '(' argList? ')'                         // String template constructor call
-    | Identifier '[' expression ']'                     // array element access
-    | Identifier '.' fieldName                          // field access
+    | Identifier '(' argList? ')'                                           // function call
+    | Identifier '.' fieldName '.' fieldName '(' argList? ')'               // chained method call: obj.field.method(...)
+    | Identifier '.' fieldName '(' argList? ')'                              // method call
+    | 'String' '(' argList? ')'                                              // String template constructor call
+    | Identifier '.' fieldName '[' expression ']'                            // subscript on field: obj.field[i]
+    | Identifier '[' expression ']'                                          // array element access
+    | Identifier '.' fieldName                                               // field access
     | Identifier
     | 'value'                                               // contextual keyword as variable ref
     | 'address'                                             // contextual keyword as variable ref
