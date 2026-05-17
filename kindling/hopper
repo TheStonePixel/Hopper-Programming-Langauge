@@ -397,6 +397,45 @@ function cmdUninstall(args) {
     }
 }
 
+function githubAPI(method, endpoint, body, token) {
+    return new Promise((resolve, reject) => {
+        const data = body ? JSON.stringify(body) : null;
+        const opts = {
+            hostname: "api.github.com",
+            path: endpoint,
+            method,
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "User-Agent": "hopper-cli",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                ...(data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}),
+            },
+        };
+        const req = https.request(opts, res => {
+            let buf = "";
+            res.on("data", chunk => buf += chunk);
+            res.on("end", () => {
+                let parsed = null;
+                try { parsed = buf ? JSON.parse(buf) : null; } catch { parsed = null; }
+                resolve({ status: res.statusCode, body: parsed });
+            });
+        });
+        req.on("error", reject);
+        if (data) req.write(data);
+        req.end();
+    });
+}
+
+function requireToken() {
+    const token = process.env.HOPPER_TOKEN || process.env.GITHUB_TOKEN;
+    if (!token) {
+        console.error("hopper: publish/revoke requires HOPPER_TOKEN or GITHUB_TOKEN env var");
+        process.exit(1);
+    }
+    return token;
+}
+
 async function cmdPublish(args) {
     const manifest = readManifest();
     if (!manifest) { console.error("hopper: no hopper.json found"); process.exit(1); }
@@ -404,33 +443,25 @@ async function cmdPublish(args) {
     const name    = args[0] || manifest.name;
     const version = manifest.version || "0.1.0";
     const repoUrl = `${REGISTRY_URL}/${name}`;
+    const token   = requireToken();
 
-    // Check git is available and we're in a git repo
     try { execSync("git rev-parse --git-dir", { stdio: "pipe" }); }
     catch { console.error("hopper: publish requires a git repository"); process.exit(1); }
 
-    // Check gh cli is available for repo creation
-    const hasGH = (() => { try { execSync("which gh", { stdio: "pipe" }); return true; } catch { return false; } })();
+    console.log(`publishing: ${name}@${version}  →  ${repoUrl}`);
 
-    if (!hasGH) {
-        console.error("hopper: publish requires the GitHub CLI (gh) — https://cli.github.com");
+    const res = await githubAPI("POST", `/orgs/${REGISTRY_ORG}/repos`, { name, private: false }, token);
+    if (res.status !== 201 && res.status !== 422) {
+        console.error(`hopper: failed to create registry repo — ${res.body?.message || res.status}`);
         process.exit(1);
     }
 
-    console.log(`publishing: ${name}@${version}  →  ${repoUrl}`);
-
-    // Create repo in org if it doesn't exist
     try {
-        execSync(`gh repo create ${REGISTRY_ORG}/${name} --public --source=. --remote=registry --push`, { stdio: "inherit" });
-    } catch {
-        // Repo may already exist — just push
-        try {
-            execSync(`git remote add registry ${repoUrl}.git 2>/dev/null || true`, { stdio: "pipe" });
-            execSync(`git push registry main`, { stdio: "inherit" });
-        } catch (e) {
-            console.error(`hopper: publish failed — ${e.message}`);
-            process.exit(1);
-        }
+        execSync(`git remote add registry ${repoUrl}.git 2>/dev/null; true`, { stdio: "pipe", shell: true });
+        execSync(`git push registry main`, { stdio: "inherit" });
+    } catch (e) {
+        console.error(`hopper: publish failed — ${e.message}`);
+        process.exit(1);
     }
 
     console.log(`published: ${name}@${version}  ✓`);
@@ -443,29 +474,24 @@ async function cmdRevoke(args) {
     const name     = args[0] || (manifest && manifest.name);
     if (!name) { console.error("hopper: revoke requires a package name"); process.exit(1); }
 
-    const hasGH = (() => { try { execSync("which gh", { stdio: "pipe" }); return true; } catch { return false; } })();
-    if (!hasGH) {
-        console.error("hopper: revoke requires the GitHub CLI (gh) — https://cli.github.com");
-        process.exit(1);
-    }
+    const token = requireToken();
 
     const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
     const ask = (q) => new Promise(resolve => rl.question(q, ans => resolve(ans.trim())));
 
-    console.log(`\n  ⚠️  This will delete ${REGISTRY_ORG}/${name} from GitHub permanently.`);
-    console.log(`  Anyone who hasn't installed it yet will no longer be able to.\n`);
+    console.log(`\n  This will delete ${REGISTRY_ORG}/${name} from the registry permanently.`);
+    console.log(`  Anyone who has not installed it yet will no longer be able to.\n`);
     const confirm = await ask(`  type the package name to confirm: `);
     rl.close();
 
     if (confirm !== name) { console.log("aborted."); process.exit(0); }
 
-    try {
-        execSync(`gh repo delete ${REGISTRY_ORG}/${name} --yes`, { stdio: "inherit" });
-        console.log(`revoked: ${name}  — repository deleted`);
-    } catch (e) {
-        console.error(`hopper: revoke failed — ${e.message}`);
+    const res = await githubAPI("DELETE", `/repos/${REGISTRY_ORG}/${name}`, null, token);
+    if (res.status !== 204) {
+        console.error(`hopper: revoke failed — ${res.body?.message || res.status}`);
         process.exit(1);
     }
+    console.log(`revoked: ${name}  — registry entry deleted`);
 }
 
 function copyDir(src, dest) {
@@ -476,6 +502,12 @@ function copyDir(src, dest) {
         if (entry.isDirectory()) copyDir(s, d);
         else fs.copyFileSync(s, d);
     }
+}
+
+// ── profile: coming soon ──────────────────────────────────────────────────
+
+function cmdProfile(_args) {
+    console.log("hopper: profile support coming soon");
 }
 
 // ── check: compile with sanitizers ────────────────────────────────────────
@@ -508,41 +540,10 @@ function cmdCheck(args) {
     console.log(`run with: ${outFile}`);
 }
 
-// ── debug: emit DWARF and launch lldb ─────────────────────────────────────
+// ── debug: coming soon ────────────────────────────────────────────────────
 
-function toObjectDebug(file) {
-    const src     = fs.readFileSync(file, "utf8");
-    const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    const ir      = genModule(ast);
-    const llFile  = path.join(BUILD_DIR, `${baseName(file)}.debug.ll`);
-    const objFile = path.join(BUILD_DIR, `${baseName(file)}.debug.o`);
-    fs.writeFileSync(llFile, ir, "utf8");
-    execSync(`llc -filetype=obj -relocation-model=pic "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
-    return { objFile };
-}
-
-function cmdDebug(args) {
-    const files   = args.length ? args : ["main.hop"];
-    const missing = files.filter(f => !fs.existsSync(f));
-    if (missing.length) {
-        console.error(`hopper: file not found: ${missing.join(", ")}`);
-        process.exit(1);
-    }
-
-    const outFile = path.join(BUILD_DIR, baseName(files[0]) + ".debug");
-    const results = files.map(toObjectDebug);
-    const objs    = results.map(r => `"${r.objFile}"`).join(" ");
-    execSync(`clang ${objs} -g -o "${outFile}"`, { stdio: "inherit" });
-    console.log(`debug build: ${outFile}`);
-
-    const debugger_ = ["lldb", "gdb"].find(d => {
-        try { execSync(`which ${d}`, { stdio: "pipe" }); return true; } catch { return false; }
-    });
-    if (!debugger_) {
-        console.log("note: lldb/gdb not found — run the binary manually with your debugger");
-        return;
-    }
-    execSync(`${debugger_} "${outFile}"`, { stdio: "inherit" });
+function cmdDebug(_args) {
+    console.log("hopper: debug support coming soon");
 }
 
 // ── format: reformat source files via the AST ─────────────────────────────
@@ -763,7 +764,8 @@ function usage() {
         "  hopper revoke [name]                permanently delete a package from the registry",
         "  hopper check [file.hop] [--asan|--tsan|--ubsan|--msan]",
         "                                      compile with sanitizers (default: --asan)",
-        "  hopper debug [file.hop]             emit DWARF symbols and launch lldb/gdb",
+        "  hopper debug [file.hop]             debug support (coming soon)",
+        "  hopper profile [file.hop]           performance profiling (coming soon)",
         "  hopper format [-w] <file.hop...>    reformat source files (-w to edit in place)",
         "  hopper test [module]                run tests (all, or a specific module)",
         "  hopper ir <file.hop>                print LLVM IR",
@@ -804,6 +806,7 @@ if (asyncCmds[sub]) {
         case "uninstall": cmdUninstall(rest); break;
         case "check":     cmdCheck(rest);    break;
         case "debug":     cmdDebug(rest);    break;
+        case "profile":   cmdProfile(rest);  break;
         case "format":    cmdFormat(rest);   break;
         case "test":      cmdTest(rest);     break;
         case "ir":        cmdIR(rest);       break;
