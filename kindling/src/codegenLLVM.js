@@ -571,7 +571,7 @@ function genExpr(ir, expr) {
 
         case "StringLiteral": {
             const strName = addStringConstant(expr.value);
-            const len = Buffer.byteLength(expr.value, 'utf8') + 1;
+            const len = stringByteLen(expr.value) + 1;
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
             return { value: tmp, type: "string" };
@@ -1793,17 +1793,43 @@ function genEntry(entry) {
 
 // ── LLVM string escaping ──────────────────────────────────────────────────
 
+// Count bytes as escapeStringForLLVM emits them:
+// U+0000–U+00FF → 1 raw byte; surrogate pairs → 4 UTF-8 bytes; BMP > U+00FF → 2–3 UTF-8 bytes.
+function stringByteLen(str) {
+    let n = 0;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }
+        else if (c <= 0xFF)  n += 1;
+        else if (c <= 0x7FF) n += 2;
+        else                 n += 3;
+    }
+    return n;
+}
+
 function escapeStringForLLVM(str) {
     let out = '';
-    for (const byte of Buffer.from(str, 'utf8')) {
-        if      (byte === 10) out += '\\0A';
-        else if (byte === 13) out += '\\0D';
-        else if (byte ===  9) out += '\\09';
-        else if (byte ===  0) out += '\\00';
-        else if (byte === 92) out += '\\5C';
-        else if (byte === 34) out += '\\22';
-        else if (byte < 32 || byte > 126) out += '\\' + byte.toString(16).padStart(2, '0').toUpperCase();
-        else out += String.fromCharCode(byte);
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < str.length) {
+            // Surrogate pair — decode to full code point and UTF-8 encode
+            const low = str.charCodeAt(i + 1);
+            const cp  = 0x10000 + ((c - 0xD800) << 10) + (low - 0xDC00);
+            i++;
+            for (const b of Buffer.from(String.fromCodePoint(cp), 'utf8'))
+                out += '\\' + b.toString(16).padStart(2, '0').toUpperCase();
+        } else if (c > 0xFF) {
+            // BMP chars above Latin-1: UTF-8 encode (2–3 bytes)
+            for (const b of Buffer.from(String.fromCharCode(c), 'utf8'))
+                out += '\\' + b.toString(16).padStart(2, '0').toUpperCase();
+        } else if (c === 10) out += '\\0A';
+        else if (c === 13)   out += '\\0D';
+        else if (c ===  9)   out += '\\09';
+        else if (c ===  0)   out += '\\00';
+        else if (c === 92)   out += '\\5C';
+        else if (c === 34)   out += '\\22';
+        else if (c < 32 || c > 126) out += '\\' + c.toString(16).padStart(2, '0').toUpperCase();
+        else out += String.fromCharCode(c);
     }
     return out;
 }
@@ -1952,7 +1978,7 @@ function genModule(ast) {
     // Emit string constants (collected during all code generation above)
     for (const [value, name] of stringConstants) {
         const escaped = escapeStringForLLVM(value);
-        const len     = Buffer.byteLength(value, 'utf8') + 1;
+        const len     = stringByteLen(value) + 1;
         out += `${name} = private unnamed_addr constant [${len} x i8] c"${escaped}\\00"\n`;
     }
     if (stringConstants.size > 0) out += "\n";
