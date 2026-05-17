@@ -1,0 +1,49 @@
+import io from linux
+import unique from Pointer
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, address argv) {
+    // Test 1: byte buffer — get/set
+    Unique<byte> buf = Unique(16)
+    buf.set(0, 72)
+    buf.set(1, 105)
+    byte b0 = buf.get(0)
+    byte b1 = buf.get(1)
+    int i0 = cast b0
+    int i1 = cast b1
+    printf("buf[0]=%d buf[1]=%d\n", i0, i1)
+
+    // Test 2: int array
+    Unique<int> nums = Unique(8)
+    nums.set(0, 100)
+    nums.set(1, 200)
+    nums.set(2, 300)
+    int a = nums.get(0)
+    int b = nums.get(1)
+    int c = nums.get(2)
+    printf("nums: %d %d %d\n", a, b, c)
+
+    // Test 3: single-value load/store
+    Unique<int> counter = Unique(1)
+    counter.store(42)
+    int v = counter.load()
+    printf("counter: %d\n", v)
+
+    // Test 4: zero fill
+    buf.zero()
+    byte z = buf.get(0)
+    int zi = cast z
+    printf("after zero: buf[0]=%d\n", zi)
+
+    // Test 5: .ptr() for address operations
+    Unique<int> val = Unique(1)
+    val.store(0)
+    address p = val.ptr()
+    int pv = p::value
+    pv = pv + 99
+    p::value = pv
+    printf("via ptr(): %d\n", val.load())
+
+    printf("all tests passed\n")
+}

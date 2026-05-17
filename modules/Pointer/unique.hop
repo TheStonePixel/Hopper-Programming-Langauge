@@ -1,0 +1,81 @@
+// Unique<T> — sole-ownership heap pointer with automatic deallocation.
+//
+// Allocates count * T::size bytes on construction; destructor calls
+// deallocate automatically. Do NOT copy or assign a Unique<T> after
+// creation — Hopper has no move semantics, so a shallow copy produces
+// two owners that will both try to free the same block.
+//
+// Typical usage — heap buffer:
+//   Unique<byte> buf = Unique(4096)
+//   int n = read(fd, buf.ptr(), 4096)  // .ptr() returns the raw address
+//
+// Typed array:
+//   Unique<int> nums = Unique(64)
+//   nums.set(0, 42)
+//   int v = nums.get(0)
+//
+// Single heap value (out-param helper):
+//   Unique<int> count = Unique(1)
+//   count.store(0)
+//   someFunction(count.ptr())   // pass raw address as out-param
+//   int result = count.load()
+
+template Unique<T> {
+    address data   // raw heap block — T[] of length count
+    int     count  // number of T elements allocated
+
+    constructor(int n) {
+        self.data  = allocate n * T::size
+        self.count = n
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    // Raw heap address — use for address arithmetic and syscalls.
+    function ptr() address {
+        return self.data
+    }
+
+    // Number of T elements this allocation can hold.
+    function len() int {
+        return self.count
+    }
+
+    // Read element at index i. No bounds check.
+    function get(int i) T {
+        address p = self.data + (i * T::size)
+        return p::value
+    }
+
+    // Write element at index i. No bounds check.
+    function set(int i, T val) {
+        address p = self.data + (i * T::size)
+        p::value = val
+    }
+
+    // Read the first element (sugar for single-value Unique<T>).
+    function load() T {
+        address p = self.data
+        return p::value
+    }
+
+    // Write the first element (sugar for single-value Unique<T>).
+    function store(T val) {
+        address p = self.data
+        p::value = val
+    }
+
+    // Zero-fill the entire allocation.
+    function zero() {
+        int total = self.count * T::size
+        int i = 0
+        while (i < total) {
+            address p = self.data + i
+            byte z = cast 0
+            p::value = z
+            i = i + 1
+        }
+    }
+}
