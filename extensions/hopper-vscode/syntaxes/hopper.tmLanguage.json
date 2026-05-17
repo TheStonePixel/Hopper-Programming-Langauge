@@ -5,18 +5,21 @@
     "fileTypes": ["hop"],
     "patterns": [
         { "include": "#comments" },
+        { "include": "#char-literals" },
         { "include": "#strings" },
         { "include": "#extern-function-decl" },
         { "include": "#function-decl" },
         { "include": "#template-decl" },
         { "include": "#class-decl" },
         { "include": "#struct-decl" },
+        { "include": "#interface-decl" },
         { "include": "#method-call" },
         { "include": "#memory-keywords" },
         { "include": "#control-keywords" },
         { "include": "#class-keywords" },
         { "include": "#template-keyword" },
         { "include": "#struct-keyword" },
+        { "include": "#interface-keyword" },
         { "include": "#function-keywords" },
         { "include": "#other-keywords" },
         { "include": "#types" },
@@ -33,17 +36,21 @@
             "match": "//.*$"
         },
 
-        "strings": {
-            "name": "string.quoted.double.hopper",
-            "begin": "\"",
-            "end": "\"",
+        "char-literals": {
             "patterns": [
-                { "name": "constant.character.escape.hopper", "match": "\\\\." }
+                { "name": "constant.character.hopper", "match": "'\\\\.'" },
+                { "name": "constant.character.hopper", "match": "'[^'\\\\]'" }
             ]
         },
 
+        "strings": {
+            "match": "(?<!['\\\\])\"(?:[^\"\\\\]|\\\\.)*\"",
+            "captures": {
+                "0": { "name": "string.quoted.double.hopper" }
+            }
+        },
+
         "extern-function-decl": {
-            "comment": "extern function <name>",
             "match": "\\b(extern)\\s+(function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             "captures": {
                 "1": { "name": "keyword.function.hopper" },
@@ -53,7 +60,6 @@
         },
 
         "function-decl": {
-            "comment": "function <name> or entry <name>",
             "match": "\\b(function|entry)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             "captures": {
                 "1": { "name": "keyword.function.hopper" },
@@ -62,7 +68,6 @@
         },
 
         "template-decl": {
-            "comment": "template <Name>",
             "match": "\\b(template)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             "captures": {
                 "1": { "name": "keyword.template.hopper" },
@@ -71,7 +76,6 @@
         },
 
         "class-decl": {
-            "comment": "class <Name>",
             "match": "\\b(class)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             "captures": {
                 "1": { "name": "keyword.class.hopper" },
@@ -80,7 +84,6 @@
         },
 
         "struct-decl": {
-            "comment": "struct <Name>",
             "match": "\\b(struct)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
             "captures": {
                 "1": { "name": "keyword.struct.hopper" },
@@ -88,8 +91,15 @@
             }
         },
 
+        "interface-decl": {
+            "match": "\\b(interface)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.interface.hopper" },
+                "2": { "name": "entity.name.type.interface.hopper" }
+            }
+        },
+
         "method-call": {
-            "comment": "obj.method( — the name between . and ( is a method",
             "match": "\\.([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
             "captures": {
                 "1": { "name": "support.function.method.hopper" }
@@ -108,7 +118,7 @@
 
         "class-keywords": {
             "name": "keyword.class.hopper",
-            "match": "\\b(class|constructor|destructor|operator)\\b"
+            "match": "\\b(class|constructor|destructor|operator|implements)\\b"
         },
 
         "template-keyword": {
@@ -121,6 +131,11 @@
             "match": "\\bstruct\\b"
         },
 
+        "interface-keyword": {
+            "name": "keyword.interface.hopper",
+            "match": "\\binterface\\b"
+        },
+
         "function-keywords": {
             "name": "keyword.function.hopper",
             "match": "\\b(function|entry|extern)\\b"
@@ -128,12 +143,12 @@
 
         "other-keywords": {
             "name": "keyword.other.hopper",
-            "match": "\\b(import|from|const|alias|bind|strict|bitfield|asm|pad|cast|requires|ensures|invariant|constrain|unsigned)\\b"
+            "match": "\\b(import|from|const|enum|alias|bind|strict|bitfield|asm|pad|cast|requires|ensures|invariant|constrain|unsigned)\\b"
         },
 
         "types": {
             "name": "storage.type.hopper",
-            "match": "\\b(int|bool|float|byte|bit|string|String|address)\\b"
+            "match": "\\b(int|bool|float|byte|bit|char|string|String|address|void)\\b"
         },
 
         "self": {
@@ -155,10 +170,8 @@
         },
 
         "scope-access": {
-            "comment": ":: operator — memory access, same color group as allocate/deallocate",
             "patterns": [
                 {
-                    "comment": "Identifier::value/address/size — color the whole access",
                     "match": "([a-zA-Z_][a-zA-Z0-9_]*)(::)(value|address|size)",
                     "captures": {
                         "2": { "name": "keyword.memory.hopper" },

@@ -1,0 +1,60 @@
+import io from linux
+
+extern function printf(String fmt, ...) int
+
+function ascending(int a, int b) bool {
+    return a < b
+}
+
+function descending(int a, int b) bool {
+    return a > b
+}
+
+function apply(int a, int b, callback(int, int) bool cmp) bool {
+    return cmp(a, b)
+}
+
+function addOne(int n) int {
+    return n + 1
+}
+
+function double(int n) int {
+    return n * 2
+}
+
+function transform(int n, callback(int) int fn) int {
+    return fn(n)
+}
+
+entry main(int argc, address argv) {
+    // Test 1: pass function as callback argument
+    bool r1 = apply(3, 5, ascending)
+    bool r2 = apply(3, 5, descending)
+    printf("ascending(3,5)=%d  descending(3,5)=%d\n", r1, r2)
+
+    // Test 2: store callback in a variable and call it
+    callback cmp = ascending(int, int) bool
+    bool r3 = cmp(10, 20)
+    printf("cmp(10,20)=%d (should be 1)\n", r3)
+
+    // Test 3: reassign callback variable
+    cmp = descending
+    bool r4 = cmp(10, 20)
+    printf("cmp(10,20) after reassign=%d (should be 0)\n", r4)
+
+    // Test 4: callback returning int
+    callback fn = addOne(int) int
+    int r5 = fn(41)
+    printf("addOne(41)=%d (should be 42)\n", r5)
+
+    fn = double
+    int r6 = fn(21)
+    printf("double(21)=%d (should be 42)\n", r6)
+
+    // Test 5: callback passed to function, returning int
+    int r7 = transform(7, addOne)
+    int r8 = transform(7, double)
+    printf("transform(7,addOne)=%d  transform(7,double)=%d\n", r7, r8)
+
+    printf("all callback tests passed\n")
+}

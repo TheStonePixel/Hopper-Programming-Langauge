@@ -1,0 +1,30 @@
+// smoke test — verifies core RPN operations and math module
+import io    from linux
+import array from ds
+import math  from math
+
+extern function printf(String fmt, ...) int
+
+function add(int a, int b) int { return a + b }
+function mul(int a, int b) int { return a * b }
+
+function applyBin(Array<int> stack, callback(int, int) int op) {
+    int b = stack.pop()
+    int a = stack.pop()
+    stack.push(op(a, b))
+}
+
+entry main(int argc, address argv) {
+    Array<int> stack = Array(8)
+
+    stack.push(3)
+    stack.push(4)
+    applyBin(stack, add)
+    stack.push(2)
+    applyBin(stack, mul)
+    bool ok = stack.pop() == 14
+
+    if (ok) {
+        printf("calc: smoke test passed\n")
+    }
+}

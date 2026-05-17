@@ -1,0 +1,87 @@
+// math.hop — integer math functions
+//
+// Usage:
+//   import math from math
+
+function abs(int n) int {
+    if (n < 0) { return 0 - n }
+    return n
+}
+
+function min(int a, int b) int {
+    if (a < b) { return a }
+    return b
+}
+
+function max(int a, int b) int {
+    if (a > b) { return a }
+    return b
+}
+
+function clamp(int val, int lo, int hi) int {
+    if (val < lo) { return lo }
+    if (val > hi) { return hi }
+    return val
+}
+
+// Integer exponentiation — base^exp, exp >= 0.
+function pow(int base, int exp) int {
+    int result = 1
+    int i = 0
+    while (i < exp) {
+        result = result * base
+        i = i + 1
+    }
+    return result
+}
+
+// n! — undefined for n < 0.
+function factorial(int n) int {
+    if (n <= 1) { return 1 }
+    return n * factorial(n - 1)
+}
+
+// Greatest common divisor — Euclidean algorithm.
+function gcd(int a, int b) int {
+    if (a < 0) { a = 0 - a }
+    if (b < 0) { b = 0 - b }
+    while (b != 0) {
+        int t = b
+        b = a % b
+        a = t
+    }
+    return a
+}
+
+// Least common multiple.
+function lcm(int a, int b) int {
+    return abs(a * b) / gcd(a, b)
+}
+
+// nth Fibonacci number — F(0)=0, F(1)=1.
+function fib(int n) int {
+    if (n <= 0) { return 0 }
+    if (n == 1) { return 1 }
+    int a = 0
+    int b = 1
+    int i = 2
+    while (i <= n) {
+        int t = a + b
+        a = b
+        b = t
+        i = i + 1
+    }
+    return b
+}
+
+// Integer square root — floor(sqrt(n)).
+function isqrt(int n) int {
+    if (n <= 0) { return 0 }
+    int x = n
+    int y = (x + 1) / 2
+    while (y < x) {
+        x = y
+        y = (x + n / x) / 2
+    }
+    return x
+}

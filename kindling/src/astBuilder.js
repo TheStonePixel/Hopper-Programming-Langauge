@@ -454,6 +454,17 @@ export class AstBuilder extends HopperVisitor {
         return Block(statements);
     }
 
+    visitCallbackDeclTyped(ctx) {
+        const ids      = ctx.Identifier();
+        const varName  = ids[0].getText();
+        const fnName   = ids[1].getText();
+        const types    = ctx.type();
+        const retType  = types[types.length - 1].getText();
+        const paramTs  = types.slice(0, -1).map(t => t.getText()).join(',');
+        const cbType   = `callback(${paramTs})${retType}`;
+        return VarDecl(varName, cbType, Var(fnName));
+    }
+
     visitVarDecl(ctx) {
         const name = ctx.Identifier().getText();
         const type = ctx.type().getText();

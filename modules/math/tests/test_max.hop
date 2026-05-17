@@ -1,0 +1,10 @@
+// EXPECT: 5 5 3 1
+
+import io   from linux
+import math from math
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, address argv) {
+    printf("%d %d %d %d\n", max(3, 5), max(5, 3), max(3, 3), max(-1, 1))
+}

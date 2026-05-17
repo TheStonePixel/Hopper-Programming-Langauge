@@ -1,0 +1,155 @@
+// io.hop — high-level platform-agnostic I/O
+//
+// Uses function overloading so programs call print() for any type.
+// No extern printf/scanf required.
+//
+// Usage:
+//   import io from io
+//
+//   print(42)          — decimal integer
+//   print("hello")     — null-terminated string
+//   print(true)        — "true" or "false"
+//   print(buf, len)    — raw byte buffer with explicit length
+//   newline()          — '\n'
+//   println(42)        — print + newline
+//   readLine(buf, max) — read line from stdin; returns byte count
+//   parseInt(buf, len) — parse decimal integer from buffer
+
+import io from linux
+
+// Print a decimal integer.
+function print(int n) {
+    if (n == 0) {
+        write(1, "0", 1)
+        return
+    }
+    address buf = allocate 25
+    int start = 0
+    int end = 0
+    if (n < 0) {
+        byte minus = cast 45
+        buf::value = minus
+        start = 1
+        end = 1
+        n = 0 - n
+    }
+    while (n > 0) {
+        int d = n % 10
+        byte db = cast (d + 48)
+        address tp = buf + end
+        tp::value = db
+        n = n / 10
+        end = end + 1
+    }
+    int lo = start
+    int hi = end - 1
+    while (lo < hi) {
+        address alo = buf + lo
+        address ahi = buf + hi
+        byte blo = alo::value
+        byte bhi = ahi::value
+        alo::value = bhi
+        ahi::value = blo
+        lo = lo + 1
+        hi = hi - 1
+    }
+    write(1, buf, end)
+    deallocate buf
+}
+
+// Print a boolean as "true" or "false".
+function print(bool b) {
+    if (b) {
+        write(1, "true", 4)
+    } else {
+        write(1, "false", 5)
+    }
+}
+
+// Print a null-terminated string.
+function print(address s) {
+    int len = 0
+    while (true) {
+        address p = s + len
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { break }
+        len = len + 1
+    }
+    write(1, s, len)
+}
+
+// Write a newline.
+function newline() {
+    write(1, "\n", 1)
+}
+
+// println — print value then newline.
+function println(int n) {
+    print(n)
+    newline()
+}
+
+function println(bool b) {
+    print(b)
+    newline()
+}
+
+function println(address s) {
+    print(s)
+    newline()
+}
+
+// Read up to maxLen bytes from stdin into buf.
+// Stops at newline or EOF. Returns byte count (newline not stored).
+function readLine(address buf, int maxLen) int {
+    address tmp = allocate 1
+    int total = 0
+    while (total < maxLen) {
+        int n = read(0, tmp, 1)
+        if (n <= 0) {
+            deallocate tmp
+            return total
+        }
+        byte b = tmp::value
+        int bi = cast b
+        if (bi == 10) {
+            deallocate tmp
+            return total
+        }
+        address slot = buf + total
+        slot::value = b
+        total = total + 1
+    }
+    deallocate tmp
+    return total
+}
+
+// Parse a decimal integer from buf[0..len). Handles leading '-'.
+function parseInt(address buf, int len) int {
+    int result = 0
+    int i = 0
+    int neg = 0
+    if (len > 0) {
+        address first = buf
+        byte fc = first::value
+        int fci = cast fc
+        if (fci == 45) {
+            neg = 1
+            i = 1
+        }
+    }
+    while (i < len) {
+        address p = buf + i
+        byte b = p::value
+        int bi = cast b
+        if (bi >= 48) {
+            if (bi <= 57) {
+                result = result * 10 + (bi - 48)
+            }
+        }
+        i = i + 1
+    }
+    if (neg == 1) { return 0 - result }
+    return result
+}
