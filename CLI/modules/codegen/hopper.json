@@ -1,15 +1,11 @@
 {
   "name": "codegen",
   "version": "0.1.0",
-  "description": "",
+  "description": "LLVM IR code generation for the Hopper compiler",
   "license": "Apache-2.0",
-  "entry": "main.hop",
-  "scripts": {
-    "build": "hopper build",
-    "run": "hopper run",
-    "test": "hopper test",
-    "check": "hopper check",
-    "format": "hopper format -w main.hop"
-  },
-  "dependencies": {}
+  "type": "library",
+  "main": "main.hop",
+  "dependencies": {
+    "ast": "./ast"
+  }
 }
