@@ -628,7 +628,16 @@ function genExpr(ir, expr) {
 
         case "Var": {
             const c = moduleConstants.get(expr.name);
-            if (c) return { value: String(c.value), type: c.type };
+            if (c) {
+                if (c.type === "string") {
+                    const strName = addStringConstant(c.value);
+                    const len     = stringByteLen(c.value) + 1;
+                    const tmp     = ir.newTmp();
+                    ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
+                    return { value: tmp, type: "string" };
+                }
+                return { value: String(c.value), type: c.type };
+            }
 
             const mmio = mmioBindings.get(expr.name);
             if (mmio) {

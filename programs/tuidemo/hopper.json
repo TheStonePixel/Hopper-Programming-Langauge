@@ -1,0 +1,8 @@
+{
+  "name": "tuidemo",
+  "version": "0.1.0",
+  "description": "Interactive TUI showcase — colors, gradients, box drawing, key input",
+  "license": "Apache-2.0",
+  "type": "program",
+  "main": "tuidemo.hop"
+}
