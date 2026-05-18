@@ -1049,6 +1049,371 @@ function cmdInit(int argc, string[] argv) {
     deallocate safeName
 }
 
+// ── hopper flash ─────────────────────────────────────────────────────────────
+
+// True if buf[0..len) contains needle.
+function flashContains(address buf, int len, address needle) bool {
+    int nLen = strLen(needle)
+    if (nLen == 0) { return true }
+    int i = 0
+    while (i <= len - nLen) {
+        bool match = true
+        int j = 0
+        while (j < nLen) {
+            address hp = buf + i + j
+            address np = needle + j
+            byte hb = hp::value
+            byte nb = np::value
+            if (hb != nb) {
+                match = false
+                break
+            }
+            j = j + 1
+        }
+        if (match) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// Scan /proc/mounts for a vfat entry whose mount point contains bootcode.bin.
+// Returns heap-allocated mount path, or null if not found.
+function flashDetectSdCard() address {
+    address mntsBuf = allocate 16384
+    int n = fileRead("/proc/mounts", mntsBuf, 16384)
+    if (n < 0) {
+        deallocate mntsBuf
+        return null
+    }
+
+    int lineStart = 0
+    while (lineStart < n) {
+        int lineEnd = lineStart
+        while (lineEnd < n) {
+            address ep = mntsBuf + lineEnd
+            byte eb = ep::value
+            int ebi = cast eb
+            if (ebi == 10 || ebi == 0) { break }
+            lineEnd = lineEnd + 1
+        }
+        int lineLen = lineEnd - lineStart
+        address line = mntsBuf + lineStart
+
+        if (flashContains(line, lineLen, "vfat")) {
+            // Skip device field
+            int fi = 0
+            while (fi < lineLen) {
+                address fp = line + fi
+                byte fb = fp::value
+                int fbi = cast fb
+                if (fbi == 32 || fbi == 9) { break }
+                fi = fi + 1
+            }
+            // Skip whitespace
+            while (fi < lineLen) {
+                address fp = line + fi
+                byte fb = fp::value
+                int fbi = cast fb
+                if (fbi != 32 && fbi != 9) { break }
+                fi = fi + 1
+            }
+            // Read mount point
+            int mStart = fi
+            while (fi < lineLen) {
+                address fp = line + fi
+                byte fb = fp::value
+                int fbi = cast fb
+                if (fbi == 32 || fbi == 9) { break }
+                fi = fi + 1
+            }
+            int mLen = fi - mStart
+            if (mLen > 0) {
+                address mpt = allocate mLen + 1
+                int mi = 0
+                while (mi < mLen) {
+                    address ms = line + mStart + mi
+                    address md = mpt + mi
+                    byte mb = ms::value
+                    md::value = mb
+                    mi = mi + 1
+                }
+                address mTerm = mpt + mLen
+                byte z = 0
+                mTerm::value = z
+
+                StringBuilder chk = StringBuilder(256)
+                chk.appendStr(mpt)
+                chk.appendStr("/bootcode.bin")
+                chk.appendChar('\0')
+                if (pathExists(chk.str())) {
+                    deallocate mntsBuf
+                    return mpt
+                }
+                deallocate mpt
+            }
+        }
+
+        lineStart = lineEnd + 1
+    }
+
+    deallocate mntsBuf
+    return null
+}
+
+// Return 1 if line was appended to cfgPath, 0 if already present.
+function flashEnsureConfigLine(address cfgPath, address line) int {
+    int lineLen = strLen(line)
+    address cfgBuf = allocate 8192
+    int n = fileRead(cfgPath, cfgBuf, 8191)
+    if (n < 0) { n = 0 }
+
+    bool found = false
+    int pos = 0
+    while (pos < n) {
+        int lEnd = pos
+        while (lEnd < n) {
+            address ep = cfgBuf + lEnd
+            byte eb = ep::value
+            int ebi = cast eb
+            if (ebi == 10 || ebi == 13) { break }
+            lEnd = lEnd + 1
+        }
+        int lLen = lEnd - pos
+        if (lLen == lineLen) {
+            bool match = true
+            int j = 0
+            while (j < lLen) {
+                address lp = cfgBuf + pos + j
+                address rp = line + j
+                byte lb = lp::value
+                byte rb = rp::value
+                if (lb != rb) {
+                    match = false
+                    break
+                }
+                j = j + 1
+            }
+            if (match) { found = true }
+        }
+        pos = lEnd
+        while (pos < n) {
+            address ep2 = cfgBuf + pos
+            byte eb2 = ep2::value
+            int ebi2 = cast eb2
+            if (ebi2 != 10 && ebi2 != 13) { break }
+            pos = pos + 1
+        }
+    }
+    deallocate cfgBuf
+    if (found) { return 0 }
+
+    StringBuilder cmd = StringBuilder(512)
+    cmd.appendStr("printf '%s\\n' '")
+    cmd.appendStr(line)
+    cmd.appendStr("' >> '")
+    cmd.appendStr(cfgPath)
+    cmd.appendStr("'")
+    cmd.appendChar('\0')
+    shellCode(cmd.str())
+    return 1
+}
+
+function cmdFlash(int argc, string[] argv) {
+    address mountArg = null
+    bool dryRun = false
+
+    int i = 2
+    while (i < argc) {
+        address arg = cast argv[i]
+        i = i + 1
+        if (strEq(arg, "--dry-run")) {
+            dryRun = true
+            continue
+        }
+        if (strEq(arg, "--mount") || strEq(arg, "-m")) {
+            if (i < argc) {
+                mountArg = cast argv[i]
+                i = i + 1
+            }
+            continue
+        }
+    }
+
+    address wdBuf = allocate 4096
+    getcwd(wdBuf, 4095)
+    address root = findProjectRoot(wdBuf)
+    deallocate wdBuf
+
+    address boardName = readManifest(root, "board")
+    if (boardName == null) {
+        eprintln("hopper: 'board' is not set in hopper.json")
+        eprintln("  flash only works for bare-metal targets (e.g. pi-zero)")
+        deallocate root
+        exit(1)
+    }
+
+    if (!strEq(boardName, "pi-zero")) {
+        eprint("hopper: unknown board '")
+        eprint(boardName)
+        eprintln("' — only 'pi-zero' is supported")
+        deallocate boardName
+        deallocate root
+        exit(1)
+    }
+
+    address projName = readManifest(root, "name")
+    if (projName == null) { projName = strCopy("project") }
+
+    // Locate kernel.img
+    Path buildDir = Path(root)
+    buildDir.join("build/dev")
+    Path imgPath = Path(buildDir.str())
+    imgPath.join("kernel.img")
+
+    if (!pathExists(imgPath.str())) {
+        eprint("hopper: kernel.img not found at ")
+        eprintln(buildDir.str())
+        eprintln("  Run 'hopper build' first.")
+        deallocate boardName
+        deallocate projName
+        deallocate root
+        exit(1)
+    }
+
+    // Try to read meta.json for summary info
+    Path metaPath = Path(buildDir.str())
+    StringBuilder metaName = StringBuilder(128)
+    metaName.appendStr(projName)
+    metaName.appendStr(".meta.json")
+    metaName.appendChar('\0')
+    metaPath.join(metaName.str())
+    address metaArch = "armv6"
+    address metaBits = "32"
+    address metaLoad = "0x8000"
+    if (pathExists(metaPath.str())) {
+        address metaBuf = allocate 2048
+        int mn = fileRead(metaPath.str(), metaBuf, 2047)
+        if (mn > 0) {
+            address ma = jsonGetString(metaBuf, mn, "arch")
+            if (ma != null) { metaArch = ma }
+            address ml = jsonGetString(metaBuf, mn, "loadAddress")
+            if (ml != null) { metaLoad = ml }
+        }
+        deallocate metaBuf
+    }
+
+    // Find mount point
+    address mountPoint = mountArg
+    if (mountPoint == null) {
+        mountPoint = flashDetectSdCard()
+        if (mountPoint == null) {
+            eprintln("hopper: could not auto-detect an SD card with bootcode.bin.")
+            eprintln("")
+            eprintln("  Make sure the card is mounted and contains the Pi Zero firmware,")
+            eprintln("  then try again, or specify the path explicitly:")
+            eprintln("    hopperc flash --mount /path/to/sdcard")
+            eprintln("")
+            eprintln("  The SD card needs these blobs in its root:")
+            eprintln("    bootcode.bin  start.elf")
+            deallocate boardName
+            deallocate projName
+            deallocate root
+            exit(1)
+        }
+    }
+
+    // Verify required firmware
+    Path chkBoot = Path(mountPoint)
+    chkBoot.join("bootcode.bin")
+    Path chkStart = Path(mountPoint)
+    chkStart.join("start.elf")
+    bool missingBoot  = !pathExists(chkBoot.str())
+    bool missingStart = !pathExists(chkStart.str())
+    if (missingBoot || missingStart) {
+        eprint("hopper: missing firmware on SD card at ")
+        eprintln(mountPoint)
+        if (missingBoot)  { eprintln("  missing: bootcode.bin") }
+        if (missingStart) { eprintln("  missing: start.elf") }
+        eprintln("")
+        eprintln("  Download from: https://github.com/raspberrypi/firmware/tree/master/boot")
+        deallocate boardName
+        deallocate projName
+        deallocate root
+        exit(1)
+    }
+
+    // Summary
+    println("")
+    print("hopper: flash  ")
+    print(projName)
+    print("  ->  ")
+    println(mountPoint)
+    print("  board     ")
+    print(boardName)
+    print("  (")
+    print(metaArch)
+    print(" little-endian ")
+    print(metaBits)
+    print("-bit, load ")
+    print(metaLoad)
+    println(")")
+    print("  image     ")
+    println(imgPath.str())
+    print("  firmware  bootcode.bin ")
+    println("[ok]")
+    print("  firmware  start.elf    ")
+    println("[ok]")
+
+    if (dryRun) {
+        println("")
+        println("  [dry run — nothing written]")
+        println("")
+        deallocate boardName
+        deallocate projName
+        deallocate root
+        return
+    }
+
+    // Copy kernel.img
+    Path destImg = Path(mountPoint)
+    destImg.join("kernel.img")
+    StringBuilder cpCmd = StringBuilder(512)
+    cpCmd.appendStr("cp '")
+    cpCmd.appendStr(imgPath.str())
+    cpCmd.appendStr("' '")
+    cpCmd.appendStr(destImg.str())
+    cpCmd.appendStr("'")
+    cpCmd.appendChar('\0')
+    shellMust(cpCmd.str())
+    print("  wrote     ")
+    println(destImg.str())
+
+    // Ensure config.txt
+    Path cfgPath = Path(mountPoint)
+    cfgPath.join("config.txt")
+    int added = 0
+    added = added + flashEnsureConfigLine(cfgPath.str(), "init_uart_clock=3000000")
+    added = added + flashEnsureConfigLine(cfgPath.str(), "dtparam=act_led_trigger=none")
+    if (added > 0) {
+        print("  config.txt  (+")
+        printInt(added)
+        println(" lines)")
+    } else {
+        println("  config.txt  already up to date")
+    }
+
+    // Sync
+    shellCode("sync")
+
+    println("")
+    println("hopper: done — eject SD card, insert in Pi Zero, power on")
+    println("")
+
+    deallocate boardName
+    deallocate projName
+    deallocate root
+}
+
 // ── hopper ir ─────────────────────────────────────────────────────────────────
 
 function cmdIR(int argc, string[] argv) {
@@ -1088,6 +1453,8 @@ function usage() {
     println("  hopperc test [module...]                 run tests")
     println("  hopperc check [--asan|--tsan|--ubsan|--msan]")
     println("                                           sanitizer build")
+    println("  hopperc flash [--mount <path>]           flash bare-metal image to SD card")
+    println("  hopperc flash [--dry-run]                show what would be flashed")
     println("  hopperc ir <file.hop>                    print LLVM IR")
     println("  hopperc help                             this message")
     println("")
@@ -1127,6 +1494,10 @@ entry main(int argc, string[] argv) {
     }
     if (strEq(sub, "ir")) {
         cmdIR(argc, argv)
+        return
+    }
+    if (strEq(sub, "flash")) {
+        cmdFlash(argc, argv)
         return
     }
     if (strEq(sub, "help")) {
