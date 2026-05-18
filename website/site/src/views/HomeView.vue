@@ -31,12 +31,18 @@ const fontStyle = computed(() => ({
   fontSize:   FONTS[fontIndex.value].size,
 }))
 
+const words = computed(() => message.value.split(' '))
+
+const PROMPT_COLORS = ['#2563eb', '#10b981', '#7c3aed', '#d97706', '#0891b2']
+const promptColorIndex = ref(0)
+
 function cycleFont() {
   isSwitching.value = true
   setTimeout(() => {
     fontIndex.value = (fontIndex.value + 1) % FONTS.length
+    promptColorIndex.value = (promptColorIndex.value + 1) % PROMPT_COLORS.length
     isSwitching.value = false
-  }, 250)
+  }, 200)
 }
 
 let fontTimer
@@ -116,9 +122,15 @@ onUnmounted(() => { clearInterval(fontTimer) })
           <div class="output-block">
             <span class="output-label">output</span>
             <div class="output-body">
-              <div class="output-line" :class="{ switching: isSwitching }" :style="fontStyle">
-                <span class="out-prompt">&gt;</span>
-                <span class="out-text">{{ message }}</span>
+              <div class="output-line" :style="fontStyle">
+                <span class="out-prompt" :style="{ color: PROMPT_COLORS[promptColorIndex] }">&gt;</span>
+                <span
+                  v-for="(word, i) in words"
+                  :key="i"
+                  class="out-word"
+                  :class="{ switching: isSwitching }"
+                  :style="{ transitionDelay: isSwitching ? '0ms' : `${i * 90}ms` }"
+                >{{ word }}</span>
               </div>
             </div>
           </div>
@@ -572,27 +584,25 @@ onUnmounted(() => { clearInterval(fontTimer) })
 .output-line {
   display: flex;
   align-items: baseline;
-  gap: 0.4em;
-  line-height: 1.2;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  line-height: 1.3;
   max-width: 100%;
-  transition: opacity 0.22s ease, filter 0.22s ease, transform 0.22s ease;
-}
-
-.output-line.switching {
-  opacity: 0;
-  filter: blur(5px);
-  transform: scale(0.95);
 }
 
 .out-prompt {
-  color: #2563eb;
   flex-shrink: 0;
+  transition: color 0.5s ease;
 }
 
-.out-text {
+.out-word {
   color: #111827;
-  word-break: break-word;
-  min-width: 0;
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+
+.out-word.switching {
+  opacity: 0;
+  filter: blur(4px);
 }
 
 .compare-link {
