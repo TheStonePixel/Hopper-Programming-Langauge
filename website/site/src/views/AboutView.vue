@@ -117,16 +117,6 @@
   margin-bottom: 0;
 }
 
-.section code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.83rem;
-  color: #374151;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.1em 0.45em;
-  border-radius: 4px;
-}
-
 .page-footer {
   padding: 3rem 0;
   background: #ffffff;

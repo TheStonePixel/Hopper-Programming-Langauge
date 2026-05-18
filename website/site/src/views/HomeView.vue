@@ -638,16 +638,6 @@ code {
   line-height: 1.6;
 }
 
-.feature code {
-  font-size: 0.8rem;
-  color: #374151;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.1em 0.4em;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
 /* ── Principles ── */
 .principles {
   padding: 6rem 0;
@@ -681,16 +671,6 @@ code {
   line-height: 1.7;
 }
 
-.card code {
-  font-size: 0.82rem;
-  color: #374151;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.1em 0.4em;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
 /* ── Layers ── */
 .layers {
   padding: 6rem 0;
@@ -712,16 +692,6 @@ code {
   max-width: 860px;
   line-height: 1.8;
   margin-bottom: 2.5rem;
-}
-
-.vision-sub code {
-  font-size: 0.85rem;
-  color: #374151;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.1em 0.4em;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 .future-note {
@@ -834,16 +804,6 @@ code {
   color: #6b7280;
   max-width: 600px;
   line-height: 1.7;
-}
-
-.step code {
-  font-size: 0.82rem;
-  color: #374151;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.1em 0.4em;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 /* ── Footer ── */
