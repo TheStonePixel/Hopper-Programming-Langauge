@@ -1808,7 +1808,11 @@ function genStmt(ir, stmt, retType) {
                     ir.emit(`ret ${llvmType(retType)} ${coerced.value}`);
                 }
             } else {
-                ir.emit(`ret void`);
+                if (retType && retType !== "void") {
+                    ir.emit(`ret ${llvmType(retType)} 0`);
+                } else {
+                    ir.emit(`ret void`);
+                }
             }
             break;
         }
