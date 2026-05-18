@@ -15,10 +15,15 @@ import { genModule }                   from "./src/codegenLLVM.js";
 const args  = process.argv.slice(2);
 const oIdx  = args.indexOf("-o");
 const outFile = oIdx !== -1 ? args[oIdx + 1] : null;
-const files   = args.filter((_, i) => oIdx === -1 || (i !== oIdx && i !== oIdx + 1));
+const tIdx    = args.findIndex(a => a.startsWith("--target="));
+const target  = tIdx !== -1 ? args[tIdx].slice("--target=".length) : "host";
+const files   = args.filter((_, i) =>
+    (oIdx === -1 || (i !== oIdx && i !== oIdx + 1)) &&
+    i !== tIdx
+);
 
 if (files.length === 0) {
-    process.stderr.write("hopperc: usage: hopperc.js <file.hop> [-o out.ll]\n");
+    process.stderr.write("hopperc: usage: hopperc.js <file.hop> [--target=armv6-bare] [-o out.ll]\n");
     process.exit(1);
 }
 
@@ -26,7 +31,7 @@ try {
     const file = files[0];
     const src  = readFileSync(file, "utf8");
     const ast  = buildAstFromSource(src, { baseDir: dirname(resolve(file)) });
-    const ir   = genModule(ast);
+    const ir   = genModule(ast, { target });
 
     if (outFile) {
         writeFileSync(outFile, ir, "utf8");

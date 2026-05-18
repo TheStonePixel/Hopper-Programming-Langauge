@@ -59,6 +59,81 @@ function clangFlags(profile) {
     return "-g -O0 -c -fPIC -Wno-override-module"; // dev and test
 }
 
+// ── bare-metal board support ───────────────────────────────────────────────
+
+// Known board configurations.  Adding a new board is just a new entry here.
+const BOARD_CONFIGS = {
+    "pi-zero": {
+        llvmTarget:    "armv6-bare",
+        clangTarget:   "arm-none-eabi",
+        mcpu:          "arm1176jzf-s",
+        floatAbi:      "soft",
+        textBase:      0x8000,
+        linkerEntry:   "_start",
+        bootStub:      path.join(__dirname, "boards", "pi-zero", "boot.s"),
+    },
+};
+
+// Read the "board" field from hopper.json in the project root, if any.
+function readBoard(projectRoot) {
+    const mf = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(mf)) return null;
+    try { return JSON.parse(fs.readFileSync(mf, "utf8")).board ?? null; }
+    catch { return null; }
+}
+
+// Generate a minimal linker script for a known board.
+// The entry symbol is always the boot stub's _start, which calls the Hopper entry.
+function generateLinkerScript(cfg) {
+    const base = `0x${cfg.textBase.toString(16)}`;
+    return `ENTRY(${cfg.linkerEntry})
+SECTIONS
+{
+    . = ${base};
+    .text.boot : { KEEP(*(.text.boot)) }
+    .text       : { *(.text*) }
+    .rodata     : { *(.rodata*) }
+    .data       : { *(.data*) }
+    .bss        : {
+        . = ALIGN(4);
+        __bss_start = .;
+        *(.bss*)
+        *(COMMON)
+        . = ALIGN(4);
+        __bss_end = .;
+    }
+    /DISCARD/ : {
+        *(.ARM.exidx*)
+        *(.ARM.extab*)
+        *(.note*)
+    }
+}
+`;
+}
+
+// Compile one .hop file for a bare-metal target.
+function toObjectBare(file, llDir, oDir, cfg) {
+    const src     = fs.readFileSync(file, "utf8");
+    const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
+    const ir      = genModule(ast, { target: cfg.llvmTarget });
+    const llFile  = path.join(llDir, `${baseName(file)}.ll`);
+    const objFile = path.join(oDir,  `${baseName(file)}.o`);
+    fs.writeFileSync(llFile, ir, "utf8");
+    const flags = `-target ${cfg.clangTarget} -mcpu=${cfg.mcpu} -mfloat-abi=${cfg.floatAbi} -ffreestanding -nostdlib -O2 -c -Wno-override-module`;
+    execSync(`clang ${flags} "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    return { objFile, entryName: ast.entry?.name ?? "main" };
+}
+
+// Link bare-metal objects into an ELF then strip to a raw kernel.img.
+function linkBare(bootObj, results, ldScript, outELF, outImg) {
+    const objs = [`"${bootObj}"`, ...results.map(r => `"${r.objFile}"`)].join(" ");
+    execSync(`ld.lld -T "${ldScript}" ${objs} -o "${outELF}"`, { stdio: "inherit" });
+    execSync(`llvm-objcopy -O binary "${outELF}" "${outImg}"`, { stdio: "inherit" });
+    return outImg;
+}
+
+// ── hosted build helpers ───────────────────────────────────────────────────
+
 // Binary name: from hopper.json "name" field, or entry file basename.
 function projectBinaryName(entryFile, projectRoot) {
     const mf = path.join(projectRoot, "hopper.json");
@@ -126,11 +201,42 @@ function cmdBuild(args) {
     }
 
     const { projectRoot, buildDir, llDir, oDir } = profileDirs(files[0], profile);
-    const flags   = clangFlags(profile);
-    const results = files.map(f => toObject(f, llDir, oDir, flags));
-    const outFile = output || path.join(buildDir, projectBinaryName(files[0], projectRoot));
-    link(results, outFile);
-    console.log(`built [${profile}]: ${outFile}`);
+    const boardName = readBoard(projectRoot);
+    const boardCfg  = boardName ? BOARD_CONFIGS[boardName] : null;
+
+    if (boardCfg) {
+        // ── bare-metal build ───────────────────────────────────────────────
+        if (!boardCfg) {
+            console.error(`hopper: unknown board '${boardName}'. Known boards: ${Object.keys(BOARD_CONFIGS).join(", ")}`);
+            process.exit(1);
+        }
+
+        // Compile all .hop files for the target
+        const results = files.map(f => toObjectBare(f, llDir, oDir, boardCfg));
+
+        // Compile the board boot stub
+        const bootObj = path.join(oDir, "boot.o");
+        const asmFlags = `-target ${boardCfg.clangTarget} -mcpu=${boardCfg.mcpu} -mfloat-abi=${boardCfg.floatAbi} -ffreestanding -nostdlib -c`;
+        execSync(`clang ${asmFlags} "${boardCfg.bootStub}" -o "${bootObj}"`, { stdio: "inherit" });
+
+        // Write auto-generated linker script
+        const ldScript = path.join(buildDir, "link.ld");
+        fs.writeFileSync(ldScript, generateLinkerScript(boardCfg));
+
+        // Link and convert to raw kernel.img
+        const binaryName = output ? path.basename(output, ".img") : projectBinaryName(files[0], projectRoot);
+        const outELF = path.join(buildDir, `${binaryName}.elf`);
+        const outImg = output || path.join(buildDir, "kernel.img");
+        linkBare(bootObj, results, ldScript, outELF, outImg);
+        console.log(`built [bare-metal/${boardName}]: ${outImg}`);
+    } else {
+        // ── hosted build ──────────────────────────────────────────────────
+        const flags   = clangFlags(profile);
+        const results = files.map(f => toObject(f, llDir, oDir, flags));
+        const outFile = output || path.join(buildDir, projectBinaryName(files[0], projectRoot));
+        link(results, outFile);
+        console.log(`built [${profile}]: ${outFile}`);
+    }
 }
 
 function cmdBuildModule(args) {
