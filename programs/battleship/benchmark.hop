@@ -13,7 +13,7 @@ function rngStep(address state) int {
     int s = state::value
     s = s * 1664525 + 1013904223
     state::value = s
-    int r = s & 0x7FFFFFFF
+    int r = (s ^ (s >> 16)) & 0x7FFFFFFF
     return r
 }
 
