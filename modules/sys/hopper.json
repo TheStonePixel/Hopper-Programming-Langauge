@@ -1,0 +1,8 @@
+{
+  "name": "sys",
+  "version": "0.1.0",
+  "description": "Architecture-neutral syscall layer (do not import directly)",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "io.hop"
+}

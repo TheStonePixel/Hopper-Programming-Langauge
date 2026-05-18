@@ -25,4 +25,4 @@
 // ── struct EpollEvent ─────────────────────────────────────────────────────────
 //   events(int32)  data(int64)  — data is a union; store fd as int64
 
-import poll from target
+import poll from sys

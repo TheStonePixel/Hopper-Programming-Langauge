@@ -5,7 +5,7 @@
 // Use pointer() + length() to hand the buffer to I/O:
 //   write(1, s.pointer(), s.length())
 //
-// Import this module with: import String from utf8
+// Import this module with: import utf8 from string
 
 import IString from string
 

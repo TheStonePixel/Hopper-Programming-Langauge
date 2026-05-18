@@ -12,7 +12,7 @@
 // EXPECT: rootdir: /
 // EXPECT: hidden ext:
 
-import io from io
+import io from core
 import path from path
 
 entry main(int argc, address argv) {

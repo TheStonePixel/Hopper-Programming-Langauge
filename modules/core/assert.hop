@@ -13,7 +13,7 @@
 //   panic("unreachable\n")
 
 import io  from core
-import sys from target
+import sys from sys
 
 function panic(string msg) {
     eprint(msg)

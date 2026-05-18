@@ -1,4 +1,4 @@
-import io from io
+import io from core
 
 entry main {
     print("Hello from ast!")

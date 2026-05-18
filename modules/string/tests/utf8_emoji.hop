@@ -2,7 +2,7 @@
 // EXPECT: Hopper is 🔥
 // EXPECT: Let's go 🚀
 // EXPECT: 💻 + 🤖 = ❤
-import String from utf8
+import utf8 from string
 import io from linux
 
 entry main {

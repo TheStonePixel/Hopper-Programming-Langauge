@@ -26,4 +26,4 @@
 // ── io_uring_setup params.flags ───────────────────────────────────────────────
 //   IORING_SETUP_IOPOLL=1  IORING_SETUP_SQPOLL=2  IORING_SETUP_SQ_AFF=4
 
-import io_uring from target
+import io_uring from sys

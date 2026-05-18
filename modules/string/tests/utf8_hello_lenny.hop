@@ -2,7 +2,7 @@
 // EXPECT: Hello, World
 // EXPECT: Hello, Lenny
 // EXPECT: Hello, World Hello, Lenny
-import String from ascii
+import ascii from string
 import io from linux
 
 entry main {

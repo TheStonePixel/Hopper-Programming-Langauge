@@ -24,4 +24,4 @@
 // ── struct Timespec ───────────────────────────────────────────────────────────
 //   sec(int)  nsec(int)
 
-import timer from target
+import timer from sys

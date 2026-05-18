@@ -34,4 +34,4 @@
 // ── memfd flags ───────────────────────────────────────────────────────────────
 //   MFD_CLOEXEC=1  MFD_ALLOW_SEALING=2  MFD_HUGETLB=4
 
-import mem from target
+import mem from sys

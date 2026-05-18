@@ -13,4 +13,4 @@
 //   GRND_RANDOM=2   — draw from the slower /dev/random pool (rarely needed)
 //   GRND_INSECURE=4 — allow output before pool is seeded (not cryptographic)
 
-import random from target
+import random from sys

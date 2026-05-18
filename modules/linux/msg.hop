@@ -15,4 +15,4 @@
 // ── struct msgbuf ─────────────────────────────────────────────────────────────
 //   mtype(int, must be > 0)  mtext(byte[...])
 
-import msg from target
+import msg from sys

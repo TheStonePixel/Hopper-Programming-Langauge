@@ -52,4 +52,4 @@
 //   IN_CREATE=256   IN_DELETE=512   IN_DELETE_SELF=1024   IN_MOVE_SELF=2048
 //   IN_ALL_EVENTS=4095   IN_NONBLOCK=2048   IN_CLOEXEC=524288
 
-import fs from target
+import fs from sys

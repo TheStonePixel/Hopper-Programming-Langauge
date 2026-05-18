@@ -12,4 +12,4 @@
 //   PTRACE_ATTACH=16  PTRACE_DETACH=17  PTRACE_SYSCALL=24
 //   PTRACE_SETOPTIONS=0x4200  PTRACE_GETSIGINFO=0x4202
 
-import ptrace from target
+import ptrace from sys

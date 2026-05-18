@@ -1,7 +1,8 @@
 // EXPECT: hello
 // EXPECT: 42
-// EXPECT: Ω
-import String from utf8
+// EXPECT: ff
+// EXPECT: 0
+import ascii from string
 import io from linux
 
 entry main {
@@ -19,9 +20,13 @@ entry main {
     n.append(10)
     write(1, n.pointer(), n.length())
 
-    // U+03A9 GREEK CAPITAL LETTER OMEGA — 2-byte UTF-8: 0xCE 0xA9
-    String u = String(8)
-    u.append(937)
-    u.append(10)
-    write(1, u.pointer(), u.length())
+    String h = String(16)
+    h.appendHex(255)
+    h.append(10)
+    write(1, h.pointer(), h.length())
+
+    String z = String(4)
+    z.appendNumber(0)
+    z.append(10)
+    write(1, z.pointer(), z.length())
 }

@@ -5,7 +5,7 @@
 // EXPECT: 100
 // EXPECT: -999
 
-import io from io
+import io from core
 
 entry main(int argc, address argv) {
     println(0)

@@ -43,4 +43,4 @@
 //   t.cc[VMIN] = 1; t.cc[VTIME] = 0
 //   tcsetattr(fd, TCSANOW, &t)
 
-import tty from target
+import tty from sys

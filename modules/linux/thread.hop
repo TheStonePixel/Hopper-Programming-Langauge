@@ -16,4 +16,4 @@
 // futex_wait(addr, val)  — block while *addr == val
 // futex_wake(addr, n)    — wake up to n threads waiting on addr
 
-import thread from target
+import thread from sys

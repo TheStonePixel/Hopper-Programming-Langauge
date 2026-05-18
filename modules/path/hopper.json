@@ -1,0 +1,8 @@
+{
+  "name": "path",
+  "version": "0.1.0",
+  "description": "Filesystem path manipulation",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "path.hop"
+}

@@ -5,7 +5,7 @@
 // EXPECT: true
 // EXPECT: H
 import io from linux
-import String from ascii
+import ascii from string
 
 class Vec {
     int x

@@ -6,9 +6,9 @@
 // EXPECT: new dir is dir: true
 // EXPECT: listed root: true
 
-import io from io
+import io from core
 import path from path
-import fs from fs
+import fs from io
 
 entry main(int argc, address argv) {
     FileSystem fsys = FileSystem()

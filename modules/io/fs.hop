@@ -11,7 +11,7 @@
 //   S_IFREG type nibble: st_mode[25:24] / 4096 == 8
 //
 // Usage:
-//   import fs from fs
+//   import fs from io
 //
 //   FileSystem fsys = FileSystem()
 //   Path cwd    = fsys.cwd()

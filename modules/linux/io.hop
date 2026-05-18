@@ -9,7 +9,7 @@
 //   base : address  — pointer to buffer
 //   len  : int      — byte count
 
-import io from target
+import io from sys
 
 // Write buf to stdout.
 function print(address buf, int len) {

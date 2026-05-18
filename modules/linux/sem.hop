@@ -20,4 +20,4 @@
 // ── struct sembuf ─────────────────────────────────────────────────────────────
 //   sem_num(int16)  sem_op(int16)  sem_flg(int16)
 
-import sem from target
+import sem from sys

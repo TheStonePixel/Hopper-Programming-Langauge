@@ -12,4 +12,4 @@
 // ── shmat flags ───────────────────────────────────────────────────────────────
 //   SHM_RDONLY=0x1000  SHM_RND=0x2000  SHM_REMAP=0x4000
 
-import shm from target
+import shm from sys
