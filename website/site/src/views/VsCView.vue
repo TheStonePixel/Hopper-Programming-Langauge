@@ -1,15 +1,8 @@
 <script setup>
-import { RouterLink } from 'vue-router'
 </script>
 
 <template>
   <div class="page">
-
-    <nav class="topnav">
-      <div class="container">
-        <RouterLink to="/" class="back">← Hopper</RouterLink>
-      </div>
-    </nav>
 
     <header class="page-header">
       <div class="container">
@@ -321,26 +314,9 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
   font-weight: 600;
 }
 
-/* ── Top Nav ── */
-.topnav {
-  padding: 1.25rem 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.back {
-  font-size: 0.9rem;
-  color: #6b7280;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.15s;
-}
-
-.back:hover { color: #111827; }
-
 /* ── Page Header ── */
 .page-header {
-  padding: 5rem 0 4rem;
+  padding: 4rem 0 3.5rem;
   background: #ffffff;
   border-bottom: 2px solid #e5e7eb;
 }
