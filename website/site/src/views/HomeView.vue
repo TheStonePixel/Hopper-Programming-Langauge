@@ -640,9 +640,10 @@ code {
 
 .feature code {
   font-size: 0.8rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.4em;
   border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -682,9 +683,10 @@ code {
 
 .card code {
   font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.4em;
   border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -714,9 +716,10 @@ code {
 
 .vision-sub code {
   font-size: 0.85rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 6px;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.4em;
   border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -835,9 +838,10 @@ code {
 
 .step code {
   font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.4em;
   border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }

@@ -378,9 +378,10 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 .compare-header code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.45em;
   border-radius: 4px;
 }
 
@@ -422,10 +423,12 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
 }
 
 pre {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  border-radius: 0 6px 6px 6px;
-  padding: 1.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #9ca3af;
+  border-radius: 0 8px 8px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 1.5rem 1.75rem;
   overflow-x: auto;
   font-size: 0.875rem;
   line-height: 2;
@@ -434,18 +437,18 @@ pre {
 }
 
 .block:has(.hop-label) pre {
-  background: #f0f7ff;
-  border-color: #bfdbfe;
+  border-left-color: #2563eb;
 }
 
 code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: #1e293b;
 }
 
-.comment { color: #9ca3af; }
-.kw      { color: #2563eb; }
-.type    { color: #059669; }
-.str     { color: #d97706; }
+.comment { color: #94a3b8; font-style: italic; }
+.kw      { color: #2563eb; font-weight: 600; }
+.type    { color: #16a34a; }
+.str     { color: #b45309; }
 .num     { color: #7c3aed; }
 .op      { color: #9ca3af; }
 

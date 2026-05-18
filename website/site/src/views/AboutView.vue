@@ -119,10 +119,11 @@
 
 .section code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.85rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 6px;
+  font-size: 0.83rem;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.45em;
   border-radius: 4px;
 }
 

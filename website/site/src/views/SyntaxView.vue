@@ -714,10 +714,12 @@ section p {
 
 /* ── Code blocks ── */
 pre {
-  background: #12121e;
-  border: 1px solid #2d2d3d;
-  border-radius: 10px;
-  padding: 1.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #2563eb;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  padding: 1.5rem 1.75rem;
   overflow-x: auto;
   font-size: 0.875rem;
   line-height: 1.9;
@@ -726,7 +728,7 @@ pre {
 
 code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #cdd6f4;
+  color: #1e293b;
 }
 
 pre code {
@@ -740,22 +742,23 @@ pre code {
 section p code,
 section li code,
 table code {
-  font-size: 0.85rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 6px;
-  border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.83rem;
+  color: #374151;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.1em 0.45em;
+  border-radius: 4px;
 }
 
-/* syntax highlighting inside pre */
-.c   { color: #44475a; }
-.kw  { color: #79b8ff; }
-.kw2 { color: #ff9580; }
-.str { color: #a3e635; }
-.num { color: #e0af68; }
-.hex { color: #f78c6c; }
-.op  { color: #6272a4; }
+/* syntax highlighting inside pre — light theme */
+.c   { color: #94a3b8; font-style: italic; }
+.kw  { color: #2563eb; font-weight: 600; }
+.kw2 { color: #7c3aed; }
+.str { color: #16a34a; }
+.num { color: #b45309; }
+.hex { color: #c2410c; }
+.op  { color: #9ca3af; }
 
 /* ── Tables ── */
 .type-table {
