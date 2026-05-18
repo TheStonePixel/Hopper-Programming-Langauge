@@ -8,6 +8,7 @@ import { execSync, spawn } from "node:child_process";
 import { buildAstFromSource } from "./src/astBuilder.js";
 import { genModule } from "./src/codegenLLVM.js";
 import { parseSource } from "./src/parse.js";
+import { formatAst } from "./src/formatter.js";
 
 const __filename  = fileURLToPath(import.meta.url);
 const __dirname   = path.dirname(__filename);
@@ -917,14 +918,11 @@ function formatNode(node, indent) {
     return fmtStmt(node, indent);
 }
 
-function getStmts(body) {
-    if (!body) return [];
-    if (Array.isArray(body)) return body;
-    if (body.kind === "Block") return body.statements || [];
-    return [body];
+function formatSource(ast, originalSource) {
+    return formatAst(ast, originalSource);
 }
 
-function formatSource(ast, originalSource) {
+function _legacyFormatSource(ast, originalSource) {
     // Reconstruct imports from the original source (they're stripped before AST build)
     const importLines = [];
     for (const line of originalSource.split("\n")) {
@@ -1223,7 +1221,8 @@ if (asyncCmds[sub]) {
         case "check":     cmdCheck(rest);    break;
         case "debug":     cmdDebug(rest);    break;
         case "profile":   cmdProfile(rest);  break;
-        case "format":    cmdFormat(rest);   break;
+        case "format":
+        case "fmt":       cmdFormat(rest);   break;
         case "test":      cmdTest(rest);     break;
         case "flash":     cmdFlash(rest);   break;
         case "ir":        cmdIR(rest);       break;

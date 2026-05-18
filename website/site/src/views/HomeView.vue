@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import CodeBlock from '@/components/CodeBlock.vue'
+import { formatHopper } from '@/lib/hopperFmt.js'
 
 const message = ref('Welcome To Hopper!')
 
@@ -13,6 +14,24 @@ function onPaste(e) {
   e.preventDefault()
   const text = (e.clipboardData.getData('text/plain') || '').replace(/[\n\r]/g, '')
   document.execCommand('insertText', false, text)
+}
+
+const codeRef = ref(null)
+const fmtFlash = ref(false)
+
+function runFmt() {
+  if (!codeRef.value) return
+  const raw = codeRef.value.innerText
+  const formatted = formatHopper(raw)
+  codeRef.value.innerText = formatted.trimEnd()
+  message.value = extractMessage(formatted)
+  fmtFlash.value = true
+  setTimeout(() => { fmtFlash.value = false }, 600)
+}
+
+function extractMessage(src) {
+  const m = src.match(/println\("([^"]*)"/)
+  return m ? m[1] : message.value
 }
 
 const FONTS = [
@@ -112,7 +131,8 @@ onUnmounted(() => { clearInterval(fontTimer) })
         <div class="demo-split">
 
           <CodeBlock label="hello.hop">
-            <pre class="demo-pre"><code><span class="kw">import</span> io <span class="kw">from</span> core
+            <button class="fmt-btn" :class="{ flash: fmtFlash }" @click="runFmt" title="Format code (hopper fmt)">fmt</button>
+            <pre ref="codeRef" class="demo-pre" @keydown.ctrl.s.prevent="runFmt" @keydown.meta.s.prevent="runFmt"><code><span class="kw">import</span> io <span class="kw">from</span> core
 
 <span class="kw">entry</span> main {
     println(<span class="str">"<span class="editable" contenteditable="true" spellcheck="false" @input="onInput" @paste="onPaste" @keydown.enter.prevent>Welcome To Hopper!</span>"</span>)
@@ -526,6 +546,37 @@ onUnmounted(() => { clearInterval(fontTimer) })
 }
 
 /* ── Source pane ── */
+.fmt-btn {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.9rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #cbd5e1;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  z-index: 1;
+}
+
+.fmt-btn:hover {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.fmt-btn.flash {
+  color: #059669;
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+}
+
 .demo-pre {
   flex: 1;
   overflow-x: auto;
