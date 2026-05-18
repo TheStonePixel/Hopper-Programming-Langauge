@@ -1,0 +1,8 @@
+{
+  "name": "CLI",
+  "version": "0.1.0",
+  "entry": "main.hop",
+  "dependencies": {
+    "io": "stdlib"
+  }
+}
