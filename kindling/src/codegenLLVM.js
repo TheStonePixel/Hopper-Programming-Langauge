@@ -715,12 +715,17 @@ function genExpr(ir, expr) {
                 const mask = (1n << BigInt(width)) - 1n;
                 const masked = ir.newTmp();
                 ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
-                // Truncate to the field's natural LLVM type
-                const llFieldType = llvmType(fieldType);
-                if (llFieldType === llType) return { value: masked, type: fieldType };
+                // Truncate to the field's natural LLVM type.
+                // For multi-bit "bit[N]" fields, i1 can only hold 0 or 1 so we use
+                // bitsToLLType(width) (i8+) and surface the Hopper type as "byte" so
+                // downstream codegen sees a consistent LLVM/Hopper type pair.
+                const isWideBit  = fieldType === "bit" && width > 1;
+                const llFieldType = isWideBit ? bitsToLLType(width) : llvmType(fieldType);
+                const hopperType  = isWideBit ? "byte" : fieldType;
+                if (llFieldType === llType) return { value: masked, type: hopperType };
                 const result = ir.newTmp();
                 ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
-                return { value: result, type: fieldType };
+                return { value: result, type: hopperType };
             }
 
             if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {

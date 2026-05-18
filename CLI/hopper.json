@@ -1,8 +1,9 @@
 {
-  "name": "CLI",
+  "name": "hopper",
   "version": "0.1.0",
-  "description": "A unified standalone command-line toolchain drives the entire development lifecycle of your code—from project initialization to dependency management, compilation, and diagnostics.",
-  "license": "Apache 2.0",
+  "description": "Hopper language CLI and toolchain",
+  "license": "Apache-2.0",
+  "type": "executable",
   "entry": "main.hop",
   "scripts": {
     "build": "hopper build",
@@ -11,5 +12,7 @@
     "check": "hopper check",
     "format": "hopper format -w main.hop"
   },
-  "dependencies": {}
+  "dependencies": {
+    "io": "stdlib"
+  }
 }

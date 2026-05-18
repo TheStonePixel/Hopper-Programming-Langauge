@@ -12,14 +12,11 @@ import { parseSource } from "./src/parse.js";
 const __filename  = fileURLToPath(import.meta.url);
 const __dirname   = path.dirname(__filename);
 const ROOT        = path.resolve(__dirname, "..");
-const BUILD_DIR   = path.join(ROOT, "build");
 const MODULES_DIR = path.join(ROOT, "modules");
 
 // ── registry ───────────────────────────────────────────────────────────────
 const REGISTRY_ORG = "HopperLangauge";               // github.com/HopperLangauge/<pkg>
 const REGISTRY_URL = `https://github.com/${REGISTRY_ORG}`;  // swap for thestonepixel.com/hopper later
-
-if (!fs.existsSync(BUILD_DIR)) fs.mkdirSync(BUILD_DIR, { recursive: true });
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -33,21 +30,55 @@ function toIR(file) {
     return genModule(ast);
 }
 
-function localBuildDir(file) {
-    const dir = path.join(path.dirname(path.resolve(file)), "build");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    return dir;
+// Walk up from startDir to find the nearest directory containing hopper.json.
+// Falls back to startDir itself if none is found.
+function findProjectRoot(startDir) {
+    let cursor = path.resolve(startDir);
+    while (true) {
+        if (fs.existsSync(path.join(cursor, "hopper.json"))) return cursor;
+        const parent = path.dirname(cursor);
+        if (parent === cursor) return path.resolve(startDir);
+        cursor = parent;
+    }
 }
 
-function toObject(file) {
+// Returns { projectRoot, buildDir, llDir, oDir } for the given entry file and profile.
+function profileDirs(entryFile, profile) {
+    const projectRoot = findProjectRoot(path.dirname(path.resolve(entryFile)));
+    const buildDir    = path.join(projectRoot, "build", profile);
+    const llDir       = path.join(buildDir, "ll");
+    const oDir        = path.join(buildDir, "o");
+    fs.mkdirSync(llDir, { recursive: true });
+    fs.mkdirSync(oDir,  { recursive: true });
+    return { projectRoot, buildDir, llDir, oDir };
+}
+
+// Clang flags per build profile.
+function clangFlags(profile) {
+    if (profile === "production") return "-O2 -c -fPIC -Wno-override-module";
+    return "-g -O0 -c -fPIC -Wno-override-module"; // dev and test
+}
+
+// Binary name: from hopper.json "name" field, or entry file basename.
+function projectBinaryName(entryFile, projectRoot) {
+    const mf = path.join(projectRoot, "hopper.json");
+    if (fs.existsSync(mf)) {
+        try {
+            const m = JSON.parse(fs.readFileSync(mf, "utf8"));
+            if (m.name) return m.name;
+        } catch {}
+    }
+    return baseName(entryFile);
+}
+
+function toObject(file, llDir, oDir, flags) {
     const src     = fs.readFileSync(file, "utf8");
     const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
     const ir      = genModule(ast);
-    const buildDir = localBuildDir(file);
-    const llFile  = path.join(buildDir, `${baseName(file)}.ll`);
-    const objFile = path.join(buildDir, `${baseName(file)}.o`);
+    const llFile  = path.join(llDir, `${baseName(file)}.ll`);
+    const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
-    execSync(`clang -O2 -c -fPIC -Wno-override-module "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    execSync(`clang ${flags} "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
     return { objFile, entryName: ast.entry?.name ?? "main" };
 }
 
@@ -57,8 +88,8 @@ function link(results, outFile) {
     return outFile;
 }
 
-function compile(files, outFile) {
-    const results = files.map(toObject);
+function compile(files, outFile, llDir, oDir, flags) {
+    const results = files.map(f => toObject(f, llDir, oDir, flags));
     link(results, outFile);
     return outFile;
 }
@@ -74,6 +105,12 @@ function findHopFiles(dir) {
 function cmdBuild(args) {
     if (args[0] === "module") { cmdBuildModule(args.slice(1)); return; }
 
+    // Parse build profile (default: dev)
+    let profile = "dev";
+    if (args.includes("--production")) profile = "production";
+    else if (args.includes("--test"))  profile = "test";
+    args = args.filter(a => a !== "--dev" && a !== "--production" && a !== "--test");
+
     const outputIdx = args.indexOf("-o");
     let output = null;
     if (outputIdx !== -1) {
@@ -88,9 +125,12 @@ function cmdBuild(args) {
         process.exit(1);
     }
 
-    const outFile = output || path.join(localBuildDir(files[0]), baseName(files[0]));
-    compile(files, outFile);
-    console.log(`built: ${outFile}`);
+    const { projectRoot, buildDir, llDir, oDir } = profileDirs(files[0], profile);
+    const flags   = clangFlags(profile);
+    const results = files.map(f => toObject(f, llDir, oDir, flags));
+    const outFile = output || path.join(buildDir, projectBinaryName(files[0], projectRoot));
+    link(results, outFile);
+    console.log(`built [${profile}]: ${outFile}`);
 }
 
 function cmdBuildModule(args) {
@@ -132,12 +172,16 @@ function cmdRun(args) {
         return;
     }
 
-    // hopper run — execute the project's built entry binary from build/
-    const manifest = readManifest();
-    const entry    = manifest ? baseName(manifest.entry || "main.hop") : "main";
-    const bin      = path.join(BUILD_DIR, entry);
+    // hopper run — find and execute the dev build from the project's build/dev/
+    const projectRoot = findProjectRoot(process.cwd());
+    const mf = path.join(projectRoot, "hopper.json");
+    let name = "main";
+    if (fs.existsSync(mf)) {
+        try { name = JSON.parse(fs.readFileSync(mf, "utf8")).name || name; } catch {}
+    }
+    const bin = path.join(projectRoot, "build", "dev", name);
     if (!fs.existsSync(bin)) {
-        console.error(`hopper: no binary found at ${bin} — run 'hopper build' first`);
+        console.error(`hopper: no binary at ${bin} — run 'hopper build' first`);
         process.exit(1);
     }
     execSync(bin, { stdio: "inherit" });
@@ -151,7 +195,9 @@ function cmdDev(args) {
         process.exit(1);
     }
 
-    const outFile = path.join(BUILD_DIR, baseName(files[0]));
+    const { projectRoot, buildDir, llDir, oDir } = profileDirs(files[0], "dev");
+    const flags   = clangFlags("dev");
+    const outFile = path.join(buildDir, projectBinaryName(files[0], projectRoot));
     const watchDirs = [...new Set(files.map(f => path.dirname(path.resolve(f))))];
 
     let running = null;
@@ -180,7 +226,7 @@ function cmdDev(args) {
         dirty = false;
         console.log("\n[hopper dev] rebuilding...");
         try {
-            compile(files, outFile);
+            compile(files, outFile, llDir, oDir, flags);
             console.log("[hopper dev] ok — running");
             runProcess();
         } catch (e) {
@@ -244,6 +290,7 @@ async function cmdInit(args) {
 
     const manifest = {
         name, version, description, license,
+        type: "executable",
         entry: "main.hop",
         scripts: {
             build:  "hopper build",
@@ -295,7 +342,7 @@ async function cmdInit(args) {
 
 function fetchTarball(url, destDir) {
     return new Promise((resolve, reject) => {
-        const tmp = path.join(BUILD_DIR, `_pkg_${Date.now()}.tar.gz`);
+        const tmp = path.join(destDir, `_pkg_${Date.now()}.tar.gz`);
         const file = fs.createWriteStream(tmp);
 
         function get(url) {
@@ -342,7 +389,6 @@ async function cmdInstall(args) {
     }
 
     fs.mkdirSync(LOCAL_MODULES, { recursive: true });
-    if (!fs.existsSync(BUILD_DIR)) fs.mkdirSync(BUILD_DIR, { recursive: true });
 
     for (const name of names) {
         const dest = path.join(LOCAL_MODULES, name);
@@ -538,8 +584,10 @@ function cmdCheck(args) {
         process.exit(1);
     }
 
-    const outFile = path.join(BUILD_DIR, baseName(files[0]) + ".check");
-    const results = files.map(toObject);
+    const { buildDir, llDir, oDir } = profileDirs(files[0], "dev");
+    const flags   = "-g -O0 -c -fPIC -Wno-override-module";
+    const outFile = path.join(buildDir, baseName(files[0]) + ".check");
+    const results = files.map(f => toObject(f, llDir, oDir, flags));
     const objs    = results.map(r => `"${r.objFile}"`).join(" ");
     const san     = sanitizers.join(",");
     execSync(`clang ${objs} -fsanitize=${san} -o "${outFile}"`, { stdio: "inherit" });

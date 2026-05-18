@@ -1,6 +1,7 @@
-import io from io
 
-entry main {
-    print("Hello from CLI!")
-    newline()
+import io from io
+entry main(int argc, string[] argv) {
+
+	print("Hello, Hopper")
+	return 0
 }
