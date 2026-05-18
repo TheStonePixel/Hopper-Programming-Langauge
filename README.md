@@ -11,6 +11,34 @@ Hopper is a strongly typed, bare-metal systems language that compiles to LLVM IR
 
 ---
 
+## Join Us in Refining Systems Programming
+
+Hopper doesn't try to reinvent the wheel with unproven, overly academic concepts. Instead, it takes the best, battle-tested syntax conventions available, strips away the compiler bloat, and aligns them perfectly with systems development.
+
+We didn't create anything fundamentally new — we simply refined what already works. Hopper elevates familiar syntax so that a single, cohesive language can describe raw hardware layout, manage complex templates, and drive high-performance software with absolute clarity.
+
+If you believe that systems programming doesn't need to be esoteric to be powerful, and you want to work with a language that focuses on perfecting the fundamentals, we invite you to help build the Hopper ecosystem.
+
+### Where We Are Building Next
+
+- **Fleshing out the Core Libraries:** We are applying Hopper's refined memory model to standard system utilities — expanding our data structures (`ds`) and building ultra-fast streaming modules (like our JSON and upcoming CSV parsers).
+- **Expanding OS and Hardware Profiles:** Hopper bridges the gap between freestanding bare-metal (ARM Cortex-M, RISC-V) and hosted environments (Linux syscall architectures). Help us map and optimize these system targets.
+- **Strengthening the Toolchain:** With over 409 tests currently ensuring stability, we are continuously expanding our test suites and polishing the CLI experience to ensure that as the language grows, the toolchain stays simple.
+
+### Get Started
+
+Every part of Hopper is designed to be straightforward, predictable, and immediately familiar. You can set up a project and run the test suite in seconds:
+
+```bash
+hopper init my_project
+cd my_project
+hopper test
+```
+
+If you want to contribute to an engineering ecosystem that values elegance, predictability, and honest performance across the entire systems stack, join us in building Hopper.
+
+---
+
 ## The Thesis
 
 **The toolchain is complicated because the language failed. Fix the language, and the toolchain becomes simple.**
