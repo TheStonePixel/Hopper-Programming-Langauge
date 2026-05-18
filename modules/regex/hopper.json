@@ -4,5 +4,5 @@
   "description": "Recursive backtracking regex engine — reMatch, reMatchAt",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "src/regex.hop"
+  "main": "regex.hop"
 }
