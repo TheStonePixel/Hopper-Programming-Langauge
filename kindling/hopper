@@ -33,12 +33,19 @@ function toIR(file) {
     return genModule(ast);
 }
 
+function localBuildDir(file) {
+    const dir = path.join(path.dirname(path.resolve(file)), "build");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
 function toObject(file) {
     const src     = fs.readFileSync(file, "utf8");
     const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
     const ir      = genModule(ast);
-    const llFile  = path.join(BUILD_DIR, `${baseName(file)}.ll`);
-    const objFile = path.join(BUILD_DIR, `${baseName(file)}.o`);
+    const buildDir = localBuildDir(file);
+    const llFile  = path.join(buildDir, `${baseName(file)}.ll`);
+    const objFile = path.join(buildDir, `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
     execSync(`clang -O2 -c -fPIC -Wno-override-module "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
     return { objFile, entryName: ast.entry?.name ?? "main" };
@@ -81,7 +88,7 @@ function cmdBuild(args) {
         process.exit(1);
     }
 
-    const outFile = output || path.join(BUILD_DIR, baseName(files[0]));
+    const outFile = output || path.join(localBuildDir(files[0]), baseName(files[0]));
     compile(files, outFile);
     console.log(`built: ${outFile}`);
 }
