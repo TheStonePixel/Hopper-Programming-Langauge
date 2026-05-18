@@ -40,7 +40,7 @@ function toObject(file) {
     const llFile  = path.join(BUILD_DIR, `${baseName(file)}.ll`);
     const objFile = path.join(BUILD_DIR, `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
-    execSync(`llc -filetype=obj -relocation-model=pic "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    execSync(`clang -O2 -c -fPIC -Wno-override-module "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
     return { objFile, entryName: ast.entry?.name ?? "main" };
 }
 

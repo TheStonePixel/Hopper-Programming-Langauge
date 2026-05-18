@@ -912,7 +912,7 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
-                        // left.value is i8* (all address:T values normalized); bitcast to T* for GEP then back
+                        // typed address arithmetic scales by element size (like C int* arithmetic)
                         const pointedTo = left.type.substring(8);
                         const llPtrType = `${llvmType(pointedTo)}*`;
                         const castIn = ir.newTmp();
@@ -936,7 +936,7 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
-                        // left.value is i8* (all address:T values normalized); bitcast to T* for GEP then back
+                        // typed address arithmetic scales by element size (like C int* arithmetic)
                         const pointedTo = left.type.substring(8);
                         const llPtrType = `${llvmType(pointedTo)}*`;
                         const castIn = ir.newTmp();
