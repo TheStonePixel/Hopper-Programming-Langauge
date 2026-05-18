@@ -1,0 +1,8 @@
+{
+  "name": "pgrep",
+  "version": "0.1.0",
+  "description": "Parallel grep — searches files concurrently using regex and spawn()",
+  "license": "Apache-2.0",
+  "type": "program",
+  "main": "pgrep.hop"
+}

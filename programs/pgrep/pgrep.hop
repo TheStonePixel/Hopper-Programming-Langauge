@@ -1,0 +1,392 @@
+// pgrep — parallel grep using regex + concurrent modules.
+//
+// Usage:
+//   pgrep <pattern> [file|dir ...]
+//
+// Searches every file (recursively under directories) for lines matching the
+// regex pattern.  One thread is spawned per file.  Output is serialized via a
+// mutex so lines from different files never interleave.
+//
+// Output format:  filename:linenum:line
+
+import regex      from regex
+import concurrent from concurrent
+import io         from linux
+import fs         from linux
+
+extern function printf(string fmt, ...) int
+
+// These are declared in concurrent.hop (via the import); re-declaring them
+// here is safe — codegenLLVM deduplicates extern declarations.
+extern function pthread_mutex_lock(address m) int
+extern function pthread_mutex_unlock(address m) int
+extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
+extern function pthread_detach(int tid) int
+
+// Maximum number of files pgrep will search in one invocation.
+const MAX_FILES = 8192
+
+// ── string helpers ────────────────────────────────────────────────────────────
+
+function pgStrLen(address s) int {
+    int n = 0
+    bool done = false
+    while (!done) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { done = true }
+        if (!done) { n = n + 1 }
+    }
+    return n
+}
+
+// Allocate a heap copy of the null-terminated string at src.
+function pgStrDup(address src) address {
+    int len = pgStrLen(src)
+    address dst = allocate len + 1
+    int i = 0
+    while (i <= len) {
+        address sp = src + i
+        byte b = sp::value
+        address dp = dst + i
+        dp::value = b
+        i = i + 1
+    }
+    return dst
+}
+
+// Append null-terminated src into dst starting at off; return new offset.
+// Caller ensures dst is large enough.  Does NOT write a null terminator.
+function pgStrAppend(address src, address dst, int off) int {
+    int i = 0
+    bool done = false
+    while (!done) {
+        address sp = src + i
+        byte b = sp::value
+        int bi = cast b
+        if (bi == 0) { done = true }
+        if (!done) {
+            address dp = dst + off + i
+            dp::value = b
+            i = i + 1
+        }
+    }
+    return off + i
+}
+
+// ── dirent64 helpers ──────────────────────────────────────────────────────────
+// struct linux_dirent64: ino(8) off(8) reclen(2) type(1) name(variable)
+// DT_REG=8  DT_DIR=4  DT_LNK=10
+
+function pgDirentReclen(address e) int {
+    address rp = e + 16
+    int r = rp::value
+    return r & 0xFFFF
+}
+
+function pgDirentType(address e) int {
+    address tp = e + 18
+    byte t = tp::value
+    return cast t
+}
+
+function pgIsDot(address e) bool {
+    address np = e + 19
+    byte b0 = np::value
+    int i0 = cast b0
+    if (i0 != '.') { return false }
+    address np1 = np + 1
+    byte b1 = np1::value
+    int i1 = cast b1
+    if (i1 == 0) { return true }
+    if (i1 != '.') { return false }
+    address np2 = np + 2
+    byte b2 = np2::value
+    int i2 = cast b2
+    return i2 == 0
+}
+
+// ── file discovery ────────────────────────────────────────────────────────────
+// Recursively collect absolute/relative file paths into filePtrs[0..].
+// countPtr points to the current count (int); updated in-place.
+// Heap-allocates a copy of each path string.
+
+function collectFiles(address pathStr, address filePtrs, address countPtr) {
+    // Try to open as a directory (O_RDONLY | O_DIRECTORY = 65536).
+    string sp = cast pathStr
+    int fd = open(sp, 65536, 0)
+    if (fd < 0) {
+        // Not a directory or unreadable — treat as a regular file.
+        int fd2 = open(sp, 0, 0)
+        if (fd2 >= 0) {
+            close(fd2)
+            int cur = countPtr::value
+            if (cur < MAX_FILES) {
+                address dup = pgStrDup(pathStr)
+                address slot = filePtrs + cur * 8
+                slot::value = dup
+                cur = cur + 1
+                countPtr::value = cur
+            }
+        }
+        return
+    }
+
+    address buf = allocate 65536
+    bool reading = true
+    while (reading) {
+        int n = getdents64(fd, buf, 65536)
+        if (n <= 0) { reading = false }
+        if (reading) {
+            int off = 0
+            while (off < n) {
+                address e = buf + off
+                int reclen = pgDirentReclen(e)
+                if (reclen <= 0) { off = n }
+                if (reclen > 0) {
+                    if (!pgIsDot(e)) {
+                        int dtype = pgDirentType(e)
+                        address name = e + 19
+
+                        // Build child path: pathStr "/" name (avoid double-slash)
+                        address childBuf = allocate 4096
+                        int cOff = pgStrAppend(pathStr, childBuf, 0)
+                        // Only add slash if pathStr doesn't already end with '/'
+                        if (cOff > 0) {
+                            address lastSlot = childBuf + cOff - 1
+                            byte lastB = lastSlot::value
+                            int lastI = cast lastB
+                            if (lastI != '/') {
+                                address slashSlot = childBuf + cOff
+                                byte slashB = '/'
+                                slashSlot::value = slashB
+                                cOff = cOff + 1
+                            }
+                        }
+                        cOff = pgStrAppend(name, childBuf, cOff)
+                        address termSlot = childBuf + cOff
+                        byte nulB = cast 0
+                        termSlot::value = nulB
+
+                        if (dtype == 8) {
+                            // DT_REG — regular file
+                            int cur = countPtr::value
+                            if (cur < MAX_FILES) {
+                                address dup = pgStrDup(childBuf)
+                                address slot = filePtrs + cur * 8
+                                slot::value = dup
+                                cur = cur + 1
+                                countPtr::value = cur
+                            }
+                        }
+                        if (dtype == 4) {
+                            // DT_DIR — recurse
+                            collectFiles(childBuf, filePtrs, countPtr)
+                        }
+
+                        deallocate childBuf
+                    }
+                    off = off + reclen
+                }
+            }
+        }
+    }
+    close(fd)
+    deallocate buf
+}
+
+// ── async spawn helpers ───────────────────────────────────────────────────────
+// asyncThunk from concurrent.hop is used as the thread start routine.
+// We only need pSpawn (which returns the raw statePtr) and pWait.
+
+// Spawn fn(arg) on a new OS thread.
+// Returns the statePtr (heap address, 16 bytes) for use with pWait / pFree.
+function pSpawn(address fn, address arg) address {
+    address statePtr = allocate 16
+    statePtr::value = 0
+    address valSlot = statePtr + 8
+    valSlot::value = null
+
+    address thunkArgs = allocate 24
+    thunkArgs::value = fn
+    address argSlot = thunkArgs + 8
+    argSlot::value = arg
+    address stSlot = thunkArgs + 16
+    stSlot::value = statePtr
+
+    address thunkAddr = asyncThunk::address
+    address tidPtr = allocate 8
+    pthread_create(tidPtr, null, thunkAddr, thunkArgs)
+    int tid = tidPtr::value
+    pthread_detach(tid)
+    deallocate tidPtr
+
+    return statePtr
+}
+
+// Block until the statePtr (returned by pSpawn) signals completion.
+function pWait(address sp) {
+    bool done = false
+    while (!done) {
+        int st = sp::value
+        if (st != 0) { done = true }
+        if (!done) { futex_wait(sp, 0) }
+    }
+}
+
+// ── grep worker ───────────────────────────────────────────────────────────────
+// Worker arg layout (24 bytes, heap-allocated by main, freed here):
+//   [0]  address pattern    — null-terminated regex pattern (shared, not freed)
+//   [8]  address filename   — null-terminated file path (shared, not freed)
+//   [16] address mutHandle  — raw pthread_mutex_t for stdout serialization
+
+function grepWorker(address rawArgs) address {
+    address pattern   = rawArgs::value
+    address fnSlot    = rawArgs + 8
+    address filename  = fnSlot::value
+    address mhSlot    = rawArgs + 16
+    address mutHandle = mhSlot::value
+    deallocate rawArgs
+
+    string sfn = cast filename
+    int fd = open(sfn, 0, 0)
+    if (fd < 0) { return null }
+
+    address lineBuf  = allocate 4096
+    address byteBuf  = allocate 1
+    int lineLen  = 0
+    int lineNum  = 1
+    bool eof     = false
+
+    while (!eof) {
+        int n = read(fd, byteBuf, 1)
+        if (n <= 0) {
+            eof = true
+        }
+        if (!eof) {
+            byte b = byteBuf::value
+            int bi = cast b
+            if (bi == '\n') {
+                // Null-terminate and test the line.
+                address termPtr = lineBuf + lineLen
+                byte nulB = cast 0
+                termPtr::value = nulB
+                bool m = reMatch(pattern, lineBuf)
+                if (m) {
+                    pthread_mutex_lock(mutHandle)
+                    printf("%s:%lld:%s\n", filename, lineNum, lineBuf)
+                    pthread_mutex_unlock(mutHandle)
+                }
+                lineLen = 0
+                lineNum = lineNum + 1
+            } else {
+                if (lineLen < 4094) {
+                    address wp = lineBuf + lineLen
+                    wp::value = b
+                    lineLen = lineLen + 1
+                }
+            }
+        }
+    }
+
+    // Handle last line without trailing newline.
+    if (lineLen > 0) {
+        address termPtr = lineBuf + lineLen
+        byte nulB = cast 0
+        termPtr::value = nulB
+        bool m = reMatch(pattern, lineBuf)
+        if (m) {
+            pthread_mutex_lock(mutHandle)
+            printf("%s:%lld:%s\n", filename, lineNum, lineBuf)
+            pthread_mutex_unlock(mutHandle)
+        }
+    }
+
+    close(fd)
+    deallocate byteBuf
+    deallocate lineBuf
+    return null
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main(int argc, address argv) {
+    if (argc < 3) {
+        printf("usage: pgrep <pattern> <file|dir> [...]\n")
+        return
+    }
+
+    // argv[1] = pattern
+    address arg1ptr = argv + 8
+    address patternArg = arg1ptr::value
+
+    // Output mutex — serializes writes from all worker threads.
+    Mutex outMtx = Mutex()
+    address mutHandle = outMtx.rawHandle()
+
+    // Collect file paths from argv[2..argc-1].
+    address filePtrs = allocate MAX_FILES * 8
+    int fileCount = 0
+
+    int argi = 2
+    while (argi < argc) {
+        address argNptr = argv + argi * 8
+        address argVal = argNptr::value
+        collectFiles(argVal, filePtrs, fileCount::address)
+        argi = argi + 1
+    }
+
+    if (fileCount == 0) {
+        printf("pgrep: no files found\n")
+        deallocate filePtrs
+        return
+    }
+
+    // Allocate statePtr array for tracking completion.
+    address statePtrs = allocate fileCount * 8
+
+    // Spawn one worker per file.
+    address wfn = grepWorker::address
+    int fi = 0
+    while (fi < fileCount) {
+        address fpSlot = filePtrs + fi * 8
+        address filename = fpSlot::value
+
+        // Build worker args (24 bytes, freed by grepWorker).
+        address wargs = allocate 24
+        wargs::value = patternArg
+        address fnSlot = wargs + 8
+        fnSlot::value = filename
+        address mhSlot = wargs + 16
+        mhSlot::value = mutHandle
+
+        address sp = pSpawn(wfn, wargs)
+        address spSlot = statePtrs + fi * 8
+        spSlot::value = sp
+
+        fi = fi + 1
+    }
+
+    // Wait for every worker to finish.
+    int wi = 0
+    while (wi < fileCount) {
+        address spSlot = statePtrs + wi * 8
+        address sp = spSlot::value
+        pWait(sp)
+        deallocate sp
+        wi = wi + 1
+    }
+
+    // Free the per-file path copies.
+    int ffi = 0
+    while (ffi < fileCount) {
+        address slot = filePtrs + ffi * 8
+        address fp = slot::value
+        deallocate fp
+        ffi = ffi + 1
+    }
+
+    deallocate statePtrs
+    deallocate filePtrs
+}
