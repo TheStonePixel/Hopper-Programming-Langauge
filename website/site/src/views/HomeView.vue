@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import CodeBlock from '@/components/CodeBlock.vue'
 
 const message = ref('Welcome To Hopper!')
 
@@ -13,6 +14,34 @@ function onPaste(e) {
   const text = (e.clipboardData.getData('text/plain') || '').replace(/[\n\r]/g, '')
   document.execCommand('insertText', false, text)
 }
+
+const FONTS = [
+  { family: "'VT323', monospace",              size: '3.5rem'  },
+  { family: "'Press Start 2P', monospace",     size: '1.35rem' },
+  { family: "'Share Tech Mono', monospace",    size: '2.25rem' },
+  { family: "'Orbitron', sans-serif",          size: '1.85rem' },
+  { family: "'Major Mono Display', monospace", size: '2.25rem' },
+]
+
+const fontIndex = ref(0)
+const isSwitching = ref(false)
+
+const fontStyle = computed(() => ({
+  fontFamily: FONTS[fontIndex.value].family,
+  fontSize:   FONTS[fontIndex.value].size,
+}))
+
+function cycleFont() {
+  isSwitching.value = true
+  setTimeout(() => {
+    fontIndex.value = (fontIndex.value + 1) % FONTS.length
+    isSwitching.value = false
+  }, 250)
+}
+
+let fontTimer
+onMounted(() => { fontTimer = setInterval(cycleFont, 4000) })
+onUnmounted(() => { clearInterval(fontTimer) })
 </script>
 
 <template>
@@ -74,22 +103,20 @@ function onPaste(e) {
     <section class="demo">
       <div class="container">
         <span class="label">Try It</span>
-        <p class="demo-sub">Click the string in the code and type — the output updates live.</p>
         <div class="demo-split">
 
-          <div class="demo-pane source-pane">
-            <span class="demo-label">hello.hop</span>
-            <pre class="demo-pre"><code><span class="dkw">import</span> io <span class="dkw">from</span> core
+          <CodeBlock label="hello.hop">
+            <pre class="demo-pre"><code><span class="kw">import</span> io <span class="kw">from</span> core
 
-<span class="dkw">entry</span> main {
-    println(<span class="ds">"<span class="editable" contenteditable="true" spellcheck="false" @input="onInput" @paste="onPaste" @keydown.enter.prevent>Welcome To Hopper!</span>"</span>)
+<span class="kw">entry</span> main {
+    println(<span class="str">"<span class="editable" contenteditable="true" spellcheck="false" @input="onInput" @paste="onPaste" @keydown.enter.prevent>Welcome To Hopper!</span>"</span>)
 }</code></pre>
-          </div>
+          </CodeBlock>
 
-          <div class="demo-pane output-pane">
-            <span class="demo-label">output</span>
+          <div class="output-block">
+            <span class="output-label">output</span>
             <div class="output-body">
-              <div class="output-line">
+              <div class="output-line" :class="{ switching: isSwitching }" :style="fontStyle">
                 <span class="out-prompt">&gt;</span>
                 <span class="out-text">{{ message }}</span>
               </div>
@@ -475,63 +502,22 @@ function onPaste(e) {
   border-bottom: 1px solid #e5e7eb;
 }
 
-.demo-sub {
-  font-size: 0.95rem;
-  color: #6b7280;
-  margin-bottom: 2.5rem;
-}
-
 .demo-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.08);
+  gap: 1.25rem;
+  align-items: stretch;
 }
 
-.demo-pane {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.demo-label {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.9rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: #cbd5e1;
-  z-index: 1;
-  user-select: none;
+.demo-split :deep(.code-block) {
+  margin-bottom: 0 !important;
 }
 
 /* ── Source pane ── */
-.source-pane {
-  background: #ffffff;
-  border-right: 1px solid #e2e8f0;
-}
-
 .demo-pre {
-  margin: 0;
-  padding: 1.5rem 1.75rem;
-  overflow-x: auto;
-  font-size: 0.875rem;
-  line-height: 1.9;
   flex: 1;
+  overflow-x: auto;
 }
-
-.demo-pre code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #1e293b;
-}
-
-.dkw { color: #2563eb; font-weight: 600; }
-.ds  { color: #16a34a; }
 
 .editable {
   color: inherit;
@@ -548,9 +534,31 @@ function onPaste(e) {
   border-bottom-color: #16a34a;
 }
 
-/* ── Output pane ── */
-.output-pane {
+/* ── Output block ── */
+.output-block {
+  position: relative;
   background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.output-label {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #cbd5e1;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
 }
 
 .output-body {
@@ -558,17 +566,22 @@ function onPaste(e) {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem 2rem;
+  padding: 3rem 2.5rem;
 }
 
 .output-line {
   display: flex;
   align-items: baseline;
   gap: 0.4em;
-  font-family: 'VT323', monospace;
-  font-size: 3.5rem;
-  line-height: 1;
+  line-height: 1.2;
   max-width: 100%;
+  transition: opacity 0.22s ease, filter 0.22s ease, transform 0.22s ease;
+}
+
+.output-line.switching {
+  opacity: 0;
+  filter: blur(5px);
+  transform: scale(0.95);
 }
 
 .out-prompt {
