@@ -1,0 +1,54 @@
+// EXPECT: KEY_NONE = -1
+// EXPECT: KEY_CHAR = 0
+// EXPECT: KEY_ENTER = 1
+// EXPECT: KEY_UP = 5
+// EXPECT: KEY_DOWN = 6
+// EXPECT: KEY_CTRL_C = 24
+// EXPECT: TUI_BLACK = 0
+// EXPECT: TUI_WHITE = 7
+// EXPECT: TUI_BRIGHT_BLACK = 8
+// EXPECT: TUI_BRIGHT_WHITE = 15
+// EXPECT: key code: 5
+// EXPECT: key val: 65
+// EXPECT: fresh key code: -1
+// EXPECT: fresh key val: 0
+
+import tui from tui
+import io  from core
+
+entry main {
+    print("KEY_NONE = ")
+    println(KEY_NONE)
+    print("KEY_CHAR = ")
+    println(KEY_CHAR)
+    print("KEY_ENTER = ")
+    println(KEY_ENTER)
+    print("KEY_UP = ")
+    println(KEY_UP)
+    print("KEY_DOWN = ")
+    println(KEY_DOWN)
+    print("KEY_CTRL_C = ")
+    println(KEY_CTRL_C)
+    print("TUI_BLACK = ")
+    println(TUI_BLACK)
+    print("TUI_WHITE = ")
+    println(TUI_WHITE)
+    print("TUI_BRIGHT_BLACK = ")
+    println(TUI_BRIGHT_BLACK)
+    print("TUI_BRIGHT_WHITE = ")
+    println(TUI_BRIGHT_WHITE)
+
+    Key k = Key()
+    k.setCode(KEY_UP)
+    k.setVal(65)
+    print("key code: ")
+    println(k.getCode())
+    print("key val: ")
+    println(k.getVal())
+
+    Key fresh = Key()
+    print("fresh key code: ")
+    println(fresh.getCode())
+    print("fresh key val: ")
+    println(fresh.getVal())
+}

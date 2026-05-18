@@ -106,3 +106,29 @@ class FileWriter {
         return write(self.fd, s, len)
     }
 }
+
+// ── convenience functions ─────────────────────────────────────────────────────
+
+// Read up to maxLen bytes from path into buf. Null-terminates buf.
+// Returns bytes read, or -1 on open failure.
+function fileRead(address path, address buf, int maxLen) int {
+    int fd = open(path, 0, 0)    // O_RDONLY
+    if (fd < 0) { return -1 }
+    int n = read(fd, buf, maxLen - 1)
+    close(fd)
+    if (n < 0) { n = 0 }
+    address term = buf + n
+    byte z = 0
+    term::value = z
+    return n
+}
+
+// Write len bytes from buf to path (create/truncate). Returns true on success.
+function fileWrite(address path, address buf, int len) bool {
+    // O_WRONLY=1  O_CREAT=64  O_TRUNC=512  mode 0644=420
+    int fd = open(path, 577, 420)
+    if (fd < 0) { return false }
+    int written = write(fd, buf, len)
+    close(fd)
+    return written == len
+}

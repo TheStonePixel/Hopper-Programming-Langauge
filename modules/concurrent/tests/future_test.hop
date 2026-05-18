@@ -1,0 +1,74 @@
+// TEST: spawn three fibonacci computations concurrently, await in order
+// EXPECT: fib(10) = 55
+// EXPECT: fib(20) = 6765
+// EXPECT: fib(30) = 832040
+
+// TEST: isReady returns true after get()
+// EXPECT: ready after get = 1
+
+// TEST: address future with identity function
+// EXPECT: identity = 99
+
+import concurrent from concurrent
+import assert     from core
+extern function printf(string fmt, ...) int
+
+// Iterative fibonacci.  Argument is the index n cast from address.
+function fibWork(address rawN) address {
+    int n = cast rawN
+    int a = 0
+    int b = 1
+    int i = 0
+    while (i < n) {
+        int c = a + b
+        a = b
+        b = c
+        i = i + 1
+    }
+    return cast a
+}
+
+// Identity: returns its argument unchanged.
+function identityWork(address arg) address {
+    return arg
+}
+
+entry main {
+    // cast in argument position is not allowed — use local variables.
+    address n10 = cast 10
+    address n20 = cast 20
+    address n30 = cast 30
+
+    // Spawn three concurrent computations.
+    Future<address> f1 = spawn(fibWork::address, n10)
+    Future<address> f2 = spawn(fibWork::address, n20)
+    Future<address> f3 = spawn(fibWork::address, n30)
+
+    // Await in submission order — get() blocks until each is ready.
+    address r1 = f1.get()
+    address r2 = f2.get()
+    address r3 = f3.get()
+
+    int v1 = cast r1
+    int v2 = cast r2
+    int v3 = cast r3
+
+    assert(v1 == 55,     "fib(10) should be 55\n")
+    assert(v2 == 6765,   "fib(20) should be 6765\n")
+    assert(v3 == 832040, "fib(30) should be 832040\n")
+
+    printf("fib(10) = %lld\n", v1)
+    printf("fib(20) = %lld\n", v2)
+    printf("fib(30) = %lld\n", v3)
+
+    // After get(), isReady() must be true.
+    printf("ready after get = %lld\n", f1.isReady())
+
+    // Identity roundtrip.
+    address n99 = cast 99
+    Future<address> fi = spawn(identityWork::address, n99)
+    address ri = fi.get()
+    int vi     = cast ri
+    assert(vi == 99, "identity should return 99\n")
+    printf("identity = %lld\n", vi)
+}

@@ -1,0 +1,1533 @@
+// main.hop — Hopper CLI written in Hopper.
+//
+// The self-hosted build tool compiled to a native binary called `hopperc`.
+// Compilation of .hop source is delegated to the JS compiler
+// (kindling/hopperc.js); everything else is native Hopper.
+//
+// Requires:
+//   HOPPER_ROOT  — path to the Hopper repository root
+//
+// Build:
+//   node kindling/hopper build bootstrap/src/main.hop -o hopperc
+//   export HOPPER_ROOT=$(pwd)
+//   ./hopperc build  bootstrap/src/main.hop -o hopperc   # self-build!
+
+import io            from core
+import stringbuilder from ds
+import array         from ds
+import path          from path
+import file          from io
+import fs            from linux
+import sys           from linux
+import concurrent    from concurrent
+
+extern function system(string cmd) int
+extern function getenv(string name) address
+extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
+extern function pthread_detach(int tid) int
+extern function pthread_mutex_init(address m, address attr) int
+extern function pthread_mutex_lock(address m) int
+extern function pthread_mutex_unlock(address m) int
+extern function pthread_mutex_destroy(address m) int
+extern function memset(address dst, int c, int n) address
+
+// ── build profiles ────────────────────────────────────────────────────────────
+
+const PROF_DEV        = 0
+const PROF_PRODUCTION = 1
+const PROF_TEST       = 2
+
+function profileName(int p) address {
+    if (p == PROF_PRODUCTION) { return "production" }
+    if (p == PROF_TEST)       { return "test" }
+    return "dev"
+}
+
+function clangCompileFlags(int p) address {
+    if (p == PROF_PRODUCTION) { return "-O2 -c -fPIC -Wno-override-module" }
+    return "-g -O0 -c -fPIC -Wno-override-module"
+}
+
+// ── minimal string utilities ──────────────────────────────────────────────────
+
+function strLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { return n }
+        n = n + 1
+    }
+    return 0
+}
+
+function strEq(address a, address b) bool {
+    int i = 0
+    while (true) {
+        address pa = a + i
+        address pb = b + i
+        byte ba = pa::value
+        byte bb = pb::value
+        int ai = cast ba
+        int bi = cast bb
+        if (ai != bi) { return false }
+        if (ai == 0)  { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// Return a heap-allocated null-terminated copy of src.
+function strCopy(address src) address {
+    int len = strLen(src)
+    address buf = allocate len + 1
+    int i = 0
+    while (i <= len) {
+        address sp = src + i
+        address dp = buf + i
+        byte b = sp::value
+        dp::value = b
+        i = i + 1
+    }
+    return buf
+}
+
+// ── shell execution ───────────────────────────────────────────────────────────
+// All shell functions take a null-terminated command string.
+
+function shellCode(address cmd) int {
+    int status = system(cmd)
+    return (status >> 8) & 0xFF
+}
+
+function shellMust(address cmd) {
+    int code = shellCode(cmd)
+    if (code != 0) {
+        eprint("hopper: command failed (exit ")
+        eprintInt(code)
+        eprintln(")")
+        exit(1)
+    }
+}
+
+// Create directory tree.
+function mkdirP(address p) {
+    StringBuilder cmd = StringBuilder(256)
+    cmd.appendStr("mkdir -p \"")
+    cmd.appendStr(p)
+    cmd.appendStr("\"")
+    cmd.appendChar('\0')
+    shellMust(cmd.str())
+}
+
+// True if the path exists (file or directory).
+function pathExists(address p) bool {
+    return access(p, 0) == 0
+}
+
+// ── project discovery ─────────────────────────────────────────────────────────
+
+// Walk up from startDir until a directory containing hopper.json is found.
+// Returns a heap-allocated string; never returns null.
+function findProjectRoot(address startDir) address {
+    Path cursor = Path(startDir)
+    int tries = 0
+    while (tries < 32) {
+        Path manifest = Path(cursor.str())
+        manifest.join("hopper.json")
+        bool found = pathExists(manifest.str())
+        if (found) {
+            address result = strCopy(cursor.str())
+            return result
+        }
+        Path parent = cursor.dirname()
+        bool atRoot = strEq(parent.str(), cursor.str())
+        if (atRoot) { return strCopy(startDir) }
+        cursor = parent
+        tries = tries + 1
+    }
+    return strCopy(startDir)
+}
+
+// Minimal JSON string extractor: finds `"key": "value"` and returns value.
+// Returns heap-allocated string or null.
+function jsonGetString(address buf, int bufLen, address key) address {
+    int keyLen = strLen(key)
+    int patLen = keyLen + 3   // `"key":`
+
+    // Build search pattern
+    address pat = allocate patLen + 1
+    address p0 = pat
+    byte dq = cast 34
+    p0::value = dq
+    int i = 0
+    while (i < keyLen) {
+        address ks = key + i
+        address kd = pat + 1 + i
+        byte b = ks::value
+        kd::value = b
+        i = i + 1
+    }
+    address pe = pat + 1 + keyLen
+    pe::value = dq
+    address pc = pat + 2 + keyLen
+    byte col = cast 58
+    pc::value = col
+    address pz = pat + patLen
+    byte z = 0
+    pz::value = z
+
+    // Scan for pattern
+    int pos = 0
+    int found = -1
+    while (pos <= bufLen - patLen) {
+        address bp = buf + pos
+        bool match = true
+        int j = 0
+        while (j < patLen) {
+            address bpj = bp + j
+            address pj  = pat + j
+            byte bpb = bpj::value
+            byte pb  = pj::value
+            if (bpb != pb) {
+                match = false
+                break
+            }
+            j = j + 1
+        }
+        if (match) {
+            found = pos
+            break
+        }
+        pos = pos + 1
+    }
+    deallocate pat
+    if (found < 0) { return null }
+
+    // Skip whitespace after pattern, then expect opening '"'
+    pos = found + patLen
+    while (pos < bufLen) {
+        address bp = buf + pos
+        byte b = bp::value
+        int bi = cast b
+        if (bi == 32 || bi == 9 || bi == 10 || bi == 13) {
+            pos = pos + 1
+        } else {
+            break
+        }
+    }
+    if (pos >= bufLen) { return null }
+    address oq = buf + pos
+    byte oqb = oq::value
+    int oqi = cast oqb
+    if (oqi != 34) { return null }
+    pos = pos + 1
+
+    // Read value until closing '"'
+    int start = pos
+    while (pos < bufLen) {
+        address vp = buf + pos
+        byte vb = vp::value
+        int vbi = cast vb
+        if (vbi == 34) { break }
+        pos = pos + 1
+    }
+    int vlen = pos - start
+    address val = allocate vlen + 1
+    int vi = 0
+    while (vi < vlen) {
+        address vs = buf + start + vi
+        address vd = val + vi
+        byte b = vs::value
+        vd::value = b
+        vi = vi + 1
+    }
+    address vterm = val + vlen
+    vterm::value = z
+    return val
+}
+
+// Read hopper.json from projectRoot and extract the value of key.
+function readManifest(address projectRoot, address key) address {
+    Path mf = Path(projectRoot)
+    mf.join("hopper.json")
+    if (!pathExists(mf.str())) { return null }
+    FileReader r = FileReader(mf.str())
+    if (!r.valid()) { return null }
+    address buf = allocate 8192
+    int n = r.readBytes(buf, 8191)
+    address term = buf + n
+    byte z = 0
+    term::value = z
+    address val = jsonGetString(buf, n, key)
+    deallocate buf
+    return val
+}
+
+// ── Hopper repository root ────────────────────────────────────────────────────
+
+function findHopperRoot() address {
+    address env = getenv("HOPPER_ROOT")
+    if (env != null) {
+        if (strLen(env) > 0) { return strCopy(env) }
+    }
+    // Fall back to /proc/self/exe → walk up to find kindling/
+    address exeBuf = allocate 4096
+    int exeLen = readlink("/proc/self/exe", exeBuf, 4095)
+    if (exeLen > 0) {
+        address ts = exeBuf + exeLen
+        byte z = 0
+        ts::value = z
+        Path exe = Path(exeBuf)
+        Path dir = exe.dirname()
+        int tries = 0
+        while (tries < 8) {
+            Path kd = Path(dir.str())
+            kd.join("kindling")
+            bool found = pathExists(kd.str())
+            if (found) {
+                address result = strCopy(dir.str())
+                deallocate exeBuf
+                return result
+            }
+            Path parent = dir.dirname()
+            bool atRoot = strEq(parent.str(), dir.str())
+            if (atRoot) {
+                address result2 = strCopy(parent.str())
+                deallocate exeBuf
+                return result2
+            }
+            dir = parent
+            tries = tries + 1
+        }
+    }
+    deallocate exeBuf
+    return strCopy(".")
+}
+
+// ── filename utilities (string-scan based, no Path needed) ───────────────────
+
+// Basename start offset in a file path string.
+function basenameOffset(address p) int {
+    int len = strLen(p)
+    int i = len - 1
+    while (i >= 0) {
+        address ip = p + i
+        byte ib = ip::value
+        int ibi = cast ib
+        if (ibi == 47) { return i + 1 }   // '/'
+        i = i - 1
+    }
+    return 0
+}
+
+// Extension start offset in a file path string (-1 if no extension).
+function extOffset(address p) int {
+    int len = strLen(p)
+    int bOff = basenameOffset(p)
+    int i = len - 1
+    while (i > bOff) {
+        address ip = p + i
+        byte ib = ip::value
+        int ibi = cast ib
+        if (ibi == 46) { return i }   // '.'
+        i = i - 1
+    }
+    return -1
+}
+
+// ── parallel build helpers ────────────────────────────────────────────────────
+
+// Parse an unsigned decimal string; returns 0 on invalid input.
+function parseIntStr(address s) int {
+    int n = 0
+    address p = s
+    bool done = false
+    while (!done) {
+        byte cb = p::value
+        int ci = cast cb
+        if (ci < '0' || ci > '9') { done = true }
+        if (!done) {
+            n = n * 10 + (ci - 48)
+            p = p + 1
+        }
+    }
+    return n
+}
+
+// Spawn fn(arg) on a new OS thread; return the raw statePtr.
+// statePtr layout (16 bytes): [0..7] state (0=pending, 1=done), [8..15] return value.
+// Caller must call buildWait(sp) then deallocate(sp).
+function buildSpawn(address fn, address arg) address {
+    address statePtr = allocate 16
+    statePtr::value = 0
+    address valSlot = statePtr + 8
+    valSlot::value = null
+
+    address thunkArgs = allocate 24
+    thunkArgs::value = fn
+    address argSlot = thunkArgs + 8
+    argSlot::value = arg
+    address stSlot = thunkArgs + 16
+    stSlot::value = statePtr
+
+    address thunkAddr = asyncThunk::address
+    address tidPtr = allocate 8
+    pthread_create(tidPtr, null, thunkAddr, thunkArgs)
+    int tid = tidPtr::value
+    pthread_detach(tid)
+    deallocate tidPtr
+
+    return statePtr
+}
+
+// Block until a statePtr signals completion.
+function buildWait(address sp) {
+    bool done = false
+    while (!done) {
+        int st = sp::value
+        if (st != 0) { done = true }
+        if (!done) { futex_wait(sp, 0) }
+    }
+}
+
+// Thread pool worker for parallel compilation.
+// Pool state layout (72 bytes, heap-allocated, shared read-only except nextIdx):
+//   [0]  address fileBuf    — raw buffer of nFiles file-path addresses
+//   [8]  int     fileCount  — total files to compile
+//   [16] int     nextIdx    — next file index to claim (mutex-protected)
+//   [24] address idxMutex   — heap-allocated pthread_mutex_t
+//   [32] address resultBuf  — raw buffer for nFiles result .o addresses
+//   [40] address llDir
+//   [48] address oDir
+//   [56] int     profile
+//   [64] address hopRoot
+// Workers atomically claim a file index, compile it, store the .o path,
+// then repeat until all files are claimed.  Does NOT free poolState.
+function poolWorker(address poolState) address {
+    address ps8  = poolState + 8
+    address ps16 = poolState + 16
+    address ps24 = poolState + 24
+    address ps32 = poolState + 32
+    address ps40 = poolState + 40
+    address ps48 = poolState + 48
+    address ps56 = poolState + 56
+    address ps64 = poolState + 64
+
+    address fileBuf   = poolState::value
+    int     fileCount = ps8::value
+    address idxMutex  = ps24::value
+    address resultBuf = ps32::value
+    address llDir     = ps40::value
+    address oDir      = ps48::value
+    int     profile   = ps56::value
+    address hopRoot   = ps64::value
+
+    bool done = false
+    while (!done) {
+        pthread_mutex_lock(idxMutex)
+        int myIdx = ps16::value
+        int nextVal = myIdx + 1
+        ps16::value = nextVal
+        pthread_mutex_unlock(idxMutex)
+
+        if (myIdx >= fileCount) { done = true }
+        if (!done) {
+            address fslot = fileBuf + (myIdx * 8)
+            address f = fslot::value
+            address obj = compileFile(f, llDir, oDir, profile, hopRoot)
+            address rslot = resultBuf + (myIdx * 8)
+            rslot::value = obj
+        }
+    }
+    return null
+}
+
+// ── compile one .hop file ─────────────────────────────────────────────────────
+
+// Compile hopFile → llDir/<stem>.ll → oDir/<stem>.o using StringBuilder.
+// Returns heap-allocated path to the .o file.
+function compileFile(address hopFile, address llDir, address oDir, int profile, address hopRoot) address {
+    int fileLen = strLen(hopFile)
+    int bOff    = basenameOffset(hopFile)
+    int eOff    = extOffset(hopFile)
+    if (eOff < 0) { eOff = fileLen }
+    int stemLen = eOff - bOff
+
+    // Build llPath = llDir/stem.ll
+    StringBuilder llSb = StringBuilder(256)
+    llSb.appendStr(llDir)
+    llSb.appendChar('/')
+    int si = 0
+    while (si < stemLen) {
+        address sp = hopFile + bOff + si
+        byte sb_ = sp::value
+        llSb.appendChar(sb_)
+        si = si + 1
+    }
+    llSb.appendStr(".ll")
+    llSb.appendChar('\0')
+
+    // Build oPath = oDir/stem.o
+    StringBuilder oSb = StringBuilder(256)
+    oSb.appendStr(oDir)
+    oSb.appendChar('/')
+    si = 0
+    while (si < stemLen) {
+        address sp = hopFile + bOff + si
+        byte sb_ = sp::value
+        oSb.appendChar(sb_)
+        si = si + 1
+    }
+    oSb.appendStr(".o")
+    oSb.appendChar('\0')
+
+    // Step 1: .hop → .ll
+    StringBuilder step1 = StringBuilder(512)
+    step1.appendStr("node \"")
+    step1.appendStr(hopRoot)
+    step1.appendStr("/kindling/hopperc.js\" \"")
+    step1.appendStr(hopFile)
+    step1.appendStr("\" -o \"")
+    step1.appendStr(llSb.str())
+    step1.appendStr("\"")
+    step1.appendChar('\0')
+    shellMust(step1.str())
+
+    // Step 2: .ll → .o
+    StringBuilder step2 = StringBuilder(512)
+    step2.appendStr("clang ")
+    step2.appendStr(clangCompileFlags(profile))
+    step2.appendStr(" \"")
+    step2.appendStr(llSb.str())
+    step2.appendStr("\" -o \"")
+    step2.appendStr(oSb.str())
+    step2.appendStr("\"")
+    step2.appendChar('\0')
+    shellMust(step2.str())
+
+    return strCopy(oSb.str())
+}
+
+// ── hopper build ─────────────────────────────────────────────────────────────
+
+function cmdBuild(int argc, string[] argv) {
+    int profile = PROF_DEV
+    int jobs = 1
+    address outOverride = null
+    Array<address> files = Array(8)
+
+    int i = 2
+    while (i < argc) {
+        address arg = cast argv[i]
+        i = i + 1
+        if (strEq(arg, "--production")) {
+            profile = PROF_PRODUCTION
+            continue
+        }
+        if (strEq(arg, "--test")) {
+            profile = PROF_TEST
+            continue
+        }
+        if (strEq(arg, "--dev")) { continue }
+        if (strEq(arg, "-o")) {
+            if (i < argc) {
+                outOverride = cast argv[i]
+                i = i + 1
+            }
+            continue
+        }
+        if (strEq(arg, "-j")) {
+            if (i < argc) {
+                address jval = cast argv[i]
+                jobs = parseIntStr(jval)
+                if (jobs < 1) { jobs = 1 }
+                i = i + 1
+            }
+            continue
+        }
+        files.push(arg)
+    }
+    if (files.empty()) { files.push("main.hop") }
+
+    // Verify files exist
+    int fi = 0
+    while (fi < files.len()) {
+        address f = files.get(fi)
+        if (!pathExists(f)) {
+            eprint("hopper: file not found: ")
+            eprintln(f)
+            exit(1)
+        }
+        fi = fi + 1
+    }
+
+    // Project root from the first file's directory
+    address firstFile = files.get(0)
+    Path firstDir = Path(firstFile)
+    Path fd = firstDir.dirname()
+    address root = findProjectRoot(fd.str())
+
+    // Build directories: root/build/<profile>/ll  and  .../o
+    Path buildDir = Path(root)
+    buildDir.join("build")
+    buildDir.join(profileName(profile))
+
+    Path llDir = Path(buildDir.str())
+    llDir.join("ll")
+    Path oDir = Path(buildDir.str())
+    oDir.join("o")
+
+    mkdirP(llDir.str())
+    mkdirP(oDir.str())
+
+    // Binary name from hopper.json, or fallback to first file's stem
+    address binName = readManifest(root, "name")
+    if (binName == null) {
+        int eOff = extOffset(firstFile)
+        int bOff = basenameOffset(firstFile)
+        if (eOff < 0) { eOff = strLen(firstFile) }
+        int stemLen = eOff - bOff
+        binName = allocate stemLen + 1
+        int bi_ = 0
+        while (bi_ < stemLen) {
+            address sp = firstFile + bOff + bi_
+            address dp = binName + bi_
+            byte b = sp::value
+            dp::value = b
+            bi_ = bi_ + 1
+        }
+        address bnTerm = binName + stemLen
+        byte z = 0
+        bnTerm::value = z
+    }
+
+    address hopRoot = findHopperRoot()
+
+    // Compile all files — parallel when -j N > 1, serial otherwise.
+    Array<address> objs = Array(8)
+
+    if (jobs > 1) {
+        // Thread pool: spawn `jobs` persistent workers; each atomically claims
+        // the next file index until all files are done.  No idle time at batch
+        // boundaries — a free worker immediately picks up the next file.
+        int nFiles = files.len()
+
+        // Copy file paths into a flat raw buffer so workers can index without
+        // holding a reference to the Array object.
+        address fileBuf = allocate nFiles * 8
+        int fbi = 0
+        while (fbi < nFiles) {
+            address fslot = fileBuf + (fbi * 8)
+            fslot::value = files.get(fbi)
+            fbi = fbi + 1
+        }
+
+        // Result buffer — worker i writes its .o path at resultBuf[fileIdx*8].
+        address resultBuf = allocate nFiles * 8
+
+        // Mutex protecting the shared next-index counter.
+        address idxMutex = allocate 64
+        memset(idxMutex, 0, 64)
+        pthread_mutex_init(idxMutex, null)
+
+        // Build the pool state shared by all workers.
+        address poolState = allocate 72
+        address ps8  = poolState + 8
+        address ps16 = poolState + 16
+        address ps24 = poolState + 24
+        address ps32 = poolState + 32
+        address ps40 = poolState + 40
+        address ps48 = poolState + 48
+        address ps56 = poolState + 56
+        address ps64 = poolState + 64
+        poolState::value = fileBuf
+        ps8::value       = nFiles
+        ps16::value      = 0
+        ps24::value      = idxMutex
+        ps32::value      = resultBuf
+        ps40::value      = llDir.str()
+        ps48::value      = oDir.str()
+        ps56::value      = profile
+        ps64::value      = hopRoot
+
+        // Spawn exactly `jobs` workers — all receive the same poolState pointer.
+        address wfn = poolWorker::address
+        Array<address> workerSPs = Array(jobs)
+        int wi = 0
+        while (wi < jobs) {
+            address sp = buildSpawn(wfn, poolState)
+            workerSPs.push(sp)
+            wi = wi + 1
+        }
+
+        // Wait for all workers to finish.
+        int wj = 0
+        while (wj < workerSPs.len()) {
+            address sp = workerSPs.get(wj)
+            buildWait(sp)
+            deallocate sp
+            wj = wj + 1
+        }
+
+        // Collect results in original file order.
+        int ri = 0
+        while (ri < nFiles) {
+            address rslot = resultBuf + (ri * 8)
+            address obj = rslot::value
+            objs.push(obj)
+            ri = ri + 1
+        }
+
+        pthread_mutex_destroy(idxMutex)
+        deallocate idxMutex
+        deallocate resultBuf
+        deallocate fileBuf
+        deallocate poolState
+    } else {
+        // Serial (original behaviour).
+        fi = 0
+        while (fi < files.len()) {
+            address f = files.get(fi)
+            address obj = compileFile(f, llDir.str(), oDir.str(), profile, hopRoot)
+            objs.push(obj)
+            fi = fi + 1
+        }
+    }
+
+    // Binary output path
+    Path outPath = Path(buildDir.str())
+    outPath.join(binName)
+    address outFile = outOverride
+    if (outFile == null) { outFile = outPath.str() }
+
+    // Link
+    StringBuilder linkCmd = StringBuilder(1024)
+    linkCmd.appendStr("clang")
+    fi = 0
+    while (fi < objs.len()) {
+        address obj = objs.get(fi)
+        linkCmd.appendStr(" \"")
+        linkCmd.appendStr(obj)
+        linkCmd.appendStr("\"")
+        fi = fi + 1
+    }
+    linkCmd.appendStr(" -o \"")
+    linkCmd.appendStr(outFile)
+    linkCmd.appendStr("\"")
+    linkCmd.appendChar('\0')
+    shellMust(linkCmd.str())
+
+    print("built [")
+    print(profileName(profile))
+    print("]: ")
+    println(outFile)
+
+    deallocate binName
+    deallocate root
+    deallocate hopRoot
+    fi = 0
+    while (fi < objs.len()) {
+        deallocate objs.get(fi)
+        fi = fi + 1
+    }
+}
+
+// ── hopper run ────────────────────────────────────────────────────────────────
+
+function cmdRun(int argc, string[] argv) {
+    if (argc >= 3) {
+        address bin = cast argv[2]
+        if (!pathExists(bin)) {
+            eprint("hopper: binary not found: ")
+            eprintln(bin)
+            exit(1)
+        }
+        StringBuilder cmd = StringBuilder(512)
+        cmd.appendStr("\"")
+        cmd.appendStr(bin)
+        cmd.appendStr("\"")
+        int i = 3
+        while (i < argc) {
+            address arg = cast argv[i]
+            cmd.appendStr(" \"")
+            cmd.appendStr(arg)
+            cmd.appendStr("\"")
+            i = i + 1
+        }
+        cmd.appendChar('\0')
+        exit(shellCode(cmd.str()))
+        return
+    }
+
+    // No binary specified — find from hopper.json
+    address wdBuf = allocate 4096
+    getcwd(wdBuf, 4095)
+    address root = findProjectRoot(wdBuf)
+    deallocate wdBuf
+
+    address name = readManifest(root, "name")
+    if (name == null) { name = strCopy("main") }
+
+    Path bin = Path(root)
+    bin.join("build/dev")
+    bin.join(name)
+    deallocate name
+
+    if (!pathExists(bin.str())) {
+        eprint("hopper: no binary at ")
+        eprint(bin.str())
+        eprintln(" — run 'hopper build' first")
+        deallocate root
+        exit(1)
+    }
+
+    StringBuilder cmd = StringBuilder(256)
+    cmd.appendStr("\"")
+    cmd.appendStr(bin.str())
+    cmd.appendStr("\"")
+    cmd.appendChar('\0')
+    int code = shellCode(cmd.str())
+    deallocate root
+    exit(code)
+}
+
+// ── hopper test ───────────────────────────────────────────────────────────────
+
+function cmdTest(int argc, string[] argv) {
+    address hopRoot = findHopperRoot()
+
+    Path testScript = Path(hopRoot)
+    testScript.join("kindling/tools/test.js")
+
+    StringBuilder cmd = StringBuilder(512)
+    cmd.appendStr("node \"")
+    cmd.appendStr(testScript.str())
+    cmd.appendStr("\"")
+    int i = 2
+    while (i < argc) {
+        address arg = cast argv[i]
+        cmd.appendStr(" \"")
+        cmd.appendStr(arg)
+        cmd.appendStr("\"")
+        i = i + 1
+    }
+    cmd.appendChar('\0')
+
+    int code = shellCode(cmd.str())
+    deallocate hopRoot
+    exit(code)
+}
+
+// ── hopper check ─────────────────────────────────────────────────────────────
+
+function cmdCheck(int argc, string[] argv) {
+    address sanFlags = "-fsanitize=address"
+    Array<address> files = Array(8)
+
+    int i = 2
+    while (i < argc) {
+        address arg = cast argv[i]
+        i = i + 1
+        if (strEq(arg, "--asan")) {
+            sanFlags = "-fsanitize=address"
+            continue
+        }
+        if (strEq(arg, "--tsan")) {
+            sanFlags = "-fsanitize=thread"
+            continue
+        }
+        if (strEq(arg, "--ubsan")) {
+            sanFlags = "-fsanitize=undefined"
+            continue
+        }
+        if (strEq(arg, "--msan")) {
+            sanFlags = "-fsanitize=memory"
+            continue
+        }
+        files.push(arg)
+    }
+    if (files.empty()) { files.push("main.hop") }
+
+    address firstFile = files.get(0)
+    Path fd = Path(firstFile)
+    Path fdir = fd.dirname()
+    address root = findProjectRoot(fdir.str())
+
+    Path buildDir = Path(root)
+    buildDir.join("build/dev")
+    Path llDir = Path(buildDir.str())
+    llDir.join("ll")
+    Path oDir  = Path(buildDir.str())
+    oDir.join("o")
+
+    mkdirP(llDir.str())
+    mkdirP(oDir.str())
+
+    address hopRoot = findHopperRoot()
+    Array<address> objs = Array(8)
+    int fi = 0
+    while (fi < files.len()) {
+        address f = files.get(fi)
+        objs.push(compileFile(f, llDir.str(), oDir.str(), PROF_DEV, hopRoot))
+        fi = fi + 1
+    }
+
+    Path outBin = Path(buildDir.str())
+    outBin.join("check")
+
+    StringBuilder linkCmd = StringBuilder(512)
+    linkCmd.appendStr("clang")
+    fi = 0
+    while (fi < objs.len()) {
+        address obj = objs.get(fi)
+        linkCmd.appendStr(" \"")
+        linkCmd.appendStr(obj)
+        linkCmd.appendStr("\"")
+        fi = fi + 1
+    }
+    linkCmd.appendStr(" ")
+    linkCmd.appendStr(sanFlags)
+    linkCmd.appendStr(" -o \"")
+    linkCmd.appendStr(outBin.str())
+    linkCmd.appendStr("\"")
+    linkCmd.appendChar('\0')
+    shellMust(linkCmd.str())
+
+    print("check build: ")
+    print(outBin.str())
+    print("  (")
+    print(sanFlags)
+    println(")")
+    print("run with: ")
+    println(outBin.str())
+
+    deallocate root
+    deallocate hopRoot
+    fi = 0
+    while (fi < objs.len()) {
+        deallocate objs.get(fi)
+        fi = fi + 1
+    }
+}
+
+// ── hopper init ───────────────────────────────────────────────────────────────
+
+function cmdInit(int argc, string[] argv) {
+    if (argc < 3) {
+        eprintln("hopper: init requires a project name  —  hopperc init <name>")
+        exit(1)
+    }
+
+    address rawName  = cast argv[2]
+    address safeName = strCopy(rawName)
+
+    // Sanitise name
+    int nlen = strLen(safeName)
+    int ni = 0
+    while (ni < nlen) {
+        address np = safeName + ni
+        byte nb = np::value
+        int nbi = cast nb
+        bool ok = (nbi >= 65 && nbi <= 90) || (nbi >= 97 && nbi <= 122) || (nbi >= 48 && nbi <= 57) || nbi == 95 || nbi == 45
+        if (!ok) {
+            byte under = cast 95
+            np::value = under
+        }
+        ni = ni + 1
+    }
+
+    if (pathExists(safeName)) {
+        eprint("hopper: '")
+        eprint(safeName)
+        eprintln("' already exists")
+        exit(1)
+    }
+
+    bool isLib = false
+    int ai = 3
+    while (ai < argc) {
+        address arg = cast argv[ai]
+        if (strEq(arg, "--lib") || strEq(arg, "-l")) { isLib = true }
+        ai = ai + 1
+    }
+
+    // Directory structure
+    Path srcDir  = Path(safeName)
+    srcDir.join("src")
+    Path modDir  = Path(safeName)
+    modDir.join("modules")
+    Path testDir = Path(safeName)
+    testDir.join("tests")
+
+    mkdirP(srcDir.str())
+    mkdirP(modDir.str())
+    mkdirP(testDir.str())
+
+    // .gitignore
+    Path giPath = Path(safeName)
+    giPath.join(".gitignore")
+    FileWriter gi = FileWriter(giPath.str())
+    gi.writeStr("build/\n")
+
+    // .gitkeep files
+    Path mkp = Path(modDir.str())
+    mkp.join(".gitkeep")
+    FileWriter mk = FileWriter(mkp.str())
+
+    Path tkp = Path(testDir.str())
+    tkp.join(".gitkeep")
+    FileWriter tk = FileWriter(tkp.str())
+
+    // hopper.json
+    Path hjp = Path(safeName)
+    hjp.join("hopper.json")
+    FileWriter hj = FileWriter(hjp.str())
+    hj.writeStr("{\n  \"name\": \"")
+    hj.writeStr(safeName)
+    hj.writeStr("\",\n  \"version\": \"0.1.0\",\n  \"description\": \"\",\n  \"license\": \"MIT\",\n")
+    if (isLib) {
+        hj.writeStr("  \"type\": \"library\",\n  \"main\": \"src/main.hop\",\n  \"dependencies\": {}\n}\n")
+    } else {
+        hj.writeStr("  \"type\": \"executable\",\n  \"entry\": \"main.hop\",\n  \"scripts\": {\n")
+        hj.writeStr("    \"build\":  \"hopperc build\",\n    \"run\":    \"hopperc run\",\n")
+        hj.writeStr("    \"test\":   \"hopperc test\",\n    \"check\":  \"hopperc check\"\n  },\n")
+        hj.writeStr("  \"dependencies\": {}\n}\n")
+    }
+
+    // Main source file
+    if (isLib) {
+        Path lm = Path(srcDir.str())
+        lm.join("main.hop")
+        FileWriter lmw = FileWriter(lm.str())
+        lmw.writeStr("// ")
+        lmw.writeStr(safeName)
+        lmw.writeStr("\n")
+    } else {
+        Path em = Path(safeName)
+        em.join("main.hop")
+        FileWriter emw = FileWriter(em.str())
+        emw.writeStr("import io from core\n\nentry main {\n    println(\"Hello from ")
+        emw.writeStr(safeName)
+        emw.writeStr("!\")\n}\n")
+    }
+
+    // Summary
+    println("")
+    print("created ")
+    print(safeName)
+    println("/")
+    if (!isLib) {
+        print("  ")
+        print(safeName)
+        println("/main.hop")
+    }
+    print("  ")
+    print(safeName)
+    println("/hopper.json")
+    print("  ")
+    print(safeName)
+    println("/src/")
+    print("  ")
+    print(safeName)
+    println("/modules/")
+    print("  ")
+    print(safeName)
+    println("/tests/")
+    println("")
+    if (isLib) {
+        print("  import ")
+        print(safeName)
+        println(" from <parent-module>")
+    } else {
+        print("  cd ")
+        print(safeName)
+        println(" && hopperc run")
+    }
+
+    deallocate safeName
+}
+
+// ── hopper flash ─────────────────────────────────────────────────────────────
+
+// True if buf[0..len) contains needle.
+function flashContains(address buf, int len, address needle) bool {
+    int nLen = strLen(needle)
+    if (nLen == 0) { return true }
+    int i = 0
+    while (i <= len - nLen) {
+        bool match = true
+        int j = 0
+        while (j < nLen) {
+            address hp = buf + i + j
+            address np = needle + j
+            byte hb = hp::value
+            byte nb = np::value
+            if (hb != nb) {
+                match = false
+                break
+            }
+            j = j + 1
+        }
+        if (match) { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// Scan /proc/mounts for a vfat entry whose mount point contains bootcode.bin.
+// Returns heap-allocated mount path, or null if not found.
+function flashDetectSdCard() address {
+    address mntsBuf = allocate 16384
+    int n = fileRead("/proc/mounts", mntsBuf, 16384)
+    if (n < 0) {
+        deallocate mntsBuf
+        return null
+    }
+
+    int lineStart = 0
+    while (lineStart < n) {
+        int lineEnd = lineStart
+        while (lineEnd < n) {
+            address ep = mntsBuf + lineEnd
+            byte eb = ep::value
+            int ebi = cast eb
+            if (ebi == 10 || ebi == 0) { break }
+            lineEnd = lineEnd + 1
+        }
+        int lineLen = lineEnd - lineStart
+        address line = mntsBuf + lineStart
+
+        if (flashContains(line, lineLen, "vfat")) {
+            // Skip device field
+            int fi = 0
+            while (fi < lineLen) {
+                address fp = line + fi
+                byte fb = fp::value
+                int fbi = cast fb
+                if (fbi == 32 || fbi == 9) { break }
+                fi = fi + 1
+            }
+            // Skip whitespace
+            while (fi < lineLen) {
+                address fp = line + fi
+                byte fb = fp::value
+                int fbi = cast fb
+                if (fbi != 32 && fbi != 9) { break }
+                fi = fi + 1
+            }
+            // Read mount point
+            int mStart = fi
+            while (fi < lineLen) {
+                address fp = line + fi
+                byte fb = fp::value
+                int fbi = cast fb
+                if (fbi == 32 || fbi == 9) { break }
+                fi = fi + 1
+            }
+            int mLen = fi - mStart
+            if (mLen > 0) {
+                address mpt = allocate mLen + 1
+                int mi = 0
+                while (mi < mLen) {
+                    address ms = line + mStart + mi
+                    address md = mpt + mi
+                    byte mb = ms::value
+                    md::value = mb
+                    mi = mi + 1
+                }
+                address mTerm = mpt + mLen
+                byte z = 0
+                mTerm::value = z
+
+                StringBuilder chk = StringBuilder(256)
+                chk.appendStr(mpt)
+                chk.appendStr("/bootcode.bin")
+                chk.appendChar('\0')
+                if (pathExists(chk.str())) {
+                    deallocate mntsBuf
+                    return mpt
+                }
+                deallocate mpt
+            }
+        }
+
+        lineStart = lineEnd + 1
+    }
+
+    deallocate mntsBuf
+    return null
+}
+
+// Return 1 if line was appended to cfgPath, 0 if already present.
+function flashEnsureConfigLine(address cfgPath, address line) int {
+    int lineLen = strLen(line)
+    address cfgBuf = allocate 8192
+    int n = fileRead(cfgPath, cfgBuf, 8191)
+    if (n < 0) { n = 0 }
+
+    bool found = false
+    int pos = 0
+    while (pos < n) {
+        int lEnd = pos
+        while (lEnd < n) {
+            address ep = cfgBuf + lEnd
+            byte eb = ep::value
+            int ebi = cast eb
+            if (ebi == 10 || ebi == 13) { break }
+            lEnd = lEnd + 1
+        }
+        int lLen = lEnd - pos
+        if (lLen == lineLen) {
+            bool match = true
+            int j = 0
+            while (j < lLen) {
+                address lp = cfgBuf + pos + j
+                address rp = line + j
+                byte lb = lp::value
+                byte rb = rp::value
+                if (lb != rb) {
+                    match = false
+                    break
+                }
+                j = j + 1
+            }
+            if (match) { found = true }
+        }
+        pos = lEnd
+        while (pos < n) {
+            address ep2 = cfgBuf + pos
+            byte eb2 = ep2::value
+            int ebi2 = cast eb2
+            if (ebi2 != 10 && ebi2 != 13) { break }
+            pos = pos + 1
+        }
+    }
+    deallocate cfgBuf
+    if (found) { return 0 }
+
+    StringBuilder cmd = StringBuilder(512)
+    cmd.appendStr("printf '%s\\n' '")
+    cmd.appendStr(line)
+    cmd.appendStr("' >> '")
+    cmd.appendStr(cfgPath)
+    cmd.appendStr("'")
+    cmd.appendChar('\0')
+    shellCode(cmd.str())
+    return 1
+}
+
+function cmdFlash(int argc, string[] argv) {
+    address mountArg = null
+    bool dryRun = false
+
+    int i = 2
+    while (i < argc) {
+        address arg = cast argv[i]
+        i = i + 1
+        if (strEq(arg, "--dry-run")) {
+            dryRun = true
+            continue
+        }
+        if (strEq(arg, "--mount") || strEq(arg, "-m")) {
+            if (i < argc) {
+                mountArg = cast argv[i]
+                i = i + 1
+            }
+            continue
+        }
+    }
+
+    address wdBuf = allocate 4096
+    getcwd(wdBuf, 4095)
+    address root = findProjectRoot(wdBuf)
+    deallocate wdBuf
+
+    address boardName = readManifest(root, "board")
+    if (boardName == null) {
+        eprintln("hopper: 'board' is not set in hopper.json")
+        eprintln("  flash only works for bare-metal targets (e.g. pi-zero)")
+        deallocate root
+        exit(1)
+    }
+
+    if (!strEq(boardName, "pi-zero")) {
+        eprint("hopper: unknown board '")
+        eprint(boardName)
+        eprintln("' — only 'pi-zero' is supported")
+        deallocate boardName
+        deallocate root
+        exit(1)
+    }
+
+    address projName = readManifest(root, "name")
+    if (projName == null) { projName = strCopy("project") }
+
+    // Locate kernel.img
+    Path buildDir = Path(root)
+    buildDir.join("build/dev")
+    Path imgPath = Path(buildDir.str())
+    imgPath.join("kernel.img")
+
+    if (!pathExists(imgPath.str())) {
+        eprint("hopper: kernel.img not found at ")
+        eprintln(buildDir.str())
+        eprintln("  Run 'hopper build' first.")
+        deallocate boardName
+        deallocate projName
+        deallocate root
+        exit(1)
+    }
+
+    // Try to read meta.json for summary info
+    Path metaPath = Path(buildDir.str())
+    StringBuilder metaName = StringBuilder(128)
+    metaName.appendStr(projName)
+    metaName.appendStr(".meta.json")
+    metaName.appendChar('\0')
+    metaPath.join(metaName.str())
+    address metaArch = "armv6"
+    address metaBits = "32"
+    address metaLoad = "0x8000"
+    if (pathExists(metaPath.str())) {
+        address metaBuf = allocate 2048
+        int mn = fileRead(metaPath.str(), metaBuf, 2047)
+        if (mn > 0) {
+            address ma = jsonGetString(metaBuf, mn, "arch")
+            if (ma != null) { metaArch = ma }
+            address ml = jsonGetString(metaBuf, mn, "loadAddress")
+            if (ml != null) { metaLoad = ml }
+        }
+        deallocate metaBuf
+    }
+
+    // Find mount point
+    address mountPoint = mountArg
+    if (mountPoint == null) {
+        mountPoint = flashDetectSdCard()
+        if (mountPoint == null) {
+            eprintln("hopper: could not auto-detect an SD card with bootcode.bin.")
+            eprintln("")
+            eprintln("  Make sure the card is mounted and contains the Pi Zero firmware,")
+            eprintln("  then try again, or specify the path explicitly:")
+            eprintln("    hopperc flash --mount /path/to/sdcard")
+            eprintln("")
+            eprintln("  The SD card needs these blobs in its root:")
+            eprintln("    bootcode.bin  start.elf")
+            deallocate boardName
+            deallocate projName
+            deallocate root
+            exit(1)
+        }
+    }
+
+    // Verify required firmware
+    Path chkBoot = Path(mountPoint)
+    chkBoot.join("bootcode.bin")
+    Path chkStart = Path(mountPoint)
+    chkStart.join("start.elf")
+    bool missingBoot  = !pathExists(chkBoot.str())
+    bool missingStart = !pathExists(chkStart.str())
+    if (missingBoot || missingStart) {
+        eprint("hopper: missing firmware on SD card at ")
+        eprintln(mountPoint)
+        if (missingBoot)  { eprintln("  missing: bootcode.bin") }
+        if (missingStart) { eprintln("  missing: start.elf") }
+        eprintln("")
+        eprintln("  Download from: https://github.com/raspberrypi/firmware/tree/master/boot")
+        deallocate boardName
+        deallocate projName
+        deallocate root
+        exit(1)
+    }
+
+    // Summary
+    println("")
+    print("hopper: flash  ")
+    print(projName)
+    print("  ->  ")
+    println(mountPoint)
+    print("  board     ")
+    print(boardName)
+    print("  (")
+    print(metaArch)
+    print(" little-endian ")
+    print(metaBits)
+    print("-bit, load ")
+    print(metaLoad)
+    println(")")
+    print("  image     ")
+    println(imgPath.str())
+    print("  firmware  bootcode.bin ")
+    println("[ok]")
+    print("  firmware  start.elf    ")
+    println("[ok]")
+
+    if (dryRun) {
+        println("")
+        println("  [dry run — nothing written]")
+        println("")
+        deallocate boardName
+        deallocate projName
+        deallocate root
+        return
+    }
+
+    // Copy kernel.img
+    Path destImg = Path(mountPoint)
+    destImg.join("kernel.img")
+    StringBuilder cpCmd = StringBuilder(512)
+    cpCmd.appendStr("cp '")
+    cpCmd.appendStr(imgPath.str())
+    cpCmd.appendStr("' '")
+    cpCmd.appendStr(destImg.str())
+    cpCmd.appendStr("'")
+    cpCmd.appendChar('\0')
+    shellMust(cpCmd.str())
+    print("  wrote     ")
+    println(destImg.str())
+
+    // Ensure config.txt
+    Path cfgPath = Path(mountPoint)
+    cfgPath.join("config.txt")
+    int added = 0
+    added = added + flashEnsureConfigLine(cfgPath.str(), "init_uart_clock=3000000")
+    added = added + flashEnsureConfigLine(cfgPath.str(), "dtparam=act_led_trigger=none")
+    if (added > 0) {
+        print("  config.txt  (+")
+        printInt(added)
+        println(" lines)")
+    } else {
+        println("  config.txt  already up to date")
+    }
+
+    // Sync
+    shellCode("sync")
+
+    println("")
+    println("hopper: done — eject SD card, insert in Pi Zero, power on")
+    println("")
+
+    deallocate boardName
+    deallocate projName
+    deallocate root
+}
+
+// ── hopper ir ─────────────────────────────────────────────────────────────────
+
+function cmdIR(int argc, string[] argv) {
+    if (argc < 3) {
+        eprintln("hopper: ir requires a file")
+        exit(1)
+    }
+    address hopFile = cast argv[2]
+    address hopRoot = findHopperRoot()
+
+    Path hopperc = Path(hopRoot)
+    hopperc.join("kindling/hopperc.js")
+
+    StringBuilder cmd = StringBuilder(512)
+    cmd.appendStr("node \"")
+    cmd.appendStr(hopperc.str())
+    cmd.appendStr("\" \"")
+    cmd.appendStr(hopFile)
+    cmd.appendStr("\"")
+    cmd.appendChar('\0')
+
+    int code = shellCode(cmd.str())
+    deallocate hopRoot
+    exit(code)
+}
+
+// ── usage ─────────────────────────────────────────────────────────────────────
+
+function usage() {
+    println("")
+    println("  Hopper  — systems programming language")
+    println("")
+    println("  hopperc init <name> [--lib]              scaffold a new project")
+    println("  hopperc build [file.hop] [-o out]        compile (default: main.hop)")
+    println("  hopperc build [--production|--test]      build with profile")
+    println("  hopperc run [binary]                     run the dev build")
+    println("  hopperc test [module...]                 run tests")
+    println("  hopperc check [--asan|--tsan|--ubsan|--msan]")
+    println("                                           sanitizer build")
+    println("  hopperc flash [--mount <path>]           flash bare-metal image to SD card")
+    println("  hopperc flash [--dry-run]                show what would be flashed")
+    println("  hopperc ir <file.hop>                    print LLVM IR")
+    println("  hopperc help                             this message")
+    println("")
+    println("  Set HOPPER_ROOT to the Hopper repository root.")
+    println("")
+}
+
+// ── entry point ───────────────────────────────────────────────────────────────
+
+entry main(int argc, string[] argv) {
+    if (argc < 2) {
+        usage()
+        exit(1)
+    }
+
+    address sub = cast argv[1]
+
+    if (strEq(sub, "build")) {
+        cmdBuild(argc, argv)
+        return
+    }
+    if (strEq(sub, "run")) {
+        cmdRun(argc, argv)
+        return
+    }
+    if (strEq(sub, "test")) {
+        cmdTest(argc, argv)
+        return
+    }
+    if (strEq(sub, "init")) {
+        cmdInit(argc, argv)
+        return
+    }
+    if (strEq(sub, "check")) {
+        cmdCheck(argc, argv)
+        return
+    }
+    if (strEq(sub, "ir")) {
+        cmdIR(argc, argv)
+        return
+    }
+    if (strEq(sub, "flash")) {
+        cmdFlash(argc, argv)
+        return
+    }
+    if (strEq(sub, "help")) {
+        usage()
+        return
+    }
+    if (strEq(sub, "-c")) {
+        cmdBuild(argc, argv)
+        return
+    }
+    if (strEq(sub, "--compile")) {
+        cmdBuild(argc, argv)
+        return
+    }
+    if (strEq(sub, "-r")) {
+        cmdRun(argc, argv)
+        return
+    }
+    if (strEq(sub, "--run")) {
+        cmdRun(argc, argv)
+        return
+    }
+    if (strEq(sub, "--ir")) {
+        cmdIR(argc, argv)
+        return
+    }
+
+    eprint("hopper: unknown subcommand '")
+    eprint(sub)
+    eprintln("'")
+    usage()
+    exit(1)
+}

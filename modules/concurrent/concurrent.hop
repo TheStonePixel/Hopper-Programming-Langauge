@@ -1,0 +1,339 @@
+// concurrent — async/await, mutex, condvar, and bounded channel for Hopper
+//
+// Primitives
+//   Mutex     — POSIX mutex (pthread_mutex_t).
+//   Condvar   — POSIX condition variable (pthread_cond_t).
+//   Future<T> — Result of an async computation; call .get() to await.
+//   spawn     — Run fn on a new OS thread; returns Future<address>.
+//   Channel<T>— Bounded MPMC queue; send blocks when full, recv when empty.
+//
+// Generics note: T in Future<T> must be cast-compatible with address
+// (int, bool, address, or any pointer-sized type).  Heap-box larger values
+// and use Future<address>.
+//
+// Spawn usage:
+//   function myWork(address arg) address { ... return cast result }
+//   Future<address> f = spawn(myWork::address, arg)
+//   address raw = f.get()
+//   int v = cast raw
+//
+// Mutex / Condvar are not copyable — copying shares the underlying handle
+// and leads to a double-destroy when the copies go out of scope.
+
+import thread from linux
+
+extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
+extern function pthread_detach(int tid) int
+
+extern function pthread_mutex_init(address m, address attr) int
+extern function pthread_mutex_lock(address m) int
+extern function pthread_mutex_trylock(address m) int
+extern function pthread_mutex_unlock(address m) int
+extern function pthread_mutex_destroy(address m) int
+
+extern function pthread_cond_init(address c, address attr) int
+extern function pthread_cond_wait(address c, address m) int
+extern function pthread_cond_signal(address c) int
+extern function pthread_cond_broadcast(address c) int
+extern function pthread_cond_destroy(address c) int
+
+extern function memset(address dst, int c, int n) address
+
+// sizeof(pthread_mutex_t) on Linux x86-64 = 40; 64 for safety.
+const MUTEX_STORAGE = 64
+// sizeof(pthread_cond_t)  on Linux x86-64 = 48; 64 for safety.
+const COND_STORAGE  = 64
+
+// ── Mutex ─────────────────────────────────────────────────────────────────────
+
+class Mutex {
+    address handle
+
+    constructor() {
+        self.handle = allocate MUTEX_STORAGE
+        memset(self.handle, 0, MUTEX_STORAGE)
+        pthread_mutex_init(self.handle, null)
+    }
+
+    function lock() {
+        pthread_mutex_lock(self.handle)
+    }
+
+    function tryLock() bool {
+        int rc = pthread_mutex_trylock(self.handle)
+        return rc == 0
+    }
+
+    function unlock() {
+        pthread_mutex_unlock(self.handle)
+    }
+
+    // Return the raw pthread_mutex_t address for use with Condvar.wait()
+    // or for passing to worker threads via spawn().
+    function rawHandle() address {
+        return self.handle
+    }
+
+    destructor() {
+        pthread_mutex_destroy(self.handle)
+        deallocate self.handle
+    }
+}
+
+// ── Condvar ───────────────────────────────────────────────────────────────────
+
+class Condvar {
+    address handle
+
+    constructor() {
+        self.handle = allocate COND_STORAGE
+        memset(self.handle, 0, COND_STORAGE)
+        pthread_cond_init(self.handle, null)
+    }
+
+    // Atomically release the mutex identified by mutHandle, sleep until
+    // signalled, then reacquire it.  The caller must hold the mutex.
+    // Pass mutex.rawHandle() as mutHandle.
+    function wait(address mutHandle) {
+        pthread_cond_wait(self.handle, mutHandle)
+    }
+
+    function signal() {
+        pthread_cond_signal(self.handle)
+    }
+
+    function broadcast() {
+        pthread_cond_broadcast(self.handle)
+    }
+
+    function rawHandle() address {
+        return self.handle
+    }
+
+    destructor() {
+        pthread_cond_destroy(self.handle)
+        deallocate self.handle
+    }
+}
+
+// ── asyncThunk ────────────────────────────────────────────────────────────────
+// pthread start_routine — ABI: void*(void*).
+//
+// rawArgs layout (24 bytes, heap-allocated by spawn(), freed here):
+//   [0]  address fn       — user callback address
+//   [8]  address arg      — opaque user argument
+//   [16] address statePtr — SharedState to write result into
+
+function asyncThunk(address rawArgs) address {
+    address fn      = rawArgs::value
+    address argSlot = rawArgs + 8
+    address userArg = argSlot::value
+    address stSlot  = rawArgs + 16
+    address statePtr = stSlot::value
+    deallocate rawArgs
+
+    callback(address) address cb = cast fn
+    address result = cb(userArg)
+
+    // Write value before signalling ready (x86-64 TSO guarantees ordering).
+    address valSlot = statePtr + 8
+    valSlot::value  = result
+    statePtr::value = 1
+    futex_wake(statePtr, 2147483647)
+
+    return null
+}
+
+// ── Future<T> ─────────────────────────────────────────────────────────────────
+// SPSC (single-producer, single-consumer) future backed by a futex.
+//
+// SharedState layout (16 bytes, heap-allocated by spawn()):
+//   [0..7]  int state   — 0 = pending, 1 = ready
+//   [8..15] address val — raw result; T result = cast val at call site
+//
+// The Future owns statePtr; do not let it go out of scope before .get()
+// if the background thread may still be writing.
+
+template Future<T> {
+    address statePtr
+
+    constructor(address sp) {
+        self.statePtr = sp
+    }
+
+    // Block until ready, return the typed result.
+    function get() T {
+        address sp = self.statePtr
+        while (true) {
+            int st = sp::value
+            if (st != 0) {
+                break
+            }
+            futex_wait(sp, 0)
+        }
+        address valSlot = sp + 8
+        address rawVal  = valSlot::value
+        T result        = cast rawVal
+        return result
+    }
+
+    // Non-blocking poll — true when the result is available.
+    function isReady() bool {
+        address sp = self.statePtr
+        int st = sp::value
+        return st != 0
+    }
+
+    // Block without returning the value.
+    function wait() {
+        address sp = self.statePtr
+        while (true) {
+            int st = sp::value
+            if (st != 0) {
+                break
+            }
+            futex_wait(sp, 0)
+        }
+    }
+
+    destructor() {
+        deallocate self.statePtr
+    }
+}
+
+// ── spawn ─────────────────────────────────────────────────────────────────────
+// Spawn fn on a new OS thread, return Future<address>.
+//
+// fn  — address of a Hopper function with signature:
+//         function foo(address arg) address
+//       Use   foo::address   to obtain the pointer.
+// arg — opaque value forwarded unchanged to fn.
+//
+// Cast the raw Future<address> result at the call site:
+//   int v = cast f.get()
+
+function spawn(address fn, address arg) Future<address> {
+    // Allocate shared state: [state=0 | value=null]
+    address statePtr = allocate 16
+    statePtr::value  = 0
+    address valSlot  = statePtr + 8
+    valSlot::value   = null
+
+    // Allocate thunk args: [fn | arg | statePtr]
+    address thunkArgs  = allocate 24
+    thunkArgs::value   = fn
+    address argSlot    = thunkArgs + 8
+    argSlot::value     = arg
+    address stSlot     = thunkArgs + 16
+    stSlot::value      = statePtr
+
+    address thunkAddr = asyncThunk::address
+    address tidPtr    = allocate 8
+    pthread_create(tidPtr, null, thunkAddr, thunkArgs)
+    int tid = tidPtr::value
+    pthread_detach(tid)
+    deallocate tidPtr
+
+    Future<address> result = Future(statePtr)
+    return result
+}
+
+// ── Channel<T> ────────────────────────────────────────────────────────────────
+// Bounded MPMC channel backed by a ring buffer.
+// send() blocks when full; recv() blocks when empty.
+//
+// Internal pthread handles are stored directly as address fields to avoid
+// value-copy issues with the Mutex / Condvar class wrappers.
+
+template Channel<T> {
+    address data         // ring buffer: capacity * T::size bytes
+    int     head
+    int     tail
+    int     count
+    int     capacity
+    address mutHandle    // pthread_mutex_t (heap, MUTEX_STORAGE bytes)
+    address neHandle     // pthread_cond_t "not-empty" (heap)
+    address nfHandle     // pthread_cond_t "not-full"  (heap)
+
+    constructor(int cap) {
+        self.data      = allocate cap * T::size
+        self.head      = 0
+        self.tail      = 0
+        self.count     = 0
+        self.capacity  = cap
+        self.mutHandle = allocate MUTEX_STORAGE
+        self.neHandle  = allocate COND_STORAGE
+        self.nfHandle  = allocate COND_STORAGE
+        memset(self.mutHandle, 0, MUTEX_STORAGE)
+        memset(self.neHandle,  0, COND_STORAGE)
+        memset(self.nfHandle,  0, COND_STORAGE)
+        pthread_mutex_init(self.mutHandle, null)
+        pthread_cond_init(self.neHandle,  null)
+        pthread_cond_init(self.nfHandle,  null)
+    }
+
+    // Enqueue val; blocks if the buffer is full.
+    function send(T val) {
+        pthread_mutex_lock(self.mutHandle)
+        while (self.count == self.capacity) {
+            pthread_cond_wait(self.nfHandle, self.mutHandle)
+        }
+        address slot = self.data + (self.tail * T::size)
+        slot::value  = val
+        self.tail    = (self.tail + 1) % self.capacity
+        self.count   = self.count + 1
+        pthread_cond_signal(self.neHandle)
+        pthread_mutex_unlock(self.mutHandle)
+    }
+
+    // Dequeue and return the front element; blocks if empty.
+    function recv() T {
+        pthread_mutex_lock(self.mutHandle)
+        while (self.count == 0) {
+            pthread_cond_wait(self.neHandle, self.mutHandle)
+        }
+        address slot = self.data + (self.head * T::size)
+        T val        = slot::value
+        self.head    = (self.head + 1) % self.capacity
+        self.count   = self.count - 1
+        pthread_cond_signal(self.nfHandle)
+        pthread_mutex_unlock(self.mutHandle)
+        return val
+    }
+
+    // Non-blocking send.  Returns false if full.
+    function trySend(T val) bool {
+        pthread_mutex_lock(self.mutHandle)
+        if (self.count == self.capacity) {
+            pthread_mutex_unlock(self.mutHandle)
+            return false
+        }
+        address slot = self.data + (self.tail * T::size)
+        slot::value  = val
+        self.tail    = (self.tail + 1) % self.capacity
+        self.count   = self.count + 1
+        pthread_cond_signal(self.neHandle)
+        pthread_mutex_unlock(self.mutHandle)
+        return true
+    }
+
+    // Snapshot of the current item count.
+    function len() int {
+        return self.count
+    }
+
+    // True when the buffer holds no items.
+    function empty() bool {
+        return self.count == 0
+    }
+
+    destructor() {
+        pthread_mutex_destroy(self.mutHandle)
+        pthread_cond_destroy(self.neHandle)
+        pthread_cond_destroy(self.nfHandle)
+        deallocate self.mutHandle
+        deallocate self.neHandle
+        deallocate self.nfHandle
+        deallocate self.data
+    }
+}

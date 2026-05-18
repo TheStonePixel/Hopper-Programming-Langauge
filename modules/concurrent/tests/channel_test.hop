@@ -1,0 +1,93 @@
+// TEST: FIFO send / recv
+// EXPECT: len after 3 sends = 3
+// EXPECT: recv 1 = 10
+// EXPECT: recv 2 = 20
+// EXPECT: recv 3 = 30
+// EXPECT: empty after drain = 1
+
+// TEST: trySend on full / after space
+// EXPECT: trySend on full = 0
+// EXPECT: trySend after recv = 1
+
+// TEST: capacity-filling send / recv roundtrip
+// EXPECT: drain sum = 28
+
+// TEST: large value roundtrip
+// EXPECT: large value = 1000000
+
+// NOTE: Channel is a *bounded* queue — send() blocks when full.
+// All single-threaded tests stay within the channel capacity to avoid deadlock.
+// Multi-threaded (producer / consumer) tests are in the integration suite
+// once heap-allocated channel references are supported.
+
+import concurrent from concurrent
+import assert     from core
+extern function printf(string fmt, ...) int
+
+entry main {
+    // ── FIFO ordering ────────────────────────────────────────────────────
+    Channel<int> ch = Channel(4)
+
+    ch.send(10)
+    ch.send(20)
+    ch.send(30)
+    assert(ch.len() == 3, "len after 3 sends\n")
+    printf("len after 3 sends = %lld\n", ch.len())
+
+    int v = ch.recv()
+    assert(v == 10, "recv 1\n")
+    printf("recv 1 = %lld\n", v)
+
+    v = ch.recv()
+    assert(v == 20, "recv 2\n")
+    printf("recv 2 = %lld\n", v)
+
+    v = ch.recv()
+    assert(v == 30, "recv 3\n")
+    printf("recv 3 = %lld\n", v)
+
+    assert(ch.empty(), "empty after drain\n")
+    printf("empty after drain = %lld\n", ch.empty())
+
+    // ── trySend ───────────────────────────────────────────────────────────
+    Channel<int> small = Channel(2)
+    small.send(1)
+    small.send(2)
+
+    bool full = small.trySend(99)
+    assert(full == false, "trySend on full should be false\n")
+    printf("trySend on full = %lld\n", full)
+
+    // Drain one slot, then trySend should succeed.
+    int consumed = small.recv()
+    bool room = small.trySend(99)
+    assert(room == true, "trySend after recv should be true\n")
+    printf("trySend after recv = %lld\n", room)
+
+    // ── capacity-filling send / recv roundtrip ────────────────────────────
+    // Use cap=8 so we can push 8 items without blocking.
+    Channel<int> big = Channel(8)
+    int k = 0
+    while (k < 8) {
+        big.send(k)
+        k = k + 1
+    }
+    assert(big.len() == 8, "len should be 8 after filling capacity\n")
+
+    int dsum = 0
+    int m = 0
+    while (m < 8) {
+        dsum = dsum + big.recv()
+        m = m + 1
+    }
+    // 0+1+2+3+4+5+6+7 = 28
+    assert(dsum == 28, "drain sum of 0..7\n")
+    printf("drain sum = %lld\n", dsum)
+
+    // ── large value roundtrip ─────────────────────────────────────────────
+    Channel<int> lch = Channel(2)
+    lch.send(1000000)
+    int big_v = lch.recv()
+    assert(big_v == 1000000, "large value round-trip\n")
+    printf("large value = %lld\n", big_v)
+}
