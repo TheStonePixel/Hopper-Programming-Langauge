@@ -4,5 +4,5 @@
   "description": "Filesystem path manipulation",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "path.hop"
+  "main": "src/path.hop"
 }

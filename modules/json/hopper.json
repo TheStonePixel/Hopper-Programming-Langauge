@@ -4,5 +4,5 @@
   "description": "JSON parser and value types",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "json.hop"
+  "main": "src/json.hop"
 }

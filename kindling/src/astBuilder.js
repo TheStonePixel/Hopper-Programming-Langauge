@@ -888,14 +888,16 @@ function resolveModuleFiles(moduleName, names, baseDir) {
 }
 
 function filesToLoad(moduleDir, names) {
+    // Prefer src/ subdirectory if present (standard module layout)
+    const srcDir  = path.join(moduleDir, "src");
+    const loadDir = fs.existsSync(srcDir) ? srcDir : moduleDir;
+
     if (names) {
-        // named import: load only requested files
-        return names.map(n => path.join(moduleDir, n + ".hop"));
+        return names.map(n => path.join(loadDir, n + ".hop"));
     } else {
-        // whole module: load all .hop files
-        return fs.readdirSync(moduleDir)
+        return fs.readdirSync(loadDir)
             .filter(f => f.endsWith(".hop"))
-            .map(f => path.join(moduleDir, f));
+            .map(f => path.join(loadDir, f));
     }
 }
 

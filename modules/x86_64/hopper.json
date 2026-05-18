@@ -4,5 +4,5 @@
   "description": "Raw x86-64 syscall bindings (do not import directly)",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "io.hop"
+  "main": "src/io.hop"
 }

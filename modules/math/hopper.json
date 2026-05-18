@@ -1,8 +1,8 @@
 {
   "name": "math",
   "version": "0.1.0",
-  "description": "Common math functions — abs, min, max, pow, sqrt, trig",
+  "description": "Common math functions \u2014 abs, min, max, pow, sqrt, trig",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "math.hop"
+  "main": "src/math.hop"
 }

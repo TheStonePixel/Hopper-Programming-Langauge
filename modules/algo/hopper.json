@@ -1,8 +1,8 @@
 {
   "name": "algo",
   "version": "0.1.0",
-  "description": "Algorithms — sort and search utilities",
+  "description": "Algorithms \u2014 sort and search utilities",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "sort.hop"
+  "main": "src/sort.hop"
 }

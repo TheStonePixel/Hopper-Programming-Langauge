@@ -4,5 +4,5 @@
   "description": "Character classification and conversion utilities",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "char.hop"
+  "main": "src/char.hop"
 }

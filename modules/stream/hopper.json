@@ -4,5 +4,5 @@
   "description": "Generic byte stream template",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "stream.hop"
+  "main": "src/stream.hop"
 }

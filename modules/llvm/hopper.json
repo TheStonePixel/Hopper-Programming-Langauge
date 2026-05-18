@@ -4,5 +4,5 @@
   "description": "LLVM C API bindings for IR construction and compilation",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "llvm.hop"
+  "main": "src/llvm.hop"
 }
