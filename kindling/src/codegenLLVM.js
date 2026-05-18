@@ -931,7 +931,7 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
-                        // left.value is i8* (all address:T values normalized); bitcast to T* for GEP then back
+                        // typed address arithmetic scales by element size (like C int* arithmetic)
                         const pointedTo = left.type.substring(8);
                         const llPtrType = `${llvmType(pointedTo)}*`;
                         const castIn = ir.newTmp();
@@ -955,7 +955,7 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
-                        // left.value is i8* (all address:T values normalized); bitcast to T* for GEP then back
+                        // typed address arithmetic scales by element size (like C int* arithmetic)
                         const pointedTo = left.type.substring(8);
                         const llPtrType = `${llvmType(pointedTo)}*`;
                         const castIn = ir.newTmp();
@@ -1832,6 +1832,38 @@ function genBlock(ir, block, retType) {
     for (const s of block.statements) genStmt(ir, s, retType);
 }
 
+// Hoist all alloca instructions to the function entry block.
+// alloca has no data dependencies — it only reserves stack space — so moving
+// it before any other instruction is always valid LLVM IR.  Without this,
+// allocas emitted inside loop bodies accumulate stack space on every iteration
+// and eventually overflow the stack.
+//
+// Only allocas in non-entry basic blocks are moved.  Allocas already in the
+// entry block (before the first non-entry label) are left in place.
+function hoistAllocas(lines) {
+    const entryIdx = lines.findIndex(l => l.trim() === "entry:");
+    if (entryIdx === -1) return lines;
+
+    // Find the end of the entry block = the first non-entry label after entry:.
+    // Labels are unindented lines ending with ':' (e.g. "while.cond.0:").
+    const labelRe = /^[\w.]+:/;
+    let entryBlockEnd = lines.length;
+    for (let i = entryIdx + 1; i < lines.length; i++) {
+        if (labelRe.test(lines[i])) { entryBlockEnd = i; break; }
+    }
+
+    const allocaRe = /^\s*%\w+ = alloca\b/;
+    const hoisted  = [];
+    const rest     = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (i >= entryBlockEnd && allocaRe.test(lines[i])) hoisted.push(lines[i]);
+        else rest.push(lines[i]);
+    }
+    const insertAt = rest.findIndex(l => l.trim() === "entry:") + 1;
+    rest.splice(insertAt, 0, ...hoisted);
+    return rest;
+}
+
 // ── function / method codegen ─────────────────────────────────────────────
 
 function genFunction(fn) {
@@ -1870,7 +1902,7 @@ function genFunction(fn) {
         ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
-    return ir.lines.join("\n");
+    return hoistAllocas(ir.lines).join("\n");
 }
 
 function genMethod(typeName, method, isClass = true) {
@@ -1926,7 +1958,7 @@ function genMethod(typeName, method, isClass = true) {
         ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
-    return ir.lines.join("\n");
+    return hoistAllocas(ir.lines).join("\n");
 }
 
 function genOperator(className, op) {
@@ -2048,7 +2080,7 @@ function genEntry(entry) {
         ir.emit("}");
     }
 
-    return ir.lines.join("\n");
+    return hoistAllocas(ir.lines).join("\n");
 }
 
 // ── LLVM string escaping ──────────────────────────────────────────────────

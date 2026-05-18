@@ -44,8 +44,8 @@ entry main {
     pair[0] = 10
     pair[1] = 20
     address base = pair[0]::address
-    // advance one int (8 bytes) and read
-    address next = base + 8
+    // advance one int element (typed address arithmetic scales by element size)
+    address next = base + 1
     soft(next::value == 20, "offset read != 20\n")
     // write through offset
     next::value = 99
