@@ -98,8 +98,8 @@ export function ConstDecl(name, value, type) {
 
 // enum — named integer type with compile-time variants
 // variants: [{ name, value }]  (values assigned sequentially, or explicit)
-export function EnumDecl(name, variants) {
-    return { kind: "EnumDecl", name, variants };
+export function EnumDecl(name, variants, enumKind = "int") {
+    return { kind: "EnumDecl", name, variants, enumKind };
 }
 
 // template = parameterized class, monomorphized per instantiation

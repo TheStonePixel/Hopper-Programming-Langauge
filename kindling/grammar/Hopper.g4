@@ -60,7 +60,7 @@ enumDecl
     ;
 
 enumVariant
-    : Identifier ('=' '-'? IntegerLiteral)?
+    : Identifier ('=' ('-'? IntegerLiteral | StringLiteral))?
     ;
 
 aliasDecl

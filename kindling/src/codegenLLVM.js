@@ -684,12 +684,20 @@ function genExpr(ir, expr) {
         }
 
         case "FieldAccess": {
-            // Enum access: ErrorCode.NOT_FOUND → integer literal
+            // Enum access: Color.Red → int or string constant
             if (enumTypes.has(expr.object)) {
-                const variants = enumTypes.get(expr.object);
-                if (!variants.has(expr.field))
+                const en = enumTypes.get(expr.object);
+                if (!en.variants.has(expr.field))
                     throw new Error(`Unknown enum variant: ${expr.object}.${expr.field}`);
-                return { value: String(variants.get(expr.field)), type: "int" };
+                const v = en.variants.get(expr.field);
+                if (v.kind === "string") {
+                    const strName = addStringConstant(v.value);
+                    const len     = stringByteLen(v.value) + 1;
+                    const tmp     = ir.newTmp();
+                    ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
+                    return { value: tmp, type: "string" };
+                }
+                return { value: String(v.value), type: "int" };
             }
             // Check MMIO (strict) bitfield first — uses volatile load
             const mmioFA = mmioBindings.get(expr.object);
@@ -2206,8 +2214,8 @@ function genModule(ast, opts = {}) {
 
     for (const en of ast.enums || []) {
         const variants = new Map();
-        for (const v of en.variants) variants.set(v.name, v.value);
-        enumTypes.set(en.name, variants);
+        for (const v of en.variants) variants.set(v.name, { value: v.value, kind: v.kind || "int" });
+        enumTypes.set(en.name, { variants, enumKind: en.enumKind || "int" });
     }
 
     // Register regular struct and class types first (monomorphization may reference them)

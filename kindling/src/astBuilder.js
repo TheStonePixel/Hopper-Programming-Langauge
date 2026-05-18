@@ -159,18 +159,26 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const variants = [];
         let next = 0;
+        let kind = "int";   // inferred from first variant that has an explicit value
         for (const v of ctx.enumVariant()) {
             const varName = v.Identifier().getText();
+            const strLit  = v.StringLiteral ? v.StringLiteral() : null;
             const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
-            if (intLit) {
-                const negative = v.children.some(c => c.getText && c.getText() === '-');
-                next = parseInt(intLit.getText(), 10);
-                if (negative) next = -next;
+            if (strLit) {
+                kind = "string";
+                const raw = unescapeHopperString(strLit.getText().slice(1, -1));
+                variants.push({ name: varName, value: raw, kind: "string" });
+            } else {
+                if (intLit) {
+                    const negative = v.children.some(c => c.getText && c.getText() === '-');
+                    next = parseInt(intLit.getText(), 10);
+                    if (negative) next = -next;
+                }
+                variants.push({ name: varName, value: next, kind: "int" });
+                next += 1;
             }
-            variants.push({ name: varName, value: next });
-            next += 1;
         }
-        return EnumDecl(name, variants);
+        return EnumDecl(name, variants, kind);
     }
 
     // ── const ──────────────────────────────────────────────────────────────

@@ -933,16 +933,23 @@ export default class HopperParser extends antlr4.Parser {
 	        if(_la===5) {
 	            this.state = 231;
 	            this.match(HopperParser.T__4);
-	            this.state = 233;
-	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            if(_la===13) {
-	                this.state = 232;
-	                this.match(HopperParser.T__12);
+	            if(_la===91) {
+	                // StringLiteral value
+	                this.state = 235;
+	                this.match(HopperParser.StringLiteral);
+	            } else {
+	                // Optional negation + IntegerLiteral
+	                this.state = 233;
+	                this._errHandler.sync(this);
+	                _la = this._input.LA(1);
+	                if(_la===13) {
+	                    this.state = 232;
+	                    this.match(HopperParser.T__12);
+	                }
+	                this.state = 235;
+	                this.match(HopperParser.IntegerLiteral);
 	            }
-
-	            this.state = 235;
-	            this.match(HopperParser.IntegerLiteral);
 	        }
 
 	    } catch (re) {
@@ -5102,6 +5109,10 @@ class EnumVariantContext extends antlr4.ParserRuleContext {
 
 	IntegerLiteral() {
 	    return this.getToken(HopperParser.IntegerLiteral, 0);
+	};
+
+	StringLiteral() {
+	    return this.getToken(HopperParser.StringLiteral, 0);
 	};
 
 	enterRule(listener) {
