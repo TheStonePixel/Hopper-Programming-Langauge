@@ -1,17 +1,24 @@
-// blink.hop — Pi Zero ACT LED bare-metal demo
+// blink.hop — Pi Zero ACT LED + UART "hello world" bare-metal demo
 //
-// Blinks the onboard ACT LED (GPIO47) using direct MMIO via the BCM2835
-// GPIO controller.  No OS, no libc — just Hopper and the hardware.
+// Blinks the onboard ACT LED (GPIO47) and prints a message over UART0
+// on every toggle.  No OS, no libc — just Hopper and the BCM2835.
 //
-// Flash to SD card as kernel.img after building with:
-//   hopper build blink.hop
+// Build:  hopper build blink.hop   →  build/dev/kernel.img
+// Flash:  copy bootcode.bin, start.elf, config.txt, kernel.img to FAT32 SD
+//
+// config.txt should contain:
+//   init_uart_clock=3000000
+//
+// Connect a 3.3 V USB-serial adapter: GND, GPIO14 (TX)→RX, GPIO15 (RX)→TX
+// Open terminal at 115200 8N1.
 
-// BCM2835 GPIO MMIO registers (peripheral base 0x20000000)
-strict int GPFSEL4 = 0x20200010   // Function select for GPIO 40-49  (32-bit)
-strict int GPSET1  = 0x20200024   // Set    register bank 1 (GPIO 32-63, 32-bit)
-strict int GPCLR1  = 0x20200030   // Clear  register bank 1 (GPIO 32-63, 32-bit)
+import uart from uart
 
-// Busy-wait delay — loop count tuned for ~500ms at ~700 MHz ARM clock
+// BCM2835 GPIO MMIO registers
+strict int GPFSEL4 = 0x20200010   // function select for GPIO 40-49  (32-bit)
+strict int GPSET1  = 0x20200024   // set    bank 1 (GPIO 32-63)
+strict int GPCLR1  = 0x20200030   // clear  bank 1 (GPIO 32-63)
+
 function delay(int n) {
     int i = 0
     while (i < n) {
@@ -20,19 +27,30 @@ function delay(int n) {
 }
 
 entry main {
-    // Configure GPIO47 as output.
-    // GPFSEL4 bits [23:21] control GPIO47: 000=input, 001=output.
-    // All other GPIO40-49 remain as inputs (bits default to 000).
-    GPFSEL4 = 2097152        // 1 << 21 = 0x00200000
+    // Initialise serial output
+    uartInit()
+    uartPutsLn("Hopper bare-metal Pi Zero booted!")
 
+    // Configure GPIO47 as output (ACT LED)
+    // GPFSEL4 bits [23:21] = 001 for GPIO47
+    GPFSEL4 = 2097152        // 1 << 21
+
+    int cycle = 0
     bool on = true
     while (true) {
         if (on) {
-            GPSET1 = 32768   // bit 15 = GPIO47 (1 << 15 = 0x00008000)
+            GPSET1 = 32768   // set GPIO47
+            uartPuts("LED on  — cycle ")
         } else {
-            GPCLR1 = 32768   // bit 15 = GPIO47
+            GPCLR1 = 32768   // clear GPIO47
+            uartPuts("LED off — cycle ")
         }
+        uartPutInt(cycle)
+        uartPutc(13)
+        uartPutc(10)
+
         delay(500000)
         on = !on
+        cycle = cycle + 1
     }
 }
