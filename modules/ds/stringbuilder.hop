@@ -1,0 +1,151 @@
+// StringBuilder — growable byte buffer for building strings incrementally.
+//
+// Appends characters, raw buffers, null-terminated strings, integers, and
+// booleans into a single contiguous allocation. Use str() + length() to
+// pass the result to write() or any address-based API.
+//
+// Usage:
+//   import stringbuilder from ds
+//
+//   StringBuilder sb = StringBuilder(64)
+//   sb.appendStr("x = ")
+//   sb.appendInt(42)
+//   sb.appendChar('\n')
+//   write(1, sb.str(), sb.length())
+
+class StringBuilder {
+    address buf
+    int     len
+    int     cap
+
+    constructor(int initialCap) {
+        self.buf = allocate initialCap
+        self.len = 0
+        self.cap = initialCap
+    }
+
+    destructor() {
+        deallocate self.buf
+    }
+
+    // Raw address of the accumulated bytes (not null-terminated).
+    function str() address {
+        return self.buf
+    }
+
+    // Number of bytes currently in the buffer.
+    function length() int {
+        return self.len
+    }
+
+    // True if the buffer contains no bytes.
+    function empty() bool {
+        return self.len == 0
+    }
+
+    // Reset length to zero without freeing the allocation.
+    function reset() {
+        self.len = 0
+    }
+
+    // Double the backing capacity.
+    function grow() {
+        int     newCap = self.cap * 2
+        address newBuf = allocate newCap
+        int i = 0
+        while (i < self.len) {
+            address src = self.buf + i
+            address dst = newBuf + i
+            byte b = src::value
+            dst::value = b
+            i = i + 1
+        }
+        deallocate self.buf
+        self.buf = newBuf
+        self.cap = newCap
+    }
+
+    // Ensure at least n bytes of spare capacity, growing as needed.
+    function reserve(int n) {
+        while (self.len + n > self.cap) {
+            self.grow()
+        }
+    }
+
+    // Append a single byte.
+    function appendChar(byte c) {
+        self.reserve(1)
+        address p = self.buf + self.len
+        p::value = c
+        self.len = self.len + 1
+    }
+
+    // Append n bytes from buf.
+    function appendBuf(address buf, int n) {
+        self.reserve(n)
+        int i = 0
+        while (i < n) {
+            address src = buf + i
+            address dst = self.buf + self.len + i
+            byte b = src::value
+            dst::value = b
+            i = i + 1
+        }
+        self.len = self.len + n
+    }
+
+    // Append a null-terminated string.
+    function appendStr(address s) {
+        int n = 0
+        while (true) {
+            address p = s + n
+            byte b = p::value
+            int bi = cast b
+            if (bi == 0) { break }
+            n = n + 1
+        }
+        self.appendBuf(s, n)
+    }
+
+    // Append the decimal representation of an integer.
+    function appendInt(int n) {
+        if (n == 0) {
+            byte z = cast '0'
+            self.appendChar(z)
+            return
+        }
+        address tmp = allocate 24
+        int digits = 0
+        int v = n
+        if (v < 0) { v = 0 - v }
+        while (v > 0) {
+            int d = v % 10
+            byte db = cast (d + '0')
+            address tp = tmp + digits
+            tp::value = db
+            v = v / 10
+            digits = digits + 1
+        }
+        if (n < 0) {
+            byte minus = cast '-'
+            self.appendChar(minus)
+        }
+        int i = 0
+        while (i < digits) {
+            address tp = tmp + (digits - 1 - i)
+            byte b = tp::value
+            self.appendChar(b)
+            i = i + 1
+        }
+        deallocate tmp
+    }
+
+    // Append "true" or "false".
+    function appendBool(bool b) {
+        if (b) {
+            self.appendStr("true")
+        } else {
+            self.appendStr("false")
+        }
+    }
+}

@@ -1,0 +1,14 @@
+// EXPECT: 12 15 24 7
+
+import io   from linux
+import math from math
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, address argv) {
+    printf("%d %d %d %d\n",
+        lcm(4, 6),
+        lcm(3, 5),
+        lcm(12, 8),
+        lcm(7, 1))
+}

@@ -1,0 +1,98 @@
+import assert from core
+import io     from core
+
+// TEST: constructor initializes state
+// EXPECT: constructor ok
+
+// TEST: counter increment
+// EXPECT: counter ok
+
+// TEST: constructor with args
+// EXPECT: args ok
+
+// TEST: nested construction
+// EXPECT: nested ok
+
+class Counter {
+    int count
+
+    constructor() {
+        self.count = 0
+    }
+
+    function inc() {
+        self.count = self.count + 1
+    }
+
+    function get() int {
+        return self.count
+    }
+}
+
+class Box {
+    int width
+    int height
+
+    constructor(int w, int h) {
+        self.width  = w
+        self.height = h
+    }
+
+    function area() int {
+        return self.width * self.height
+    }
+
+    function getWidth() int {
+        return self.width
+    }
+
+    function getHeight() int {
+        return self.height
+    }
+}
+
+class Pair {
+    Counter a
+    Counter b
+
+    constructor() {
+        self.a = Counter()
+        self.b = Counter()
+    }
+
+    function total() int {
+        return self.a.get() + self.b.get()
+    }
+}
+
+entry main {
+    // — constructor initializes zero state ————————————————
+    Counter c = Counter()
+    soft(c.get() == 0, "constructor: initial count != 0\n")
+    println("constructor ok")
+
+    // — method calls on constructed object ————————————————
+    Counter d = Counter()
+    d.inc()
+    d.inc()
+    d.inc()
+    soft(d.get() == 3, "counter: expected 3\n")
+    println("counter ok")
+
+    // — constructor with args ——————————————————————————————
+    Box b = Box(4, 6)
+    soft(b.getWidth()  == 4,  "box width != 4\n")
+    soft(b.getHeight() == 6,  "box height != 6\n")
+    soft(b.area()      == 24, "box area != 24\n")
+    println("args ok")
+
+    // — nested construction (embedded class fields) ————————
+    Pair p = Pair()
+    p.a.inc()
+    p.a.inc()
+    p.b.inc()
+    soft(p.total() == 3, "nested: total != 3\n")
+    soft(p.a.get() == 2, "nested: a != 2\n")
+    soft(p.b.get() == 1, "nested: b != 1\n")
+    println("nested ok")
+}

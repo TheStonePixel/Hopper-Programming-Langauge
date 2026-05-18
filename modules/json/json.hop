@@ -1,0 +1,292 @@
+// json.hop — JSON parser built on Stream<byte>
+//
+// Usage:
+//   JsonReader r = JsonReader(src, len)
+//   address root = r.parseValue()
+//   JsonNode n = root::value
+//   if (n.kind == JsonKind.OBJECT) { ... }
+
+import array  from ds
+import stream from stream
+
+enum JsonKind {
+    NONE   = 0
+    BOOL   = 1
+    INT    = 2
+    STRING = 3
+    ARRAY  = 4
+    OBJECT = 5
+}
+
+struct JsonNode {
+    int     kind
+    int     numVal
+    string  strVal
+    address children    // heap Array<address> of JsonNode*
+    address keys        // heap Array<string> — object only
+}
+
+class JsonReader {
+    Stream<byte> stream
+
+    constructor(string src, int len) {
+        address ptr = cast src
+        self.stream = Stream(ptr, len)
+    }
+
+    function skipWhitespace() {
+        while (self.stream.atEnd() == 0) {
+            int character = cast self.stream.peek()
+            if (character == ' ' || character == '\t' || character == '\n' || character == '\r') {
+                self.stream.advance()
+            } else {
+                break
+            }
+        }
+    }
+
+    function parseValue() address {
+        self.skipWhitespace()
+        int character = cast self.stream.peek()
+
+        if (character == '{') { return self.parseObject() }
+        if (character == '[') { return self.parseArray() }
+        if (character == '"') { return self.parseStringNode() }
+        if (character == 't') { return self.parseTrue() }
+        if (character == 'f') { return self.parseFalse() }
+        if (character == 'n') { return self.parseNull() }
+        return self.parseIntNode()
+    }
+
+    function parseObject() address {
+        self.stream.advance()  // '{'
+
+        Array<address> children = Array(8)
+        Array<string>  keys     = Array(8)
+
+        self.skipWhitespace()
+        int character = cast self.stream.peek()
+
+        if (character != '}') {
+            while (true) {
+                self.skipWhitespace()
+                string key = self.parseString()
+                keys.push(key)
+
+                self.skipWhitespace()
+                self.stream.advance()  // ':'
+                self.skipWhitespace()
+
+                address child = self.parseValue()
+                children.push(child)
+
+                self.skipWhitespace()
+                character = cast self.stream.peek()
+                if (character == ',') {
+                    self.stream.advance()
+                } else {
+                    break
+                }
+            }
+        }
+
+        self.skipWhitespace()
+        self.stream.advance()  // '}'
+
+        address childPtr = allocate Array_address::size
+        childPtr::value  = children
+        address keysPtr  = allocate Array_string::size
+        keysPtr::value   = keys
+
+        JsonNode node
+        node.kind     = JsonKind.OBJECT
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = childPtr
+        node.keys     = keysPtr
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    function parseArray() address {
+        self.stream.advance()  // '['
+
+        Array<address> children = Array(8)
+
+        self.skipWhitespace()
+        int character = cast self.stream.peek()
+
+        if (character != ']') {
+            while (true) {
+                self.skipWhitespace()
+                address child = self.parseValue()
+                children.push(child)
+
+                self.skipWhitespace()
+                character = cast self.stream.peek()
+                if (character == ',') {
+                    self.stream.advance()
+                } else {
+                    break
+                }
+            }
+        }
+
+        self.skipWhitespace()
+        self.stream.advance()  // ']'
+
+        address childPtr = allocate Array_address::size
+        childPtr::value  = children
+
+        JsonNode node
+        node.kind     = JsonKind.ARRAY
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = childPtr
+        node.keys     = null
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    function parseString() string {
+        self.stream.advance()  // opening '"'
+
+        Array<byte> buf = Array(64)
+
+        while (self.stream.atEnd() == 0) {
+            byte b        = self.stream.advance()
+            int  character = cast b
+
+            if (character == '"') { break }
+
+            if (character == '\\') {
+                int escaped = cast self.stream.advance()
+                if (escaped == 'n') {
+                    byte nl = '\n'
+                    buf.push(nl)
+                } else {
+                    if (escaped == 't') {
+                        byte tb = '\t'
+                        buf.push(tb)
+                    } else {
+                        buf.push(b)
+                    }
+                }
+            } else {
+                buf.push(b)
+            }
+        }
+
+        byte nul = 0
+        buf.push(nul)
+        string result = cast buf.data
+        return result
+    }
+
+    function parseStringNode() address {
+        string s = self.parseString()
+
+        JsonNode node
+        node.kind     = JsonKind.STRING
+        node.numVal   = 0
+        node.strVal   = s
+        node.children = null
+        node.keys     = null
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    function parseInt() int {
+        int sign      = 1
+        int character = cast self.stream.peek()
+        if (character == '-') {
+            sign = -1
+            self.stream.advance()
+        }
+
+        int val = 0
+        while (self.stream.atEnd() == 0) {
+            character = cast self.stream.peek()
+            if (character < '0' || character > '9') { break }
+            self.stream.advance()
+            val = val * 10 + (character - '0')
+        }
+        return sign * val
+    }
+
+    function parseIntNode() address {
+        int n = self.parseInt()
+
+        JsonNode node
+        node.kind     = JsonKind.INT
+        node.numVal   = n
+        node.strVal   = ""
+        node.children = null
+        node.keys     = null
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    function parseTrue() address {
+        self.stream.advance()  // t
+        self.stream.advance()  // r
+        self.stream.advance()  // u
+        self.stream.advance()  // e
+
+        JsonNode node
+        node.kind     = JsonKind.BOOL
+        node.numVal   = 1
+        node.strVal   = ""
+        node.children = null
+        node.keys     = null
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    function parseFalse() address {
+        self.stream.advance()  // f
+        self.stream.advance()  // a
+        self.stream.advance()  // l
+        self.stream.advance()  // s
+        self.stream.advance()  // e
+
+        JsonNode node
+        node.kind     = JsonKind.BOOL
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = null
+        node.keys     = null
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+
+    function parseNull() address {
+        self.stream.advance()  // n
+        self.stream.advance()  // u
+        self.stream.advance()  // l
+        self.stream.advance()  // l
+
+        JsonNode node
+        node.kind     = JsonKind.NONE
+        node.numVal   = 0
+        node.strVal   = ""
+        node.children = null
+        node.keys     = null
+
+        address ptr = allocate JsonNode::size
+        ptr::value  = node
+        return ptr
+    }
+}

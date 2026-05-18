@@ -1,0 +1,7 @@
+// COMPILE_ONLY
+import io from core
+entry main {
+    print("\x1b[32mgreen\x1b[0m\n")
+    print("\x1b[31mred\x1b[0m\n")
+    println("\x1b[1mbold\x1b[0m")
+}

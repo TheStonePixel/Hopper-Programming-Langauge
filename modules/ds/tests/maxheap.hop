@@ -1,0 +1,94 @@
+// TEST: constructor
+// EXPECT: new() -> empty = 1
+// EXPECT: new() -> len = 0
+
+// TEST: push / peek
+// EXPECT: push(30,10,50,20,40) -> len = 5
+// EXPECT: peek() = 50
+
+// TEST: pop
+// EXPECT: pop() = 50
+// EXPECT: pop() = 40
+// EXPECT: pop() = 30
+// EXPECT: pop() = 20
+// EXPECT: pop() = 10
+// EXPECT: pop() -> empty = 1
+
+// TEST: grow
+// EXPECT: grow(16) -> max = 15
+// EXPECT: grow(16) -> sorted order preserved
+
+import assert  from core
+import maxheap from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    MaxHeap<int> h = MaxHeap(4)
+
+    assert(h.empty() == 1, "new heap should be empty\n")
+    assert(h.len()   == 0, "new heap len should be 0\n")
+    printf("new() -> empty = %lld\n", h.empty())
+    printf("new() -> len = %lld\n", h.len())
+
+    h.push(30)
+    h.push(10)
+    h.push(50)
+    h.push(20)
+    h.push(40)
+
+    assert(h.len()  == 5,  "len after 5 pushes\n")
+    assert(h.peek() == 50, "peek should return maximum\n")
+    printf("push(30,10,50,20,40) -> len = %lld\n", h.len())
+    printf("peek() = %lld\n", h.peek())
+
+    int prev = h.pop()
+    assert(prev == 50, "first pop\n")
+    printf("pop() = %lld\n", prev)
+
+    int next = h.pop()
+    assert(next == 40,     "second pop\n")
+    assert(prev >= next,   "heap order: 50 >= 40\n")
+    printf("pop() = %lld\n", next)
+    prev = next
+
+    next = h.pop()
+    assert(next == 30,     "third pop\n")
+    assert(prev >= next,   "heap order: 40 >= 30\n")
+    printf("pop() = %lld\n", next)
+    prev = next
+
+    next = h.pop()
+    assert(next == 20,     "fourth pop\n")
+    assert(prev >= next,   "heap order: 30 >= 20\n")
+    printf("pop() = %lld\n", next)
+    prev = next
+
+    next = h.pop()
+    assert(next == 10,     "fifth pop\n")
+    assert(prev >= next,   "heap order: 20 >= 10\n")
+    printf("pop() = %lld\n", next)
+
+    assert(h.empty() == 1, "heap should be empty after drain\n")
+    printf("pop() -> empty = %lld\n", h.empty())
+
+    MaxHeap<int> big = MaxHeap(2)
+    int i = 0
+    while (i <= 15) {
+        big.push(i)
+        i = i + 1
+    }
+    assert(big.len() == 16, "grow: len wrong\n")
+    int m = big.pop()
+    assert(m == 15, "grow: max wrong\n")
+    printf("grow(16) -> max = %lld\n", m)
+
+    prev = m
+    int j = 1
+    while (j < 16) {
+        next = big.pop()
+        assert(prev >= next, "grow: sorted order violated\n")
+        prev = next
+        j = j + 1
+    }
+    printf("grow(16) -> sorted order preserved\n")
+}

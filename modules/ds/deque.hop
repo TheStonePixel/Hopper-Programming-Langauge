@@ -1,0 +1,104 @@
+// Deque<T> — double-ended queue backed by a ring buffer
+//
+// pushFront/popFront operate at head, pushBack/popBack at tail.
+// grow() linearises the ring into a fresh allocation.
+//
+// Usage:
+//   Deque<int> d = Deque(8)
+//   d.pushBack(1)
+//   d.pushFront(0)
+//   int front = d.popFront()  // 0
+//   int back  = d.popBack()   // 1
+
+template Deque<T> {
+    address data
+    int     head
+    int     length
+    int     capacity
+
+    constructor(int initialCap) {
+        self.data     = allocate initialCap * T::size
+        self.head     = 0
+        self.length   = 0
+        self.capacity = initialCap
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function len() int {
+        return self.length
+    }
+
+    function empty() bool {
+        return self.length == 0
+    }
+
+    function peekFront() T {
+        address ptr = self.data + (self.head * T::size)
+        T val = ptr::value
+        return val
+    }
+
+    function peekBack() T {
+        int     idx = (self.head + self.length - 1) % self.capacity
+        address ptr = self.data + (idx * T::size)
+        T val = ptr::value
+        return val
+    }
+
+    function pushBack(T val) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        int     idx = (self.head + self.length) % self.capacity
+        address ptr = self.data + (idx * T::size)
+        ptr::value  = val
+        self.length = self.length + 1
+    }
+
+    function pushFront(T val) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        self.head   = (self.head - 1 + self.capacity) % self.capacity
+        address ptr = self.data + (self.head * T::size)
+        ptr::value  = val
+        self.length = self.length + 1
+    }
+
+    function popFront() T {
+        address ptr = self.data + (self.head * T::size)
+        T val       = ptr::value
+        self.head   = (self.head + 1) % self.capacity
+        self.length = self.length - 1
+        return val
+    }
+
+    function popBack() T {
+        self.length = self.length - 1
+        int     idx = (self.head + self.length) % self.capacity
+        address ptr = self.data + (idx * T::size)
+        T val       = ptr::value
+        return val
+    }
+
+    function grow() {
+        int     newCap  = self.capacity * 2
+        address newData = allocate newCap * T::size
+        int i = 0
+        while (i < self.length) {
+            int     idx = (self.head + i) % self.capacity
+            address src = self.data + (idx * T::size)
+            T elem      = src::value
+            address dst = newData + (i * T::size)
+            dst::value  = elem
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = newData
+        self.head     = 0
+        self.capacity = newCap
+    }
+}

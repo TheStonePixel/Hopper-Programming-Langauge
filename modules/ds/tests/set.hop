@@ -1,0 +1,66 @@
+// TEST: constructor
+// EXPECT: new() -> len = 0
+// EXPECT: contains(1) = 0
+
+// TEST: add / contains
+// EXPECT: add(1, 2) -> contains(1) = 1
+// EXPECT: add(1, 2) -> contains(2) = 1
+// EXPECT: add(1, 2) -> len = 2
+
+// TEST: duplicate add
+// EXPECT: add(1) again -> len unchanged = 2
+
+// TEST: remove
+// EXPECT: remove(1) -> contains(1) = 0
+// EXPECT: remove(1) -> len = 1
+
+// TEST: grow
+// EXPECT: grow(12) -> len = 12
+// EXPECT: grow(12) -> contains preserved
+
+import assert from core
+import set    from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    Set<int> s = Set(4)
+
+    assert(s.len()       == 0, "new set len should be 0\n")
+    assert(s.contains(1) == 0, "contains on empty set\n")
+    printf("new() -> len = %lld\n", s.len())
+    printf("contains(1) = %lld\n", s.contains(1))
+
+    s.add(1)
+    s.add(2)
+    assert(s.contains(1) == 1, "contains 1 after add\n")
+    assert(s.contains(2) == 1, "contains 2 after add\n")
+    assert(s.len()        == 2, "len after 2 adds\n")
+    printf("add(1, 2) -> contains(1) = %lld\n", s.contains(1))
+    printf("add(1, 2) -> contains(2) = %lld\n", s.contains(2))
+    printf("add(1, 2) -> len = %lld\n", s.len())
+
+    s.add(1)
+    assert(s.len() == 2, "duplicate add must not change len\n")
+    printf("add(1) again -> len unchanged = %lld\n", s.len())
+
+    s.remove(1)
+    assert(s.contains(1) == 0, "contains after remove\n")
+    assert(s.len()        == 1, "len after remove\n")
+    printf("remove(1) -> contains(1) = %lld\n", s.contains(1))
+    printf("remove(1) -> len = %lld\n", s.len())
+
+    Set<int> big = Set(4)
+    int i = 0
+    while (i < 12) {
+        big.add(i)
+        i = i + 1
+    }
+    assert(big.len() == 12, "grow: len wrong\n")
+    printf("grow(12) -> len = %lld\n", big.len())
+
+    assert(big.contains(0)  == 1, "grow: contains 0\n")
+    assert(big.contains(7)  == 1, "grow: contains 7\n")
+    assert(big.contains(11) == 1, "grow: contains 11\n")
+    assert(big.contains(12) == 0, "grow: should not contain 12\n")
+    printf("grow(12) -> contains preserved\n")
+}

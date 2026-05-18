@@ -1,0 +1,140 @@
+// BST<T> — unbalanced binary search tree
+//
+// Node layout: [left: 8 bytes][right: 8 bytes][data: T::size bytes]
+// Supports insert, contains, min, max.
+// T must support <, >, and ==.
+//
+// Usage:
+//   BST<int> tree = BST()
+//   tree.insert(5)
+//   tree.insert(3)
+//   tree.insert(7)
+//   bool ok  = tree.contains(3)  // true
+//   int  min = tree.min()        // 3
+//   int  max = tree.max()        // 7
+
+template BST<T> {
+    address root
+    int     length
+
+    constructor() {
+        self.root   = null
+        self.length = 0
+    }
+
+    destructor() {
+        self.freeSubtree(self.root)
+    }
+
+    function len() int {
+        return self.length
+    }
+
+    function empty() bool {
+        return self.length == 0
+    }
+
+    function insert(T val) {
+        self.root = self.insertAt(self.root, val)
+    }
+
+    function contains(T val) bool {
+        address node = self.root
+        while (node != null) {
+            address dataField = node + 16
+            T data            = dataField::value
+            if (val == data) {
+                return true
+            }
+            if (val < data) {
+                address leftField = node
+                address left      = leftField::value
+                node = left
+            } else {
+                address rightField = node + 8
+                address right      = rightField::value
+                node = right
+            }
+        }
+        return false
+    }
+
+    // Return the minimum value. Caller ensures len() > 0.
+    function min() T {
+        address node   = self.root
+        int     active = 1
+        while (active == 1) {
+            address leftField = node
+            address left      = leftField::value
+            if (left == null) {
+                active = 0
+            } else {
+                node = left
+            }
+        }
+        address dataField = node + 16
+        T val = dataField::value
+        return val
+    }
+
+    // Return the maximum value. Caller ensures len() > 0.
+    function max() T {
+        address node   = self.root
+        int     active = 1
+        while (active == 1) {
+            address rightField = node + 8
+            address right      = rightField::value
+            if (right == null) {
+                active = 0
+            } else {
+                node = right
+            }
+        }
+        address dataField = node + 16
+        T val = dataField::value
+        return val
+    }
+
+    function insertAt(address node, T val) address {
+        if (node == null) {
+            address n          = allocate 16 + T::size
+            address leftField  = n
+            leftField::value   = null
+            address rightField = n + 8
+            rightField::value  = null
+            address dataField  = n + 16
+            dataField::value   = val
+            self.length        = self.length + 1
+            return n
+        }
+        address dataField = node + 16
+        T data            = dataField::value
+        if (val < data) {
+            address leftField = node
+            address left      = leftField::value
+            address newLeft   = self.insertAt(left, val)
+            leftField::value  = newLeft
+        } else {
+            if (val > data) {
+                address rightField = node + 8
+                address right      = rightField::value
+                address newRight   = self.insertAt(right, val)
+                rightField::value  = newRight
+            }
+        }
+        return node
+    }
+
+    function freeSubtree(address node) {
+        if (node == null) {
+            return
+        }
+        address leftField  = node
+        address left       = leftField::value
+        address rightField = node + 8
+        address right      = rightField::value
+        self.freeSubtree(left)
+        self.freeSubtree(right)
+        deallocate node
+    }
+}

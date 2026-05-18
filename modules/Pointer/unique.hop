@@ -1,0 +1,112 @@
+// Unique<T> — sole-ownership heap pointer with automatic deallocation.
+//
+// Allocates count * T::size bytes on construction; destructor calls
+// deallocate automatically. Ownership is transferred explicitly via .move().
+// Do NOT shallow-copy a Unique<T> — two instances pointing to the same block
+// will both call free() on it, causing undefined behaviour.
+//
+// Typical usage — heap buffer:
+//   Unique<byte> buf = Unique(4096)
+//   int n = read(fd, buf.ptr(), 4096)  // .ptr() returns the raw address
+//
+// Typed array:
+//   Unique<int> nums = Unique(64)
+//   nums.set(0, 42)
+//   int v = nums.get(0)
+//
+// Ownership transfer — use move() to pass to another Unique without double-free:
+//   Unique<int> src = Unique(64)
+//   src.set(0, 99)
+//   Unique<int> dst = Unique(0)   // placeholder; move() will free this
+//   src.move(dst)                 // dst owns the data; src.data is null
+
+template Unique<T> {
+    address data   // raw heap block — T[] of length count
+    int     count  // number of T elements allocated
+
+    constructor(int n) {
+        self.data  = allocate n * T::size
+        self.count = n
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    // Raw heap address — use for address arithmetic and syscalls.
+    function ptr() address {
+        return self.data
+    }
+
+    // Number of T elements this allocation can hold.
+    function len() int {
+        return self.count
+    }
+
+    // Read element at index i. No bounds check.
+    function get(int i) T {
+        address p = self.data + (i * T::size)
+        return p::value
+    }
+
+    // Write element at index i. No bounds check.
+    function set(int i, T val) {
+        address p = self.data + (i * T::size)
+        p::value = val
+    }
+
+    // Read the first element (sugar for single-value Unique<T>).
+    function load() T {
+        address p = self.data
+        return p::value
+    }
+
+    // Write the first element (sugar for single-value Unique<T>).
+    function store(T val) {
+        address p = self.data
+        p::value = val
+    }
+
+    // Transfer ownership to dst, clearing this instance to prevent double-free.
+    // dst's current data (if any) is freed first.
+    // After move(): self.data = null, self.count = 0; dst owns the original block.
+    function move(Unique<T> dst) {
+        deallocate dst.data
+        dst.data  = self.data
+        dst.count = self.count
+        self.data  = null
+        self.count = 0
+    }
+
+    // Zero-fill the entire allocation.
+    function zero() {
+        int total = self.count * T::size
+        int i = 0
+        while (i < total) {
+            address p = self.data + i
+            byte z = cast 0
+            p::value = z
+            i = i + 1
+        }
+    }
+
+    // Atomically exchange data and count with another Unique<T>.
+    // After swap: self owns other's previous allocation, other owns self's.
+    // Use with a local Unique<T> for RAII-style buffer replacement.
+    function swap(Unique<T> other) {
+        address temporaryData  = other.data
+        int     temporaryCount = other.count
+        other.data  = self.data
+        other.count = self.count
+        self.data   = temporaryData
+        self.count  = temporaryCount
+    }
+
+    // Free managed data and reset to empty. Safe to call multiple times.
+    // Useful for explicit cleanup when auto-destruction is not available.
+    function destroy() {
+        deallocate self.data
+        self.data  = null
+        self.count = 0
+    }
+}

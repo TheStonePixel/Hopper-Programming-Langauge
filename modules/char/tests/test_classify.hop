@@ -1,0 +1,77 @@
+// EXPECT: alpha: true false true false
+// EXPECT: digit: false true false true
+// EXPECT: space: true false true false
+// EXPECT: upper: true false false
+// EXPECT: lower: false true false
+// EXPECT: hex: true true true false
+
+import io from io
+import char from char
+
+entry main(int argc, address argv) {
+    byte A   = cast 'A'
+    byte one = cast '1'
+    byte z   = cast 'z'
+    byte bang = cast '!'
+    byte nine = cast '9'
+
+    print("alpha: ")
+    print(isAlpha(A))
+    print(" ")
+    print(isAlpha(one))
+    print(" ")
+    print(isAlpha(z))
+    print(" ")
+    print(isAlpha(bang))
+    newline()
+
+    print("digit: ")
+    print(isDigit(A))
+    print(" ")
+    print(isDigit(one))
+    print(" ")
+    print(isDigit(z))
+    print(" ")
+    print(isDigit(nine))
+    newline()
+
+    byte sp  = cast ' '
+    byte tab = cast '\t'
+    print("space: ")
+    print(isSpace(sp))
+    print(" ")
+    print(isSpace(A))
+    print(" ")
+    print(isSpace(tab))
+    print(" ")
+    print(isSpace(one))
+    newline()
+
+    print("upper: ")
+    print(isUpper(A))
+    print(" ")
+    print(isUpper(z))
+    print(" ")
+    print(isUpper(one))
+    newline()
+
+    print("lower: ")
+    print(isLower(A))
+    print(" ")
+    print(isLower(z))
+    print(" ")
+    print(isLower(one))
+    newline()
+
+    byte fa = cast 'f'
+    byte fx = cast 'x'
+    print("hex: ")
+    print(isHex(one))
+    print(" ")
+    print(isHex(A))
+    print(" ")
+    print(isHex(fa))
+    print(" ")
+    print(isHex(fx))
+    newline()
+}

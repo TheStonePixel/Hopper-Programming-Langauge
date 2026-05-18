@@ -1,0 +1,10 @@
+// EXPECT: ok
+
+import io from linux
+import sys from linux
+
+entry main {
+    print("ok\n", 3)
+    exit(0)
+    print("unreachable\n", 12)
+}

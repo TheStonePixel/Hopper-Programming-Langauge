@@ -1,0 +1,72 @@
+// TEST: constructor
+// EXPECT: new() -> len = 0
+// EXPECT: contains(1) = 0
+
+// TEST: set / get
+// EXPECT: get(1) = 100
+// EXPECT: get(2) = 200
+// EXPECT: set(1, 2) -> len = 2
+
+// TEST: update
+// EXPECT: set(1, 999) -> get(1) = 999
+// EXPECT: set(1, 999) -> len unchanged = 2
+// EXPECT: contains(1) = 1
+
+// TEST: remove
+// EXPECT: remove(1) -> contains(1) = 0
+// EXPECT: remove(1) -> len = 1
+
+// TEST: grow
+// EXPECT: grow(12) -> len = 12
+// EXPECT: grow(12) -> values preserved
+
+import assert  from core
+import hashmap from ds
+extern function printf(String fmt, ...) int
+
+entry main {
+    HashMap<int, int> m = HashMap(4)
+
+    assert(m.len()       == 0, "new map len should be 0\n")
+    assert(m.contains(1) == 0, "contains on empty map\n")
+    printf("new() -> len = %lld\n", m.len())
+    printf("contains(1) = %lld\n", m.contains(1))
+
+    m.set(1, 100)
+    m.set(2, 200)
+
+    assert(m.get(1) == 100, "get 1 wrong\n")
+    assert(m.get(2) == 200, "get 2 wrong\n")
+    assert(m.len()  == 2,   "len after 2 sets\n")
+    printf("get(1) = %lld\n", m.get(1))
+    printf("get(2) = %lld\n", m.get(2))
+    printf("set(1, 2) -> len = %lld\n", m.len())
+
+    m.set(1, 999)
+    assert(m.get(1)      == 999, "update value\n")
+    assert(m.len()       == 2,   "update must not change len\n")
+    assert(m.contains(1) == 1,   "contains after update\n")
+    printf("set(1, 999) -> get(1) = %lld\n", m.get(1))
+    printf("set(1, 999) -> len unchanged = %lld\n", m.len())
+    printf("contains(1) = %lld\n", m.contains(1))
+
+    m.remove(1)
+    assert(m.contains(1) == 0, "contains after remove\n")
+    assert(m.len()        == 1, "len after remove\n")
+    printf("remove(1) -> contains(1) = %lld\n", m.contains(1))
+    printf("remove(1) -> len = %lld\n", m.len())
+
+    HashMap<int, int> big = HashMap(4)
+    int i = 0
+    while (i < 12) {
+        big.set(i, i * 10)
+        i = i + 1
+    }
+    assert(big.len() == 12, "grow: len wrong\n")
+    printf("grow(12) -> len = %lld\n", big.len())
+
+    assert(big.get(0)  == 0,   "grow: value 0\n")
+    assert(big.get(5)  == 50,  "grow: value 5\n")
+    assert(big.get(11) == 110, "grow: value 11\n")
+    printf("grow(12) -> values preserved\n")
+}

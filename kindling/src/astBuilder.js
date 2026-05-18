@@ -21,7 +21,10 @@ import {
     ClassOperator,
     ClassConstructor,
     ClassDestructor,
+    InterfaceDecl,
+    InterfaceMethod,
     ConstDecl,
+    EnumDecl,
     AliasDecl,
     TemplateDecl,
     EntryDecl,
@@ -40,6 +43,8 @@ import {
     ContinueStmt,
     ReturnStmt,
     DeferStmt,
+    AllocateExpr,
+    DeallocateStmt,
     ExprStmt,
     Block,
     Binary,
@@ -49,6 +54,7 @@ import {
     FieldAccess,
     IntLiteral,
     HexLiteral,
+    CharLiteral,
     FloatLiteral,
     BoolLiteral,
     StringLiteral,
@@ -62,8 +68,45 @@ import {
     ArrayAccess,
     ArrayAssign,
     ArrayElementAddress,
+    ChainedMethodCall,
+    FieldIndexAccess,
+    NestedFieldAssign,
     AsmStmt,
+    BitfieldDecl,
+    BitfieldField,
+    BitfieldPad,
 } from "./ast.js";
+
+// Decode Hopper string escape sequences to raw bytes.
+// Handles: \n \t \r \\ \" \' and \xNN hex escapes.
+function unescapeHopperString(s) {
+    return s.replace(/\\(\\|n|t|r|"|'|x[0-9a-fA-F]{2})/g, (_, seq) => {
+        if (seq === 'n')  return '\n';
+        if (seq === 't')  return '\t';
+        if (seq === 'r')  return '\r';
+        if (seq === '\\') return '\\';
+        if (seq === '"')  return '"';
+        if (seq === "'")  return "'";
+        return String.fromCharCode(parseInt(seq.slice(1), 16));
+    });
+}
+
+// Resolve a CharLiteral token (e.g. 'H', '\n') to its integer byte value.
+function charLiteralValue(text) {
+    const inner = text.slice(1, -1); // strip surrounding single quotes
+    if (inner.length === 1) return inner.charCodeAt(0);
+    // escape sequences
+    switch (inner[1]) {
+        case 'n':  return 10;
+        case 't':  return 9;
+        case 'r':  return 13;
+        case '0':  return 0;
+        case '\\': return 92;
+        case '\'': return 39;
+        case '"':  return 34;
+        default:   return inner.charCodeAt(1);
+    }
+}
 
 export class AstBuilder extends HopperVisitor {
     visitProgram(ctx) {
@@ -71,27 +114,33 @@ export class AstBuilder extends HopperVisitor {
         const structs = [];
         const classes = [];
         const consts = [];
+        const enums = [];
         const aliases = [];
         const templates = [];
         const binds = [];
         const stricts = [];
+        const bitfields = [];
+        const interfaces = [];
         let   entry = null;
 
         for (const decl of ctx.topLevelDecl()) {
             const node = this.visit(decl);
             if (!node) continue;
-            if (node.kind === "FunctionDecl")       functions.push(node);
-            else if (node.kind === "StructDecl")    structs.push(node);
-            else if (node.kind === "ClassDecl")     classes.push(node);
-            else if (node.kind === "ConstDecl")     consts.push(node);
-            else if (node.kind === "AliasDecl")     aliases.push(node);
-            else if (node.kind === "TemplateDecl")  templates.push(node);
-            else if (node.kind === "EntryDecl")     entry = node;
-            else if (node.kind === "BindDecl")      binds.push(node);
-            else if (node.kind === "StrictDecl")  stricts.push(node);
+            if (node.kind === "FunctionDecl")        functions.push(node);
+            else if (node.kind === "StructDecl")     structs.push(node);
+            else if (node.kind === "ClassDecl")      classes.push(node);
+            else if (node.kind === "ConstDecl")      consts.push(node);
+            else if (node.kind === "EnumDecl")       enums.push(node);
+            else if (node.kind === "AliasDecl")      aliases.push(node);
+            else if (node.kind === "TemplateDecl")   templates.push(node);
+            else if (node.kind === "EntryDecl")      entry = node;
+            else if (node.kind === "BindDecl")       binds.push(node);
+            else if (node.kind === "StrictDecl")     stricts.push(node);
+            else if (node.kind === "BitfieldDecl")   bitfields.push(node);
+            else if (node.kind === "InterfaceDecl")  interfaces.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts);
+        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums);
     }
 
     visitTopLevelDecl(ctx) {
@@ -104,27 +153,52 @@ export class AstBuilder extends HopperVisitor {
         return AliasDecl(ctx.Identifier().getText(), ctx.type().getText());
     }
 
+    // ── enum ───────────────────────────────────────────────────────────────
+
+    visitEnumDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const variants = [];
+        let next = 0;
+        for (const v of ctx.enumVariant()) {
+            const varName = v.Identifier().getText();
+            const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
+            if (intLit) {
+                const negative = v.children.some(c => c.getText && c.getText() === '-');
+                next = parseInt(intLit.getText(), 10);
+                if (negative) next = -next;
+            }
+            variants.push({ name: varName, value: next });
+            next += 1;
+        }
+        return EnumDecl(name, variants);
+    }
+
     // ── const ──────────────────────────────────────────────────────────────
 
     visitConstDecl(ctx) {
         const name = ctx.Identifier().getText();
         const litCtx = ctx.literal();
         const lit = this.visitLiteral(litCtx);
-        return ConstDecl(name, lit.value, lit.type);
+        // Check for optional leading '-' (negative constants)
+        const negative = ctx.children && ctx.children.some(c => c.getText && c.getText() === '-');
+        const value = negative ? -lit.value : lit.value;
+        return ConstDecl(name, value, lit.type);
     }
 
     visitLiteral(ctx) {
         const text = ctx.getText();
         if (ctx.HexLiteral && ctx.HexLiteral())
             return { value: parseInt(text, 16), type: "int" };
+        if (ctx.CharLiteral && ctx.CharLiteral())
+            return { value: charLiteralValue(text), type: "char" };
+        if (ctx.UnicodeLiteral && ctx.UnicodeLiteral())
+            return { value: parseInt(text.slice(2), 16), type: "int" };
         if (ctx.FloatLiteral && ctx.FloatLiteral())
             return { value: parseFloat(text), type: "float" };
         if (ctx.IntegerLiteral && ctx.IntegerLiteral())
             return { value: parseInt(text, 10), type: "int" };
         if (ctx.StringLiteral && ctx.StringLiteral()) {
-            const raw = text.slice(1, -1)
-                .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-                .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+            const raw = unescapeHopperString(text.slice(1, -1));
             return { value: raw, type: "string" };
         }
         if (text === "true")  return { value: true,  type: "bool" };
@@ -152,10 +226,64 @@ export class AstBuilder extends HopperVisitor {
         return StructPad(size);
     }
 
+    // ── bitfield ───────────────────────────────────────────────────────────
+
+    visitBitfieldDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const members = ctx.bitfieldMember ? ctx.bitfieldMember() : [];
+        const fields = members.map(m => this.visit(m));
+        return BitfieldDecl(name, fields);
+    }
+
+    visitBitfieldField(ctx) {
+        const type = ctx.type().getText();
+        const name = ctx.fieldName().getText();
+        return BitfieldField(name, type, 1);
+    }
+
+    visitBitfieldArrayField(ctx) {
+        const type  = ctx.type().getText();
+        const name  = ctx.fieldName().getText();
+        const count = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return BitfieldField(name, type, count);
+    }
+
+    visitBitfieldPad(ctx) {
+        const bits = parseInt(ctx.IntegerLiteral().getText(), 10);
+        return BitfieldPad(bits);
+    }
+
+    // ── interface ──────────────────────────────────────────────────────────
+
+    visitInterfaceDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const methods = ctx.interfaceMember ? ctx.interfaceMember().map(m => this.visit(m)) : [];
+        return InterfaceDecl(name, methods);
+    }
+
+    visitInterfaceFunc(ctx) {
+        const name = ctx.fieldName().getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
+            : [];
+        return InterfaceMethod(name, params, ctx.type().getText());
+    }
+
+    visitInterfaceProc(ctx) {
+        const name = ctx.fieldName().getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
+            : [];
+        return InterfaceMethod(name, params, null);
+    }
+
     // ── class ──────────────────────────────────────────────────────────────
 
     visitClassDecl(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.className().getText();
+        const interfaces = ctx.implementsList()
+            ? ctx.implementsList().Identifier().map(id => id.getText())
+            : [];
         const fields = [];
         const methods = [];
         const operators = [];
@@ -173,7 +301,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "ClassDestructor")  destructor = node;
         }
 
-        return ClassDecl(name, fields, methods, operators, constructor, destructor);
+        return ClassDecl(name, fields, methods, operators, constructor, destructor, interfaces);
     }
 
     visitClassField(ctx) {
@@ -183,7 +311,7 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitClassMethod(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         const returnType = ctx.type().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
@@ -193,16 +321,18 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitClassOperator(ctx) {
-        const op = ctx.operatorSymbol().getText();
-        const p = ctx.param();
-        const param = Param(p.paramName().getText(), p.type().getText());
-        const returnType = ctx.type().getText();
+        const op     = ctx.operatorSymbol().getText();
+        const ps     = ctx.param();
+        const params = ps ? (Array.isArray(ps) ? ps : [ps]).map(p => Param(p.paramName().getText(), p.type().getText())) : [];
+        const param  = params[0] ?? null;
+        const rawReturn  = ctx.type().getText();
+        const returnType = rawReturn === "void" ? null : rawReturn;
         const body = this.visit(ctx.block());
-        return ClassOperator(op, param, returnType, body);
+        return ClassOperator(op, param, returnType, body, params);
     }
 
     visitClassProcMethod(ctx) {
-        const name = ctx.Identifier().getText();
+        const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
@@ -226,9 +356,22 @@ export class AstBuilder extends HopperVisitor {
     // ── template ───────────────────────────────────────────────────────────
 
     visitTemplateDecl(ctx) {
-        const ids = ctx.Identifier();
-        const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
-        const typeParams = Array.isArray(ids) ? ids.slice(1).map(id => id.getText()) : [];
+        const name = ctx.templateName().getText();   // template name — Identifier or 'String' keyword
+
+        const typeParams  = [];   // free variables: T, K, V
+        const fixedParams = [];   // concrete types: byte, int, address, ...
+
+        for (const p of ctx.templateParam()) {
+            if (p.constructor.name === "FreeParamContext") {
+                typeParams.push(p.getText());
+            } else {
+                // FixedParam — getText() concatenates tokens, reconstruct spaced keywords
+                let t = p.getText();
+                if (t === "unsignedint")  t = "unsigned int";
+                if (t === "unsignedbyte") t = "unsigned byte";
+                fixedParams.push(t);
+            }
+        }
 
         const fields = [];
         const methods = [];
@@ -247,7 +390,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "ClassDestructor")  destructor = node;
         }
 
-        return TemplateDecl(name, typeParams, fields, methods, operators, constructor, destructor);
+        return TemplateDecl(name, typeParams, fixedParams, fields, methods, operators, constructor, destructor);
     }
 
     // ── entry ──────────────────────────────────────────────────────────────
@@ -336,11 +479,28 @@ export class AstBuilder extends HopperVisitor {
         return Block(statements);
     }
 
+    visitCallbackDeclTyped(ctx) {
+        const ids      = ctx.Identifier();
+        const varName  = ids[0].getText();
+        const fnName   = ids[1].getText();
+        const types    = ctx.type();
+        const retType  = types[types.length - 1].getText();
+        const paramTs  = types.slice(0, -1).map(t => t.getText()).join(',');
+        const cbType   = `callback(${paramTs})${retType}`;
+        return VarDecl(varName, cbType, Var(fnName));
+    }
+
     visitVarDecl(ctx) {
         const name = ctx.Identifier().getText();
         const type = ctx.type().getText();
         const initExpr = this.visit(ctx.expression());
         return VarDecl(name, type, initExpr);
+    }
+
+    visitAllocateVarDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        const type = ctx.type().getText();
+        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())));
     }
 
     visitVarDeclNoInit(ctx) {
@@ -353,11 +513,29 @@ export class AstBuilder extends HopperVisitor {
         return Assign(ctx.Identifier().getText(), this.visit(ctx.expression()));
     }
 
+    visitAllocateAssign(ctx) {
+        return Assign(ctx.Identifier().getText(), AllocateExpr(this.visit(ctx.expression())));
+    }
+
     visitFieldAssign(ctx) {
         const object = ctx.Identifier(0).getText();
         const field  = ctx.fieldName().getText();
         const expr   = this.visit(ctx.expression());
         return FieldAssign(object, field, expr);
+    }
+
+    visitNestedFieldAssign(ctx) {
+        const object     = ctx.Identifier().getText();
+        const outerField = ctx.fieldName(0).getText();
+        const innerField = ctx.fieldName(1).getText();
+        const expr       = this.visit(ctx.expression());
+        return NestedFieldAssign(object, outerField, innerField, expr);
+    }
+
+    visitAllocateFieldAssign(ctx) {
+        const object = ctx.Identifier(0).getText();
+        const field  = ctx.fieldName().getText();
+        return FieldAssign(object, field, AllocateExpr(this.visit(ctx.expression())));
     }
 
     visitDerefAssign(ctx) {
@@ -438,12 +616,25 @@ export class AstBuilder extends HopperVisitor {
 
     visitBreakStmt()    { return BreakStmt(); }
     visitContinueStmt() { return ContinueStmt(); }
+
+    // templateParam alternatives — handled inline in visitTemplateDecl, not visited directly
+    visitFreeParam()  { return null; }
+    visitFixedParam() { return null; }
+
+    // ── compile-time contract stubs (not yet implemented) ──────────────────
+    // requires / ensures / invariant / constrain are reserved and parsed
+    // but silently ignored until the constraint system is built.
+    visitRequiresClause()  { return null; }
+    visitEnsuresClause()   { return null; }
+    visitInvariantClause() { return null; }
+    visitConstrainClause() { return null; }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
         return ReturnStmt(expr);
     }
-    visitDeferStmt(ctx)  { return DeferStmt(this.visit(ctx.expression())); }
-    visitExprStmt(ctx)   { return ExprStmt(this.visit(ctx.expression())); }
+    visitDeferStmt(ctx)      { return DeferStmt(this.visit(ctx.expression())); }
+    visitDeallocateStmt(ctx) { return DeallocateStmt(this.visit(ctx.expression())); }
+    visitExprStmt(ctx)       { return ExprStmt(this.visit(ctx.expression())); }
 
     // ── expressions ────────────────────────────────────────────────────────
 
@@ -526,8 +717,9 @@ export class AstBuilder extends HopperVisitor {
 
     visitUnary(ctx) {
         if (ctx.primary()) return this.visit(ctx.primary());
-        const op = ctx.children[0].getText(); // '!', '-', '~', or 'cast'
-        if (op === "cast") return CastExpr(this.visit(ctx.unary()));
+        const op = ctx.children[0].getText(); // '!', '-', '~', 'cast', or 'allocate'
+        if (op === "cast")     return CastExpr(this.visit(ctx.unary()));
+        if (op === "allocate") return AllocateExpr(this.visit(ctx.unary()));
         return Unary(op, this.visit(ctx.unary()));
     }
 
@@ -535,6 +727,16 @@ export class AstBuilder extends HopperVisitor {
         // Hex literal: 0xFF
         if (ctx.HexLiteral && ctx.HexLiteral()) {
             return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
+        }
+
+        // Character literal: 'H' → 72, '\n' → 10 — produces type char
+        if (ctx.CharLiteral && ctx.CharLiteral()) {
+            return CharLiteral(charLiteralValue(ctx.CharLiteral().getText()));
+        }
+
+        // Unicode literal: U+1F600 → 128512
+        if (ctx.UnicodeLiteral && ctx.UnicodeLiteral()) {
+            return IntLiteral(parseInt(ctx.UnicodeLiteral().getText().slice(2), 16));
         }
 
         // Float literal: 3.14
@@ -549,9 +751,7 @@ export class AstBuilder extends HopperVisitor {
 
         // String literal
         if (ctx.StringLiteral && ctx.StringLiteral()) {
-            const raw = ctx.StringLiteral().getText().slice(1, -1)
-                .replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-                .replace(/\\r/g, '\r').replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+            const raw = unescapeHopperString(ctx.StringLiteral().getText().slice(1, -1));
             return StringLiteral(raw);
         }
 
@@ -566,75 +766,90 @@ export class AstBuilder extends HopperVisitor {
         const children   = ctx.children || [];
         const childTexts = children.map(c => c.getText ? c.getText() : String(c));
 
+        // ctx.Identifier() returns a single TerminalNode (grammar has ≤1 Identifier per primary alt)
+        // Normalize to either a string name or null.
+        const idTok  = ctx.Identifier ? ctx.Identifier() : null;
+        const idName = idTok ? idTok.getText() : null;
+
+        // Normalize fieldName contexts to an array (for method/field name lookup)
+        const rawFns = ctx.fieldName ? ctx.fieldName() : null;
+        const fnsArr = rawFns ? (Array.isArray(rawFns) ? rawFns : [rawFns]) : [];
+
         // buffer[i]::address
         if (childTexts.includes('[') && childTexts.includes('::') && childTexts.includes('address')) {
-            const ids  = ctx.Identifier();
-            const name = Array.isArray(ids) ? ids[0].getText() : ids.getText();
             const exprs = ctx.expression();
-            return ArrayElementAddress(name, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
+            return ArrayElementAddress(idName, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
         }
 
         // x::size
         if (childTexts.includes('::') && childTexts.includes('size')) {
-            const ids = ctx.Identifier();
-            return SizeOf(Array.isArray(ids) ? ids[0].getText() : ids.getText());
+            return SizeOf(idName);
         }
 
         // x::address
         if (childTexts.includes('::') && childTexts.includes('address')) {
-            const ids  = ctx.Identifier();
-            return AddressOf(Array.isArray(ids) ? ids[0].getText() : ids.getText());
+            return AddressOf(idName);
         }
 
         // p::value
         if (childTexts.includes('::') && childTexts.includes('value')) {
-            const ids  = ctx.Identifier();
-            return Deref(Array.isArray(ids) ? ids[0].getText() : ids.getText());
+            return Deref(idName);
         }
 
-        // array access: buffer[i]
-        if (childTexts.includes('[') && !childTexts.includes('::')) {
-            const ids   = ctx.Identifier();
-            const name  = Array.isArray(ids) ? ids[0].getText() : ids.getText();
+        // array access: buffer[i]  (not obj.field[i] — that's FieldIndexAccess below)
+        if (childTexts.includes('[') && !childTexts.includes('::') && !childTexts.includes('.')) {
             const exprs = ctx.expression();
-            return ArrayAccess(name, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
+            return ArrayAccess(idName, this.visit(Array.isArray(exprs) ? exprs[0] : exprs));
         }
 
-        // method call: obj.method(args)
-        if (ctx.Identifier && childTexts.includes('.') && childTexts.includes('(')) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 2) {
+        // dotted access: method calls, field subscripts, field access
+        if (idName && childTexts.includes('.')) {
+            // chained method call: obj.field.method(args) — 2 fieldNames + '('
+            if (fnsArr.length === 2 && childTexts.includes('(')) {
                 const args = ctx.argList && ctx.argList()
                     ? ctx.argList().expression().map(e => this.visit(e))
                     : [];
-                return MethodCall(ids[0].getText(), ids[1].getText(), args);
+                return ChainedMethodCall(idName, fnsArr[0].getText(), fnsArr[1].getText(), args);
             }
-        }
 
-        // function call: name(args)
-        if (ctx.Identifier && ctx.argList !== undefined && childTexts.includes('(')) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 1) {
+            // field subscript: obj.field[i] — 1 fieldName + '[' (no '(')
+            if (fnsArr.length === 1 && childTexts.includes('[') && !childTexts.includes('(')) {
+                const exprs = ctx.expression();
+                const idx   = this.visit(Array.isArray(exprs) ? exprs[0] : exprs);
+                return FieldIndexAccess(idName, fnsArr[0].getText(), idx);
+            }
+
+            // method call: obj.method(args) — 1 fieldName + '('
+            if (fnsArr.length === 1 && childTexts.includes('(')) {
                 const args = ctx.argList && ctx.argList()
                     ? ctx.argList().expression().map(e => this.visit(e))
                     : [];
-                return Call(ids[0].getText(), args);
+                return MethodCall(idName, fnsArr[0].getText(), args);
+            }
+
+            // field access: obj.field — 1 fieldName (no '(' or '[')
+            if (fnsArr.length === 1) {
+                return FieldAccess(idName, fnsArr[0].getText());
             }
         }
 
-        // field access: obj.field (field may be a fieldName — allows 'value', 'address')
-        if (ctx.Identifier && childTexts.includes('.') && !childTexts.includes('(')) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length >= 1 && ctx.fieldName && ctx.fieldName()) {
-                return FieldAccess(ids[0].getText(), ctx.fieldName().getText());
-            }
+        // function call: name(args) — no dot
+        if (idName && childTexts.includes('(')) {
+            const args = ctx.argList && ctx.argList()
+                ? ctx.argList().expression().map(e => this.visit(e))
+                : [];
+            return Call(idName, args);
         }
 
         // plain variable
-        if (ctx.Identifier) {
-            const ids = ctx.Identifier();
-            if (Array.isArray(ids) && ids.length === 1) return Var(ids[0].getText());
-            if (ids && !Array.isArray(ids)) return Var(ids.getText());
+        if (idName) return Var(idName);
+
+        // String template constructor call: String(cap)
+        if (childTexts[0] === 'String' && childTexts.includes('(')) {
+            const args = ctx.argList && ctx.argList()
+                ? ctx.argList().expression().map(e => this.visit(e))
+                : [];
+            return Call("String", args);
         }
 
         // parenthesised expression
@@ -649,9 +864,11 @@ export class AstBuilder extends HopperVisitor {
 
 // ── import resolution ──────────────────────────────────────────────────────
 
-// Find modules/ directory by walking up from baseDir, then fall back to built-ins.
+// Hopper stdlib location — the modules/ dir next to kindling/src/
+const STDLIB_DIR = path.resolve(__dirname, "..", "..", "modules");
+
+// Find modules/ directory by walking up from baseDir, then fall back to stdlib.
 function resolveModuleFiles(moduleName, names, baseDir) {
-    // Walk up from baseDir looking for modules/<moduleName>/
     let dir = baseDir || process.cwd();
     while (true) {
         const candidate = path.join(dir, "modules", moduleName);
@@ -661,6 +878,11 @@ function resolveModuleFiles(moduleName, names, baseDir) {
         const parent = path.dirname(dir);
         if (parent === dir) break;
         dir = parent;
+    }
+    // Fall back to the Hopper standard library
+    const stdlibCandidate = path.join(STDLIB_DIR, moduleName);
+    if (fs.existsSync(stdlibCandidate)) {
+        return filesToLoad(stdlibCandidate, names);
     }
     throw new Error(`Module '${moduleName}' not found`);
 }
@@ -677,7 +899,7 @@ function filesToLoad(moduleDir, names) {
     }
 }
 
-export function buildAstFromSource(source, { baseDir = null, visited = new Set() } = {}) {
+export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false } = {}) {
     // Strip import lines before ANTLR sees them, collect import requests
     const imports = [];
     const strippedSource = source.replace(
@@ -700,6 +922,8 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     const tree = parser.program();
     const ast  = new AstBuilder().visit(tree);
 
+    if (noImports) return ast;
+
     for (const { module: moduleName, names } of imports) {
         const files = resolveModuleFiles(moduleName, names, baseDir);
         for (const resolved of files) {
@@ -715,10 +939,12 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             ast.structs.unshift(...importedAst.structs);
             ast.classes.unshift(...importedAst.classes);
             ast.consts.unshift(...importedAst.consts);
+            ast.enums.unshift(...(importedAst.enums || []));
             ast.aliases.unshift(...importedAst.aliases);
             ast.templates.unshift(...importedAst.templates);
             ast.binds.unshift(...importedAst.binds);
             ast.stricts.unshift(...importedAst.stricts);
+            ast.interfaces.unshift(...importedAst.interfaces);
             // entry is never inherited from imports — only the main file sets it
         }
     }

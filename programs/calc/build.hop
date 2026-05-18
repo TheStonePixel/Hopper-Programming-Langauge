@@ -1,0 +1,8 @@
+const name    = "calc"
+const version = "0.1.0"
+const entry   = "calc.hop"
+const target  = "linux/x86_64"
+
+import io    from linux
+import array from ds
+import math  from math

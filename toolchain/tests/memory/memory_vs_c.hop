@@ -1,0 +1,150 @@
+// ═══════════════════════════════════════════════════════════════
+// Hopper Memory Capabilities — Head-to-Head with C
+//
+// Each section shows the C equivalent (commented) then Hopper.
+// Covers: address-of, dereference, write-through, size,
+//         element address, pointer arithmetic, null, swap.
+// ═══════════════════════════════════════════════════════════════
+//
+// EXPECT: 42
+// EXPECT: 99
+// EXPECT: 8
+// EXPECT: 1
+// EXPECT: 8
+// EXPECT: 16
+// EXPECT: 30
+// EXPECT: 99
+// EXPECT: 20
+// EXPECT: 40
+// EXPECT: null
+// EXPECT: 13
+// EXPECT: 7
+
+extern function printf(String fmt, ...) int
+
+struct Point {
+    int x
+    int y
+}
+
+entry main {
+
+    // ── 1. ADDRESS-OF AND READ ───────────────────────────────────
+    //
+    // C:  int n = 42;
+    //     int *ptr = &n;
+    //     printf("%d\n", *ptr);
+    //
+    // Hopper — no * sigil, no ambiguity with multiply:
+    //
+    int n = 42
+    address ptr = n::address
+    printf("%d\n", ptr::value)           // 42
+
+
+    // ── 2. WRITE THROUGH POINTER ────────────────────────────────
+    //
+    // C:  *ptr = 99;
+    //     printf("%d\n", n);             // n is now 99
+    //
+    // Hopper — assignment reads naturally left-to-right:
+    //
+    ptr::value = 99
+    printf("%d\n", n)                    // 99
+
+
+    // ── 3. SIZE OPERATIONS ──────────────────────────────────────
+    //
+    // C:  printf("%zu\n", sizeof(n));    // 4 on 32-bit, 8 on 64-bit — platform dependent
+    //     printf("%zu\n", sizeof(char)); // 1
+    //     printf("%zu\n", sizeof(ptr));  // 8
+    //
+    // Hopper — int is always 64-bit, size lives on the variable not the type:
+    //
+    printf("%d\n", n::size)              // 8  (always)
+    byte b = 0
+    printf("%d\n", b::size)             // 1
+    printf("%d\n", ptr::size)           // 8
+
+
+    // ── 4. STRUCT SIZE ──────────────────────────────────────────
+    //
+    // C:  struct Point { int x; int y; };
+    //     printf("%zu\n", sizeof(struct Point));   // 16
+    //
+    // Hopper — same result, cleaner syntax:
+    //
+    Point p
+    printf("%d\n", p::size)             // 16
+
+
+    // ── 5. ARRAY ELEMENT ADDRESS ────────────────────────────────
+    //
+    // C:  int arr[5] = {10, 20, 30, 40, 50};
+    //     int *elem = &arr[2];
+    //     printf("%d\n", *elem);         // 30
+    //     *elem = 99;
+    //     printf("%d\n", arr[2]);        // 99
+    //
+    // Hopper — element address is explicit, not implicit decay:
+    //
+    int arr[5]
+    arr[0] = 10
+    arr[1] = 20
+    arr[2] = 30
+    arr[3] = 40
+    arr[4] = 50
+    address elem = arr[2]::address
+    printf("%d\n", elem::value)          // 30
+    elem::value = 99
+    printf("%d\n", arr[2])              // 99
+
+
+    // ── 6. POINTER ARITHMETIC ───────────────────────────────────
+    //
+    // C:  int *walk = &arr[0];
+    //     printf("%d\n", *(walk + 1));   // 20  (advances sizeof(int) bytes)
+    //     printf("%d\n", *(walk + 3));   // 40
+    //
+    // Hopper — typed address arithmetic scales by element size automatically,
+    //           same semantics as C, no manual sizeof multiply needed:
+    //
+    address walk = arr[0]::address
+    address step1 = walk + 1            // advances one int (8 bytes)
+    address step3 = walk + 3
+    printf("%d\n", step1::value)        // 20
+    printf("%d\n", step3::value)        // 40
+
+
+    // ── 7. NULL CHECK ───────────────────────────────────────────
+    //
+    // C:  int *maybe = NULL;
+    //     if (maybe == NULL) printf("null\n");
+    //
+    // Hopper — null is a first-class keyword, no macro needed:
+    //
+    address maybe = null
+    if (maybe == null) {
+        printf("null\n")                 // null
+    }
+
+
+    // ── 8. SWAP VIA ADDRESSES ───────────────────────────────────
+    //
+    // C:  int a = 7, bv = 13;
+    //     int *pa = &a, *pb = &bv;
+    //     int tmp = *pa; *pa = *pb; *pb = tmp;
+    //     printf("%d\n%d\n", a, bv);    // 13, 7
+    //
+    // Hopper — identical logic, :: makes the intent obvious at each step:
+    //
+    int a = 7
+    int bv = 13
+    address pa = a::address
+    address pb = bv::address
+    int swaptmp = pa::value
+    pa::value = pb::value
+    pb::value = swaptmp
+    printf("%d\n", a)                    // 13
+    printf("%d\n", bv)                   // 7
+}

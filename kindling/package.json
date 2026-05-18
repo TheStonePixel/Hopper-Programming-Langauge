@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-"scripts": {
+  "scripts": {
     "gen:grammar": "java -jar tools/antlr-4.13.1-complete.jar -Dlanguage=JavaScript -visitor -o src/generated grammar/Hopper.g4",
-    "test": "node tools/test.js"
+    "test": "node tools/test.js",
+    "build": "node tools/build.js",
+    "run": "node tools/run.js",
+    "install:ext": "node tools/install-ext.js"
   },
   "bin": {
     "hopper": "./hopper"

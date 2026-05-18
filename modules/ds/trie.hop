@@ -1,0 +1,101 @@
+// Trie — byte-indexed prefix trie for null-terminated strings
+//
+// Node layout: [isEnd: 8 bytes][children: 256 * 8 bytes] = 2056 bytes/node
+// children[b] is the child address for byte value b, or null if absent.
+//
+// Usage:
+//   Trie t = Trie()
+//   t.insert("hello")
+//   bool ok = t.contains("hello")  // true
+//   bool no = t.contains("hell")   // false (unless inserted)
+
+class Trie {
+    address root
+
+    constructor() {
+        self.root = self.newNode()
+    }
+
+    destructor() {
+        self.freeNode(self.root)
+    }
+
+    function insert(string word) {
+        address node = self.root
+        address ptr  = cast word
+        int active   = 1
+        while (active == 1) {
+            byte b  = ptr::value
+            int  bi = cast b
+            if (bi == 0) {
+                active = 0
+            } else {
+                address childSlot = node + 8 + (bi * 8)
+                address child     = childSlot::value
+                if (child == null) {
+                    address fresh    = self.newNode()
+                    childSlot::value = fresh
+                    child            = fresh
+                }
+                node = child
+                ptr  = ptr + 1
+            }
+        }
+        address isEndField = node
+        int one = 1
+        isEndField::value = one
+    }
+
+    function contains(string word) bool {
+        address node = self.root
+        address ptr  = cast word
+        int active   = 1
+        while (active == 1) {
+            byte b  = ptr::value
+            int  bi = cast b
+            if (bi == 0) {
+                active = 0
+            } else {
+                address childSlot = node + 8 + (bi * 8)
+                address child     = childSlot::value
+                if (child == null) {
+                    return false
+                }
+                node = child
+                ptr  = ptr + 1
+            }
+        }
+        address isEndField = node
+        int isEnd          = isEndField::value
+        return isEnd == 1
+    }
+
+    function newNode() address {
+        int     nodeSize = 2056
+        address node     = allocate nodeSize
+        int i = 0
+        while (i < nodeSize) {
+            address ptr = node + i
+            byte zero   = cast 0
+            ptr::value  = zero
+            i = i + 1
+        }
+        return node
+    }
+
+    function freeNode(address node) {
+        if (node == null) {
+            return
+        }
+        int i = 0
+        while (i < 256) {
+            address childSlot = node + 8 + (i * 8)
+            address child     = childSlot::value
+            if (child != null) {
+                self.freeNode(child)
+            }
+            i = i + 1
+        }
+        deallocate node
+    }
+}

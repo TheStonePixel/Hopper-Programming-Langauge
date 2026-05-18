@@ -1,0 +1,9 @@
+// COMPILE_ONLY
+import io from core
+entry main {
+    println("🚢 BATTLESHIP")
+    println("🌊 water")
+    println("🔥 hit")
+    println("💨 miss")
+    println("⬛ ship")
+}

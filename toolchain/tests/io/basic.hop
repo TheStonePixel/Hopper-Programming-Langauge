@@ -1,0 +1,37 @@
+// TEST: print / println
+// EXPECT: hello
+// EXPECT: world
+
+// TEST: printInt
+// EXPECT: 0
+// EXPECT: 1
+// EXPECT: -1
+// EXPECT: 42
+// EXPECT: -99
+// EXPECT: 2147483647
+// EXPECT: -2147483648
+// EXPECT: 1000000000
+
+import io from core
+
+entry main {
+    println("hello")
+    println("world")
+
+    printInt(0)
+    print("\n")
+    printInt(1)
+    print("\n")
+    printInt(-1)
+    print("\n")
+    printInt(42)
+    print("\n")
+    printInt(-99)
+    print("\n")
+    printInt(2147483647)
+    print("\n")
+    printInt(-2147483648)
+    print("\n")
+    printInt(1000000000)
+    print("\n")
+}

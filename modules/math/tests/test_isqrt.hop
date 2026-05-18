@@ -1,0 +1,18 @@
+// EXPECT: 0 1 1 2 3 12 1 2
+
+import io   from linux
+import math from math
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, address argv) {
+    printf("%d %d %d %d %d %d %d %d\n",
+        isqrt(0),
+        isqrt(1),
+        isqrt(2),
+        isqrt(4),
+        isqrt(9),
+        isqrt(144),
+        isqrt(3),
+        isqrt(8))
+}

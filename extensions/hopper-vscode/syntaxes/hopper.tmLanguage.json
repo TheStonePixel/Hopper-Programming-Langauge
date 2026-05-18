@@ -1,0 +1,198 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Hopper",
+    "scopeName": "source.hopper",
+    "fileTypes": ["hop"],
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#char-literals" },
+        { "include": "#strings" },
+        { "include": "#extern-function-decl" },
+        { "include": "#function-decl" },
+        { "include": "#template-decl" },
+        { "include": "#class-decl" },
+        { "include": "#struct-decl" },
+        { "include": "#interface-decl" },
+        { "include": "#method-call" },
+        { "include": "#memory-keywords" },
+        { "include": "#control-keywords" },
+        { "include": "#class-keywords" },
+        { "include": "#template-keyword" },
+        { "include": "#struct-keyword" },
+        { "include": "#interface-keyword" },
+        { "include": "#function-keywords" },
+        { "include": "#other-keywords" },
+        { "include": "#types" },
+        { "include": "#self" },
+        { "include": "#language-constants" },
+        { "include": "#numbers" },
+        { "include": "#scope-access" },
+        { "include": "#operators" }
+    ],
+    "repository": {
+
+        "comments": {
+            "name": "comment.line.double-slash.hopper",
+            "match": "//.*$"
+        },
+
+        "char-literals": {
+            "patterns": [
+                { "name": "constant.character.hopper", "match": "'\\\\.'" },
+                { "name": "constant.character.hopper", "match": "'[^'\\\\]'" }
+            ]
+        },
+
+        "strings": {
+            "match": "(?<!['\\\\])\"(?:[^\"\\\\]|\\\\.)*\"",
+            "captures": {
+                "0": { "name": "string.quoted.double.hopper" }
+            }
+        },
+
+        "extern-function-decl": {
+            "match": "\\b(extern)\\s+(function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.function.hopper" },
+                "2": { "name": "keyword.function.hopper" },
+                "3": { "name": "entity.name.function.hopper" }
+            }
+        },
+
+        "function-decl": {
+            "match": "\\b(function|entry)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.function.hopper" },
+                "2": { "name": "entity.name.function.hopper" }
+            }
+        },
+
+        "template-decl": {
+            "match": "\\b(template)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.template.hopper" },
+                "2": { "name": "entity.name.type.template.hopper" }
+            }
+        },
+
+        "class-decl": {
+            "match": "\\b(class)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.class.hopper" },
+                "2": { "name": "entity.name.type.class.hopper" }
+            }
+        },
+
+        "struct-decl": {
+            "match": "\\b(struct)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.struct.hopper" },
+                "2": { "name": "entity.name.type.struct.hopper" }
+            }
+        },
+
+        "interface-decl": {
+            "match": "\\b(interface)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.interface.hopper" },
+                "2": { "name": "entity.name.type.interface.hopper" }
+            }
+        },
+
+        "method-call": {
+            "match": "\\.([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
+            "captures": {
+                "1": { "name": "support.function.method.hopper" }
+            }
+        },
+
+        "memory-keywords": {
+            "name": "keyword.memory.hopper",
+            "match": "\\b(allocate|deallocate)\\b"
+        },
+
+        "control-keywords": {
+            "name": "keyword.control.hopper",
+            "match": "\\b(if|else|while|for|break|continue|return|defer)\\b"
+        },
+
+        "class-keywords": {
+            "name": "keyword.class.hopper",
+            "match": "\\b(class|constructor|destructor|operator|implements)\\b"
+        },
+
+        "template-keyword": {
+            "name": "keyword.template.hopper",
+            "match": "\\btemplate\\b"
+        },
+
+        "struct-keyword": {
+            "name": "keyword.struct.hopper",
+            "match": "\\bstruct\\b"
+        },
+
+        "interface-keyword": {
+            "name": "keyword.interface.hopper",
+            "match": "\\binterface\\b"
+        },
+
+        "function-keywords": {
+            "name": "keyword.function.hopper",
+            "match": "\\b(function|entry|extern)\\b"
+        },
+
+        "other-keywords": {
+            "name": "keyword.other.hopper",
+            "match": "\\b(import|from|const|enum|alias|bind|strict|bitfield|asm|pad|cast|requires|ensures|invariant|constrain|unsigned)\\b"
+        },
+
+        "types": {
+            "name": "storage.type.hopper",
+            "match": "\\b(int|bool|float|byte|bit|char|string|String|address|void)\\b"
+        },
+
+        "self": {
+            "name": "variable.language.self.hopper",
+            "match": "\\bself\\b"
+        },
+
+        "language-constants": {
+            "name": "constant.language.hopper",
+            "match": "\\b(true|false|null)\\b"
+        },
+
+        "numbers": {
+            "patterns": [
+                { "name": "constant.numeric.hex.hopper",     "match": "\\b0x[0-9a-fA-F]+\\b" },
+                { "name": "constant.numeric.float.hopper",   "match": "\\b[0-9]+\\.[0-9]+\\b" },
+                { "name": "constant.numeric.integer.hopper", "match": "\\b[0-9]+\\b" }
+            ]
+        },
+
+        "scope-access": {
+            "patterns": [
+                {
+                    "match": "([a-zA-Z_][a-zA-Z0-9_]*)(::)(value|address|size)",
+                    "captures": {
+                        "2": { "name": "keyword.memory.hopper" },
+                        "3": { "name": "keyword.memory.hopper" }
+                    }
+                },
+                {
+                    "name": "keyword.memory.hopper",
+                    "match": "::"
+                }
+            ]
+        },
+
+        "operators": {
+            "patterns": [
+                { "name": "keyword.operator.logical.hopper",    "match": "(&&|\\|\\||!(?!=))" },
+                { "name": "keyword.operator.comparison.hopper", "match": "(==|!=|<=|>=|<|>)" },
+                { "name": "keyword.operator.bitwise.hopper",    "match": "(&(?!&)|\\|(?!\\|)|\\^|~|<<|>>)" },
+                { "name": "keyword.operator.arithmetic.hopper", "match": "(\\+|-|\\*|/|%)" },
+                { "name": "keyword.operator.assignment.hopper", "match": "(?<![=!<>])=(?!=)" }
+            ]
+        }
+    }
+}

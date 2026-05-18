@@ -1,0 +1,12 @@
+// expr.hop — expression codegen
+//
+// Literals, binary ops, unary ops, calls, field access, casts, etc.
+
+function genExpression(address node) string
+function genLiteral(address node) string
+function genBinaryOp(address node) string
+function genUnaryOp(address node) string
+function genCall(address node) string
+function genFieldAccess(address node) string
+function genCast(address node) string
+function genIdentifier(address node) string

@@ -1,0 +1,23 @@
+// Tests inline assembly with register assignment and syscall instruction
+// EXPECT: hello from asm
+// EXPECT: also from asm
+
+entry main {
+    string msg1 = "hello from asm\n"
+    asm {
+        rax = 1
+        rdi = 1
+        rsi = msg1
+        rdx = 15
+        syscall
+    }
+
+    string msg2 = "also from asm\n"
+    asm {
+        rax = 1
+        rdi = 1
+        rsi = msg2
+        rdx = 14
+        syscall
+    }
+}

@@ -12,11 +12,14 @@ topLevelDecl
     | classDecl
     | templateDecl
     | constDecl
+    | enumDecl
     | importDecl
     | aliasDecl
     | entryDecl
     | bindDecl
     | strictDecl
+    | bitfieldDecl
+    | interfaceDecl
     ;
 
 importDecl
@@ -46,7 +49,18 @@ entryDecl
     ;
 
 constDecl
-    : 'const' Identifier '=' literal
+    : 'const' Identifier '=' '-'? literal
+    ;
+
+// enum — compile-time integer type with named variants
+// Variants may have explicit values; otherwise they increment from the previous.
+//   enum JsonKind { NONE = 0   BOOL   INT   STRING   ARRAY   OBJECT }
+enumDecl
+    : 'enum' Identifier '{' NEWLINE* (enumVariant (NEWLINE+ enumVariant)* NEWLINE*)? '}'
+    ;
+
+enumVariant
+    : Identifier ('=' '-'? IntegerLiteral)?
     ;
 
 aliasDecl
@@ -56,8 +70,15 @@ aliasDecl
 functionDecl
     : 'extern' 'function' Identifier '(' externParamList? ')' type   # ExternFuncDecl
     | 'extern' 'function' Identifier '(' externParamList? ')'        # ExternProcDecl
-    | 'function' Identifier '(' paramList? ')' type block            # FuncDecl
-    | 'function' Identifier '(' paramList? ')' block                 # ProcDecl
+    | 'function' Identifier '(' paramList? ')' type contractClause* block   # FuncDecl
+    | 'function' Identifier '(' paramList? ')' contractClause* block        # ProcDecl
+    ;
+
+// Compile-time contract clauses (Hoare Logic) — reserved, not yet implemented
+// NEWLINEs allowed before each clause so they can appear on their own lines.
+contractClause
+    : NEWLINE+ 'requires' expression   # RequiresClause
+    | NEWLINE+ 'ensures'  expression   # EnsuresClause
     ;
 
 // struct = memory layout only, no methods, no default values
@@ -70,23 +91,81 @@ structMember
     | 'pad' IntegerLiteral  # StructPad
     ;
 
+// bitfield = bit-level layout — fields packed sequentially from LSB
+// bit[N] is simply an array of N bits, consistent with int[N] and byte[N]
+bitfieldDecl
+    : 'bitfield' Identifier '{' NEWLINE* (bitfieldMember (NEWLINE+ bitfieldMember)* NEWLINE*)? '}'
+    ;
+
+bitfieldMember
+    : type fieldName '[' IntegerLiteral ']'   # BitfieldArrayField
+    | type fieldName                           # BitfieldField
+    | 'pad' IntegerLiteral                     # BitfieldPad
+    ;
+
 // template = parameterized class, monomorphized at use sites
+// templateParam is either a free type variable (Identifier, e.g. T, K, V)
+// or a fixed concrete type (primitive keyword, e.g. byte, int, address).
+// Fixed-param templates are fully monomorphized at declaration time and their
+// name becomes a standalone type — no <> required at use sites.
 templateDecl
-    : 'template' Identifier '<' Identifier (',' Identifier)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'template' templateName '<' templateParam (',' templateParam)* '>' '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+// Allow 'String' as a template name in addition to plain identifiers.
+// 'String' is a reserved keyword so it cannot be used as Identifier directly.
+templateName
+    : Identifier
+    | 'String'
+    ;
+
+templateParam
+    : Identifier        # FreeParam    // free type variable: T, K, V
+    | 'int'             # FixedParam   // fixed primitive types — no <> at use site
+    | 'byte'            # FixedParam
+    | 'char'            # FixedParam
+    | 'float'           # FixedParam
+    | 'bool'            # FixedParam
+    | 'string'          # FixedParam
+    | 'address'         # FixedParam
+    | 'unsigned' 'int'  # FixedParam
+    | 'unsigned' 'byte' # FixedParam
+    ;
+
+// interface = compile-time contract: a set of method signatures a class must implement
+interfaceDecl
+    : 'interface' Identifier '{' NEWLINE* (interfaceMember (NEWLINE+ interfaceMember)* NEWLINE*)? '}'
+    ;
+
+interfaceMember
+    : 'function' fieldName '(' paramList? ')' type   # InterfaceFunc
+    | 'function' fieldName '(' paramList? ')'        # InterfaceProc
     ;
 
 // class = data + behavior, compiler-optimized layout
+// Optional 'implements' list for compile-time interface conformance checking
 classDecl
-    : 'class' Identifier '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'class' className implementsList? '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    ;
+
+// className allows 'String' as a class name in addition to plain identifiers
+className
+    : Identifier
+    | 'String'
+    ;
+
+// implements — list of interfaces the class must conform to
+implementsList
+    : 'implements' Identifier (',' Identifier)*
     ;
 
 classMember
-    : type fieldName                                            # ClassField
-    | 'function' Identifier '(' paramList? ')' type block      # ClassMethod
-    | 'function' Identifier '(' paramList? ')' block           # ClassProcMethod
-    | 'operator' operatorSymbol '(' param ')' type block        # ClassOperator
-    | 'constructor' '(' paramList? ')' block                   # ClassConstructor
-    | 'destructor' '(' ')' block                               # ClassDestructor
+    : type fieldName                                              # ClassField
+    | 'function' fieldName '(' paramList? ')' type block         # ClassMethod
+    | 'function' fieldName '(' paramList? ')' block              # ClassProcMethod
+    | 'operator' operatorSymbol '(' Identifier (',' param)* ')' type block   # ClassOperator
+    | 'constructor' '(' paramList? ')' block                     # ClassConstructor
+    | 'destructor' '(' ')' block                                 # ClassDestructor
     ;
 
 // fieldName allows keywords that are only special in :: context to be used as field names
@@ -101,6 +180,7 @@ operatorSymbol
     : '+' | '-' | '*' | '/' | '%'
     | '==' | '!=' | '<' | '<=' | '>' | '>='
     | '&' | '|' | '^' | '<<' | '>>'
+    | '[' ']' '='
     | '[' ']'
     ;
 
@@ -128,16 +208,21 @@ paramName
     ;
 
 type
-    : 'int'
+    : 'void'
+    | 'int'
     | 'bool'
     | 'float'
     | 'byte'
+    | 'char'
+    | 'bit'
     | 'string' '[' ']'  // array of strings — argv type, maps to i8**
     | 'string'
+    | 'String' '<' type (',' type)* '>'   // String<byte>, String<int> — template instantiation
     | 'String'
     | 'address'
     | 'unsigned' 'int'
     | 'unsigned' 'byte'
+    | 'callback' '(' (type (',' type)*)? ')' type   // function pointer type for parameters: callback(int,bool) int
     | Identifier '<' type (',' type)* '>'   // template instantiation: List<int>, Map<String,int>
     | Identifier    // user-defined types (structs, classes)
     ;
@@ -152,23 +237,41 @@ block
     ;
 
 statement
-    : type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
-    | type Identifier '[' IntegerLiteral ']'             # ArrayDecl
-    | type Identifier '=' expression                     # VarDecl
-    | type Identifier                                    # VarDeclNoInit
-    | Identifier '[' expression ']' '=' expression       # ArrayAssign
-    | Identifier '=' expression                          # Assign
-    | Identifier '.' fieldName '=' expression             # FieldAssign
-    | Identifier '::' 'value' '=' expression             # DerefAssign
-    | expression                                         # ExprStmt
-    | 'if' '(' expression ')' block ('else' block)?      # IfStmt
-    | 'while' '(' expression ')' block                   # WhileStmt
+    : 'callback' Identifier '=' Identifier '(' (type (',' type)*)? ')' type  # CallbackDeclTyped
+    | type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
+    | type Identifier '[' IntegerLiteral ']'                    # ArrayDecl
+    | type Identifier '=' 'allocate' expression constrainClause?  # AllocateVarDecl
+    | type Identifier '=' expression constrainClause?           # VarDecl
+    | type Identifier constrainClause?                          # VarDeclNoInit
+    | Identifier '[' expression ']' '=' expression              # ArrayAssign
+    | Identifier '=' 'allocate' expression                      # AllocateAssign
+    | Identifier '=' expression                                 # Assign
+    | Identifier '.' fieldName '.' fieldName '=' expression     # NestedFieldAssign
+    | Identifier '.' fieldName '=' 'allocate' expression        # AllocateFieldAssign
+    | Identifier '.' fieldName '=' expression                   # FieldAssign
+    | Identifier '::' 'value' '=' expression                    # DerefAssign
+    | expression                                                # ExprStmt
+    | 'if' '(' expression ')' block ('else' block)?             # IfStmt
+    | 'while' '(' expression ')' invariantClause* block         # WhileStmt
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
-    | 'break'                                            # BreakStmt
-    | 'continue'                                         # ContinueStmt
-    | 'return' expression?                               # ReturnStmt
-    | 'defer' expression                                 # DeferStmt
-    | 'asm' asmBlock                                     # AsmStmt
+    | 'break'                                                   # BreakStmt
+    | 'continue'                                                # ContinueStmt
+    | 'return' expression?                                      # ReturnStmt
+    | 'defer' expression                                        # DeferStmt
+    | 'deallocate' expression                                   # DeallocateStmt
+    | 'asm' asmBlock                                            # AsmStmt
+    ;
+
+// Compile-time constraint clause — reserved, not yet implemented
+// e.g.  int x = 10 constrain [u8]
+constrainClause
+    : 'constrain' '[' type ']'
+    ;
+
+// Compile-time loop invariant — reserved, not yet implemented
+// e.g.  while (i < n) invariant i >= 0 { ... }
+invariantClause
+    : 'invariant' expression
     ;
 
 asmBlock
@@ -214,6 +317,8 @@ unary           : ('!' | '-' | '~') unary | 'cast' unary | primary ;
 primary
     : IntegerLiteral
     | HexLiteral
+    | CharLiteral
+    | UnicodeLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -223,10 +328,13 @@ primary
     | Identifier '::' 'address'                         // address of variable/function
     | Identifier '::' 'value'                           // dereference address
     | Identifier '::' 'size'                            // byte size of variable or type
-    | Identifier '(' argList? ')'                       // function call
-    | Identifier '.' Identifier '(' argList? ')'        // method call
-    | Identifier '[' expression ']'                     // array element access
-    | Identifier '.' fieldName                          // field access
+    | Identifier '(' argList? ')'                                           // function call
+    | Identifier '.' fieldName '.' fieldName '(' argList? ')'               // chained method call: obj.field.method(...)
+    | Identifier '.' fieldName '(' argList? ')'                              // method call
+    | 'String' '(' argList? ')'                                              // String template constructor call
+    | Identifier '.' fieldName '[' expression ']'                            // subscript on field: obj.field[i]
+    | Identifier '[' expression ']'                                          // array element access
+    | Identifier '.' fieldName                                               // field access
     | Identifier
     | 'value'                                               // contextual keyword as variable ref
     | 'address'                                             // contextual keyword as variable ref
@@ -241,6 +349,8 @@ argList
 literal
     : IntegerLiteral
     | HexLiteral
+    | CharLiteral
+    | UnicodeLiteral
     | FloatLiteral
     | StringLiteral
     | 'true'
@@ -252,9 +362,10 @@ literal
 
 IntegerLiteral  : [0-9]+ ;
 HexLiteral      : '0x' [0-9a-fA-F]+ ;
+CharLiteral     : '\'' (~['\r\n\\] | '\\' .) '\'' ;
+UnicodeLiteral  : 'U+' [0-9a-fA-F]+ ;
 FloatLiteral    : [0-9]+ '.' [0-9]+ ;
 StringLiteral   : '"' (~["\r\n\\] | '\\' .)* '"' ;
-// CharLiteral removed — characters are byte values, e.g. 72 not 'H'
 Identifier      : [a-zA-Z_][a-zA-Z0-9_]* ;
 
 // keep newlines as real tokens (for statement separation)

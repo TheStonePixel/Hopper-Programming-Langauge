@@ -1,0 +1,65 @@
+import assert from core
+import io     from core
+
+// TEST: basic count
+// EXPECT: basic ok
+
+// TEST: break
+// EXPECT: break ok
+
+// TEST: continue
+// EXPECT: continue ok
+
+// TEST: nested
+// EXPECT: nested ok
+
+// TEST: decl in init
+// EXPECT: decl ok
+
+entry main {
+    // — basic count ————————————————————————————————————————
+    int sum = 0
+    for (int i = 0; i < 5; i = i + 1) {
+        sum = sum + i
+    }
+    soft(sum == 10, "basic for sum != 10\n")
+    println("basic ok")
+
+    // — break ——————————————————————————————————————————————
+    int hit = 0
+    for (int i = 0; i < 100; i = i + 1) {
+        if (i == 7) { break }
+        hit = i
+    }
+    soft(hit == 6, "break: expected hit == 6\n")
+    println("break ok")
+
+    // — continue ———————————————————————————————————————————
+    int odds = 0
+    for (int i = 0; i < 10; i = i + 1) {
+        if (i % 2 == 0) { continue }
+        odds = odds + 1
+    }
+    soft(odds == 5, "continue: expected 5 odd numbers\n")
+    println("continue ok")
+
+    // — nested ——————————————————————————————————————————————
+    int pairs = 0
+    for (int i = 0; i < 3; i = i + 1) {
+        for (int j = 0; j < 3; j = j + 1) {
+            pairs = pairs + 1
+        }
+    }
+    soft(pairs == 9, "nested: expected 9 pairs\n")
+    println("nested ok")
+
+    // — existing var in init ———————————————————————————————
+    int k = 0
+    int acc = 0
+    for (k = 0; k < 4; k = k + 1) {
+        acc = acc + 1
+    }
+    soft(acc == 4, "decl: expected acc == 4\n")
+    soft(k == 4,   "decl: expected k == 4 after loop\n")
+    println("decl ok")
+}

@@ -1,0 +1,68 @@
+// Graph — directed graph backed by an adjacency matrix
+//
+// matrix[src * capacity + to] = 1 if edge exists, 0 otherwise.
+// Vertex indices are 0..capacity-1.
+//
+// Usage:
+//   Graph g = Graph(4)
+//   g.addEdge(0, 1)
+//   g.addEdge(0, 2)
+//   bool ok = g.hasEdge(0, 1)  // true
+//   int  d  = g.degree(0)      // 2
+
+class Graph {
+    address matrix
+    int     capacity
+
+    constructor(int n) {
+        self.capacity = n
+        self.matrix   = allocate n * n * 8
+        int total = n * n
+        int i = 0
+        while (i < total) {
+            address ptr = self.matrix + (i * 8)
+            int zero = 0
+            ptr::value = zero
+            i = i + 1
+        }
+    }
+
+    destructor() {
+        deallocate self.matrix
+    }
+
+    function vertices() int {
+        return self.capacity
+    }
+
+    function addEdge(int src, int to) {
+        address ptr = self.matrix + ((src * self.capacity + to) * 8)
+        int one = 1
+        ptr::value = one
+    }
+
+    function removeEdge(int src, int to) {
+        address ptr = self.matrix + ((src * self.capacity + to) * 8)
+        int zero = 0
+        ptr::value = zero
+    }
+
+    function hasEdge(int src, int to) bool {
+        address ptr = self.matrix + ((src * self.capacity + to) * 8)
+        int val = ptr::value
+        return val == 1
+    }
+
+    // Number of outgoing edges src vertex v.
+    function degree(int v) int {
+        int count = 0
+        int i = 0
+        while (i < self.capacity) {
+            if (self.hasEdge(v, i)) {
+                count = count + 1
+            }
+            i = i + 1
+        }
+        return count
+    }
+}

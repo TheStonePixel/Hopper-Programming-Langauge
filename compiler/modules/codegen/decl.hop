@@ -1,0 +1,10 @@
+// decl.hop — top-level declaration codegen
+//
+// Functions, externs, structs, classes, entry point.
+
+function genFunctionDecl(address node)
+function genExternDecl(address node)
+function genStructDecl(address node)
+function genClassDecl(address node)
+function genEntryDecl(address node)
+function genConstDecl(address node)

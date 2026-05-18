@@ -1,0 +1,29 @@
+// Linux io_uring — architecture-neutral.
+// Delegates to modules/target/io_uring.hop, which selects the ISA.
+//
+// Imported functions: io_uring_setup io_uring_enter io_uring_register
+//
+// io_uring is the highest-performance async I/O interface on Linux 5.1+.
+// Kernel and userspace communicate through mmap'd ring buffers; after setup,
+// most operations need zero syscalls when kernel polling mode is enabled.
+//
+// ── io_uring_enter flags ─────────────────────────────────────────────────────
+//   IORING_ENTER_GETEVENTS=1  IORING_ENTER_SQ_WAKEUP=2
+//
+// ── io_uring_register opcodes ────────────────────────────────────────────────
+//   IORING_REGISTER_BUFFERS=0  IORING_UNREGISTER_BUFFERS=1
+//   IORING_REGISTER_FILES=2    IORING_UNREGISTER_FILES=3
+//   IORING_REGISTER_EVENTFD=4  IORING_UNREGISTER_EVENTFD=5
+//
+// ── SQE opcodes (IORING_OP_*) ────────────────────────────────────────────────
+//   NOP=0  READV=1  WRITEV=2  FSYNC=3  POLL_ADD=6  POLL_REMOVE=7
+//   ACCEPT=13  CONNECT=16  OPENAT=18  CLOSE=19  READ=22  WRITE=23
+//   RECV=27  SEND=26  TIMEOUT=11  STATX=21
+//
+// ── SQE flags (IOSQE_*) ──────────────────────────────────────────────────────
+//   FIXED_FILE=1  IO_DRAIN=2  IO_LINK=4  IO_HARDLINK=8  ASYNC=16
+//
+// ── io_uring_setup params.flags ───────────────────────────────────────────────
+//   IORING_SETUP_IOPOLL=1  IORING_SETUP_SQPOLL=2  IORING_SETUP_SQ_AFF=4
+
+import io_uring from target

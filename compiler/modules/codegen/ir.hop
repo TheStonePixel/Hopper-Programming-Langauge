@@ -1,0 +1,17 @@
+// ir.hop — LLVM IR emitter
+//
+// Low-level IR string building. All other codegen modules go through here.
+
+function irEmit(string line)
+function irNewTmp() string
+function irNewLabel(string prefix) string
+function irDeclare(string name, string retType, string params)
+function irDefine(string name, string retType, string params)
+function irAlloca(string tmp, string type)
+function irStore(string type, string val, string ptr)
+function irLoad(string type, string tmp, string ptr)
+function irRet(string type, string val)
+function irBr(string label)
+function irCondBr(string cond, string trueLabel, string falseLabel)
+function irCall(string tmp, string retType, string name, string args)
+function irGlobal(string name, string type, string val)

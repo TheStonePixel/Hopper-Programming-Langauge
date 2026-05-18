@@ -1,0 +1,15 @@
+// EXPECT: ok
+
+import fs from linux
+import io from linux
+
+entry main {
+    int fd = open(".", 0, 0)
+    address buf = allocate 4096
+    int n = getdents64(fd, buf, 4096)
+    if (n > 0) {
+        write(1, "ok\n", 3)
+    }
+    close(fd)
+    deallocate buf
+}

@@ -1,0 +1,13 @@
+// EXPECT: ok
+
+import fs from linux
+import io from linux
+
+entry main {
+    address buf = allocate 144
+    int r = stat("/dev/null", buf)
+    if (r == 0) {
+        write(1, "ok\n", 3)
+    }
+    deallocate buf
+}

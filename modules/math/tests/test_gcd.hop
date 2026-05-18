@@ -1,0 +1,15 @@
+// EXPECT: 6 25 1 5 4
+
+import io   from linux
+import math from math
+
+extern function printf(String fmt, ...) int
+
+entry main(int argc, address argv) {
+    printf("%d %d %d %d %d\n",
+        gcd(48, 18),
+        gcd(100, 75),
+        gcd(7, 3),
+        gcd(0, 5),
+        gcd(-12, 8))
+}

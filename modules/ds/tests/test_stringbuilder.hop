@@ -1,0 +1,46 @@
+// EXPECT: hello world
+// EXPECT: x = 42
+// EXPECT: neg = -7
+// EXPECT: flags: true false
+// EXPECT: len: 10
+
+import io from io
+import stringbuilder from ds
+
+entry main(int argc, address argv) {
+    StringBuilder sb = StringBuilder(8)
+
+    sb.appendStr("hello")
+    byte sp = cast ' '
+    sb.appendChar(sp)
+    sb.appendStr("world")
+    print(sb.str(), sb.length())
+    newline()
+
+    sb.reset()
+    sb.appendStr("x = ")
+    sb.appendInt(42)
+    print(sb.str(), sb.length())
+    newline()
+
+    sb.reset()
+    sb.appendStr("neg = ")
+    sb.appendInt(-7)
+    print(sb.str(), sb.length())
+    newline()
+
+    sb.reset()
+    sb.appendStr("flags: ")
+    sb.appendBool(true)
+    byte space = cast ' '
+    sb.appendChar(space)
+    sb.appendBool(false)
+    print(sb.str(), sb.length())
+    newline()
+
+    sb.reset()
+    sb.appendStr("0123456789")
+    print("len: ")
+    print(sb.length())
+    newline()
+}

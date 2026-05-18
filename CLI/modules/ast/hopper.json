@@ -1,0 +1,11 @@
+{
+  "name": "ast",
+  "version": "0.1.0",
+  "description": "AST node types for the Hopper compiler",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "main.hop",
+  "dependencies": {
+    "utf8": "stdlib"
+  }
+}

@@ -1,0 +1,26 @@
+// TEST: ok result
+// EXPECT: Result(ok) -> isOk() = 1
+// EXPECT: Result(ok) -> unwrap() = 42
+// EXPECT: Result(ok) -> unwrapOr(0) = 42
+
+// TEST: err result
+// EXPECT: Result(err) -> isOk() = 0
+// EXPECT: Result(err) -> isErr() = 1
+// EXPECT: Result(err) -> errorCode() = 404
+// EXPECT: Result(err) -> unwrapOr(0) = 0
+
+import result from core
+extern function printf(string fmt, ...) int
+
+entry main {
+    Result<int> ok = Result(1, 42, 0)
+    printf("Result(ok) -> isOk() = %lld\n",    ok.isOk())
+    printf("Result(ok) -> unwrap() = %lld\n",  ok.unwrap())
+    printf("Result(ok) -> unwrapOr(0) = %lld\n", ok.unwrapOr(0))
+
+    Result<int> err = Result(0, 0, 404)
+    printf("Result(err) -> isOk() = %lld\n",     err.isOk())
+    printf("Result(err) -> isErr() = %lld\n",    err.isErr())
+    printf("Result(err) -> errorCode() = %lld\n", err.errorCode())
+    printf("Result(err) -> unwrapOr(0) = %lld\n",  err.unwrapOr(0))
+}

@@ -1,0 +1,11 @@
+// Tests stdlib/io.hop — pure Linux syscalls, no libc
+// EXPECT: hello from hopper
+// EXPECT: second line
+
+import io from linux
+
+entry main {
+    print("hello from hopper\n", 18)
+    print("second line\n", 12)
+    error("this goes to stderr\n", 20)
+}

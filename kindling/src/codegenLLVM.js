@@ -5,11 +5,16 @@ import { buildAstFromSource } from "./astBuilder.js";
 const stringConstants    = new Map();   // raw value  → @.str.N
 const structTypes        = new Map();   // name       → { fields: [{name,type,isPad,size}] }
 const classTypes         = new Map();   // name       → { fields: [{name,type}], methods, operators }
+const interfaceDefs      = new Map();   // name       → { methods: [{name, params, returnType}] }
 const moduleConstants    = new Map();   // const name → { value, type }
 const typeAliases        = new Map();   // alias name → target type string
 const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
+const overloadGroups     = new Map();   // baseName → [{mangledName, params, returnType}]
 const templateDefs       = new Map();   // template name → TemplateDecl
+const templateInstances  = new Set();   // mangled names from monomorphization — fields are public
 const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
+const bitfieldTypes      = new Map();   // name → BitfieldDecl
+const enumTypes          = new Map();   // enum name → Map(variantName → int value)
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
 
@@ -17,11 +22,16 @@ function resetAll() {
     stringConstants.clear();
     structTypes.clear();
     classTypes.clear();
+    interfaceDefs.clear();
     moduleConstants.clear();
     typeAliases.clear();
     functionReturnTypes.clear();
+    overloadGroups.clear();
     templateDefs.clear();
+    templateInstances.clear();
     mmioBindings.clear();
+    bitfieldTypes.clear();
+    enumTypes.clear();
     instantiatedClasses = [];
     stringCounter = 0;
 }
@@ -37,6 +47,37 @@ function registerStruct(name, fields) {
 
 function registerClass(name, fields, methods, operators) {
     classTypes.set(name, { fields, methods, operators });
+}
+
+function checkImplements(cls) {
+    for (const ifaceName of cls.interfaces || []) {
+        const iface = interfaceDefs.get(ifaceName);
+        if (!iface) throw new Error(`Interface '${ifaceName}' not found (required by class '${cls.name}')`);
+        for (const req of iface.methods) {
+            const found = (cls.methods || []).find(m => m.name === req.name);
+            if (!found) {
+                throw new Error(
+                    `Class '${cls.name}' does not implement '${ifaceName}.${req.name}' — add a '${req.name}' method`
+                );
+            }
+        }
+    }
+}
+
+// ── function overload helpers ─────────────────────────────────────────────
+
+// Mangle a function name with its parameter types: print(int,bool) → print__int_bool
+function mangledFnName(name, params) {
+    if (!params || params.length === 0) return `${name}__`;
+    const sig = params.map(p => normalizeType(p.type).replace(/[^a-zA-Z0-9]/g, "_")).join("_");
+    return `${name}__${sig}`;
+}
+
+// Check whether an argument type is compatible with a parameter type for overload matching.
+// Treats string and address as interchangeable (both are i8*).
+function overloadTypeMatch(argType, paramType) {
+    const norm = t => { const n = normalizeType(t); return n === "string" ? "address" : n; };
+    return norm(argType) === norm(paramType);
 }
 
 // ── template helpers ───────────────────────────────────────────────────────
@@ -86,15 +127,34 @@ function substBlock(block, subst) {
     return { ...block, statements: block.statements.map(s => substStmt(s, subst)) };
 }
 
+function substExpr(e, subst) {
+    if (!e) return null;
+    switch (e.kind) {
+        case "SizeOf":        return { ...e, name: substTypeStr(e.name, subst) };
+        case "Binary":        return { ...e, left: substExpr(e.left, subst), right: substExpr(e.right, subst) };
+        case "Unary":         return { ...e, expr: substExpr(e.expr, subst) };
+        case "AllocateExpr":  return { ...e, sizeExpr: substExpr(e.sizeExpr, subst) };
+        case "DeallocateStmt": return { ...e, expr: substExpr(e.expr, subst) };
+        default:              return e;
+    }
+}
+
 function substStmt(s, subst) {
     if (!s) return null;
     switch (s.kind) {
-        case "VarDecl":       return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDecl":     return { ...s, type: substTypeStr(s.type, subst) };
-        case "ArrayDeclInit": return { ...s, type: substTypeStr(s.type, subst) };
-        case "IfStmt":      return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
-        case "WhileStmt":   return { ...s, body: substBlock(s.body, subst) };
-        case "ForStmt":     return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        case "VarDecl":        return { ...s, type: substTypeStr(s.type, subst), init: substExpr(s.init, subst) };
+        case "ArrayDecl":      return { ...s, type: substTypeStr(s.type, subst) };
+        case "ArrayDeclInit":  return { ...s, type: substTypeStr(s.type, subst) };
+        case "IfStmt":         return { ...s, thenBlock: substBlock(s.thenBlock, subst), elseBlock: s.elseBlock ? substBlock(s.elseBlock, subst) : null };
+        case "WhileStmt":      return { ...s, body: substBlock(s.body, subst) };
+        case "ForStmt":        return { ...s, init: substStmt(s.init, subst), body: substBlock(s.body, subst) };
+        case "DeallocateStmt": return { ...s, expr: substExpr(s.expr, subst) };
+        case "ExprStmt":       return { ...s, expr: substExpr(s.expr, subst) };
+        case "ReturnStmt":     return { ...s, expr: substExpr(s.expr, subst) };
+        case "FieldAssign":       return { ...s, expr: substExpr(s.expr, subst) };
+        case "NestedFieldAssign": return { ...s, expr: substExpr(s.expr, subst) };
+        case "Assign":            return { ...s, expr: substExpr(s.expr, subst) };
+        case "DerefAssign":       return { ...s, expr: substExpr(s.expr, subst) };
         default: return s;
     }
 }
@@ -120,7 +180,8 @@ function monomorphize(tmpl, typeArgs) {
     function substOperator(op) {
         return {
             ...op,
-            param:      substParam(op.param, subst),
+            param:      op.param ? substParam(op.param, subst) : null,
+            params:     (op.params || []).map(p => substParam(p, subst)),
             returnType: substTypeStr(op.returnType, subst),
             body:       substBlock(op.body, subst),
         };
@@ -161,6 +222,7 @@ function instantiateTemplate(typeStr) {
 
     // Register before recursing to prevent infinite loops
     registerClass(concreteClass.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+    templateInstances.add(concreteClass.name);
     instantiatedClasses.push(concreteClass);
 
     // Register return types for all methods so call sites can resolve them
@@ -171,8 +233,9 @@ function instantiateTemplate(typeStr) {
     }
     for (const op of concreteClass.operators || []) {
         const ns = operatorNameSafe(op.op);
+        const opParams = op.params && op.params.length > 0 ? op.params : (op.param ? [op.param] : []);
         functionReturnTypes.set(`${concreteClass.name}_op_${ns}`, {
-            returnType: op.returnType, isVariadic: false, params: [op.param]
+            returnType: op.returnType, isVariadic: false, params: opParams
         });
     }
     if (concreteClass.constructor) {
@@ -242,6 +305,8 @@ function collectTypeUsages(ast) {
     }
     for (const s of ast.structs || []) s.fields.forEach(f => checkType(f.type));
 
+    if (ast.entry && ast.entry.body) scanBlock(ast.entry.body);
+
     return usages;
 }
 
@@ -249,11 +314,31 @@ function collectTypeUsages(ast) {
 
 function operatorNameSafe(op) {
     return op
-        .replace('[]','idx').replace('<<','shl').replace('>>','shr')
+        .replace('[]=','setidx').replace('[]','idx').replace('<<','shl').replace('>>','shr')
         .replace('<=','le').replace('>=','ge').replace('==','eq').replace('!=','ne')
         .replace('+','plus').replace('-','minus').replace('*','mul')
         .replace('/','div').replace('%','mod').replace('<','lt').replace('>','gt')
         .replace('&','band').replace('|','bor').replace('^','bxor');
+}
+
+// ── callback type helpers ─────────────────────────────────────────────────
+
+// "callback(int,int)bool" → { params: ["int","int"], ret: "bool" }
+function parseCallbackType(t) {
+    const openP  = t.indexOf('(');
+    const closeP = t.lastIndexOf(')');
+    const paramsStr = t.substring(openP + 1, closeP).trim();
+    const ret       = t.substring(closeP + 1).trim();
+    const params    = paramsStr ? paramsStr.split(',').map(p => p.trim()) : [];
+    return { params, ret };
+}
+
+// "callback(int,int)bool" → "i1 (i64, i64)"  (LLVM function type, no trailing *)
+function callbackFnTypeSig(t) {
+    const { params, ret } = parseCallbackType(t);
+    const retLl    = ret ? llvmType(ret) : "void";
+    const paramLls = params.map(p => llvmType(p)).join(", ");
+    return `${retLl} (${paramLls})`;
 }
 
 // ── type helpers ───────────────────────────────────────────────────────────
@@ -261,19 +346,24 @@ function operatorNameSafe(op) {
 function llvmType(t) {
     if (!t) return "void";
     if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
+    // Check class/struct registries before hard-coded keywords so that
+    // user-defined classes named 'String' take priority over the i8* fallback.
+    if (classTypes.has(t))    return `%class.${t}`;
+    if (structTypes.has(t))   return `%struct.${t}`;
+    if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
     if (t === "int")          return "i64";
     if (t === "bool")         return "i1";
-    if (t === "byte")         return "i8";
+    if (t === "bit")          return "i1";
+    if (t === "byte" || t === "char")         return "i8";
     if (t === "float")        return "double";
     if (t === "string[]")     return "i8**";
     if (t === "string")       return "i8*";
-    if (t === "String")       return "i8*";
+    if (t === "String")       return "i8*";   // fallback: bare String with no class registered
     if (t === "address")      return "i8*";
     if (t === "unsignedint")  return "i64";
     if (t === "unsignedbyte") return "i8";
-    if (structTypes.has(t))   return `%struct.${t}`;
-    if (classTypes.has(t))    return `%class.${t}`;
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
+    if (t.startsWith("callback(")) return "i8*";  // stored as opaque pointer
     if (t.includes('<')) {
         const m = mangleTemplate(t);
         if (classTypes.has(m)) return `%class.${m}`;
@@ -283,22 +373,79 @@ function llvmType(t) {
 }
 
 function isFloatType(t) { return t === "float"; }
-function isIntType(t)   { return t === "int" || t === "byte" || t === "bool" || t === "unsignedint" || t === "unsignedbyte"; }
+function isIntType(t)   { return t === "int" || t === "byte" || t === "char" || t === "bool" || t === "bit" || t === "unsignedint" || t === "unsignedbyte"; }
 function isUnsigned(t)  { return t === "unsignedint" || t === "unsignedbyte"; }
+
+// Number of BITS a type occupies (used for bitfield layout)
+function bitWidth(type, count = 1) {
+    if (type === "bit")          return 1 * count;
+    if (type === "bool")         return 1 * count;
+    if (type === "byte" || type === "char") return 8 * count;
+    if (type === "unsignedbyte") return 8 * count;
+    if (type === "int")          return 64 * count;
+    if (type === "unsignedint")  return 64 * count;
+    if (type === "float")        return 64 * count;
+    if (type === "address")      return 64 * count;
+    return 8 * count; // default: treat as byte-sized
+}
+
+// Smallest integer LLVM type that holds N bits (rounded up to 8/16/32/64)
+function bitsToLLType(n) {
+    if (n <= 8)  return "i8";
+    if (n <= 16) return "i16";
+    if (n <= 32) return "i32";
+    return "i64";
+}
+
+// Total bit count and LLVM container type for a bitfield
+function bitfieldLayout(bf) {
+    let total = 0;
+    for (const f of bf.fields) {
+        if (f.isPad) { total += f.bits; continue; }
+        total += bitWidth(f.type, f.count);
+    }
+    return { totalBits: total, llType: bitsToLLType(total) };
+}
+
+function bitfieldLLType(bf) {
+    return bitfieldLayout(bf).llType;
+}
 
 function sizeOfType(t) {
     if (t === "int")     return 8;
-    if (t === "byte")    return 1;
+    if (t === "byte" || t === "char")    return 1;
+    if (t === "bit")     return 1;  // stored as i8 minimum when standalone
     if (t === "bool")    return 1;
     if (t === "float")   return 8;
     if (t === "string")  return 8;
-    if (t === "String")  return 8;
     if (t === "address") return 8;
+    if (bitfieldTypes.has(t)) {
+        const { totalBits } = bitfieldLayout(bitfieldTypes.get(t));
+        return Math.ceil(totalBits / 8);
+    }
     if (structTypes.has(t)) {
         return structTypes.get(t).fields.reduce((s, f) =>
             s + (f.isPad ? f.size : sizeOfType(f.type)), 0);
     }
+    if (classTypes.has(t)) {
+        return classTypes.get(t).fields.reduce((acc, f) => acc + sizeOfType(f.type), 0);
+    }
+    if (t === "String")  return 8;   // bare String fallback (pointer size)
     throw new Error(`Unknown type for sizeof: ${t}`);
+}
+
+// ── bitfield field lookup ─────────────────────────────────────────────────
+
+// Returns { offset (bit), width (bits), fieldType } for a named field in a bitfield
+function bitfieldFieldInfo(bf, fieldName) {
+    let offset = 0;
+    for (const f of bf.fields) {
+        if (f.isPad) { offset += f.bits; continue; }
+        const width = bitWidth(f.type, f.count);
+        if (f.name === fieldName) return { offset, width, fieldType: f.type };
+        offset += width;
+    }
+    throw new Error(`Field '${fieldName}' not found in bitfield`);
 }
 
 // ── field lookup (struct and class) ───────────────────────────────────────
@@ -330,6 +477,14 @@ function getFieldType(typeName, fieldName) {
     return f.type;
 }
 
+// Return the appropriate LLVM zero-value literal for a given LLVM type string.
+function llvmZeroValue(llType) {
+    if (llType === "double") return "0.0";
+    if (llType.endsWith("*")) return "null";
+    if (llType.startsWith("%class.") || llType.startsWith("%struct.")) return "zeroinitializer";
+    return "0";
+}
+
 // ── IRBuilder ──────────────────────────────────────────────────────────────
 
 class IRBuilder {
@@ -343,6 +498,7 @@ class IRBuilder {
     }
 
     emit(line)              { this.lines.push(line); }
+    isTerminated()          { const l = this.lines[this.lines.length - 1]; return l && /^\s*(ret|br)\b/.test(l); }
     newTmp()                { return `%t${this.tmp++}`; }
     newLabel(prefix)        { return `${prefix}${this.label++}`; }
     getVar(name) {
@@ -380,7 +536,7 @@ function emitCast(ir, srcVal, srcType, targetType) {
         ir.emit(`${tmp} = fptosi double ${srcVal} to i64`);
         return { value: tmp, type: targetType };
     }
-    if (isFloatType(srcType) && (targetType === "byte" || targetType === "unsignedbyte")) {
+    if (isFloatType(srcType) && (targetType === "byte" || targetType === "char" || targetType === "unsignedbyte")) {
         ir.emit(`${tmp} = fptosi double ${srcVal} to i8`);
         return { value: tmp, type: targetType };
     }
@@ -388,15 +544,15 @@ function emitCast(ir, srcVal, srcType, targetType) {
         ir.emit(`${tmp} = sitofp i64 ${srcVal} to double`);
         return { value: tmp, type: targetType };
     }
-    if ((srcType === "byte" || srcType === "unsignedbyte") && isFloatType(targetType)) {
+    if ((srcType === "byte" || srcType === "char" || srcType === "unsignedbyte") && isFloatType(targetType)) {
         ir.emit(`${tmp} = sitofp i8 ${srcVal} to double`);
         return { value: tmp, type: targetType };
     }
-    if ((srcType === "int" || srcType === "unsignedint") && (targetType === "byte" || targetType === "unsignedbyte")) {
+    if ((srcType === "int" || srcType === "unsignedint") && (targetType === "byte" || targetType === "char" || targetType === "unsignedbyte")) {
         ir.emit(`${tmp} = trunc i64 ${srcVal} to i8`);
         return { value: tmp, type: targetType };
     }
-    if ((srcType === "byte" || srcType === "unsignedbyte") && (targetType === "int" || targetType === "unsignedint")) {
+    if ((srcType === "byte" || srcType === "char" || srcType === "unsignedbyte") && (targetType === "int" || targetType === "unsignedint")) {
         if (unsigned || isUnsigned(srcType)) {
             ir.emit(`${tmp} = zext i8 ${srcVal} to i64`);
         } else {
@@ -404,6 +560,24 @@ function emitCast(ir, srcVal, srcType, targetType) {
         }
         return { value: tmp, type: targetType };
     }
+    if ((srcType === "char" && targetType === "byte") || (srcType === "byte" && targetType === "char")) {
+        return { value: srcVal, type: targetType };
+    }
+    // string and address are both i8* in LLVM — no instruction needed
+    if ((srcType === "string" && targetType === "address") ||
+        (srcType === "address" && targetType === "string")) {
+        return { value: srcVal, type: targetType };
+    }
+    // int ↔ address (inttoptr / ptrtoint) — natural in systems code
+    if ((srcType === "int" || srcType === "unsignedint") && targetType === "address") {
+        ir.emit(`${tmp} = inttoptr i64 ${srcVal} to i8*`);
+        return { value: tmp, type: "address" };
+    }
+    if (srcType === "address" && (targetType === "int" || targetType === "unsignedint")) {
+        ir.emit(`${tmp} = ptrtoint i8* ${srcVal} to i64`);
+        return { value: tmp, type: targetType };
+    }
+
     if (srcType === "bool" && (targetType === "int" || targetType === "unsignedint")) {
         ir.emit(`${tmp} = zext i1 ${srcVal} to i64`);
         return { value: tmp, type: targetType };
@@ -432,6 +606,9 @@ function genExpr(ir, expr) {
         case "IntLiteral":
             return { value: String(expr.value), type: "int" };
 
+        case "CharLiteral":
+            return { value: String(expr.value), type: "int" };
+
         case "HexLiteral":
             return { value: String(expr.value), type: "int" };
 
@@ -445,7 +622,7 @@ function genExpr(ir, expr) {
 
         case "StringLiteral": {
             const strName = addStringConstant(expr.value);
-            const len = expr.value.length + 1;
+            const len = stringByteLen(expr.value) + 1;
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
             return { value: tmp, type: "string" };
@@ -475,17 +652,83 @@ function genExpr(ir, expr) {
             }
 
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) {
+                // Function name used as a value (e.g. passed as callback argument)
+                if (functionReturnTypes.has(expr.name)) {
+                    const fnInfo  = functionReturnTypes.get(expr.name);
+                    const retLl   = fnInfo.returnType ? llvmType(fnInfo.returnType) : "void";
+                    const paramLls = (fnInfo.params || []).map(p => llvmType(p.type)).join(", ");
+                    const fnSig   = `${retLl} (${paramLls})`;
+                    const tmp     = ir.newTmp();
+                    ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
+                    return { value: tmp, type: "address" };
+                }
+                throw new Error(`Unknown variable: ${expr.name}`);
+            }
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${v.type}, ${v.type}* ${v.ptr}`);
             return { value: tmp, type: v.hType };
         }
 
         case "FieldAccess": {
+            // Enum access: ErrorCode.NOT_FOUND → integer literal
+            if (enumTypes.has(expr.object)) {
+                const variants = enumTypes.get(expr.object);
+                if (!variants.has(expr.field))
+                    throw new Error(`Unknown enum variant: ${expr.object}.${expr.field}`);
+                return { value: String(variants.get(expr.field)), type: "int" };
+            }
+            // Check MMIO (strict) bitfield first — uses volatile load
+            const mmioFA = mmioBindings.get(expr.object);
+            if (mmioFA && bitfieldTypes.has(mmioFA.hType)) {
+                const bf = bitfieldTypes.get(mmioFA.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmioFA.addr} to ${llType}*`);
+                const container = ir.newTmp();
+                ir.emit(`${container} = load volatile ${llType}, ${llType}* ${ptr}`);
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = lshr ${llType} ${container}, ${offset}`);
+                const mask = (1n << BigInt(width)) - 1n;
+                const masked = ir.newTmp();
+                ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
+                const llFieldType = llvmType(fieldType);
+                if (llFieldType === llType) return { value: masked, type: fieldType };
+                const result = ir.newTmp();
+                ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
+                return { value: result, type: fieldType };
+            }
+
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
 
-            if (classTypes.has(v.hType) && !v.isSelf) {
+            // Bitfield read: load container integer, shift right by field offset, mask to width
+            if (bitfieldTypes.has(v.hType)) {
+                const bf = bitfieldTypes.get(v.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
+                const container = ir.newTmp();
+                ir.emit(`${container} = load ${llType}, ${llType}* ${v.ptr}`);
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = lshr ${llType} ${container}, ${offset}`);
+                const mask = (1n << BigInt(width)) - 1n;
+                const masked = ir.newTmp();
+                ir.emit(`${masked} = and ${llType} ${shifted}, ${mask}`);
+                // Truncate to the field's natural LLVM type.
+                // For multi-bit "bit[N]" fields, i1 can only hold 0 or 1 so we use
+                // bitsToLLType(width) (i8+) and surface the Hopper type as "byte" so
+                // downstream codegen sees a consistent LLVM/Hopper type pair.
+                const isWideBit  = fieldType === "bit" && width > 1;
+                const llFieldType = isWideBit ? bitsToLLType(width) : llvmType(fieldType);
+                const hopperType  = isWideBit ? "byte" : fieldType;
+                if (llFieldType === llType) return { value: masked, type: hopperType };
+                const result = ir.newTmp();
+                ir.emit(`${result} = trunc ${llType} ${masked} to ${llFieldType}`);
+                return { value: result, type: hopperType };
+            }
+
+            if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
                 );
@@ -506,19 +749,53 @@ function genExpr(ir, expr) {
 
         case "AddressOf": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) {
+                // Function name used as address: fnName::address
+                if (functionReturnTypes.has(expr.name)) {
+                    const fnInfo   = functionReturnTypes.get(expr.name);
+                    const retLl    = fnInfo.returnType ? llvmType(fnInfo.returnType) : "void";
+                    const paramLls = (fnInfo.params || []).map(p => llvmType(p.type)).join(", ");
+                    const fnSig    = `${retLl} (${paramLls})`;
+                    const tmp      = ir.newTmp();
+                    ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
+                    return { value: tmp, type: "address" };
+                }
+                throw new Error(`Unknown variable: ${expr.name}`);
+            }
             if (v.hType.startsWith("array:")) {
                 const elemType = v.hType.split(":")[1];
                 const elemPtr  = ir.newTmp();
                 ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i32 0`);
-                return { value: elemPtr, type: `address:${elemType}` };
+                // Normalize to i8* — all address:T values use i8* as their LLVM representation
+                const cast = ir.newTmp();
+                ir.emit(`${cast} = bitcast ${llvmType(elemType)}* ${elemPtr} to i8*`);
+                return { value: cast, type: `address:${elemType}` };
             }
-            return { value: v.ptr, type: `address:${v.hType}` };
+            // Normalize to i8* — all address:T values use i8* as their LLVM representation
+            const cast = ir.newTmp();
+            ir.emit(`${cast} = bitcast ${llvmType(v.hType)}* ${v.ptr} to i8*`);
+            return { value: cast, type: `address:${v.hType}` };
         }
 
         case "ArrayAccess": {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+
+            // Dispatch to class [] operator if defined
+            if (classTypes.has(v.hType)) {
+                const cls = classTypes.get(v.hType);
+                const idxOp = (cls.operators || []).find(o => o.op === '[]');
+                if (idxOp) {
+                    const indexVal = genExpr(ir, expr.index);
+                    const fnName = `${v.hType}_op_idx`;
+                    const selfType = `%class.${v.hType}*`;
+                    const paramType = llvmType(idxOp.param.type);
+                    const retType = idxOp.returnType;
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${v.ptr}, ${paramType} ${indexVal.value})`);
+                    return { value: tmp, type: retType };
+                }
+            }
 
             // string[] (argv) indexing — i8** pointer, each element is i8*
             if (v.hType === "string[]") {
@@ -553,15 +830,24 @@ function genExpr(ir, expr) {
             const indexVal   = genExpr(ir, expr.index);
             const elemPtr    = ir.newTmp();
             ir.emit(`${elemPtr} = getelementptr ${v.type}, ${v.type}* ${v.ptr}, i32 0, i64 ${indexVal.value}`);
-            return { value: elemPtr, type: `address:${elemType}` };
+            // Normalize to i8* — all address:T values use i8* as their LLVM representation
+            const cast = ir.newTmp();
+            ir.emit(`${cast} = bitcast ${llvmType(elemType)}* ${elemPtr} to i8*`);
+            return { value: cast, type: `address:${elemType}` };
         }
 
         case "Deref": {
             const v = ir.vars.get(expr.name);
             if (!v) throw new Error(`Unknown variable: ${expr.name}`);
-            if (!v.hType.startsWith("address:"))
+            // Plain address: infer pointedTo from the address:T tag if present, else from return type
+            let pointedTo;
+            if (v.hType.startsWith("address:")) {
+                pointedTo = v.hType.substring(8);
+            } else if (v.hType === "address" && ir.returnType) {
+                pointedTo = ir.returnType;
+            } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            const pointedTo   = v.hType.substring(8);
+            }
             const llPointedTo = llvmType(pointedTo);
             const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
@@ -597,6 +883,46 @@ function genExpr(ir, expr) {
         }
 
         case "Binary": {
+            // Dispatch to class operator if left operand is a class with this operator defined
+            if (expr.left.kind === "Var") {
+                const lv = ir.vars.get(expr.left.name);
+                if (lv && classTypes.has(lv.hType)) {
+                    const cls = classTypes.get(lv.hType);
+                    const matchingOp = (cls.operators || []).find(o => o.op === expr.op && o.param);
+                    if (matchingOp) {
+                        const ns = operatorNameSafe(expr.op);
+                        const fnName = `${lv.hType}_op_${ns}`;
+                        const selfType = `%class.${lv.hType}*`;
+                        const paramNormT = normalizeType(matchingOp.param.type);
+                        const retType = matchingOp.returnType;
+                        const normRetT = retType ? normalizeType(retType) : null;
+                        let rightArgStr;
+                        if (classTypes.has(paramNormT) && expr.right.kind === "Var") {
+                            const rv = ir.vars.get(expr.right.name);
+                            if (rv && classTypes.has(rv.hType)) {
+                                rightArgStr = `%class.${paramNormT}* ${rv.ptr}`;
+                            }
+                        }
+                        if (!rightArgStr) {
+                            const right = genExpr(ir, expr.right);
+                            rightArgStr = `${llvmType(matchingOp.param.type)} ${right.value}`;
+                        }
+                        if (normRetT && classTypes.has(normRetT)) {
+                            // Operator returns a class object by value.
+                            const llRetT  = `%class.${normRetT}`;
+                            const retVal  = ir.newTmp();
+                            const slotPtr = ir.newTmp();
+                            ir.emit(`${retVal} = call ${llRetT} @${fnName}(${selfType} ${lv.ptr}, ${rightArgStr})`);
+                            ir.emit(`${slotPtr} = alloca ${llRetT}`);
+                            ir.emit(`store ${llRetT} ${retVal}, ${llRetT}* ${slotPtr}`);
+                            return { value: slotPtr, type: normRetT, isClassPtr: true };
+                        }
+                        const tmp = ir.newTmp();
+                        ir.emit(`${tmp} = call ${llvmType(retType)} @${fnName}(${selfType} ${lv.ptr}, ${rightArgStr})`);
+                        return { value: tmp, type: retType };
+                    }
+                }
+            }
             const left  = genExpr(ir, expr.left);
             const right = genExpr(ir, expr.right);
             const lt    = llvmType(left.type);
@@ -610,10 +936,16 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
+                        // typed address arithmetic scales by element size (like C int* arithmetic)
                         const pointedTo = left.type.substring(8);
-                        const tmp = ir.newTmp();
-                        ir.emit(`${tmp} = getelementptr ${llvmType(pointedTo)}, ${llvmType(pointedTo)}* ${left.value}, i64 ${right.value}`);
-                        return { value: tmp, type: left.type };
+                        const llPtrType = `${llvmType(pointedTo)}*`;
+                        const castIn = ir.newTmp();
+                        ir.emit(`${castIn} = bitcast i8* ${left.value} to ${llPtrType}`);
+                        const gep = ir.newTmp();
+                        ir.emit(`${gep} = getelementptr ${llvmType(pointedTo)}, ${llPtrType} ${castIn}, i64 ${right.value}`);
+                        const castOut = ir.newTmp();
+                        ir.emit(`${castOut} = bitcast ${llPtrType} ${gep} to i8*`);
+                        return { value: castOut, type: left.type };
                     }
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = ${isF ? "fadd" : "add"} ${lt} ${left.value}, ${right.value}`);
@@ -628,12 +960,18 @@ function genExpr(ir, expr) {
                         return { value: tmp, type: "address" };
                     }
                     if (left.type.startsWith("address:") && right.type === "int") {
+                        // typed address arithmetic scales by element size (like C int* arithmetic)
                         const pointedTo = left.type.substring(8);
+                        const llPtrType = `${llvmType(pointedTo)}*`;
+                        const castIn = ir.newTmp();
+                        ir.emit(`${castIn} = bitcast i8* ${left.value} to ${llPtrType}`);
                         const neg = ir.newTmp();
                         ir.emit(`${neg} = sub i64 0, ${right.value}`);
-                        const tmp = ir.newTmp();
-                        ir.emit(`${tmp} = getelementptr ${llvmType(pointedTo)}, ${llvmType(pointedTo)}* ${left.value}, i64 ${neg}`);
-                        return { value: tmp, type: left.type };
+                        const gep = ir.newTmp();
+                        ir.emit(`${gep} = getelementptr ${llvmType(pointedTo)}, ${llPtrType} ${castIn}, i64 ${neg}`);
+                        const castOut = ir.newTmp();
+                        ir.emit(`${castOut} = bitcast ${llPtrType} ${gep} to i8*`);
+                        return { value: castOut, type: left.type };
                     }
                     const tmp = ir.newTmp();
                     ir.emit(`${tmp} = ${isF ? "fsub" : "sub"} ${lt} ${left.value}, ${right.value}`);
@@ -700,38 +1038,66 @@ function genExpr(ir, expr) {
         }
 
         case "Call": {
-            // syscall(num, arg1, ...) builtin — maps directly to Linux syscall instruction
-            if (expr.callee === "syscall") {
-                const syscallRegs = ['rax','rdi','rsi','rdx','r10','r8','r9'];
-                const args = (expr.args || []).map(a => genExpr(ir, a));
-                const inputArgs = args.map((a, i) => {
-                    let v = a.value, t = llvmType(a.type);
-                    if (t.endsWith("*")) {
-                        const tmp2 = ir.newTmp();
-                        ir.emit(`${tmp2} = ptrtoint ${t} ${v} to i64`);
-                        v = tmp2; t = "i64";
-                    }
-                    if (t === "i8" || t === "i1") {
-                        const tmp2 = ir.newTmp();
-                        ir.emit(`${tmp2} = zext ${t} ${v} to i64`);
-                        v = tmp2; t = "i64";
-                    }
-                    return { reg: syscallRegs[i], llType: t, value: v };
-                });
-                const outC  = `={rax}`;
-                // first input (syscall number) uses tied constraint "0" = same reg as output 0 (rax)
-                const inC   = inputArgs.map((a, i) => i === 0 ? "0" : `{${a.reg}}`).join(",");
-                const clob  = `~{rcx},~{r11},~{memory}`;
-                const constraints = `${outC},${inC},${clob}`;
-                const argStr = inputArgs.map(a => `${a.llType} ${a.value}`).join(", ");
+            // Indirect call through a callback variable
+            const cbVar = ir.vars.get(expr.callee);
+            if (cbVar && cbVar.hType && cbVar.hType.startsWith("callback(")) {
+                const args    = (expr.args || []).map(a => genExpr(ir, a));
+                const argStr  = args.map(v => `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`).join(", ");
+                const fnSig   = callbackFnTypeSig(cbVar.hType);
+                const fnPtrLl = `${fnSig}*`;
+                const { ret } = parseCallbackType(cbVar.hType);
+                const fnRaw   = ir.newTmp();
+                ir.emit(`${fnRaw} = load i8*, i8** ${cbVar.ptr}`);
+                const fnTyped = ir.newTmp();
+                ir.emit(`${fnTyped} = bitcast i8* ${fnRaw} to ${fnPtrLl}`);
+                if (!ret || ret === "void" || ret === "null") {
+                    ir.emit(`call ${fnSig} ${fnTyped}(${argStr})`);
+                    return { value: "0", type: "int" };
+                }
                 const tmp = ir.newTmp();
-                ir.emit(`${tmp} = call i64 asm sideeffect "syscall", "${constraints}"(${argStr})`);
-                return { value: tmp, type: "int" };
+                ir.emit(`${tmp} = call ${fnSig} ${fnTyped}(${argStr})`);
+                return { value: tmp, type: ret };
             }
 
-            const args     = (expr.args || []).map(a => genExpr(ir, a));
-            const argStr   = args.map(v => `${llvmType(v.type)} ${v.value}`).join(", ");
+            // Overload resolution: if this name has multiple definitions, pick by arg types.
+            if (overloadGroups.has(expr.callee)) {
+                const preArgs = (expr.args || []).map(a => genExpr(ir, a));
+                const overloads = overloadGroups.get(expr.callee);
+                const best = overloads.find(ov => {
+                    if (ov.params.length !== preArgs.length) return false;
+                    return ov.params.every((p, i) => overloadTypeMatch(preArgs[i].type, p.type));
+                });
+                if (best) {
+                    const fi = functionReturnTypes.get(best.mangledName);
+                    const argStr = preArgs.map(v =>
+                        `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`
+                    ).join(", ");
+                    const retType = fi ? fi.returnType : null;
+                    if (retType === null) {
+                        ir.emit(`call void @${best.mangledName}(${argStr})`);
+                        return { value: "0", type: "int" };
+                    }
+                    const tmp = ir.newTmp();
+                    ir.emit(`${tmp} = call ${llvmType(retType)} @${best.mangledName}(${argStr})`);
+                    return { value: tmp, type: retType };
+                }
+            }
+
             const fnInfo   = functionReturnTypes.get(expr.callee);
+            const args     = (expr.args || []).map((a, i) => {
+                const paramNormT = fnInfo && fnInfo.params && fnInfo.params[i]
+                    ? normalizeType(fnInfo.params[i].type) : null;
+                if (paramNormT && classTypes.has(paramNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar) return { value: argVar.ptr, type: paramNormT, isClassPtr: true };
+                }
+                return genExpr(ir, a);
+            });
+            // address:T values are normalized to i8* — use i8* as LLVM type in call args
+            const argStr   = args.map(v => {
+                if (v.isClassPtr) return `${llvmType(v.type)}* ${v.value}`;
+                return `${v.type.startsWith("address:") ? "i8*" : llvmType(v.type)} ${v.value}`;
+            }).join(", ");
             const retType  = fnInfo ? fnInfo.returnType : "int";
             const isVararg = fnInfo && fnInfo.isVariadic;
             if (retType === null) {
@@ -750,6 +1116,88 @@ function genExpr(ir, expr) {
             return { value: tmp, type: retType };
         }
 
+        case "ChainedMethodCall": {
+            // obj.field.method(args) — get pointer to the field, call method on it
+            const v = ir.vars.get(expr.object);
+            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!classTypes.has(v.hType))
+                throw new Error(`ChainedMethodCall: '${expr.object}' is not a class`);
+            const outerIdx   = getFieldIndex(v.hType, expr.field);
+            const fieldType  = normalizeType(getFieldType(v.hType, expr.field));
+            const outerLL    = llvmType(v.hType);
+            const fieldPtr   = ir.newTmp();
+            ir.emit(`${fieldPtr} = getelementptr ${outerLL}, ${outerLL}* ${v.ptr}, i32 0, i32 ${outerIdx}`);
+            if (!classTypes.has(fieldType))
+                throw new Error(`ChainedMethodCall: field '${expr.field}' is not a class (type: ${fieldType})`);
+            const mangled  = `${fieldType}_${expr.method}`;
+            const mInfo    = functionReturnTypes.get(mangled);
+            const retType  = mInfo ? mInfo.returnType : "int";
+            const fieldLL  = `%class.${fieldType}`;
+            const rawArgs  = (expr.args || []).map((a, i) => {
+                const expectedNormT = mInfo && mInfo.params[i] ? normalizeType(mInfo.params[i].type) : null;
+                if (expectedNormT && classTypes.has(expectedNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar && classTypes.has(argVar.hType)) {
+                        return { value: argVar.ptr, type: argVar.hType, isClassPtr: true };
+                    }
+                }
+                return genExpr(ir, a);
+            });
+            const coercedArgs = rawArgs.map((a, i) => {
+                if (a.isClassPtr) return a;
+                const expectedType = mInfo && mInfo.params[i] ? mInfo.params[i].type : null;
+                if (!expectedType || expectedType === a.type) return a;
+                try { return emitCast(ir, a.value, a.type, expectedType); } catch { return a; }
+            });
+            const selfArg   = `${fieldLL}* ${fieldPtr}`;
+            const otherArgs = coercedArgs.map(a => {
+                if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
+                return `${llvmType(a.type)} ${a.value}`;
+            }).join(", ");
+            const argStr   = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+            const normRetT = retType ? normalizeType(retType) : null;
+            if (normRetT && classTypes.has(normRetT)) {
+                const llRetT  = `%class.${normRetT}`;
+                const retVal  = ir.newTmp();
+                const slotPtr = ir.newTmp();
+                ir.emit(`${retVal} = call ${llRetT} @${mangled}(${argStr})`);
+                ir.emit(`${slotPtr} = alloca ${llRetT}`);
+                ir.emit(`store ${llRetT} ${retVal}, ${llRetT}* ${slotPtr}`);
+                return { value: slotPtr, type: normRetT, isClassPtr: true };
+            }
+            if (retType === null) {
+                ir.emit(`call void @${mangled}(${argStr})`);
+                return { value: "0", type: "int" };
+            }
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(retType)} @${mangled}(${argStr})`);
+            return { value: tmp, type: retType };
+        }
+
+        case "FieldIndexAccess": {
+            // obj.field[i] — get pointer to field, call its [] operator
+            const v = ir.vars.get(expr.object);
+            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!classTypes.has(v.hType))
+                throw new Error(`FieldIndexAccess: '${expr.object}' is not a class`);
+            const outerIdx  = getFieldIndex(v.hType, expr.field);
+            const fieldType = normalizeType(getFieldType(v.hType, expr.field));
+            const outerLL   = llvmType(v.hType);
+            const fieldPtr  = ir.newTmp();
+            ir.emit(`${fieldPtr} = getelementptr ${outerLL}, ${outerLL}* ${v.ptr}, i32 0, i32 ${outerIdx}`);
+            if (!classTypes.has(fieldType))
+                throw new Error(`FieldIndexAccess: field '${expr.field}' is not a class (type: ${fieldType})`);
+            const cls      = classTypes.get(fieldType);
+            const idxOp    = (cls.operators || []).find(o => o.op === '[]');
+            if (!idxOp) throw new Error(`FieldIndexAccess: '${fieldType}' has no [] operator`);
+            const indexVal = genExpr(ir, expr.index);
+            const fnName   = `${fieldType}_op_idx`;
+            const fieldLL  = `%class.${fieldType}`;
+            const tmp      = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(idxOp.returnType)} @${fnName}(${fieldLL}* ${fieldPtr}, ${llvmType(idxOp.param.type)} ${indexVal.value})`);
+            return { value: tmp, type: idxOp.returnType };
+        }
+
         case "MethodCall": {
             const v = ir.vars.get(expr.object);
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
@@ -757,12 +1205,42 @@ function genExpr(ir, expr) {
             const isClass    = classTypes.has(typeName);
             const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
             const mangled    = `${typeName}_${expr.method}`;
-            const args       = (expr.args || []).map(a => genExpr(ir, a));
-            const selfArg    = `${llTypeName}* ${v.ptr}`;
-            const otherArgs  = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
-            const argStr     = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             const mInfo      = functionReturnTypes.get(mangled);
             const retType    = mInfo ? mInfo.returnType : "int";
+            // Generate args — class-type params are passed by pointer (not by value)
+            const rawArgs = (expr.args || []).map((a, i) => {
+                const expectedNormT = mInfo && mInfo.params[i] ? normalizeType(mInfo.params[i].type) : null;
+                if (expectedNormT && classTypes.has(expectedNormT) && a.kind === "Var") {
+                    const argVar = ir.vars.get(a.name);
+                    if (argVar && classTypes.has(argVar.hType)) {
+                        return { value: argVar.ptr, type: argVar.hType, isClassPtr: true };
+                    }
+                }
+                return genExpr(ir, a);
+            });
+            const coercedArgs = rawArgs.map((a, i) => {
+                if (a.isClassPtr) return a;
+                const expectedType = mInfo && mInfo.params[i] ? mInfo.params[i].type : null;
+                if (!expectedType || expectedType === a.type) return a;
+                try { return emitCast(ir, a.value, a.type, expectedType); } catch { return a; }
+            });
+            const selfArg   = `${llTypeName}* ${v.ptr}`;
+            const otherArgs = coercedArgs.map(a => {
+                if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
+                return `${llvmType(a.type)} ${a.value}`;
+            }).join(", ");
+            const argStr  = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+            const normRetT = retType ? normalizeType(retType) : null;
+            if (normRetT && classTypes.has(normRetT)) {
+                // Class return by value: call returns the struct directly, store to a slot.
+                const llRetT    = `%class.${normRetT}`;
+                const retVal    = ir.newTmp();
+                const slotPtr   = ir.newTmp();
+                ir.emit(`${retVal} = call ${llRetT} @${mangled}(${argStr})`);
+                ir.emit(`${slotPtr} = alloca ${llRetT}`);
+                ir.emit(`store ${llRetT} ${retVal}, ${llRetT}* ${slotPtr}`);
+                return { value: slotPtr, type: normRetT, isClassPtr: true };
+            }
             if (retType === null) {
                 ir.emit(`call void @${mangled}(${argStr})`);
                 return { value: "0", type: "int" };
@@ -774,6 +1252,14 @@ function genExpr(ir, expr) {
 
         case "CastExpr":
             throw new Error("cast requires an assignment context");
+
+        case "AllocateExpr": {
+            const size = genExpr(ir, expr.sizeExpr);
+            const sizeVal = size.type !== "int" ? size.value : size.value;
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call i8* @malloc(i64 ${sizeVal})`);
+            return { value: tmp, type: "address" };
+        }
 
         default:
             throw new Error(`Unsupported expr kind: ${expr.kind}`);
@@ -805,12 +1291,63 @@ function genStmt(ir, stmt, retType) {
 
                 const ctorName = `${typeName}_constructor`;
                 if (functionReturnTypes.has(ctorName)) {
-                    const args      = (stmt.init.args || []).map(a => genExpr(ir, a));
+                    const ctorInfo = functionReturnTypes.get(ctorName);
+                    const args = (stmt.init.args || []).map((a, i) => {
+                        const paramNormT = ctorInfo.params && ctorInfo.params[i]
+                            ? normalizeType(ctorInfo.params[i].type) : null;
+                        if (paramNormT && classTypes.has(paramNormT) && a.kind === "Var") {
+                            const argVar = ir.vars.get(a.name);
+                            if (argVar) return { value: argVar.ptr, type: paramNormT, isClassPtr: true };
+                        }
+                        return genExpr(ir, a);
+                    });
                     const selfArg   = `${llType}* ${ptr}`;
-                    const otherArgs = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+                    const otherArgs = args.map(a =>
+                        a.isClassPtr ? `${llvmType(a.type)}* ${a.value}`
+                                     : `${a.type.startsWith("address:") ? "i8*" : llvmType(a.type)} ${a.value}`
+                    ).join(", ");
                     const argStr    = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
                     ir.emit(`call void @${ctorName}(${argStr})`);
                 }
+                break;
+            }
+
+            // Class-returning expr: MyClass x = obj.method() / obj.field.method() / a + b (operator)
+            // genExpr for these returns { isClassPtr: true, value: allocaPtr } — reuse that alloca.
+            if (classTypes.has(normType) && stmt.init
+                && (stmt.init.kind === "MethodCall"
+                    || stmt.init.kind === "ChainedMethodCall"
+                    || stmt.init.kind === "Binary")) {
+                const result = genExpr(ir, stmt.init);
+                if (result.isClassPtr) {
+                    ir.vars.set(stmt.name, { ptr: result.value, type: `%class.${normType}`, hType: normType });
+                    break;
+                }
+            }
+
+            // callback(T,T)R var = functionName  OR  = cast addressVar
+            // Variable declarations use CallbackDeclTyped syntax: callback name = fn(types) ret
+            // This path handles the VarDecl produced by that statement rule.
+            if (normType.startsWith("callback(") && stmt.init) {
+                let raw;
+                const resolvedType = normType;
+                if (stmt.init.kind === "Var") {
+                    const fnName = stmt.init.name;
+                    const fnSig = callbackFnTypeSig(resolvedType);
+                    raw = ir.newTmp();
+                    ir.emit(`${raw} = bitcast ${fnSig}* @${fnName} to i8*`);
+                } else if (stmt.init.kind === "CastExpr") {
+                    // cast address → callback: both are i8*, evaluate inner and use as-is
+                    const inner = genExpr(ir, stmt.init.expr);
+                    raw = inner.value; // already i8*
+                } else {
+                    // fallthrough to general path
+                    break;
+                }
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = alloca i8*`);
+                ir.emit(`store i8* ${raw}, i8** ${ptr}`);
+                ir.vars.set(stmt.name, { ptr, type: "i8*", hType: resolvedType });
                 break;
             }
 
@@ -822,6 +1359,12 @@ function genStmt(ir, stmt, retType) {
                     const inner = genExpr(ir, stmt.init.expr);
                     init = emitCast(ir, inner.value, inner.type, stmt.type);
                     hType = normType;
+                } else if (stmt.init.kind === "Deref") {
+                    // declared type always determines load width, even inside template methods
+                    const savedRet = ir.returnType;
+                    ir.returnType = stmt.type;
+                    init = genExpr(ir, stmt.init);
+                    ir.returnType = savedRet;
                 } else {
                     init = genExpr(ir, stmt.init);
                     if (stmt.type === "address" && init.type.startsWith("address:"))
@@ -836,9 +1379,8 @@ function genStmt(ir, stmt, retType) {
 
             if (init) {
                 if (isAddress && init.type.startsWith("address:")) {
-                    const castPtr = ir.newTmp();
-                    ir.emit(`${castPtr} = bitcast ${llvmType(init.type)} ${init.value} to i8*`);
-                    ir.emit(`store i8* ${castPtr}, i8** ${ptr}`);
+                    // init.value is already i8* (all address:T values normalized to i8*)
+                    ir.emit(`store i8* ${init.value}, i8** ${ptr}`);
                 } else {
                     ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
                 }
@@ -860,18 +1402,35 @@ function genStmt(ir, stmt, retType) {
 
             const v   = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+
+            // callback var = functionName — reassign to a different function
+            if (v.hType && v.hType.startsWith("callback(") && stmt.expr.kind === "Var") {
+                const fnName  = stmt.expr.name;
+                const fnSig   = callbackFnTypeSig(v.hType);
+                const fnPtrLl = `${fnSig}*`;
+                const raw     = ir.newTmp();
+                ir.emit(`${raw} = bitcast ${fnPtrLl} @${fnName} to i8*`);
+                ir.emit(`store i8* ${raw}, i8** ${v.ptr}`);
+                break;
+            }
+
             let val;
             if (stmt.expr.kind === "CastExpr") {
                 const inner = genExpr(ir, stmt.expr.expr);
                 val = emitCast(ir, inner.value, inner.type, v.hType);
+            } else if (stmt.expr.kind === "Deref") {
+                // target variable's type determines load width, same as VarDecl
+                const savedRet = ir.returnType;
+                ir.returnType = v.hType;
+                val = genExpr(ir, stmt.expr);
+                ir.returnType = savedRet;
             } else {
                 val = genExpr(ir, stmt.expr);
             }
             if (v.hType === "address" && val.type.startsWith("address:")) v.hType = val.type;
             if (v.type === "i8*" && val.type.startsWith("address:")) {
-                const castPtr = ir.newTmp();
-                ir.emit(`${castPtr} = bitcast ${llvmType(val.type)} ${val.value} to i8*`);
-                ir.emit(`store i8* ${castPtr}, i8** ${v.ptr}`);
+                // val.value is already i8* (all address:T values normalized to i8*)
+                ir.emit(`store i8* ${val.value}, i8** ${v.ptr}`);
             } else {
                 ir.emit(`store ${v.type} ${val.value}, ${v.type}* ${v.ptr}`);
             }
@@ -879,40 +1438,151 @@ function genStmt(ir, stmt, retType) {
         }
 
         case "FieldAssign": {
+            // Check MMIO (strict) bitfield first — uses volatile load/store
+            const mmioFW = mmioBindings.get(stmt.object);
+            if (mmioFW && bitfieldTypes.has(mmioFW.hType)) {
+                const bf = bitfieldTypes.get(mmioFW.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width } = bitfieldFieldInfo(bf, stmt.field);
+                const val = genExpr(ir, stmt.expr);
+                const srcLL = llvmType(val.type);
+                const srcBits = parseInt(srcLL.slice(1));
+                const dstBits = parseInt(llType.slice(1));
+                let inContainer = val.value;
+                if (srcLL !== llType) {
+                    const norm = ir.newTmp();
+                    ir.emit(`${norm} = ${srcBits > dstBits ? "trunc" : "zext"} ${srcLL} ${val.value} to ${llType}`);
+                    inContainer = norm;
+                }
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = shl ${llType} ${inContainer}, ${offset}`);
+                const fieldMask = (1n << BigInt(width)) - 1n;
+                const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
+                const ptr = ir.newTmp();
+                ir.emit(`${ptr} = inttoptr i64 ${mmioFW.addr} to ${llType}*`);
+                const current = ir.newTmp();
+                ir.emit(`${current} = load volatile ${llType}, ${llType}* ${ptr}`);
+                const cleared = ir.newTmp();
+                ir.emit(`${cleared} = and ${llType} ${current}, ${clearMask}`);
+                const merged = ir.newTmp();
+                ir.emit(`${merged} = or ${llType} ${cleared}, ${shifted}`);
+                ir.emit(`store volatile ${llType} ${merged}, ${llType}* ${ptr}`);
+                break;
+            }
+
             const v = ir.vars.get(stmt.object);
             if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
 
-            if (classTypes.has(v.hType) && !v.isSelf) {
+            // Bitfield write: read-modify-write on the container integer
+            if (bitfieldTypes.has(v.hType)) {
+                const bf = bitfieldTypes.get(v.hType);
+                const { llType } = bitfieldLayout(bf);
+                const { offset, width } = bitfieldFieldInfo(bf, stmt.field);
+                const val = genExpr(ir, stmt.expr);
+                // Normalize value to container width (trunc if larger, zext if smaller)
+                const srcLL = llvmType(val.type);
+                const srcBits = parseInt(srcLL.slice(1));
+                const dstBits = parseInt(llType.slice(1));
+                let inContainer = val.value;
+                if (srcLL !== llType) {
+                    const norm = ir.newTmp();
+                    ir.emit(`${norm} = ${srcBits > dstBits ? "trunc" : "zext"} ${srcLL} ${val.value} to ${llType}`);
+                    inContainer = norm;
+                }
+                // Shift value into position
+                const shifted = ir.newTmp();
+                ir.emit(`${shifted} = shl ${llType} ${inContainer}, ${offset}`);
+                // Build clear mask (all 1s except the field bits)
+                const fieldMask = (1n << BigInt(width)) - 1n;
+                const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
+                // Load current container, clear field bits, OR in new value
+                const current = ir.newTmp();
+                ir.emit(`${current} = load ${llType}, ${llType}* ${v.ptr}`);
+                const cleared = ir.newTmp();
+                ir.emit(`${cleared} = and ${llType} ${current}, ${clearMask}`);
+                const merged = ir.newTmp();
+                ir.emit(`${merged} = or ${llType} ${cleared}, ${shifted}`);
+                ir.emit(`store ${llType} ${merged}, ${llType}* ${v.ptr}`);
+                break;
+            }
+
+            if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
                 throw new Error(
                     `Access failure: cannot assign field '${stmt.field}' of class '${v.hType}' directly. Use a mutator method.`
                 );
             }
 
-            const typeName    = v.hType;
-            const fieldIdx    = getFieldIndex(typeName, stmt.field);
-            const fieldType   = getFieldType(typeName, stmt.field);
-            const llFieldType = llvmType(fieldType);
-            const llSelfType  = llvmType(typeName);
+            const typeName      = v.hType;
+            const fieldIdx      = getFieldIndex(typeName, stmt.field);
+            const fieldType     = getFieldType(typeName, stmt.field);
+            const normFieldType = normalizeType(fieldType);
+            const llFieldType   = llvmType(normFieldType);
+            const llSelfType    = llvmType(typeName);
 
             const fieldPtr = ir.newTmp();
             ir.emit(`${fieldPtr} = getelementptr ${llSelfType}, ${llSelfType}* ${v.ptr}, i32 0, i32 ${fieldIdx}`);
+
+            // Constructor-call in-place: self.field = FieldType(args)
+            const baseFieldName = fieldType.includes('<') ? fieldType.split('<')[0] : null;
+            if (classTypes.has(normFieldType) && stmt.expr.kind === "Call"
+                && (stmt.expr.callee === fieldType || stmt.expr.callee === normFieldType || stmt.expr.callee === baseFieldName)) {
+                const ctorName = `${normFieldType}_constructor`;
+                if (functionReturnTypes.has(ctorName)) {
+                    const args      = (stmt.expr.args || []).map(a => genExpr(ir, a));
+                    const selfArg   = `%class.${normFieldType}* ${fieldPtr}`;
+                    const otherArgs = args.map(a => `${llvmType(a.type)} ${a.value}`).join(", ");
+                    const argStr    = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+                    ir.emit(`call void @${ctorName}(${argStr})`);
+                }
+                break;
+            }
+
             const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llFieldType} ${val.value}, ${llFieldType}* ${fieldPtr}`);
+            break;
+        }
+
+        case "NestedFieldAssign": {
+            // obj.outerField.innerField = expr
+            // Resolves to: GEP into outer, GEP into inner, store.
+            const v = ir.vars.get(stmt.object);
+            if (!v) throw new Error(`Unknown variable: ${stmt.object}`);
+            if (!classTypes.has(v.hType))
+                throw new Error(`NestedFieldAssign: '${stmt.object}' is not a class type`);
+            const outerIdx    = getFieldIndex(v.hType, stmt.outerField);
+            const outerFType  = normalizeType(getFieldType(v.hType, stmt.outerField));
+            const outerLLType = llvmType(v.hType);
+            const outerPtr    = ir.newTmp();
+            ir.emit(`${outerPtr} = getelementptr ${outerLLType}, ${outerLLType}* ${v.ptr}, i32 0, i32 ${outerIdx}`);
+            if (!classTypes.has(outerFType))
+                throw new Error(`NestedFieldAssign: field '${stmt.outerField}' is not a class type (type: ${outerFType})`);
+            const innerIdx    = getFieldIndex(outerFType, stmt.innerField);
+            const innerFType  = getFieldType(outerFType, stmt.innerField);
+            const innerLLOuter = llvmType(outerFType);
+            const innerPtr    = ir.newTmp();
+            ir.emit(`${innerPtr} = getelementptr ${innerLLOuter}, ${innerLLOuter}* ${outerPtr}, i32 0, i32 ${innerIdx}`);
+            const val = genExpr(ir, stmt.expr);
+            ir.emit(`store ${llvmType(innerFType)} ${val.value}, ${llvmType(innerFType)}* ${innerPtr}`);
             break;
         }
 
         case "DerefAssign": {
             const v = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
-            if (!v.hType.startsWith("address:"))
+            const val = genExpr(ir, stmt.expr);
+            let pointedTo;
+            if (v.hType.startsWith("address:")) {
+                pointedTo = v.hType.substring(8);
+            } else if (v.hType === "address") {
+                pointedTo = val.type; // always infer from RHS — never use ir.returnType
+            } else {
                 throw new Error(`Cannot dereference non-address type: ${v.hType}`);
-            const pointedTo   = v.hType.substring(8);
+            }
             const llPointedTo = llvmType(pointedTo);
             const rawAddr     = ir.newTmp();
             ir.emit(`${rawAddr} = load i8*, i8** ${v.ptr}`);
             const typedAddr   = ir.newTmp();
             ir.emit(`${typedAddr} = bitcast i8* ${rawAddr} to ${llPointedTo}*`);
-            const val = genExpr(ir, stmt.expr);
             ir.emit(`store ${llPointedTo} ${val.value}, ${llPointedTo}* ${typedAddr}`);
             break;
         }
@@ -1016,6 +1686,19 @@ function genStmt(ir, stmt, retType) {
         case "ArrayAssign": {
             const v = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+
+            if (classTypes.has(v.hType)) {
+                const cls      = classTypes.get(v.hType);
+                const setIdxOp = (cls.operators || []).find(o => o.op === '[]=');
+                if (!setIdxOp) throw new Error(`Class '${v.hType}' has no []= operator`);
+                const fnName   = `${v.hType}_op_setidx`;
+                const selfType = `%class.${v.hType}*`;
+                const indexVal = genExpr(ir, stmt.index);
+                const val      = genExpr(ir, stmt.expr);
+                ir.emit(`call void @${fnName}(${selfType} ${v.ptr}, ${llvmType(setIdxOp.param.type)} ${indexVal.value}, ${llvmType(val.type)} ${val.value})`);
+                break;
+            }
+
             if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot index non-array type: ${v.hType}`);
             const elemType   = v.hType.split(":")[1];
@@ -1097,14 +1780,32 @@ function genStmt(ir, stmt, retType) {
 
         case "ReturnStmt": {
             emitDeferred(ir);
-            if (stmt.expr) {
+            const normRetT = retType ? normalizeType(retType) : null;
+            if (stmt.expr && normRetT && classTypes.has(normRetT)) {
+                // Class return: load the struct from its alloca and ret by value.
+                const llRetT = `%class.${normRetT}`;
+                let structVal;
+                if (stmt.expr.kind === "Var") {
+                    const varEntry = ir.vars.get(stmt.expr.name);
+                    structVal = ir.newTmp();
+                    ir.emit(`${structVal} = load ${llRetT}, ${llRetT}* ${varEntry.ptr}`);
+                } else {
+                    const result = genExpr(ir, stmt.expr);
+                    // genExpr for a class-returning call already gives a struct value
+                    structVal = result.value;
+                }
+                ir.emit(`ret ${llRetT} ${structVal}`);
+            } else if (stmt.expr) {
                 if (stmt.expr.kind === "CastExpr") {
                     const inner = genExpr(ir, stmt.expr.expr);
                     const casted = emitCast(ir, inner.value, inner.type, retType);
                     ir.emit(`ret ${llvmType(retType)} ${casted.value}`);
                 } else {
-                    const val = genExpr(ir, stmt.expr);
-                    ir.emit(`ret ${llvmType(retType)} ${val.value}`);
+                    const val     = genExpr(ir, stmt.expr);
+                    const coerced = val.type !== retType
+                        ? emitCast(ir, val.value, val.type, retType)
+                        : val;
+                    ir.emit(`ret ${llvmType(retType)} ${coerced.value}`);
                 }
             } else {
                 ir.emit(`ret void`);
@@ -1114,6 +1815,12 @@ function genStmt(ir, stmt, retType) {
 
         case "DeferStmt": {
             ir.deferStack.push(stmt.expr);
+            break;
+        }
+
+        case "DeallocateStmt": {
+            const ptr = genExpr(ir, stmt.expr);
+            ir.emit(`call void @free(i8* ${ptr.value})`);
             break;
         }
 
@@ -1130,24 +1837,66 @@ function genBlock(ir, block, retType) {
     for (const s of block.statements) genStmt(ir, s, retType);
 }
 
+// Hoist all alloca instructions to the function entry block.
+// alloca has no data dependencies — it only reserves stack space — so moving
+// it before any other instruction is always valid LLVM IR.  Without this,
+// allocas emitted inside loop bodies accumulate stack space on every iteration
+// and eventually overflow the stack.
+//
+// Only allocas in non-entry basic blocks are moved.  Allocas already in the
+// entry block (before the first non-entry label) are left in place.
+function hoistAllocas(lines) {
+    const entryIdx = lines.findIndex(l => l.trim() === "entry:");
+    if (entryIdx === -1) return lines;
+
+    // Find the end of the entry block = the first non-entry label after entry:.
+    // Labels are unindented lines ending with ':' (e.g. "while.cond.0:").
+    const labelRe = /^[\w.]+:/;
+    let entryBlockEnd = lines.length;
+    for (let i = entryIdx + 1; i < lines.length; i++) {
+        if (labelRe.test(lines[i])) { entryBlockEnd = i; break; }
+    }
+
+    const allocaRe = /^\s*%\w+ = alloca\b/;
+    const hoisted  = [];
+    const rest     = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (i >= entryBlockEnd && allocaRe.test(lines[i])) hoisted.push(lines[i]);
+        else rest.push(lines[i]);
+    }
+    const insertAt = rest.findIndex(l => l.trim() === "entry:") + 1;
+    rest.splice(insertAt, 0, ...hoisted);
+    return rest;
+}
+
 // ── function / method codegen ─────────────────────────────────────────────
 
 function genFunction(fn) {
     const ir         = new IRBuilder();
+    ir.returnType    = fn.returnType;
     const isVoid     = fn.returnType === null;
     const retLlType  = isVoid ? "void" : llvmType(fn.returnType);
-    const paramSig   = fn.params.map((p, i) => `${llvmType(normalizeType(p.type))} %p${i}`).join(", ");
+    const paramSig   = fn.params.map((p, i) => {
+        const normT = normalizeType(p.type);
+        const lt    = llvmType(normT);
+        return classTypes.has(normT) ? `${lt}* %p${i}` : `${lt} %p${i}`;
+    }).join(", ");
 
-    ir.emit(`define ${retLlType} @${fn.name}(${paramSig}) {`);
+    ir.emit(`define ${retLlType} @${fn._mangledName || fn.name}(${paramSig}) {`);
     ir.emit("entry:");
 
     fn.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
         const lt    = llvmType(normT);
-        const ptr   = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${lt}`);
-        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        if (classTypes.has(normT)) {
+            // Class/template types: passed by reference — %p_i is already a pointer
+            ir.vars.set(p.name, { ptr: `%p${i}`, type: lt, hType: normT });
+        } else {
+            const ptr = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${lt}`);
+            ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+            ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        }
     });
 
     genBlock(ir, fn.body, fn.returnType);
@@ -1155,23 +1904,32 @@ function genFunction(fn) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
+        ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
-    return ir.lines.join("\n");
+    return hoistAllocas(ir.lines).join("\n");
 }
 
 function genMethod(typeName, method, isClass = true) {
-    const ir         = new IRBuilder();
-    const isVoid     = method.returnType === null;
-    const retLlType  = isVoid ? "void" : llvmType(normalizeType(method.returnType));
-    const mangled    = `${typeName}_${method.name}`;
-    const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
+    const ir          = new IRBuilder();
+    ir.returnType     = method.returnType;
+    ir.currentClass   = typeName;
+    const normRetType = method.returnType ? normalizeType(method.returnType) : null;
+    const isVoid      = method.returnType === null;
+    const retLlType   = isVoid ? "void"
+        : classTypes.has(normRetType) ? `%class.${normRetType}`
+        : llvmType(normRetType);
+    const mangled     = `${typeName}_${method.name}`;
+    const llTypeName  = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
 
     const paramParts = [`${llTypeName}* %self`];
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
-        paramParts.push(`${llvmType(normT)} %p${i}`);
+        if (classTypes.has(normT)) {
+            paramParts.push(`%class.${normT}* %p${i}`);
+        } else {
+            paramParts.push(`${llvmType(normT)} %p${i}`);
+        }
     });
     ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")}) {`);
     ir.emit("entry:");
@@ -1185,11 +1943,16 @@ function genMethod(typeName, method, isClass = true) {
 
     method.params.forEach((p, i) => {
         const normT = normalizeType(p.type);
-        const lt    = llvmType(normT);
-        const ptr   = ir.newTmp();
-        ir.emit(`${ptr} = alloca ${lt}`);
-        ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
-        ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        if (classTypes.has(normT)) {
+            // Class params passed by pointer — store directly, no alloca needed
+            ir.vars.set(p.name, { ptr: `%p${i}`, type: `%class.${normT}`, hType: normT });
+        } else {
+            const lt  = llvmType(normT);
+            const ptr = ir.newTmp();
+            ir.emit(`${ptr} = alloca ${lt}`);
+            ir.emit(`store ${lt} %p${i}, ${lt}* ${ptr}`);
+            ir.vars.set(p.name, { ptr, type: lt, hType: normT });
+        }
     });
 
     genBlock(ir, method.body, method.returnType);
@@ -1197,17 +1960,17 @@ function genMethod(typeName, method, isClass = true) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
-        ir.emit(`ret ${retLlType} ${retLlType === "double" ? "0.0" : retLlType.endsWith("*") ? "null" : "0"}`);
+        ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
-    return ir.lines.join("\n");
+    return hoistAllocas(ir.lines).join("\n");
 }
 
 function genOperator(className, op) {
     const nameSafe = operatorNameSafe(op.op);
     const pseudoMethod = {
         name:       `op_${nameSafe}`,
-        params:     [op.param],
+        params:     op.params && op.params.length > 0 ? op.params : (op.param ? [op.param] : []),
         returnType: op.returnType,
         body:       op.body
     };
@@ -1221,11 +1984,10 @@ function typeSize(hType) {
     if (t === "int")          return 8;
     if (t === "float")        return 8;
     if (t === "bool")         return 1;
-    if (t === "byte")         return 1;
-    if (t === "address")      return 8;
+    if (t === "byte" || t === "char")         return 1;
+    if (t === "address" || t.startsWith("address:")) return 8;
     if (t === "string[]")     return 8;
     if (t === "string")       return 8;
-    if (t === "String")       return 8;
     if (t === "unsignedint")  return 8;
     if (t === "unsignedbyte") return 1;
     if (structTypes.has(t)) {
@@ -1235,6 +1997,7 @@ function typeSize(hType) {
     if (classTypes.has(t)) {
         return classTypes.get(t).fields.reduce((acc, f) => acc + typeSize(f.type), 0);
     }
+    if (t === "String")       return 8;   // bare String fallback (pointer size)
     throw new Error(`Cannot compute ::size of unknown type: ${t}`);
 }
 
@@ -1285,8 +2048,18 @@ function genEntry(entry) {
         }
         genBlock(ir, entry.body, "int");
         emitDeferred(ir);
-        ir.emit("ret i64 0");
+        if (!ir.isTerminated()) ir.emit("ret i64 0");
         ir.emit("}");
+        // Non-main entries: emit a @main stub so the C runtime initialises
+        // normally (libc, stdio, etc.). @main calls the named entry and exits.
+        if (entry.name !== "main") {
+            ir.emit(`\ndefine i64 @main() {`);
+            ir.emit(`entry:`);
+            const r = ir.newTmp();
+            ir.emit(`${r} = call i64 @${entry.name}()`);
+            ir.emit(`ret i64 ${r}`);
+            ir.emit(`}`);
+        }
     } else if (entry.address) {
         // address form: entry main = startup::address
         // emit a thin wrapper that calls the target function
@@ -1312,23 +2085,48 @@ function genEntry(entry) {
         ir.emit("}");
     }
 
-    return ir.lines.join("\n");
+    return hoistAllocas(ir.lines).join("\n");
 }
 
 // ── LLVM string escaping ──────────────────────────────────────────────────
 
+// Count bytes as escapeStringForLLVM emits them:
+// U+0000–U+00FF → 1 raw byte; surrogate pairs → 4 UTF-8 bytes; BMP > U+00FF → 2–3 UTF-8 bytes.
+function stringByteLen(str) {
+    let n = 0;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }
+        else if (c <= 0xFF)  n += 1;
+        else if (c <= 0x7FF) n += 2;
+        else                 n += 3;
+    }
+    return n;
+}
+
 function escapeStringForLLVM(str) {
     let out = '';
-    for (const ch of str) {
-        const c = ch.charCodeAt(0);
-        if      (c === 10) out += '\\0A';
-        else if (c === 13) out += '\\0D';
-        else if (c ===  9) out += '\\09';
-        else if (c ===  0) out += '\\00';
-        else if (c === 92) out += '\\5C';
-        else if (c === 34) out += '\\22';
-        else if (c < 32 || c > 126) out += '\\' + c.toString(16).padStart(2,'0').toUpperCase();
-        else out += ch;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < str.length) {
+            // Surrogate pair — decode to full code point and UTF-8 encode
+            const low = str.charCodeAt(i + 1);
+            const cp  = 0x10000 + ((c - 0xD800) << 10) + (low - 0xDC00);
+            i++;
+            for (const b of Buffer.from(String.fromCodePoint(cp), 'utf8'))
+                out += '\\' + b.toString(16).padStart(2, '0').toUpperCase();
+        } else if (c > 0xFF) {
+            // BMP chars above Latin-1: UTF-8 encode (2–3 bytes)
+            for (const b of Buffer.from(String.fromCharCode(c), 'utf8'))
+                out += '\\' + b.toString(16).padStart(2, '0').toUpperCase();
+        } else if (c === 10) out += '\\0A';
+        else if (c === 13)   out += '\\0D';
+        else if (c ===  9)   out += '\\09';
+        else if (c ===  0)   out += '\\00';
+        else if (c === 92)   out += '\\5C';
+        else if (c === 34)   out += '\\22';
+        else if (c < 32 || c > 126) out += '\\' + c.toString(16).padStart(2, '0').toUpperCase();
+        else out += String.fromCharCode(c);
     }
     return out;
 }
@@ -1355,22 +2153,76 @@ function emitClassIR(cls, out, fnCode) {
 function genModule(ast) {
     resetAll();
 
+    // Interfaces — registered before classes so implements checking can find them
+    for (const iface of ast.interfaces || []) {
+        interfaceDefs.set(iface.name, { methods: iface.methods });
+    }
+
     // Aliases and constants
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
     for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
 
-    // Register template definitions
-    for (const t of ast.templates || []) templateDefs.set(t.name, t);
+    // Register template definitions.
+    // Fixed templates (all params are concrete types) are monomorphized immediately —
+    // their name becomes a standalone class type with no <> required at use sites.
+    for (const t of ast.templates || []) {
+        if (t.isFixed) {
+            // Build substitution from fixedParams, then monomorphize and register as a class
+            const concreteClass = monomorphize(t, t.fixedParams);
+            // Register under the original readable name (e.g. "String"), not the mangled one
+            registerClass(t.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+            instantiatedClasses.push({ ...concreteClass, name: t.name });
+            if (t.constructor) functionReturnTypes.set(`${t.name}_constructor`, { returnType: null, isVariadic: false, params: concreteClass.constructor?.params || [] });
+            if (t.destructor)  functionReturnTypes.set(`${t.name}_destructor`,  { returnType: null, isVariadic: false, params: [] });
+            for (const m of concreteClass.methods || [])
+                functionReturnTypes.set(`${t.name}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
+        } else {
+            templateDefs.set(t.name, t);
+        }
+    }
+
+    // Register bitfield types — stored as their integer container (i8/i16/i32/i64)
+    for (const bf of ast.bitfields || []) bitfieldTypes.set(bf.name, bf);
+
+    for (const en of ast.enums || []) {
+        const variants = new Map();
+        for (const v of en.variants) variants.set(v.name, v.value);
+        enumTypes.set(en.name, variants);
+    }
 
     // Register regular struct and class types first (monomorphization may reference them)
     for (const s of ast.structs  || []) registerStruct(s.name, s.fields);
     for (const c of ast.classes  || []) registerClass(c.name, c.fields, c.methods, c.operators);
 
+    // Verify interface conformance for all classes that declare 'implements'
+    for (const c of ast.classes || []) checkImplements(c);
+
     // Scan all type usages and instantiate every template type found
     for (const typeStr of collectTypeUsages(ast)) instantiateTemplate(typeStr);
 
-    // Register return types for all regular functions
+    // Detect overloaded functions — same name, potentially different param types.
+    const fnNameCount = new Map();
     for (const fn of ast.functions || []) {
+        if (!fn.isExtern) fnNameCount.set(fn.name, (fnNameCount.get(fn.name) || 0) + 1);
+    }
+
+    // Build overload groups; attach mangled LLVM names to overloaded fn nodes.
+    for (const fn of ast.functions || []) {
+        if (fn.isExtern || fnNameCount.get(fn.name) <= 1) continue;
+        const mangled = mangledFnName(fn.name, fn.params);
+        if (!overloadGroups.has(fn.name)) overloadGroups.set(fn.name, []);
+        const group = overloadGroups.get(fn.name);
+        // Skip same-signature duplicates (e.g. gettid defined in sys.hop and thread.hop).
+        if (group.find(ov => ov.mangledName === mangled)) { fn._skip = true; continue; }
+        fn._mangledName = mangled;
+        group.push({ mangledName: mangled, params: fn.params, returnType: fn.returnType });
+        functionReturnTypes.set(mangled, { returnType: fn.returnType, isVariadic: false, params: fn.params });
+    }
+
+    // Register return types: extern functions always by plain name; non-overloaded regular
+    // functions by plain name; overloaded functions already registered under mangled names.
+    for (const fn of ast.functions || []) {
+        if (fn._mangledName || fn._skip) continue;
         functionReturnTypes.set(fn.name, { returnType: fn.returnType, isVariadic: fn.isVariadic || false, params: fn.params });
     }
 
@@ -1381,7 +2233,7 @@ function genModule(ast) {
         }
         for (const op of cls.operators || []) {
             const ns = operatorNameSafe(op.op);
-            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: [op.param] });
+            functionReturnTypes.set(`${cls.name}_op_${ns}`, { returnType: op.returnType, isVariadic: false, params: op.param ? [op.param] : [] });
         }
         if (cls.constructor) {
             functionReturnTypes.set(`${cls.name}_constructor`, { returnType: null, isVariadic: false, params: cls.constructor.params });
@@ -1415,6 +2267,10 @@ function genModule(ast) {
 
     if (typeDefs.length > 0) out += typeDefs.join("") + "\n";
 
+    // Runtime heap declarations — backing allocate/deallocate directives
+    out += `declare i8* @malloc(i64)\n`;
+    out += `declare void @free(i8*)\n\n`;
+
     // Constants are compile-time substitutions only — no LLVM globals emitted
 
     // Register strict MMIO bindings for load/store codegen
@@ -1435,7 +2291,7 @@ function genModule(ast) {
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
             const vararg = fn.isVariadic ? (params ? ", ..." : "...") : "";
             fnCode.push(`declare ${ret} @${fn.name}(${params}${vararg})\n`);
-        } else {
+        } else if (!fn._skip) {
             fnCode.push(genFunction(fn) + "\n\n");
         }
     }
@@ -1446,7 +2302,7 @@ function genModule(ast) {
     // Emit string constants (collected during all code generation above)
     for (const [value, name] of stringConstants) {
         const escaped = escapeStringForLLVM(value);
-        const len     = value.length + 1;
+        const len     = stringByteLen(value) + 1;
         out += `${name} = private unnamed_addr constant [${len} x i8] c"${escaped}\\00"\n`;
     }
     if (stringConstants.size > 0) out += "\n";

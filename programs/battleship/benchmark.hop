@@ -1,0 +1,219 @@
+// Battleship 1 benchmark — raw memory, no interaction
+//
+// Runs N bot-vs-bot games. Both sides fire randomly.
+// No display, no user input. Reports wall time and avg shots per game.
+
+import io  from core
+import io  from io
+import sys from linux
+
+// ── RNG ──────────────────────────────────────────────────────────────────────
+
+function rngStep(address state) int {
+    int s = state::value
+    s = s * 1664525 + 1013904223
+    state::value = s
+    int r = (s ^ (s >> 16)) & 0x7FFFFFFF
+    return r
+}
+
+function rngMod(address state, int n) int {
+    return rngStep(state) % n
+}
+
+// ── Board ─────────────────────────────────────────────────────────────────────
+
+function boardAlloc() address {
+    address board = allocate 800
+    int i = 0
+    while (i < 100) {
+        address cell = board + i * 8
+        cell::value = 0
+        i = i + 1
+    }
+    return board
+}
+
+function boardFree(address board) {
+    deallocate board
+}
+
+function cellGet(address board, int r, int c) int {
+    address cell = board + (r * 10 + c) * 8
+    int v = cell::value
+    return v
+}
+
+function cellSet(address board, int r, int c, int val) {
+    address cell = board + (r * 10 + c) * 8
+    cell::value = val
+}
+
+function cellGetFlat(address board, int idx) int {
+    address cell = board + idx * 8
+    int v = cell::value
+    return v
+}
+
+// ── Ship placement ────────────────────────────────────────────────────────────
+
+function canPlace(address board, int r, int c, int len, int dir) bool {
+    bool ok = true
+    int i = 0
+    while (i < len) {
+        int rr = r
+        int cc = c
+        if (dir == 0) { cc = c + i }
+        if (dir == 1) { rr = r + i }
+        if (rr >= 10) { ok = false }
+        if (cc >= 10) { ok = false }
+        if (ok) {
+            if (cellGet(board, rr, cc) == 1) { ok = false }
+        }
+        i = i + 1
+    }
+    return ok
+}
+
+function placeShip(address board, int len, address rng) {
+    bool placed = false
+    while (!placed) {
+        int r   = rngMod(rng, 10)
+        int c   = rngMod(rng, 10)
+        int dir = rngMod(rng, 2)
+        if (canPlace(board, r, c, len, dir)) {
+            int i = 0
+            while (i < len) {
+                int rr = r
+                int cc = c
+                if (dir == 0) { cc = c + i }
+                if (dir == 1) { rr = r + i }
+                cellSet(board, rr, cc, 1)
+                i = i + 1
+            }
+            placed = true
+        }
+    }
+}
+
+function placeFleet(address board, address rng) {
+    placeShip(board, 5, rng)
+    placeShip(board, 4, rng)
+    placeShip(board, 3, rng)
+    placeShip(board, 3, rng)
+    placeShip(board, 2, rng)
+}
+
+function shipsLeft(address board) int {
+    int count = 0
+    int i = 0
+    while (i < 100) {
+        if (cellGetFlat(board, i) == 1) { count = count + 1 }
+        i = i + 1
+    }
+    return count
+}
+
+// ── Bot turn ──────────────────────────────────────────────────────────────────
+
+function botTurn(address board, address rng) {
+    bool done = false
+    while (!done) {
+        int r = rngMod(rng, 10)
+        int c = rngMod(rng, 10)
+        int v = cellGet(board, r, c)
+        if (v == 0) {
+            cellSet(board, r, c, 3)
+            done = true
+        }
+        if (v == 1) {
+            cellSet(board, r, c, 2)
+            done = true
+        }
+    }
+}
+
+// ── Timing helper ─────────────────────────────────────────────────────────────
+// Returns wall time in milliseconds. Variables in their own entry block.
+
+function nowMs() int {
+    address ts = allocate 16
+    clock_gettime(1, ts)
+    address sp = ts
+    address np = ts + 8
+    int sec  = sp::value
+    int nsec = np::value
+    deallocate ts
+    return sec * 1000 + nsec / 1000000
+}
+
+// ── Single game ───────────────────────────────────────────────────────────────
+// Returns total shots fired. All locals live in this function's entry block.
+
+function runGame(address rng) int {
+    address playerBoard   = boardAlloc()
+    address computerBoard = boardAlloc()
+
+    placeFleet(playerBoard,   rng)
+    placeFleet(computerBoard, rng)
+
+    bool over  = false
+    int  shots = 0
+    while (!over) {
+        botTurn(computerBoard, rng)
+        shots = shots + 1
+        if (shipsLeft(computerBoard) == 0) {
+            over = true
+        }
+        if (!over) {
+            botTurn(playerBoard, rng)
+            shots = shots + 1
+            if (shipsLeft(playerBoard) == 0) {
+                over = true
+            }
+        }
+    }
+
+    boardFree(playerBoard)
+    boardFree(computerBoard)
+    return shots
+}
+
+// ── Entry ─────────────────────────────────────────────────────────────────────
+// All variables declared before the loop — no post-loop declarations.
+
+entry main {
+    int GAMES      = 100000
+    int rng        = 42
+    int totalShots = 0
+    int shots      = 0
+    int g          = 0
+    int t1         = 0
+    int t2         = 0
+    int elapsedMs  = 0
+    int avgShots   = 0
+
+    t1 = nowMs()
+
+    while (g < GAMES) {
+        shots = runGame(rng::address)
+        totalShots = totalShots + shots
+        g = g + 1
+    }
+
+    t2 = nowMs()
+
+    elapsedMs = t2 - t1
+    avgShots  = totalShots / GAMES
+
+    println("Battleship 1 (unsafe — raw memory)")
+    print("  Games:     ")
+    printInt(GAMES)
+    print("\n")
+    print("  Time:      ")
+    printInt(elapsedMs)
+    println(" ms")
+    print("  Avg shots: ")
+    printInt(avgShots)
+    println(" per game")
+}

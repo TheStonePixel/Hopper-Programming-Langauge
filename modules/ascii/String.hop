@@ -1,0 +1,454 @@
+// String — byte-backed, ASCII / UTF-8 byte sequence
+//
+// Each element is one byte.
+// Use pointer() + length() to hand the buffer to I/O:
+//   write(1, s.pointer(), s.length())
+//
+// Import this module with: import String from ascii
+
+import IString from string
+
+class String implements IString {
+    address data
+    int     length
+    int     capacity
+
+    // Empty string with explicit capacity.
+    constructor(int cap) {
+        self.data     = allocate cap
+        self.length   = 0
+        self.capacity = cap
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────────────
+
+    function length() int {
+        return self.length
+    }
+
+    function capacity() int {
+        return self.capacity
+    }
+
+    function pointer() address {
+        return self.data
+    }
+
+    function isEmpty() bool {
+        return self.length == 0
+    }
+
+    // Read the byte at a given index.
+    function get(int index) byte {
+        address ptr = self.data + index
+        byte b = ptr::value
+        return b
+    }
+
+    // Byte indexing: s[i]
+    operator [](self, int index) byte {
+        address ptr = self.data + index
+        byte b = ptr::value
+        return b
+    }
+
+    // ── Comparison ────────────────────────────────────────────────────────────
+
+    function equals(String other) bool {
+        if (self.length != other.length()) {
+            return false
+        }
+        int i = 0
+        while (i < self.length) {
+            byte a = self.get(i)
+            byte b = other.get(i)
+            if (a != b) {
+                return false
+            }
+            i = i + 1
+        }
+        return true
+    }
+
+    operator ==(self, String other) bool {
+        if (self.length != other.length()) {
+            return false
+        }
+        int i = 0
+        while (i < self.length) {
+            byte a = self.get(i)
+            byte b = other.get(i)
+            if (a != b) {
+                return false
+            }
+            i = i + 1
+        }
+        return true
+    }
+
+    operator !=(self, String other) bool {
+        if (self.length != other.length()) {
+            return true
+        }
+        int i = 0
+        while (i < self.length) {
+            byte a = self.get(i)
+            byte b = other.get(i)
+            if (a != b) {
+                return true
+            }
+            i = i + 1
+        }
+        return false
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    // First index of a byte value, or -1 if not found.
+    function indexOfByte(byte c) int {
+        int i = 0
+        while (i < self.length) {
+            byte b = self.get(i)
+            if (b == c) {
+                return i
+            }
+            i = i + 1
+        }
+        return -1
+    }
+
+    // First index of a substring, or -1 if not found.
+    function indexOf(String sub) int {
+        int subLen = sub.length()
+        if (subLen == 0) {
+            return 0
+        }
+        if (subLen > self.length) {
+            return -1
+        }
+        int limit = self.length - subLen
+        int i = 0
+        while (i <= limit) {
+            int j = 0
+            int match = 1
+            while (j < subLen) {
+                byte a = self.get(i + j)
+                byte b = sub.get(j)
+                if (a != b) {
+                    match = 0
+                    j = subLen
+                }
+                j = j + 1
+            }
+            if (match == 1) {
+                return i
+            }
+            i = i + 1
+        }
+        return -1
+    }
+
+    function contains(byte c) bool {
+        return self.indexOfByte(c) != -1
+    }
+
+    function startsWith(String other) bool {
+        int otherLen = other.length()
+        if (otherLen > self.length) {
+            return false
+        }
+        int i = 0
+        while (i < otherLen) {
+            byte a = self.get(i)
+            byte b = other.get(i)
+            if (a != b) {
+                return false
+            }
+            i = i + 1
+        }
+        return true
+    }
+
+    function endsWith(String other) bool {
+        int otherLen = other.length()
+        if (otherLen > self.length) {
+            return false
+        }
+        int offset = self.length - otherLen
+        int i = 0
+        while (i < otherLen) {
+            byte a = self.get(offset + i)
+            byte b = other.get(i)
+            if (a != b) {
+                return false
+            }
+            i = i + 1
+        }
+        return true
+    }
+
+    // ── Mutation ──────────────────────────────────────────────────────────────
+
+    function clear() {
+        self.length = 0
+    }
+
+    // Overwrite the byte at a given index.
+    function set(int index, byte c) {
+        address ptr = self.data + index
+        ptr::value = c
+    }
+
+    // Append a single byte.
+    function append(byte c) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        address ptr = self.data + self.length
+        byte bc = cast c
+        ptr::value = bc
+        self.length = self.length + 1
+    }
+
+    // Append all bytes from another String.
+    function appendString(String other) {
+        int i = 0
+        while (i < other.length()) {
+            byte b = other.get(i)
+            self.append(b)
+            i = i + 1
+        }
+    }
+
+    // Append a null-terminated C string literal: s.appendLiteral("Hello")
+    function appendLiteral(string s) {
+        address ptr = cast s
+        int notDone = 1
+        while (notDone == 1) {
+            byte b = ptr::value
+            int bi = cast b
+            if (bi == 0) {
+                notDone = 0
+            }
+            if (notDone == 1) {
+                self.append(b)
+                ptr = ptr + 1
+            }
+        }
+    }
+
+    // Reverse bytes in place.
+    function reverse() {
+        int left = 0
+        int right = self.length - 1
+        while (left < right) {
+            byte a = self.get(left)
+            byte b = self.get(right)
+            self.set(left, b)
+            self.set(right, a)
+            left = left + 1
+            right = right - 1
+        }
+    }
+
+    // Remove leading whitespace in place.
+    function trimLeft() {
+        int start = self.firstNonSpace()
+        int newLen = self.length - start
+        int i = 0
+        while (i < newLen) {
+            byte b = self.get(start + i)
+            self.set(i, b)
+            i = i + 1
+        }
+        self.length = newLen
+    }
+
+    // Remove trailing whitespace in place.
+    function trimRight() {
+        int last = self.lastNonSpace()
+        self.length = last + 1
+    }
+
+    // Remove leading and trailing whitespace in place.
+    function trim() {
+        self.trimRight()
+        self.trimLeft()
+    }
+
+    // ASCII uppercase in place.
+    function toUpperCase() {
+        int i = 0
+        while (i < self.length) {
+            byte b = self.get(i)
+            int bi = cast b
+            if (bi >= 97) {
+                if (bi <= 122) {
+                    byte upper = cast (bi - 32)
+                    self.set(i, upper)
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    // ASCII lowercase in place.
+    function toLowerCase() {
+        int i = 0
+        while (i < self.length) {
+            byte b = self.get(i)
+            int bi = cast b
+            if (bi >= 65) {
+                if (bi <= 90) {
+                    byte lower = cast (bi + 32)
+                    self.set(i, lower)
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    // Copy all bytes into dest (dest is cleared first).
+    function copyInto(String dest) {
+        dest.clear()
+        int i = 0
+        while (i < self.length) {
+            byte b = self.get(i)
+            dest.append(b)
+            i = i + 1
+        }
+    }
+
+    // Copy bytes [start, end) into dest (dest is cleared first).
+    function sliceInto(String dest, int start, int end) {
+        dest.clear()
+        int i = start
+        while (i < end) {
+            byte b = self.get(i)
+            dest.append(b)
+            i = i + 1
+        }
+    }
+
+    // ── Number formatting ─────────────────────────────────────────────────────
+
+    // Append a signed decimal integer.
+    function appendNumber(int n) {
+        if (n == 0) {
+            self.appendByte(48)
+            return
+        }
+        if (n < 0) {
+            self.appendByte(45)
+            n = 0 - n
+        }
+        int count = 0
+        int tmp = n
+        while (tmp > 0) {
+            count = count + 1
+            tmp = tmp / 10
+        }
+        while (self.length + count > self.capacity) {
+            self.grow()
+        }
+        int pos = self.length + count - 1
+        while (n > 0) {
+            int digit = n % 10
+            self.writeByte(pos, digit + 48)
+            n = n / 10
+            pos = pos - 1
+        }
+        self.length = self.length + count
+    }
+
+    // Append an unsigned integer as lowercase hexadecimal (no "0x" prefix).
+    function appendHex(int n) {
+        if (n == 0) {
+            self.appendByte(48)
+            return
+        }
+        int count = 0
+        int tmp = n
+        while (tmp > 0) {
+            count = count + 1
+            tmp = tmp / 16
+        }
+        while (self.length + count > self.capacity) {
+            self.grow()
+        }
+        int pos = self.length + count - 1
+        while (n > 0) {
+            int nibble = n % 16
+            int ch = nibble + 48
+            if (nibble >= 10) { ch = nibble + 87 }
+            self.writeByte(pos, ch)
+            n = n / 16
+            pos = pos - 1
+        }
+        self.length = self.length + count
+    }
+
+    // ── Internal ──────────────────────────────────────────────────────────────
+
+    function firstNonSpace() int {
+        int i = 0
+        while (i < self.length) {
+            byte b = self.get(i)
+            int bi = cast b
+            if (bi > 32) {
+                return i
+            }
+            i = i + 1
+        }
+        return self.length
+    }
+
+    function lastNonSpace() int {
+        int i = self.length - 1
+        while (i >= 0) {
+            byte b = self.get(i)
+            int bi = cast b
+            if (bi > 32) {
+                return i
+            }
+            i = i - 1
+        }
+        return -1
+    }
+
+    function appendByte(int ch) {
+        if (self.length == self.capacity) {
+            self.grow()
+        }
+        address ptr = self.data + self.length
+        byte b = cast ch
+        ptr::value = b
+        self.length = self.length + 1
+    }
+
+    function writeByte(int pos, int ch) {
+        address ptr = self.data + pos
+        byte b = cast ch
+        ptr::value = b
+    }
+
+    function grow() {
+        int     newCap  = self.capacity * 2
+        address newData = allocate newCap
+        int i = 0
+        while (i < self.length) {
+            address src = self.data + i
+            byte b = src::value
+            address dst = newData + i
+            dst::value = b
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = newData
+        self.capacity = newCap
+    }
+}

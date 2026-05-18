@@ -1,0 +1,201 @@
+// HashMap<K, V> — open-addressing hash map with linear probing
+//
+// Three parallel arrays (keys, values, used) avoid struct alignment issues.
+// Slots: used[i] = 0 (empty), 1 (occupied), 2 (tombstone).
+// Grows at 75% load — doubles capacity and rehashes all live entries.
+// K must support == and be castable to int for hashing.
+//
+// Usage:
+//   HashMap<int, int> m = HashMap(16)
+//   m.set(42, 100)
+//   int v = m.get(42)        // 100
+//   bool ok = m.contains(42) // true
+//   m.remove(42)
+
+template HashMap<K, V> {
+    address keys
+    address values
+    address used
+    int     length
+    int     capacity
+
+    constructor(int initialCap) {
+        self.capacity = initialCap
+        self.length   = 0
+        self.keys     = allocate initialCap * K::size
+        self.values   = allocate initialCap * V::size
+        self.used     = allocate initialCap
+        int i = 0
+        while (i < initialCap) {
+            address ptr = self.used + i
+            byte zero = cast 0
+            ptr::value = zero
+            i = i + 1
+        }
+    }
+
+    destructor() {
+        deallocate self.keys
+        deallocate self.values
+        deallocate self.used
+    }
+
+    function len() int {
+        return self.length
+    }
+
+    function cap() int {
+        return self.capacity
+    }
+
+    function contains(K key) bool {
+        int slot = self.find(key)
+        return slot != -1
+    }
+
+    // Returns value at key. Caller must ensure key exists.
+    function get(K key) V {
+        int slot = self.find(key)
+        address ptr = self.values + (slot * V::size)
+        V val = ptr::value
+        return val
+    }
+
+    // Insert or update key with val.
+    function set(K key, V val) {
+        if (self.length * 4 >= self.capacity * 3) {
+            self.grow()
+        }
+        int slot = self.probe(key)
+        address uptr = self.used + slot
+        byte u = uptr::value
+        int ui = cast u
+        if (ui != 1) {
+            self.length = self.length + 1
+        }
+        address kptr = self.keys + (slot * K::size)
+        address vptr = self.values + (slot * V::size)
+        kptr::value = key
+        vptr::value = val
+        byte one = cast 1
+        uptr::value = one
+    }
+
+    // Remove key. No-op if key not present.
+    function remove(K key) {
+        int slot = self.find(key)
+        if (slot == -1) {
+            return
+        }
+        address uptr = self.used + slot
+        byte tomb = cast 2
+        uptr::value = tomb
+        self.length = self.length - 1
+    }
+
+    // Find slot index of existing key, or -1 if absent.
+    function find(K key) int {
+        int h = self.hash(key)
+        int i = 0
+        while (i < self.capacity) {
+            int slot = (h + i) % self.capacity
+            address uptr = self.used + slot
+            byte u = uptr::value
+            int ui = cast u
+            if (ui == 0) {
+                return -1
+            }
+            if (ui == 1) {
+                address kptr = self.keys + (slot * K::size)
+                K k = kptr::value
+                if (k == key) {
+                    return slot
+                }
+            }
+            i = i + 1
+        }
+        return -1
+    }
+
+    // Find slot for insertion — reuses tombstones, updates in place.
+    function probe(K key) int {
+        int h = self.hash(key)
+        int tomb = -1
+        int i = 0
+        while (i < self.capacity) {
+            int slot = (h + i) % self.capacity
+            address uptr = self.used + slot
+            byte u = uptr::value
+            int ui = cast u
+            if (ui == 0) {
+                if (tomb != -1) {
+                    return tomb
+                }
+                return slot
+            }
+            if (ui == 2) {
+                if (tomb == -1) {
+                    tomb = slot
+                }
+            }
+            if (ui == 1) {
+                address kptr = self.keys + (slot * K::size)
+                K k = kptr::value
+                if (k == key) {
+                    return slot
+                }
+            }
+            i = i + 1
+        }
+        return tomb
+    }
+
+    function hash(K key) int {
+        int k = cast key
+        int h = k * 2654435761
+        if (h < 0) {
+            h = 0 - h
+        }
+        return h % self.capacity
+    }
+
+    function grow() {
+        int     oldCap    = self.capacity
+        address oldKeys   = self.keys
+        address oldValues = self.values
+        address oldUsed   = self.used
+
+        int newCap    = oldCap * 2
+        self.capacity = newCap
+        self.length   = 0
+        self.keys     = allocate newCap * K::size
+        self.values   = allocate newCap * V::size
+        self.used     = allocate newCap
+        int i = 0
+        while (i < newCap) {
+            address ptr = self.used + i
+            byte zero = cast 0
+            ptr::value = zero
+            i = i + 1
+        }
+
+        int j = 0
+        while (j < oldCap) {
+            address uptr = oldUsed + j
+            byte u = uptr::value
+            int ui = cast u
+            if (ui == 1) {
+                address kptr = oldKeys + (j * K::size)
+                address vptr = oldValues + (j * V::size)
+                K k = kptr::value
+                V v = vptr::value
+                self.set(k, v)
+            }
+            j = j + 1
+        }
+
+        deallocate oldKeys
+        deallocate oldValues
+        deallocate oldUsed
+    }
+}

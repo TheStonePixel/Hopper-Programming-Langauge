@@ -1,0 +1,240 @@
+// path.hop — path manipulation backed by a Unique<byte> buffer.
+//
+// Unique<byte> owns the storage and tracks capacity via buf.len().
+// swap() enables zero-copy buffer replacement in grow().
+//
+// Usage:
+//   import path from path
+//
+//   Path p = Path("/usr/local/bin")
+//   p.join("clang")               // "/usr/local/bin/clang"
+//   Path base = p.basename()      // Path("clang")
+//   Path dir  = p.dirname()       // Path("/usr/local/bin")
+//   Path ext  = p.ext()           // Path(".hop") or Path("")
+//   bool absolute = p.isAbsolute() // true
+
+import unique from Pointer
+
+class Path {
+    Unique<byte> buf
+    int len
+
+    constructor(address source) {
+        int sourceLength = 0
+        while (true) {
+            address cursor = source + sourceLength
+            byte character = cursor::value
+            int charCode = cast character
+            if (charCode == 0) { break }
+            sourceLength = sourceLength + 1
+        }
+        int initialCapacity = 64
+        if (sourceLength + 1 > initialCapacity) { initialCapacity = sourceLength + 1 }
+        self.buf = Unique(initialCapacity)
+        self.len = 0
+        int index = 0
+        while (index < sourceLength) {
+            address cursor = source + index
+            byte character = cursor::value
+            self.buf.set(index, character)
+            index = index + 1
+        }
+        self.len = sourceLength
+        byte nullByte = cast 0
+        self.buf.set(sourceLength, nullByte)
+    }
+
+    destructor() {
+        self.buf.destroy()
+    }
+
+    // Double capacity, preserving existing bytes and null terminator.
+    function grow() {
+        int newCapacity = self.buf.len() * 2
+        Unique<byte> newBuffer = Unique(newCapacity)
+        int index = 0
+        while (index < self.len) {
+            byte character = self.buf.get(index)
+            newBuffer.set(index, character)
+            index = index + 1
+        }
+        byte nullByte = cast 0
+        newBuffer.set(self.len, nullByte)
+        self.buf.swap(newBuffer)
+        newBuffer.destroy()
+    }
+
+    // Ensure at least needed bytes of spare capacity, growing as needed.
+    function ensureRoom(int needed) {
+        while (self.len + needed >= self.buf.len()) {
+            self.grow()
+        }
+    }
+
+    // Append a single byte and maintain the null terminator.
+    function appendByte(byte character) {
+        self.ensureRoom(2)
+        self.buf.set(self.len, character)
+        self.len = self.len + 1
+        byte nullByte = cast 0
+        self.buf.set(self.len, nullByte)
+    }
+
+    // Append a null-terminated string.
+    function appendStr(address source) {
+        int index = 0
+        while (true) {
+            address cursor = source + index
+            byte character = cursor::value
+            int charCode = cast character
+            if (charCode == 0) { break }
+            self.appendByte(character)
+            index = index + 1
+        }
+    }
+
+    // Raw pointer to the null-terminated path string. Valid until next mutation.
+    function str() address {
+        return self.buf.ptr()
+    }
+
+    // Current byte length (not including null terminator).
+    function length() int {
+        return self.len
+    }
+
+    // True if the path begins with '/'.
+    function isAbsolute() bool {
+        if (self.len == 0) { return false }
+        byte firstByte = self.buf.get(0)
+        int firstCode = cast firstByte
+        return firstCode == '/'
+    }
+
+    // Append a path segment, inserting a '/' separator if needed.
+    // A leading '/' on segment is stripped to avoid double slashes.
+    function join(address segment) {
+        if (self.len == 0) {
+            self.appendStr(segment)
+            return
+        }
+        byte lastByte = self.buf.get(self.len - 1)
+        int lastCode = cast lastByte
+        if (lastCode != '/') {
+            byte slash = cast '/'
+            self.appendByte(slash)
+        }
+        address segmentCursor = segment
+        byte segmentFirst = segmentCursor::value
+        int segmentFirstCode = cast segmentFirst
+        if (segmentFirstCode == '/') {
+            segmentCursor = segmentCursor + 1
+        }
+        self.appendStr(segmentCursor)
+    }
+
+    // Byte offset of the start of the final path component (past the last '/').
+    function basenameStart() int {
+        int index = self.len - 1
+        while (index >= 0) {
+            byte character = self.buf.get(index)
+            int charCode = cast character
+            if (charCode == '/') { return index + 1 }
+            index = index - 1
+        }
+        return 0
+    }
+
+    // Byte offset of the extension dot in the basename, or -1 if none.
+    // A leading dot (hidden file like ".bashrc") does not count as an extension.
+    function extStart() int {
+        int basenameOffset = self.basenameStart()
+        int index = self.len - 1
+        while (index > basenameOffset) {
+            byte character = self.buf.get(index)
+            int charCode = cast character
+            if (charCode == '.') { return index }
+            index = index - 1
+        }
+        return -1
+    }
+
+    // Return a new Path containing only the final component of this path.
+    function basename() Path {
+        int start = self.basenameStart()
+        int componentLength = self.len - start
+        Unique<byte> scratch = Unique(componentLength + 1)
+        int index = 0
+        while (index < componentLength) {
+            byte character = self.buf.get(start + index)
+            scratch.set(index, character)
+            index = index + 1
+        }
+        byte nullByte = cast 0
+        scratch.set(componentLength, nullByte)
+        Path result = Path(scratch.ptr())
+        scratch.destroy()
+        return result
+    }
+
+    // Return a new Path containing the directory portion of this path.
+    // Returns "/" for root-level paths, "." for paths with no directory component.
+    function dirname() Path {
+        int basenameOffset = self.basenameStart()
+        int dirLength = basenameOffset - 1
+        if (dirLength <= 0) {
+            Unique<byte> scratch = Unique(2)
+            if (self.isAbsolute()) {
+                byte slash = cast '/'
+                scratch.set(0, slash)
+            } else {
+                byte dot = cast '.'
+                scratch.set(0, dot)
+            }
+            byte nullByte = cast 0
+            scratch.set(1, nullByte)
+            Path result = Path(scratch.ptr())
+            scratch.destroy()
+            return result
+        }
+        Unique<byte> scratch = Unique(dirLength + 1)
+        int index = 0
+        while (index < dirLength) {
+            byte character = self.buf.get(index)
+            scratch.set(index, character)
+            index = index + 1
+        }
+        byte nullByte = cast 0
+        scratch.set(dirLength, nullByte)
+        Path result = Path(scratch.ptr())
+        scratch.destroy()
+        return result
+    }
+
+    // Return a new Path containing the extension including the dot, or an empty Path if none.
+    // A leading dot (hidden file like ".bashrc") does not count as an extension.
+    function ext() Path {
+        int extensionStart = self.extStart()
+        if (extensionStart == -1) {
+            Unique<byte> scratch = Unique(1)
+            byte nullByte = cast 0
+            scratch.set(0, nullByte)
+            Path result = Path(scratch.ptr())
+            scratch.destroy()
+            return result
+        }
+        int extensionLength = self.len - extensionStart
+        Unique<byte> scratch = Unique(extensionLength + 1)
+        int index = 0
+        while (index < extensionLength) {
+            byte character = self.buf.get(extensionStart + index)
+            scratch.set(index, character)
+            index = index + 1
+        }
+        byte nullByte = cast 0
+        scratch.set(extensionLength, nullByte)
+        Path result = Path(scratch.ptr())
+        scratch.destroy()
+        return result
+    }
+}

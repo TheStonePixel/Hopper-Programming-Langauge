@@ -1,0 +1,63 @@
+import assert from core
+import io     from core
+import array  from ds
+
+// TEST: allocate scalar
+// EXPECT: scalar ok
+
+// TEST: allocate array of ints
+// EXPECT: array ok
+
+// TEST: Array<int> heap growth
+// EXPECT: growth ok
+
+// TEST: reallocate
+// EXPECT: reallocate ok
+
+entry main {
+    // — allocate scalar ————————————————————————————————————
+    // Use Array<int> as the canonical safe heap wrapper
+    Array<int> a = Array(4)
+    a.push(42)
+    soft(a.len() == 1,  "scalar push: len != 1\n")
+    soft(a.get(0) == 42, "scalar push: get != 42\n")
+    println("scalar ok")
+
+    // — allocate array of ints ————————————————————————————
+    Array<int> b = Array(4)
+    int i = 0
+    while (i < 4) {
+        b.push(i * 10)
+        i = i + 1
+    }
+    soft(b.len()    == 4,  "array len != 4\n")
+    soft(b.get(0)   == 0,  "array[0] != 0\n")
+    soft(b.get(1)   == 10, "array[1] != 10\n")
+    soft(b.get(2)   == 20, "array[2] != 20\n")
+    soft(b.get(3)   == 30, "array[3] != 30\n")
+    println("array ok")
+
+    // — heap growth (push beyond initial capacity) ————————
+    Array<int> c = Array(2)
+    int j = 0
+    while (j < 10) {
+        c.push(j)
+        j = j + 1
+    }
+    soft(c.len()    == 10, "growth len != 10\n")
+    soft(c.get(0)   == 0,  "growth[0] != 0\n")
+    soft(c.get(9)   == 9,  "growth[9] != 9\n")
+    println("growth ok")
+
+    // — pop and reuse —————————————————————————————————————
+    Array<int> d = Array(4)
+    d.push(1)
+    d.push(2)
+    d.push(3)
+    int last = d.pop()
+    soft(last     == 3, "pop != 3\n")
+    soft(d.len()  == 2, "len after pop != 2\n")
+    d.push(99)
+    soft(d.get(2) == 99, "reuse slot != 99\n")
+    println("reallocate ok")
+}
