@@ -1,0 +1,8 @@
+{
+  "name": "concurrent",
+  "version": "0.1.0",
+  "description": "Async/await concurrency — Future<T>, Mutex, Condvar, Channel<T>",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "src/concurrent.hop"
+}

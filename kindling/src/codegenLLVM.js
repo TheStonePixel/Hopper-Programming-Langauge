@@ -2289,12 +2289,17 @@ function genModule(ast) {
     const bindGlobals = (ast.binds || []).map(b => genBind(b));
     if (bindGlobals.length > 0) out += bindGlobals.join("\n") + "\n\n";
 
+    const emittedExterns = new Set();
     for (const fn of ast.functions) {
         if (fn.isExtern) {
             const ret    = fn.returnType === null ? "void" : llvmType(fn.returnType);
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
             const vararg = fn.isVariadic ? (params ? ", ..." : "...") : "";
-            fnCode.push(`declare ${ret} @${fn.name}(${params}${vararg})\n`);
+            const decl   = `declare ${ret} @${fn.name}(${params}${vararg})\n`;
+            if (!emittedExterns.has(fn.name)) {
+                emittedExterns.add(fn.name);
+                fnCode.push(decl);
+            }
         } else if (!fn._skip) {
             fnCode.push(genFunction(fn) + "\n\n");
         }
