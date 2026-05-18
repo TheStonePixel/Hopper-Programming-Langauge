@@ -1,5 +1,18 @@
 <script setup>
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
+
+const message = ref('Welcome To Hopper!')
+
+function onInput(e) {
+  message.value = e.target.textContent.replace(/[\n\r]/g, '')
+}
+
+function onPaste(e) {
+  e.preventDefault()
+  const text = (e.clipboardData.getData('text/plain') || '').replace(/[\n\r]/g, '')
+  document.execCommand('insertText', false, text)
+}
 </script>
 
 <template>
@@ -54,6 +67,48 @@ import { RouterLink } from 'vue-router'
             <h3>A clean foundation</h3>
             <p>No global variables. No footguns. No syntax inherited from 1972 that exists only because removing it would break everything. Hopper is simple because it was designed to be — not simplified after the fact.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div class="container">
+        <span class="label">Try It</span>
+        <p class="demo-sub">Click the string in the code and type — the output updates live.</p>
+        <div class="demo-split">
+
+          <div class="demo-pane source-pane">
+            <div class="pane-bar source-bar">
+              <div class="pane-dots">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              </div>
+              <span class="pane-name">hello.hop</span>
+            </div>
+            <pre class="demo-pre"><code><span class="dkw">import</span> io <span class="dkw">from</span> core
+
+<span class="dkw">entry</span> main {
+    println(<span class="ds">"<span class="editable" contenteditable="true" spellcheck="false" @input="onInput" @paste="onPaste" @keydown.enter.prevent>Welcome To Hopper!</span>"</span>)
+}</code></pre>
+          </div>
+
+          <div class="demo-pane term-pane">
+            <div class="pane-bar term-bar">
+              <div class="pane-dots">
+                <span class="dot dot-r"></span>
+                <span class="dot dot-y"></span>
+                <span class="dot dot-g"></span>
+              </div>
+              <span class="pane-name">terminal</span>
+            </div>
+            <div class="term-body">
+              <div class="term-row"><span class="tprompt">$</span> <span class="tcmd">hopper build hello.hop</span></div>
+              <div class="term-row tmuted">built [linux]: ./hello</div>
+              <div class="term-row"><span class="tprompt">$</span> <span class="tcmd">./hello</span></div>
+              <div class="term-row tout">{{ message }}</div>
+              <div class="term-row"><span class="tprompt">$</span><span class="tcursor"> ▋</span></div>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -424,6 +479,152 @@ import { RouterLink } from 'vue-router'
   font-size: 0.9rem;
   color: #6b7280;
   line-height: 1.7;
+}
+
+/* ── Demo ── */
+.demo {
+  padding: 6rem 0;
+  background: #faf9f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.demo-sub {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin-bottom: 2.5rem;
+}
+
+.demo-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.08);
+}
+
+.demo-pane {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Pane headers ── */
+.pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  flex-shrink: 0;
+}
+
+.source-bar {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.term-bar {
+  background: #1e293b;
+  border-bottom: 1px solid #0f172a;
+}
+
+.pane-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d1d5db;
+}
+
+.dot-r { background: #ff5f57; }
+.dot-y { background: #febc2e; }
+.dot-g { background: #28c840; }
+
+.pane-name {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.source-bar .pane-name { color: #9ca3af; }
+.term-bar   .pane-name { color: #475569; }
+
+/* ── Source pane ── */
+.source-pane {
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+}
+
+.demo-pre {
+  margin: 0;
+  padding: 1.5rem 1.75rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.9;
+  flex: 1;
+}
+
+.demo-pre code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: #1e293b;
+}
+
+.dkw { color: #2563eb; font-weight: 600; }
+.ds  { color: #16a34a; }
+
+.editable {
+  color: inherit;
+  outline: none;
+  border-bottom: 1px dashed rgba(22, 163, 74, 0.55);
+  cursor: text;
+  min-width: 0.5ch;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.editable:focus {
+  background: rgba(22, 163, 74, 0.07);
+  border-bottom-color: #16a34a;
+}
+
+/* ── Terminal pane ── */
+.term-pane {
+  background: #0f172a;
+}
+
+.term-body {
+  padding: 1.5rem 1.75rem;
+  flex: 1;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.875rem;
+  line-height: 2;
+}
+
+.term-row {
+  color: #94a3b8;
+}
+
+.tprompt {
+  color: #22c55e;
+  user-select: none;
+}
+
+.tcmd   { color: #e2e8f0; }
+.tmuted { color: #334155; font-size: 0.8rem; }
+.tout   { color: #f8fafc; font-weight: 500; }
+
+.tcursor {
+  color: #e2e8f0;
+  animation: blink 1.2s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 .compare-link {
