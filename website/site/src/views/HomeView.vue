@@ -78,12 +78,7 @@ function onPaste(e) {
         <div class="demo-split">
 
           <div class="demo-pane source-pane">
-            <div class="pane-bar source-bar">
-              <div class="pane-dots">
-                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              </div>
-              <span class="pane-name">hello.hop</span>
-            </div>
+            <span class="demo-label">hello.hop</span>
             <pre class="demo-pre"><code><span class="dkw">import</span> io <span class="dkw">from</span> core
 
 <span class="dkw">entry</span> main {
@@ -91,21 +86,13 @@ function onPaste(e) {
 }</code></pre>
           </div>
 
-          <div class="demo-pane term-pane">
-            <div class="pane-bar term-bar">
-              <div class="pane-dots">
-                <span class="dot dot-r"></span>
-                <span class="dot dot-y"></span>
-                <span class="dot dot-g"></span>
+          <div class="demo-pane output-pane">
+            <span class="demo-label">output</span>
+            <div class="output-body">
+              <div class="output-line">
+                <span class="out-prompt">&gt;</span>
+                <span class="out-text">{{ message }}</span>
               </div>
-              <span class="pane-name">terminal</span>
-            </div>
-            <div class="term-body">
-              <div class="term-row"><span class="tprompt">$</span> <span class="tcmd">hopper build hello.hop</span></div>
-              <div class="term-row tmuted">built [linux]: ./hello</div>
-              <div class="term-row"><span class="tprompt">$</span> <span class="tcmd">./hello</span></div>
-              <div class="term-row tout">{{ message }}</div>
-              <div class="term-row"><span class="tprompt">$</span><span class="tcursor"> ▋</span></div>
             </div>
           </div>
 
@@ -506,52 +493,22 @@ function onPaste(e) {
 .demo-pane {
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
-/* ── Pane headers ── */
-.pane-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 1rem;
-  flex-shrink: 0;
-}
-
-.source-bar {
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.term-bar {
-  background: #1e293b;
-  border-bottom: 1px solid #0f172a;
-}
-
-.pane-dots {
-  display: flex;
-  gap: 5px;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #d1d5db;
-}
-
-.dot-r { background: #ff5f57; }
-.dot-y { background: #febc2e; }
-.dot-g { background: #28c840; }
-
-.pane-name {
+.demo-label {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.9rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.68rem;
-  font-weight: 600;
-  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #cbd5e1;
+  z-index: 1;
+  user-select: none;
 }
-
-.source-bar .pane-name { color: #9ca3af; }
-.term-bar   .pane-name { color: #475569; }
 
 /* ── Source pane ── */
 .source-pane {
@@ -591,40 +548,38 @@ function onPaste(e) {
   border-bottom-color: #16a34a;
 }
 
-/* ── Terminal pane ── */
-.term-pane {
-  background: #0f172a;
+/* ── Output pane ── */
+.output-pane {
+  background: #ffffff;
 }
 
-.term-body {
-  padding: 1.5rem 1.75rem;
+.output-body {
   flex: 1;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.875rem;
-  line-height: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
 }
 
-.term-row {
-  color: #94a3b8;
+.output-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  font-family: 'VT323', monospace;
+  font-size: 3.5rem;
+  line-height: 1;
+  max-width: 100%;
 }
 
-.tprompt {
-  color: #22c55e;
-  user-select: none;
+.out-prompt {
+  color: #2563eb;
+  flex-shrink: 0;
 }
 
-.tcmd   { color: #e2e8f0; }
-.tmuted { color: #334155; font-size: 0.8rem; }
-.tout   { color: #f8fafc; font-weight: 500; }
-
-.tcursor {
-  color: #e2e8f0;
-  animation: blink 1.2s step-end infinite;
-}
-
-@keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+.out-text {
+  color: #111827;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .compare-link {
