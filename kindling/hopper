@@ -64,6 +64,7 @@ function clangFlags(profile) {
 // Known board configurations.  Adding a new board is just a new entry here.
 const BOARD_CONFIGS = {
     "pi-zero": {
+        // ── compile / link ────────────────────────────────────────────────
         llvmTarget:    "armv6-bare",
         clangTarget:   "arm-none-eabi",
         mcpu:          "arm1176jzf-s",
@@ -71,6 +72,28 @@ const BOARD_CONFIGS = {
         textBase:      0x8000,
         linkerEntry:   "_start",
         bootStub:      path.join(__dirname, "boards", "pi-zero", "boot.s"),
+
+        // ── binary metadata (recorded in .meta.json after every build) ────
+        meta: {
+            arch:        "armv6",
+            endian:      "little",
+            bits:        32,
+            loadAddress: "0x8000",
+            entrySymbol: "_start",
+        },
+
+        // ── flash configuration ───────────────────────────────────────────
+        flash: {
+            method:          "sd-card",      // how to deliver the image
+            outputFile:      "kernel.img",   // filename written to the SD card
+            // firmware blobs that must already exist on the card
+            requiredFirmware: ["bootcode.bin", "start.elf"],
+            // lines the flash command ensures are present in config.txt
+            configLines: [
+                "init_uart_clock=3000000",
+                "dtparam=act_led_trigger=none",
+            ],
+        },
     },
 };
 
@@ -125,10 +148,23 @@ function toObjectBare(file, llDir, oDir, cfg) {
 }
 
 // Link bare-metal objects into an ELF then strip to a raw kernel.img.
-function linkBare(bootObj, results, ldScript, outELF, outImg) {
+// Writes a .meta.json file alongside the image for use by `hopper flash`.
+function linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg) {
     const objs = [`"${bootObj}"`, ...results.map(r => `"${r.objFile}"`)].join(" ");
     execSync(`ld.lld -T "${ldScript}" ${objs} -o "${outELF}"`, { stdio: "inherit" });
     execSync(`llvm-objcopy -O binary "${outELF}" "${outImg}"`, { stdio: "inherit" });
+
+    // Build metadata — consumed by `hopper flash`
+    const metaPath = path.join(path.dirname(outImg), `${binaryName}.meta.json`);
+    const meta = {
+        name:       binaryName,
+        board:      boardName,
+        outputFile: boardCfg.flash.outputFile,
+        ...boardCfg.meta,
+        size:       fs.statSync(outImg).size,
+        builtAt:    new Date().toISOString(),
+    };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2) + "\n");
     return outImg;
 }
 
@@ -173,6 +209,71 @@ function findHopFiles(dir) {
     return fs.readdirSync(dir)
         .filter(f => f.endsWith(".hop"))
         .map(f => path.join(dir, f));
+}
+
+// ── flash helpers ──────────────────────────────────────────────────────────
+
+// Read the full manifest from a given project root directory.
+function readManifestAt(projectRoot) {
+    const mf = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(mf)) return {};
+    try { return JSON.parse(fs.readFileSync(mf, "utf8")); } catch { return {}; }
+}
+
+// Auto-detect a mounted SD card by looking for a known firmware file.
+// On Linux reads /proc/mounts for vfat filesystems.
+// On macOS scans /Volumes/.
+function detectSdCard(flashCfg) {
+    const marker = flashCfg.requiredFirmware[0];  // e.g. "bootcode.bin"
+
+    if (process.platform === "linux") {
+        try {
+            const mounts = fs.readFileSync("/proc/mounts", "utf8");
+            for (const line of mounts.split("\n")) {
+                const parts = line.split(" ");
+                if (parts[2] === "vfat" || parts[2] === "msdosfs") {
+                    const mp = parts[1].replace(/\\040/g, " ");
+                    if (fs.existsSync(path.join(mp, marker))) return mp;
+                }
+            }
+        } catch { /* /proc not available */ }
+
+        // Fallback: walk common user-mount locations
+        for (const base of ["/media", "/mnt", "/run/media"]) {
+            if (!fs.existsSync(base)) continue;
+            try {
+                for (const user of fs.readdirSync(base)) {
+                    const userDir = path.join(base, user);
+                    for (const vol of fs.readdirSync(userDir)) {
+                        const mp = path.join(userDir, vol);
+                        if (fs.existsSync(path.join(mp, marker))) return mp;
+                    }
+                }
+            } catch { /* skip unreadable dirs */ }
+        }
+    }
+
+    if (process.platform === "darwin") {
+        try {
+            for (const vol of fs.readdirSync("/Volumes")) {
+                const mp = path.join("/Volumes", vol);
+                if (fs.existsSync(path.join(mp, marker))) return mp;
+            }
+        } catch {}
+    }
+
+    return null;
+}
+
+// Ensure every line in `required` appears in the config.txt at `cfgPath`.
+// Creates the file if it doesn't exist; otherwise appends only the missing lines.
+function ensureConfigLines(cfgPath, required) {
+    let existing = fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, "utf8") : "";
+    const missing = required.filter(l => !existing.split("\n").some(e => e.trim() === l.trim()));
+    if (missing.length === 0) return 0;
+    if (existing.length > 0 && !existing.endsWith("\n")) existing += "\n";
+    fs.writeFileSync(cfgPath, existing + missing.join("\n") + "\n");
+    return missing.length;
 }
 
 // ── subcommands ────────────────────────────────────────────────────────────
@@ -227,7 +328,7 @@ function cmdBuild(args) {
         const binaryName = output ? path.basename(output, ".img") : projectBinaryName(files[0], projectRoot);
         const outELF = path.join(buildDir, `${binaryName}.elf`);
         const outImg = output || path.join(buildDir, "kernel.img");
-        linkBare(bootObj, results, ldScript, outELF, outImg);
+        linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg);
         console.log(`built [bare-metal/${boardName}]: ${outImg}`);
     } else {
         // ── hosted build ──────────────────────────────────────────────────
@@ -907,6 +1008,137 @@ function cmdTest(args) {
     execSync(`node "${testScript}" ${args.join(" ")}`, { stdio: "inherit" });
 }
 
+// ── flash ──────────────────────────────────────────────────────────────────
+
+function cmdFlash(args) {
+    // ── parse flags ───────────────────────────────────────────────────────
+    let mountArg = null;
+    let dryRun   = false;
+    let profile  = "dev";
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === "--mount" || args[i] === "-m")  { mountArg = args[++i]; continue; }
+        if (args[i].startsWith("--mount="))             { mountArg = args[i].slice(8); continue; }
+        if (args[i] === "--dry-run")                    { dryRun   = true; continue; }
+        if (args[i] === "--production")                 { profile  = "production"; continue; }
+    }
+
+    // ── load project ──────────────────────────────────────────────────────
+    const projectRoot = findProjectRoot(process.cwd());
+    const manifest    = readManifestAt(projectRoot);
+    const boardName   = manifest.board;
+
+    if (!boardName) {
+        console.error("hopper: 'board' is not set in hopper.json — flash only works for bare-metal targets");
+        process.exit(1);
+    }
+
+    const boardCfg = BOARD_CONFIGS[boardName];
+    if (!boardCfg?.flash) {
+        console.error(`hopper: board '${boardName}' does not have a flash configuration`);
+        process.exit(1);
+    }
+
+    const flashCfg = boardCfg.flash;
+
+    // ── locate built binary ───────────────────────────────────────────────
+    const buildDir  = path.join(projectRoot, "build", profile);
+    const imgPath   = path.join(buildDir, flashCfg.outputFile);
+    const name      = manifest.name || "project";
+    const metaPath  = path.join(buildDir, `${name}.meta.json`);
+
+    if (!fs.existsSync(imgPath)) {
+        console.error([
+            `hopper: ${flashCfg.outputFile} not found at ${buildDir}`,
+            `  Run 'hopper build' first.`,
+        ].join("\n"));
+        process.exit(1);
+    }
+
+    // ── read build metadata ───────────────────────────────────────────────
+    let meta = null;
+    if (fs.existsSync(metaPath)) {
+        try { meta = JSON.parse(fs.readFileSync(metaPath, "utf8")); } catch {}
+    }
+
+    // ── find the SD card ──────────────────────────────────────────────────
+    const mountOverride = mountArg || manifest.flash?.mount || null;
+    let mountPoint = mountOverride;
+
+    if (!mountPoint) {
+        mountPoint = detectSdCard(flashCfg);
+        if (!mountPoint) {
+            console.error([
+                `hopper: could not auto-detect an SD card with ${flashCfg.requiredFirmware[0]}.`,
+                ``,
+                `  Make sure the card is mounted, then try again.`,
+                `  Or specify the path explicitly:`,
+                `    hopper flash --mount /path/to/sdcard`,
+                ``,
+                `  The SD card needs the Pi Zero firmware blobs in its root:`,
+                `    bootcode.bin  start.elf`,
+                `  Download from: https://github.com/raspberrypi/firmware/tree/master/boot`,
+            ].join("\n"));
+            process.exit(1);
+        }
+    }
+
+    // ── verify required firmware blobs ────────────────────────────────────
+    const missing = flashCfg.requiredFirmware.filter(f => !fs.existsSync(path.join(mountPoint, f)));
+    if (missing.length) {
+        console.error([
+            `hopper: missing firmware on SD card at ${mountPoint}:`,
+            ...missing.map(f => `  ✗  ${f}`),
+            ``,
+            `  Download from: https://github.com/raspberrypi/firmware/tree/master/boot`,
+            `  Copy the missing files to the SD card root and try again.`,
+        ].join("\n"));
+        process.exit(1);
+    }
+
+    // ── print summary ─────────────────────────────────────────────────────
+    const imgSize = fs.statSync(imgPath).size;
+    const arch    = meta?.arch    ?? boardCfg.meta?.arch    ?? "unknown";
+    const endian  = meta?.endian  ?? boardCfg.meta?.endian  ?? "unknown";
+    const bits    = meta?.bits    ?? boardCfg.meta?.bits    ?? "?";
+    const loadAt  = meta?.loadAddress ?? boardCfg.meta?.loadAddress ?? "?";
+
+    console.log(`\nhopper: flash  ${name}  →  ${mountPoint}`);
+    console.log(`  board     ${boardName}  (${arch} ${endian}-endian ${bits}-bit, load ${loadAt})`);
+    if (meta?.builtAt) {
+        const when = new Date(meta.builtAt).toLocaleString();
+        console.log(`  built     ${when}`);
+    }
+    console.log(`  image     ${flashCfg.outputFile}  (${(imgSize / 1024).toFixed(1)} KB)`);
+    for (const f of flashCfg.requiredFirmware) {
+        console.log(`  found     ${f} ✓`);
+    }
+
+    if (dryRun) {
+        console.log(`\n  [dry run — nothing written]\n`);
+        return;
+    }
+
+    // ── copy kernel image ─────────────────────────────────────────────────
+    const destImg = path.join(mountPoint, flashCfg.outputFile);
+    fs.copyFileSync(imgPath, destImg);
+    console.log(`  wrote     ${flashCfg.outputFile}`);
+
+    // ── ensure config.txt has required lines ──────────────────────────────
+    if (flashCfg.configLines?.length) {
+        const cfgPath = path.join(mountPoint, "config.txt");
+        const added   = ensureConfigLines(cfgPath, flashCfg.configLines);
+        if (added > 0) {
+            console.log(`  wrote     config.txt  (+${added} line${added > 1 ? "s" : ""})`);
+        } else {
+            console.log(`  config.txt already up to date ✓`);
+        }
+    }
+
+    // ── sync ─────────────────────────────────────────────────────────────
+    try { execSync("sync", { stdio: "ignore" }); } catch {}
+    console.log(`\nhopper: done — remove SD card safely, insert in Pi Zero, power on\n`);
+}
+
 // ── usage ──────────────────────────────────────────────────────────────────
 
 function usage() {
@@ -919,6 +1151,8 @@ function usage() {
         "  hopper build module <name>          scaffold modules/<name>/ with tests/ dir",
         "  hopper run [binary]                 execute a built binary (default: build/<entry>)",
         "  hopper run test [module]            run tests (all, or a specific module)",
+        "  hopper flash [--mount <path>]       write bare-metal image to SD card",
+        "              [--dry-run]             show what would be flashed without writing",
         "  hopper install [module...]          install packages from stdlib or registry",
         "  hopper uninstall <module...>        remove installed packages",
         "  hopper publish [name]               publish this package to the registry",
@@ -970,6 +1204,7 @@ if (asyncCmds[sub]) {
         case "profile":   cmdProfile(rest);  break;
         case "format":    cmdFormat(rest);   break;
         case "test":      cmdTest(rest);     break;
+        case "flash":     cmdFlash(rest);   break;
         case "ir":        cmdIR(rest);       break;
         case "ast":       cmdAST(rest);      break;
         case "parse":     cmdParse(rest);    break;
