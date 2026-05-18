@@ -84,7 +84,7 @@ function toObject(file, llDir, oDir, flags) {
 
 function link(results, outFile) {
     const objs = results.map(r => `"${r.objFile}"`).join(" ");
-    execSync(`clang ${objs} -o "${outFile}"`, { stdio: "inherit" });
+    execSync(`clang ${objs} -lpthread -o "${outFile}"`, { stdio: "inherit" });
     return outFile;
 }
 
@@ -590,7 +590,7 @@ function cmdCheck(args) {
     const results = files.map(f => toObject(f, llDir, oDir, flags));
     const objs    = results.map(r => `"${r.objFile}"`).join(" ");
     const san     = sanitizers.join(",");
-    execSync(`clang ${objs} -fsanitize=${san} -o "${outFile}"`, { stdio: "inherit" });
+    execSync(`clang ${objs} -lpthread -fsanitize=${san} -o "${outFile}"`, { stdio: "inherit" });
     console.log(`check build: ${outFile}  (sanitizers: ${san})`);
     console.log(`run with: ${outFile}`);
 }

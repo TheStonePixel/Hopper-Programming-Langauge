@@ -25,6 +25,11 @@ extern function system(string cmd) int
 extern function getenv(string name) address
 extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
 extern function pthread_detach(int tid) int
+extern function pthread_mutex_init(address m, address attr) int
+extern function pthread_mutex_lock(address m) int
+extern function pthread_mutex_unlock(address m) int
+extern function pthread_mutex_destroy(address m) int
+extern function memset(address dst, int c, int n) address
 
 // ── build profiles ────────────────────────────────────────────────────────────
 
@@ -387,28 +392,56 @@ function buildWait(address sp) {
     }
 }
 
-// Worker for parallel compilation.
-// Worker arg layout (40 bytes, heap-allocated by cmdBuild, freed here):
-//   [0]  address hopFile  — source .hop path
-//   [8]  address llDir    — output .ll directory
-//   [16] address oDir     — output .o directory
-//   [24] int     profile  — PROF_DEV / PROF_PRODUCTION / PROF_TEST
-//   [32] address hopRoot  — HOPPER_ROOT path
-// Returns the heap-allocated .o file path (caller must deallocate).
-function compileWorker(address rawArgs) address {
-    address hopFile = rawArgs::value
-    address s8  = rawArgs + 8
-    address s16 = rawArgs + 16
-    address s24 = rawArgs + 24
-    address s32 = rawArgs + 32
-    address llDir   = s8::value
-    address oDir    = s16::value
-    int     profile = s24::value
-    address hopRoot = s32::value
-    deallocate rawArgs
+// Thread pool worker for parallel compilation.
+// Pool state layout (72 bytes, heap-allocated, shared read-only except nextIdx):
+//   [0]  address fileBuf    — raw buffer of nFiles file-path addresses
+//   [8]  int     fileCount  — total files to compile
+//   [16] int     nextIdx    — next file index to claim (mutex-protected)
+//   [24] address idxMutex   — heap-allocated pthread_mutex_t
+//   [32] address resultBuf  — raw buffer for nFiles result .o addresses
+//   [40] address llDir
+//   [48] address oDir
+//   [56] int     profile
+//   [64] address hopRoot
+// Workers atomically claim a file index, compile it, store the .o path,
+// then repeat until all files are claimed.  Does NOT free poolState.
+function poolWorker(address poolState) address {
+    address ps8  = poolState + 8
+    address ps16 = poolState + 16
+    address ps24 = poolState + 24
+    address ps32 = poolState + 32
+    address ps40 = poolState + 40
+    address ps48 = poolState + 48
+    address ps56 = poolState + 56
+    address ps64 = poolState + 64
 
-    address obj = compileFile(hopFile, llDir, oDir, profile, hopRoot)
-    return obj
+    address fileBuf   = poolState::value
+    int     fileCount = ps8::value
+    address idxMutex  = ps24::value
+    address resultBuf = ps32::value
+    address llDir     = ps40::value
+    address oDir      = ps48::value
+    int     profile   = ps56::value
+    address hopRoot   = ps64::value
+
+    bool done = false
+    while (!done) {
+        pthread_mutex_lock(idxMutex)
+        int myIdx = ps16::value
+        int nextVal = myIdx + 1
+        ps16::value = nextVal
+        pthread_mutex_unlock(idxMutex)
+
+        if (myIdx >= fileCount) { done = true }
+        if (!done) {
+            address fslot = fileBuf + (myIdx * 8)
+            address f = fslot::value
+            address obj = compileFile(f, llDir, oDir, profile, hopRoot)
+            address rslot = resultBuf + (myIdx * 8)
+            rslot::value = obj
+        }
+    }
+    return null
 }
 
 // ── compile one .hop file ─────────────────────────────────────────────────────
@@ -576,47 +609,82 @@ function cmdBuild(int argc, string[] argv) {
     Array<address> objs = Array(8)
 
     if (jobs > 1) {
-        // Parallel: spawn up to `jobs` workers at a time, wait for each batch.
-        address wfn = compileWorker::address
-        int batchStart = 0
-        while (batchStart < files.len()) {
-            int batchEnd = batchStart + jobs
-            if (batchEnd > files.len()) { batchEnd = files.len() }
+        // Thread pool: spawn `jobs` persistent workers; each atomically claims
+        // the next file index until all files are done.  No idle time at batch
+        // boundaries — a free worker immediately picks up the next file.
+        int nFiles = files.len()
 
-            // Spawn the batch.
-            Array<address> batchSPs = Array(jobs)
-            int bi = batchStart
-            while (bi < batchEnd) {
-                address f = files.get(bi)
-                address wargs = allocate 40
-                wargs::value = f
-                address ws8  = wargs + 8
-                address ws16 = wargs + 16
-                address ws24 = wargs + 24
-                address ws32 = wargs + 32
-                ws8::value  = llDir.str()
-                ws16::value = oDir.str()
-                ws24::value = profile
-                ws32::value = hopRoot
-                address sp = buildSpawn(wfn, wargs)
-                batchSPs.push(sp)
-                bi = bi + 1
-            }
-
-            // Wait for the batch and collect .o paths.
-            int bsi = 0
-            while (bsi < batchSPs.len()) {
-                address sp = batchSPs.get(bsi)
-                buildWait(sp)
-                address vs = sp + 8
-                address obj = vs::value
-                objs.push(obj)
-                deallocate sp
-                bsi = bsi + 1
-            }
-
-            batchStart = batchEnd
+        // Copy file paths into a flat raw buffer so workers can index without
+        // holding a reference to the Array object.
+        address fileBuf = allocate nFiles * 8
+        int fbi = 0
+        while (fbi < nFiles) {
+            address fslot = fileBuf + (fbi * 8)
+            fslot::value = files.get(fbi)
+            fbi = fbi + 1
         }
+
+        // Result buffer — worker i writes its .o path at resultBuf[fileIdx*8].
+        address resultBuf = allocate nFiles * 8
+
+        // Mutex protecting the shared next-index counter.
+        address idxMutex = allocate 64
+        memset(idxMutex, 0, 64)
+        pthread_mutex_init(idxMutex, null)
+
+        // Build the pool state shared by all workers.
+        address poolState = allocate 72
+        address ps8  = poolState + 8
+        address ps16 = poolState + 16
+        address ps24 = poolState + 24
+        address ps32 = poolState + 32
+        address ps40 = poolState + 40
+        address ps48 = poolState + 48
+        address ps56 = poolState + 56
+        address ps64 = poolState + 64
+        poolState::value = fileBuf
+        ps8::value       = nFiles
+        ps16::value      = 0
+        ps24::value      = idxMutex
+        ps32::value      = resultBuf
+        ps40::value      = llDir.str()
+        ps48::value      = oDir.str()
+        ps56::value      = profile
+        ps64::value      = hopRoot
+
+        // Spawn exactly `jobs` workers — all receive the same poolState pointer.
+        address wfn = poolWorker::address
+        Array<address> workerSPs = Array(jobs)
+        int wi = 0
+        while (wi < jobs) {
+            address sp = buildSpawn(wfn, poolState)
+            workerSPs.push(sp)
+            wi = wi + 1
+        }
+
+        // Wait for all workers to finish.
+        int wj = 0
+        while (wj < workerSPs.len()) {
+            address sp = workerSPs.get(wj)
+            buildWait(sp)
+            deallocate sp
+            wj = wj + 1
+        }
+
+        // Collect results in original file order.
+        int ri = 0
+        while (ri < nFiles) {
+            address rslot = resultBuf + (ri * 8)
+            address obj = rslot::value
+            objs.push(obj)
+            ri = ri + 1
+        }
+
+        pthread_mutex_destroy(idxMutex)
+        deallocate idxMutex
+        deallocate resultBuf
+        deallocate fileBuf
+        deallocate poolState
     } else {
         // Serial (original behaviour).
         fi = 0
