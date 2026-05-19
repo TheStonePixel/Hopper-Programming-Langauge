@@ -445,6 +445,422 @@ entry main {
 }`,
   },
 
+
+  // ── Design Patterns ───────────────────────────────────────────────────────
+
+  {
+    id: 'observer',
+    group: 'patterns',
+    title: 'Observer',
+    tags: ['patterns', 'callbacks', 'events'],
+    desc: 'Event pub/sub via a callback dispatch table. Subscribers register as address values; the Observable casts each to the right callback type before notifying. New subscribers added at runtime are included in subsequent events.',
+    code: `import array from ds
+
+extern function printf(string fmt, ...) int
+
+function onLog(int old, int next) int {
+    printf("log:   %lld -> %lld\\n", old, next)
+    return 0
+}
+function onAudit(int old, int next) int {
+    printf("audit: delta=%lld\\n", next - old)
+    return 0
+}
+function onAlert(int old, int next) int {
+    printf("alert: value is now %lld\\n", next)
+    return 0
+}
+
+class Observable {
+    int            value
+    Array<address> listeners
+
+    constructor(int initial) {
+        self.value     = initial
+        self.listeners = Array(8)
+    }
+
+    function subscribe(address handler) {
+        self.listeners.push(handler)
+    }
+
+    function set(int newVal) {
+        int old = self.value
+        self.value = newVal
+        int i = 0
+        while (i < self.listeners.len()) {
+            address fn = self.listeners.get(i)
+            callback(int, int) int h = cast fn
+            h(old, newVal)
+            i = i + 1
+        }
+    }
+}
+
+entry main {
+    Observable counter = Observable(0)
+    counter.subscribe(onLog::address)
+    counter.subscribe(onAudit::address)
+    counter.set(10)   // log + audit fire
+    counter.set(25)   // log + audit fire
+    counter.subscribe(onAlert::address)
+    counter.set(5)    // all three fire
+}`,
+  },
+
+  {
+    id: 'strategy',
+    group: 'patterns',
+    title: 'Strategy',
+    tags: ['patterns', 'callbacks', 'higher-order'],
+    desc: 'A Validator holds a pluggable validation callback as an address. Swapping the strategy at runtime changes behaviour without touching any other part of the system. countPassing() runs whichever strategy is active over an entire array.',
+    code: `import array from ds
+
+extern function printf(string fmt, ...) int
+
+function isPositive(int n) int { if (n > 0) { return 1 }  return 0 }
+function isEven(int n) int     { if ((n % 2) == 0) { return 1 } return 0 }
+function isInByte(int n) int   { if (n >= 0 && n <= 255) { return 1 } return 0 }
+function isNonZero(int n) int  { if (n != 0) { return 1 } return 0 }
+
+class Validator {
+    address strategy   // callback(int) int — 1=pass, 0=fail
+
+    constructor(address fn) {
+        self.strategy = fn
+    }
+
+    function setStrategy(address fn) { self.strategy = fn }
+
+    function countPassing(Array<int> values) int {
+        int passed = 0
+        int i = 0
+        while (i < values.len()) {
+            callback(int) int fn = cast self.strategy
+            passed = passed + fn(values.get(i))
+            i = i + 1
+        }
+        return passed
+    }
+}
+
+entry main {
+    Array<int> nums = Array(8)
+    nums.push(-5)  nums.push(0)   nums.push(3)
+    nums.push(8)   nums.push(-2)  nums.push(12)  nums.push(7)
+
+    int n = nums.len()
+    Validator v = Validator(isPositive::address)
+    printf("isPositive: %lld/%lld pass\\n", v.countPassing(nums), n)
+    v.setStrategy(isEven::address)
+    printf("isEven:     %lld/%lld pass\\n", v.countPassing(nums), n)
+    v.setStrategy(isNonZero::address)
+    printf("isNonZero:  %lld/%lld pass\\n", v.countPassing(nums), n)
+    v.setStrategy(isInByte::address)
+    printf("isInByte:   %lld/%lld pass\\n", v.countPassing(nums), n)
+}`,
+  },
+
+  {
+    id: 'factory',
+    group: 'patterns',
+    title: 'Factory',
+    tags: ['patterns', 'enum', 'construction'],
+    desc: 'Named factory functions hide construction details behind a clean API. A ShapeKind enum tag keeps all dispatch inside the class — callers never touch the constructor directly, and the same area()/perimeter()/print() interface works regardless of which factory created the shape.',
+    code: `extern function printf(string fmt, ...) int
+
+enum ShapeKind {
+    Circle    = 0
+    Rectangle = 1
+    Triangle  = 2
+}
+
+class Shape {
+    int kind
+    int a    // Circle: radius;  Rectangle/Triangle: width or base
+    int b    // Circle: unused;  Rectangle: height;  Triangle: height
+
+    constructor(int k, int x, int y) {
+        self.kind = k  self.a = x  self.b = y
+    }
+
+    function area() int {
+        if (self.kind == ShapeKind.Circle)    { return self.a * self.a * 3 }
+        if (self.kind == ShapeKind.Rectangle) { return self.a * self.b }
+        if (self.kind == ShapeKind.Triangle)  { return (self.a * self.b) / 2 }
+        return 0
+    }
+
+    function perimeter() int {
+        if (self.kind == ShapeKind.Circle)    { return self.a * 6 }
+        if (self.kind == ShapeKind.Rectangle) { return 2 * (self.a + self.b) }
+        if (self.kind == ShapeKind.Triangle)  { return self.a + self.b + self.a }
+        return 0
+    }
+
+    function print() {
+        if (self.kind == ShapeKind.Circle) {
+            printf("circle(r=%lld):     area=%lld  perimeter=%lld\\n", self.a, self.area(), self.perimeter())
+        }
+        if (self.kind == ShapeKind.Rectangle) {
+            printf("rectangle(%lldx%lld):  area=%lld  perimeter=%lld\\n", self.a, self.b, self.area(), self.perimeter())
+        }
+        if (self.kind == ShapeKind.Triangle) {
+            printf("triangle(%lld,%lld):   area=%lld  perimeter=%lld\\n", self.a, self.b, self.area(), self.perimeter())
+        }
+    }
+}
+
+function makeCircle(int radius) Shape {
+    Shape s = Shape(ShapeKind.Circle, radius, 0)
+    return s
+}
+function makeRectangle(int w, int h) Shape {
+    Shape s = Shape(ShapeKind.Rectangle, w, h)
+    return s
+}
+function makeTriangle(int base, int height) Shape {
+    Shape s = Shape(ShapeKind.Triangle, base, height)
+    return s
+}
+
+entry main {
+    Shape c = makeCircle(5)
+    Shape r = makeRectangle(6, 4)
+    Shape t = makeTriangle(3, 4)
+    c.print()
+    r.print()
+    t.print()
+}`,
+  },
+
+  {
+    id: 'builder',
+    group: 'patterns',
+    title: 'Builder',
+    tags: ['patterns', 'construction', 'configuration'],
+    desc: 'RequestBuilder accumulates configuration step by step with sensible defaults, then produces an immutable HttpRequest via build(). withTls() auto-sets the port to 443. Callers only set what differs from the default.',
+    code: `extern function printf(string fmt, ...) int
+
+class HttpRequest {
+    string method
+    string path
+    int    port
+    int    timeout
+    int    tls
+
+    constructor(string m, string p, int port, int timeout, int tls) {
+        self.method = m  self.path = p
+        self.port = port  self.timeout = timeout  self.tls = tls
+    }
+
+    function print() {
+        string scheme = "http"
+        if (self.tls == 1) { scheme = "https" }
+        printf("%s  %s://host:%lld%s  timeout=%llds\\n",
+               self.method, scheme, self.port, self.path, self.timeout)
+    }
+}
+
+class RequestBuilder {
+    string method
+    string path
+    int    port
+    int    timeout
+    int    tls
+
+    constructor() {
+        self.method = "GET"  self.path = "/"
+        self.port = 80  self.timeout = 30  self.tls = 0
+    }
+
+    function setMethod(string m) { self.method  = m }
+    function setPath(string p)   { self.path    = p }
+    function setPort(int p)      { self.port    = p }
+    function setTimeout(int t)   { self.timeout = t }
+    function withTls()           { self.tls = 1  self.port = 443 }
+
+    function build() HttpRequest {
+        HttpRequest req = HttpRequest(self.method, self.path, self.port, self.timeout, self.tls)
+        return req
+    }
+}
+
+entry main {
+    RequestBuilder b1 = RequestBuilder()
+    HttpRequest r1 = b1.build()
+    r1.print()
+
+    RequestBuilder b2 = RequestBuilder()
+    b2.setMethod("POST")
+    b2.setPath("/api/data")
+    b2.withTls()
+    b2.setTimeout(60)
+    HttpRequest r2 = b2.build()
+    r2.print()
+
+    RequestBuilder b3 = RequestBuilder()
+    b3.setPath("/metrics")
+    b3.setPort(9090)
+    b3.setTimeout(5)
+    HttpRequest r3 = b3.build()
+    r3.print()
+}`,
+  },
+
+  {
+    id: 'iterator',
+    group: 'patterns',
+    title: 'Iterator',
+    tags: ['patterns', 'interface', 'traversal'],
+    desc: 'ArrayIter and RangeIter both implement the Iterator interface. Helpers like printAll, sumRange, and countWhere are written once and work with either. RangeIter generates integers on demand — no backing allocation.',
+    code: `import array from ds
+
+extern function printf(string fmt, ...) int
+
+interface Iterator {
+    function hasNext() bool
+    function next() int
+    function reset()
+}
+
+class ArrayIter implements Iterator {
+    Array<int> data
+    int cursor
+
+    constructor() {
+        self.data = Array(16)  self.cursor = 0
+    }
+    function push(int val)  { self.data.push(val) }
+    function hasNext() bool { return self.cursor < self.data.len() }
+    function next() int {
+        int val = self.data.get(self.cursor)
+        self.cursor = self.cursor + 1
+        return val
+    }
+    function reset() { self.cursor = 0 }
+}
+
+class RangeIter implements Iterator {
+    int start  int current  int end  int step
+
+    constructor(int lo, int hi, int stride) {
+        self.start = lo  self.current = lo
+        self.end = hi    self.step = stride
+    }
+    function hasNext() bool { return self.current < self.end }
+    function next() int {
+        int val = self.current
+        self.current = self.current + self.step
+        return val
+    }
+    function reset() { self.current = self.start }
+}
+
+function printAll(ArrayIter it) {
+    it.reset()
+    printf("[")
+    int first = 1
+    while (it.hasNext()) {
+        if (first == 0) { printf(", ") }
+        printf("%lld", it.next())
+        first = 0
+    }
+    printf("]\\n")
+}
+
+function sumRange(RangeIter it) int {
+    it.reset()
+    int total = 0
+    while (it.hasNext()) { total = total + it.next() }
+    return total
+}
+
+function countWhere(ArrayIter it, address pred) int {
+    it.reset()
+    int count = 0
+    while (it.hasNext()) {
+        callback(int) int fn = cast pred
+        if (fn(it.next()) == 1) { count = count + 1 }
+    }
+    return count
+}
+
+function isEven(int n) int { if ((n % 2) == 0) { return 1 } return 0 }
+
+entry main {
+    ArrayIter arr = ArrayIter()
+    arr.push(3)  arr.push(1)  arr.push(4)  arr.push(1)
+    arr.push(5)  arr.push(9)  arr.push(2)  arr.push(6)
+
+    printf("array: ")
+    printAll(arr)
+    printf("evens: %lld\\n", countWhere(arr, isEven::address))
+
+    RangeIter r = RangeIter(1, 11, 1)
+    printf("sum 1..10 = %lld\\n", sumRange(r))
+}`,
+  },
+
+  {
+    id: 'raii',
+    group: 'patterns',
+    title: 'RAII',
+    tags: ['patterns', 'memory', 'defer', 'lifetime'],
+    desc: 'Buffer wraps a heap allocation with a named acquire/release protocol. defer schedules release() at scope entry so it runs before every return — including early returns. No leak is possible regardless of control flow.',
+    code: `extern function printf(string fmt, ...) int
+
+class Buffer {
+    address data
+    int     size
+
+    constructor(int n) {
+        self.data = allocate n
+        self.size = n
+        printf("Buffer(%lld): acquired\\n", n)
+    }
+
+    function release() {
+        printf("Buffer(%lld): released\\n", self.size)
+        deallocate self.data
+    }
+}
+
+function freeBlock(address p) { deallocate p }
+
+// defer guarantees release() runs before any return
+function process(int earlyExit) {
+    Buffer buf = Buffer(64)
+    defer buf.release()       // scheduled here; runs before every return
+
+    printf("processing\\n")
+    if (earlyExit == 1) {
+        printf("early return\\n")
+        return                // release() fires here
+    }
+    printf("normal exit\\n")
+                              // release() fires here
+}
+
+// defer works for raw allocations too
+function rawDemo() {
+    address mem = allocate 128
+    defer freeBlock(mem)
+
+    printf("raw block in use\\n")
+    printf("returning\\n")
+}
+
+entry main {
+    printf("=== early return ===\\n")
+    process(1)
+    printf("\\n=== normal exit ===\\n")
+    process(0)
+    printf("\\n=== raw allocation ===\\n")
+    rawDemo()
+}`,
+  },
+
 ]
 
 const groups = [
@@ -453,6 +869,7 @@ const groups = [
   { id: 'systems',  label: 'Systems'  },
   { id: 'memory',   label: 'Memory & Pointers' },
   { id: 'tui',      label: 'TUI'      },
+  { id: 'patterns', label: 'Design Patterns' },
 ]
 
 function byGroup(g) {
