@@ -228,10 +228,6 @@ Items are grouped by theme, not strict priority — pick what fits the current s
   canonical naming convention and update all `import` statements and `hopper.json` files
   accordingly.
 
-- [ ] **`string` as a first-class type** — currently a pointer to null-terminated bytes.
-  Decide: keep C-compatible, or wrap in a length-prefixed type? Affects FFI, `extern`
-  declarations, and the `string` module.
-
 - [ ] **Error propagation operator** — a `?`-style or `try` keyword that auto-unwraps
   `Result<T>` or returns the error to the caller. Reduces boilerplate in deeply nested
   call chains.
