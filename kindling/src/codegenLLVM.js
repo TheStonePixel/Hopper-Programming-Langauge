@@ -4,6 +4,7 @@ import {
     emitEnsuresChecks,
     emitInvariantChecks,
     emitConstrainCheck,
+    strictAnalyze,
 } from "./codegenConstraints.js";
 
 // ── module-level registries ────────────────────────────────────────────────
@@ -25,6 +26,7 @@ let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by 
 let   stringCounter = 0;
 let   wordBits = 64;                    // native integer width: 64 for x86-64, 32 for ARM32
 let   contractsUsed = false;            // true when any requires/ensures/invariant/constrain is present
+let   releaseMode   = false;            // --release: skip all contract IR emission
 
 function resetAll() {
     stringConstants.clear();
@@ -44,6 +46,7 @@ function resetAll() {
     stringCounter = 0;
     wordBits = 64;
     contractsUsed = false;
+    releaseMode   = false;
 }
 
 function addStringConstant(value) {
@@ -1413,7 +1416,7 @@ function genStmt(ir, stmt, retType) {
                 } else {
                     ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
                 }
-                if (stmt.constrain) {
+                if (!releaseMode && stmt.constrain) {
                     contractsUsed = true;
                     emitConstrainCheck(ir, init.value, llType, stmt.constrain);
                 }
@@ -1771,7 +1774,7 @@ function genStmt(ir, stmt, retType) {
             const endLbl  = ir.newLabel("while.end.");
             ir.emit(`br label %${condLbl}`);
             ir.emit(`${condLbl}:`);
-            if (stmt.invariants && stmt.invariants.length > 0) {
+            if (!releaseMode && stmt.invariants && stmt.invariants.length > 0) {
                 contractsUsed = true;
                 emitInvariantChecks(ir, stmt.invariants, genExpr, ensureBool);
             }
@@ -1947,11 +1950,11 @@ function genFunction(fn) {
         }
     });
 
-    if (fn.requires && fn.requires.length > 0) {
+    if (!releaseMode && fn.requires && fn.requires.length > 0) {
         contractsUsed = true;
         emitRequiresChecks(ir, fn.requires, genExpr, ensureBool);
     }
-    ir.ensures = fn.ensures || [];
+    ir.ensures = (!releaseMode && fn.ensures) ? fn.ensures : [];
     if (ir.ensures.length > 0) contractsUsed = true;
 
     genBlock(ir, fn.body, fn.returnType);
@@ -2206,9 +2209,11 @@ function emitClassIR(cls, out, fnCode) {
 }
 
 function genModule(ast, opts = {}) {
-    const { target = "host" } = opts;
+    const { target = "host", release = false, strict = false } = opts;
     resetAll();
+    releaseMode = release;
     if (target === "armv6-bare") wordBits = 32;
+    if (strict) strictAnalyze(ast);
 
     // Interfaces — registered before classes so implements checking can find them
     for (const iface of ast.interfaces || []) {
@@ -2335,7 +2340,8 @@ function genModule(ast, opts = {}) {
     if (target !== "armv6-bare") {
         out += `declare i8* @malloc(i64)\n`;
         out += `declare void @free(i8*)\n`;
-        out += `declare void @abort()\n\n`;
+        if (!releaseMode) out += `declare void @abort()\n`;
+        out += `\n`;
     }
 
     // Constants are compile-time substitutions only — no LLVM globals emitted

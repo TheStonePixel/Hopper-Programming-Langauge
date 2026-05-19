@@ -1,0 +1,254 @@
+// Battleship 4 benchmark — contract overhead measurement
+//
+// Runs 100,000 bot-vs-bot games with no I/O.
+// Compile twice and compare:
+//
+//   hopperc benchmark.hop           → debug binary (runtime contract checks)
+//   hopperc benchmark.hop --release → release binary (no contract checks)
+//
+// The delta shows the runtime cost of the constraint system.
+
+import io  from core
+import io  from linux
+import sys from linux
+
+// ── RNG ───────────────────────────────────────────────────────────────────────
+
+function rngStep(address state) int {
+    int s = state::value
+    s = s * 1664525 + 1013904223
+    state::value = s
+    int r = (s ^ (s >> 16)) & 0x7FFFFFFF
+    return r
+}
+
+function rngMod(address state, int n) int
+    requires n > 0
+{
+    return rngStep(state) % n
+}
+
+// ── Board ─────────────────────────────────────────────────────────────────────
+
+function boardAlloc() address {
+    address board = allocate 800
+    int i = 0
+    while (i < 100)
+        invariant i >= 0
+    {
+        address cell = board + i * 8
+        cell::value = 0
+        i = i + 1
+    }
+    return board
+}
+
+function boardFree(address board) {
+    deallocate board
+}
+
+// Bounds checked in debug/strict builds.
+function cellGet(address board, int r, int c) int
+    requires r >= 0 && r < 10 && c >= 0 && c < 10
+{
+    address cell = board + (r * 10 + c) * 8
+    int v = cell::value
+    return v
+}
+
+function cellSet(address board, int r, int c, int val)
+    requires r >= 0 && r < 10 && c >= 0 && c < 10 && val >= 0 && val <= 3
+{
+    address cell = board + (r * 10 + c) * 8
+    cell::value = val
+}
+
+function cellGetFlat(address board, int idx) int
+    requires idx >= 0 && idx < 100
+{
+    address cell = board + idx * 8
+    int v = cell::value
+    return v
+}
+
+// ── Ship placement ────────────────────────────────────────────────────────────
+
+function canPlace(address board, int r, int c, int len, int dir) bool
+    requires r >= 0 && c >= 0 && len >= 1 && len <= 5 && (dir == 0 || dir == 1)
+{
+    bool ok = true
+    int i = 0
+    while (i < len)
+        invariant i >= 0
+    {
+        int rr = r
+        int cc = c
+        if (dir == 0) { cc = c + i }
+        if (dir == 1) { rr = r + i }
+        if (rr >= 10) { ok = false }
+        if (cc >= 10) { ok = false }
+        if (ok) {
+            if (cellGet(board, rr, cc) == 1) { ok = false }
+        }
+        i = i + 1
+    }
+    return ok
+}
+
+function placeShip(address board, int len, address rng)
+    requires len >= 1 && len <= 5
+{
+    bool placed = false
+    while (!placed) {
+        int r   = rngMod(rng, 10)
+        int c   = rngMod(rng, 10)
+        int dir = rngMod(rng, 2)
+        if (canPlace(board, r, c, len, dir)) {
+            int i = 0
+            while (i < len)
+                invariant i >= 0
+            {
+                int rr = r
+                int cc = c
+                if (dir == 0) { cc = c + i }
+                if (dir == 1) { rr = r + i }
+                cellSet(board, rr, cc, 1)
+                i = i + 1
+            }
+            placed = true
+        }
+    }
+}
+
+function placeFleet(address board, address rng) {
+    placeShip(board, 5, rng)
+    placeShip(board, 4, rng)
+    placeShip(board, 3, rng)
+    placeShip(board, 3, rng)
+    placeShip(board, 2, rng)
+}
+
+// ── Ship count ────────────────────────────────────────────────────────────────
+
+function shipsLeft(address board) int
+    ensures result >= 0 && result <= 17
+{
+    int count = 0
+    int i = 0
+    while (i < 100)
+        invariant i >= 0 && count >= 0
+    {
+        if (cellGetFlat(board, i) == 1) { count = count + 1 }
+        i = i + 1
+    }
+    return count
+}
+
+// ── Bot turn ──────────────────────────────────────────────────────────────────
+
+function botTurn(address board, address rng) {
+    bool done = false
+    while (!done) {
+        int r = rngMod(rng, 10)
+        int c = rngMod(rng, 10)
+        int v = cellGet(board, r, c)
+        if (v == 0) {
+            cellSet(board, r, c, 3)
+            done = true
+        }
+        if (v == 1) {
+            cellSet(board, r, c, 2)
+            done = true
+        }
+    }
+}
+
+// ── Timing ────────────────────────────────────────────────────────────────────
+
+function nowMs() int
+    ensures result >= 0
+{
+    address ts = allocate 16
+    clock_gettime(1, ts)
+    address sp = ts
+    address np = ts + 8
+    int sec  = sp::value
+    int nsec = np::value
+    deallocate ts
+    return sec * 1000 + nsec / 1000000
+}
+
+// ── Single game ───────────────────────────────────────────────────────────────
+
+function runGame(address rng) int
+    ensures result >= 17
+{
+    address playerBoard   = boardAlloc()
+    address computerBoard = boardAlloc()
+
+    placeFleet(playerBoard,   rng)
+    placeFleet(computerBoard, rng)
+
+    bool over  = false
+    int  shots = 0
+    while (!over) {
+        botTurn(computerBoard, rng)
+        shots = shots + 1
+        if (shipsLeft(computerBoard) == 0) {
+            over = true
+        }
+        if (!over) {
+            botTurn(playerBoard, rng)
+            shots = shots + 1
+            if (shipsLeft(playerBoard) == 0) {
+                over = true
+            }
+        }
+    }
+
+    boardFree(playerBoard)
+    boardFree(computerBoard)
+    return shots
+}
+
+// ── Entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    int GAMES      = 100000
+    int rng        = 42
+    int totalShots = 0
+    int shots      = 0
+    int g          = 0
+    int t1         = 0
+    int t2         = 0
+    int elapsedMs  = 0
+    int avgShots   = 0
+
+    t1 = nowMs()
+
+    while (g < GAMES) {
+        shots = runGame(rng::address)
+        totalShots = totalShots + shots
+        g = g + 1
+    }
+
+    t2 = nowMs()
+
+    elapsedMs = t2 - t1
+    avgShots  = totalShots / GAMES
+
+    println("Battleship 4 benchmark")
+    print("  Games:     ")
+    printInt(GAMES)
+    print("\n")
+    print("  Avg shots: ")
+    printInt(avgShots)
+    print("\n")
+    print("  Time:      ")
+    printInt(elapsedMs)
+    print(" ms\n")
+    print("  Throughput:")
+    print("  ")
+    printInt(GAMES * 1000 / elapsedMs)
+    print(" games/sec\n")
+}

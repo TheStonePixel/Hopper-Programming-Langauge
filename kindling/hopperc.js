@@ -12,18 +12,22 @@ import { resolve, dirname }            from "node:path";
 import { buildAstFromSource }          from "./src/astBuilder.js";
 import { genModule }                   from "./src/codegenLLVM.js";
 
-const args  = process.argv.slice(2);
-const oIdx  = args.indexOf("-o");
+const args    = process.argv.slice(2);
+const oIdx    = args.indexOf("-o");
 const outFile = oIdx !== -1 ? args[oIdx + 1] : null;
 const tIdx    = args.findIndex(a => a.startsWith("--target="));
 const target  = tIdx !== -1 ? args[tIdx].slice("--target=".length) : "host";
+const release = args.includes("--release");
+const strict  = args.includes("--strict");
 const files   = args.filter((_, i) =>
     (oIdx === -1 || (i !== oIdx && i !== oIdx + 1)) &&
-    i !== tIdx
+    i !== tIdx &&
+    args[i] !== "--release" &&
+    args[i] !== "--strict"
 );
 
 if (files.length === 0) {
-    process.stderr.write("hopperc: usage: hopperc.js <file.hop> [--target=armv6-bare] [-o out.ll]\n");
+    process.stderr.write("hopperc: usage: hopperc.js <file.hop> [--target=armv6-bare] [--release] [--strict] [-o out.ll]\n");
     process.exit(1);
 }
 
@@ -31,7 +35,7 @@ try {
     const file = files[0];
     const src  = readFileSync(file, "utf8");
     const ast  = buildAstFromSource(src, { baseDir: dirname(resolve(file)) });
-    const ir   = genModule(ast, { target });
+    const ir   = genModule(ast, { target, release, strict });
 
     if (outFile) {
         writeFileSync(outFile, ir, "utf8");
