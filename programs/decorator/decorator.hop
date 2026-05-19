@@ -1,0 +1,103 @@
+// decorator.hop — Decorator pattern: wrap functions to add behaviour
+//
+// LogDecorator adds before/after logging to any (int)->int function.
+// MemoDecorator caches the last result — repeated calls with the same
+// argument skip the computation entirely.
+// Both decorators use the same call(int)->int interface so they compose.
+//
+// Demonstrates: wrapping callbacks, augmenting behaviour without
+//               modifying the original function.
+//
+// Build: hopper build decorator.hop
+
+extern function printf(string fmt, ...) int
+
+// ── base computations ─────────────────────────────────────────────────────────
+
+function computeSquare(int n) int { return n * n }
+function computeCube(int n) int   { return n * n * n }
+
+function computeFib(int n) int {
+    if (n <= 1) { return n }
+    int a = 0
+    int b = 1
+    int i = 2
+    while (i <= n) {
+        int tmp = a + b
+        a = b
+        b = tmp
+        i = i + 1
+    }
+    return b
+}
+
+// ── LogDecorator — prints input and result on every call ─────────────────────
+
+class LogDecorator {
+    address inner
+    string  name
+
+    constructor(string n, address fn) {
+        self.name  = n
+        self.inner = fn
+    }
+
+    function call(int arg) int {
+        callback(int) int fn = cast self.inner
+        int result = fn(arg)
+        printf("[%s] %lld -> %lld\n", self.name, arg, result)
+        return result
+    }
+}
+
+// ── MemoDecorator — skips computation on repeated input ──────────────────────
+
+class MemoDecorator {
+    address inner
+    int     cachedArg
+    int     cachedResult
+    int     valid        // 0 = empty, 1 = has a cached value
+
+    constructor(address fn) {
+        self.inner        = fn
+        self.cachedArg    = 0
+        self.cachedResult = 0
+        self.valid        = 0
+    }
+
+    function call(int arg) int {
+        if (self.valid == 1 && self.cachedArg == arg) {
+            printf("[memo  hit] %lld -> %lld\n", arg, self.cachedResult)
+            return self.cachedResult
+        }
+        callback(int) int fn = cast self.inner
+        int result = fn(arg)
+        self.cachedArg    = arg
+        self.cachedResult = result
+        self.valid        = 1
+        printf("[memo miss] %lld -> %lld\n", arg, result)
+        return result
+    }
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    printf("-- log decorator --\n")
+    LogDecorator sq = LogDecorator("square", computeSquare::address)
+    LogDecorator cb = LogDecorator("cube",   computeCube::address)
+
+    sq.call(4)
+    sq.call(7)
+    cb.call(3)
+    cb.call(5)
+
+    printf("\n-- memo decorator --\n")
+    MemoDecorator mfib = MemoDecorator(computeFib::address)
+
+    mfib.call(10)   // miss: compute fib(10) = 55
+    mfib.call(10)   // hit:  return cached 55
+    mfib.call(10)   // hit:  return cached 55
+    mfib.call(15)   // miss: compute fib(15) = 610
+    mfib.call(10)   // miss: cache was replaced by 15
+}

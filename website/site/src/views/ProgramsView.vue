@@ -861,6 +861,333 @@ entry main {
 }`,
   },
 
+
+  // ── More Patterns ──────────────────────────────────────────────────────────
+
+  {
+    id: 'visitor',
+    group: 'patterns',
+    title: 'Visitor',
+    tags: ['patterns', 'callbacks', 'dispatch'],
+    desc: 'Shape.accept(fn) calls any visitor function with the shape\'s internal data. Swap the visitor to get a completely different behaviour — area, perimeter, description — without touching any Shape code. Visitors are plain functions, no extra class needed.',
+    code: `extern function printf(string fmt, ...) int
+
+enum ShapeKind { Circle=0, Rectangle=1, Triangle=2 }
+
+class Shape {
+    int kind  int a  int b
+
+    constructor(int k, int x, int y) {
+        self.kind = k
+        self.a    = x
+        self.b    = y
+    }
+
+    // accept dispatches self's data to any visitor
+    function accept(address visitor) int {
+        callback(int, int, int) int fn = cast visitor
+        return fn(self.kind, self.a, self.b)
+    }
+}
+
+function makeCircle(int r) Shape {
+    Shape s = Shape(ShapeKind.Circle, r, 0)
+    return s
+}
+
+// visitors — plain functions, no class required
+function visitArea(int kind, int a, int b) int {
+    if (kind == ShapeKind.Circle)    { return a * a * 3 }
+    if (kind == ShapeKind.Rectangle) { return a * b }
+    if (kind == ShapeKind.Triangle)  { return (a * b) / 2 }
+    return 0
+}
+
+function visitDescribe(int kind, int a, int b) int {
+    if (kind == ShapeKind.Circle)    { printf("circle    r=%lld\\n", a) }
+    if (kind == ShapeKind.Rectangle) { printf("rect      %lldx%lld\\n", a, b) }
+    if (kind == ShapeKind.Triangle)  { printf("triangle  base=%lld h=%lld\\n", a, b) }
+    return 0
+}
+
+entry main {
+    Shape c = makeCircle(5)
+    // ...build r and t similarly...
+
+    // apply "area" visitor
+    int area = c.accept(visitArea::address)
+    printf("area = %lld\\n", area)
+
+    // apply "describe" visitor — completely different behaviour, same accept()
+    c.accept(visitDescribe::address)
+}`,
+  },
+
+  {
+    id: 'command',
+    group: 'patterns',
+    title: 'Command',
+    tags: ['patterns', 'callbacks', 'replay', 'history'],
+    desc: 'Commands are callbacks that mutate state through a pointer. CommandQueue records every executed command so the exact sequence can be replayed from any starting point — the foundation of undo/redo and deterministic audit logs.',
+    code: `import array from ds
+extern function printf(string fmt, ...) int
+
+function doIncrement(address p) int {
+    int v = p::value
+    p::value = v + 1
+    printf("  inc -> %lld\\n", v + 1)
+    return 0
+}
+
+function doDouble(address p) int {
+    int v = p::value
+    p::value = v * 2
+    printf("  dbl -> %lld\\n", v * 2)
+    return 0
+}
+
+class CommandQueue {
+    Array<address> log
+
+    constructor() { self.log = Array(16) }
+
+    function run(address state, address cmd) {
+        callback(address) int fn = cast cmd
+        fn(state)
+        self.log.push(cmd)   // record for replay
+    }
+
+    function replay(address state) {
+        printf("--- replay %lld commands ---\\n", self.log.len())
+        int i = 0
+        while (i < self.log.len()) {
+            address fn = self.log.get(i)
+            callback(address) int cmd = cast fn
+            cmd(state)
+            i = i + 1
+        }
+    }
+}
+
+entry main {
+    int counter = 0
+    address ptr = counter::address
+
+    CommandQueue q = CommandQueue()
+    q.run(ptr, doIncrement::address)
+    q.run(ptr, doIncrement::address)
+    q.run(ptr, doDouble::address)
+    printf("counter = %lld\\n\\n", counter)  // 6
+
+    counter = 0
+    q.replay(ptr)                            // deterministic: counter = 6 again
+    printf("counter = %lld\\n", counter)
+}`,
+  },
+
+  {
+    id: 'state',
+    group: 'patterns',
+    title: 'State Machine',
+    tags: ['patterns', 'enum', 'fsm', 'transitions'],
+    desc: 'Machine holds an enum state and transitions on events. Invalid transitions are silently ignored. All the rules live in send() — the caller stays unaware of the transition table and just fires events.',
+    code: `extern function printf(string fmt, ...) int
+
+enum State {
+    Idle    = 0
+    Running = 1
+    Paused  = 2
+    Stopped = 3
+}
+
+enum Event {
+    Start  = 0
+    Pause  = 1
+    Resume = 2
+    Stop   = 3
+}
+
+function stateName(int s) string {
+    if (s == State.Idle)    { return "IDLE" }
+    if (s == State.Running) { return "RUNNING" }
+    if (s == State.Paused)  { return "PAUSED" }
+    if (s == State.Stopped) { return "STOPPED" }
+    return "?"
+}
+
+class Machine {
+    int state
+
+    constructor() { self.state = State.Idle }
+
+    function send(int event) {
+        int old  = self.state
+        int next = self.state
+
+        if (self.state == State.Idle    && event == Event.Start)  { next = State.Running }
+        if (self.state == State.Running && event == Event.Pause)  { next = State.Paused  }
+        if (self.state == State.Running && event == Event.Stop)   { next = State.Stopped }
+        if (self.state == State.Paused  && event == Event.Resume) { next = State.Running }
+        if (self.state == State.Paused  && event == Event.Stop)   { next = State.Stopped }
+
+        if (next != old) {
+            printf("%s -> %s\\n", stateName(old), stateName(next))
+            self.state = next
+        }
+    }
+
+    function current() string { return stateName(self.state) }
+}
+
+entry main {
+    Machine m = Machine()
+    m.send(Event.Start)    // IDLE    -> RUNNING
+    m.send(Event.Pause)    // RUNNING -> PAUSED
+    m.send(Event.Resume)   // PAUSED  -> RUNNING
+    m.send(Event.Stop)     // RUNNING -> STOPPED
+    m.send(Event.Start)    // ignored: already STOPPED
+    printf("state: %s\\n", m.current())
+}`,
+  },
+
+  {
+    id: 'pipeline',
+    group: 'patterns',
+    title: 'Pipeline',
+    tags: ['patterns', 'composition', 'callbacks', 'transforms'],
+    desc: 'An ordered array of single-int transforms. run() feeds a value through every stage in sequence. Pipelines compose freely — build different processing chains from the same small reusable functions with no shared state.',
+    code: `import array from ds
+extern function printf(string fmt, ...) int
+
+class Pipeline {
+    Array<address> stages
+
+    constructor() { self.stages = Array(8) }
+
+    function pipe(address stage) { self.stages.push(stage) }
+
+    function run(int input) int {
+        int val = input
+        int i = 0
+        while (i < self.stages.len()) {
+            address fn = self.stages.get(i)
+            callback(int) int stage = cast fn
+            val = stage(val)
+            i = i + 1
+        }
+        return val
+    }
+}
+
+function times2(int n) int  { return n * 2 }
+function addTen(int n) int  { return n + 10 }
+function square(int n) int  { return n * n }
+function negate(int n) int  { return 0 - n }
+
+function clamp100(int n) int {
+    if (n > 100) { return 100 }
+    return n
+}
+function absolute(int n) int {
+    if (n < 0) { return 0 - n }
+    return n
+}
+
+entry main {
+    Pipeline norm = Pipeline()
+    norm.pipe(times2::address)
+    norm.pipe(addTen::address)
+    norm.pipe(clamp100::address)
+    printf("norm(5)  = %lld\\n", norm.run(5))   // 20
+    printf("norm(50) = %lld\\n", norm.run(50))  // clamped to 100
+
+    Pipeline mag = Pipeline()
+    mag.pipe(negate::address)
+    mag.pipe(square::address)
+    mag.pipe(absolute::address)
+    printf("mag(-3)  = %lld\\n", mag.run(-3))   // 9
+}`,
+  },
+
+  {
+    id: 'decorator',
+    group: 'patterns',
+    title: 'Decorator',
+    tags: ['patterns', 'callbacks', 'wrapping', 'memoization'],
+    desc: 'LogDecorator adds before/after logging to any (int)→int function. MemoDecorator caches the last result — repeated calls with the same argument skip the computation entirely. Both expose the same call(int) interface so they compose.',
+    code: `extern function printf(string fmt, ...) int
+
+function computeFib(int n) int {
+    if (n <= 1) { return n }
+    int a = 0
+    int b = 1
+    int i = 2
+    while (i <= n) {
+        int tmp = a + b
+        a = b
+        b = tmp
+        i = i + 1
+    }
+    return b
+}
+
+class LogDecorator {
+    address inner
+    string  name
+
+    constructor(string n, address fn) {
+        self.name  = n
+        self.inner = fn
+    }
+
+    function call(int arg) int {
+        callback(int) int fn = cast self.inner
+        int result = fn(arg)
+        printf("[%s] %lld -> %lld\\n", self.name, arg, result)
+        return result
+    }
+}
+
+class MemoDecorator {
+    address inner
+    int     cachedArg
+    int     cachedResult
+    int     valid
+
+    constructor(address fn) {
+        self.inner        = fn
+        self.valid        = 0
+        self.cachedArg    = 0
+        self.cachedResult = 0
+    }
+
+    function call(int arg) int {
+        if (self.valid == 1 && self.cachedArg == arg) {
+            printf("[memo  hit] %lld\\n", arg)
+            return self.cachedResult
+        }
+        callback(int) int fn = cast self.inner
+        int result = fn(arg)
+        self.cachedArg    = arg
+        self.cachedResult = result
+        self.valid        = 1
+        printf("[memo miss] %lld -> %lld\\n", arg, result)
+        return result
+    }
+}
+
+entry main {
+    LogDecorator logged = LogDecorator("fib", computeFib::address)
+    logged.call(8)
+    logged.call(12)
+
+    MemoDecorator memo = MemoDecorator(computeFib::address)
+    memo.call(10)   // miss: computes 55
+    memo.call(10)   // hit:  returns 55 instantly
+    memo.call(15)   // miss: computes 610
+}`,
+  },
+
 ]
 
 const groups = [
