@@ -1,62 +1,308 @@
 <script setup>
-import { RouterLink } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import CodeBlock from '../components/CodeBlock.vue'
+
+// ── Typing animation ──────────────────────────────────────────────────────────
+
+const DEMO_CODE = `strict int GPIO_OUT = 0x20200028
+
+class Led {
+    int pin
+    constructor(int p) {
+        self.pin = p
+    }
+    function on()  { GPIO_OUT = 1 << self.pin }
+    function off() { GPIO_OUT = 0 }
+}
+
+entry main {
+    Led led = Led(15)
+    while (true) {
+        led.on()
+        led.off()
+    }
+}`
+
+const typedCode   = ref('')
+const phase       = ref('typing')   // 'typing' | 'compiling' | 'welcome'
+const welcomeFont = ref('"Inter", sans-serif')
+const compileDots = ref('')
+
+const FONTS = [
+    '"Georgia", serif',
+    '"Courier New", monospace',
+    'Impact, fantasy',
+    '"Palatino", serif',
+    '"Comic Sans MS", cursive',
+    '"Arial Black", sans-serif',
+    '"Trebuchet MS", sans-serif',
+    '"Inter", sans-serif',
+]
+
+onMounted(() => {
+    let i = 0
+    const typeInterval = setInterval(() => {
+        typedCode.value = DEMO_CODE.slice(0, ++i)
+        if (i >= DEMO_CODE.length) {
+            clearInterval(typeInterval)
+            setTimeout(() => {
+                phase.value = 'compiling'
+                let d = 0
+                const dotInterval = setInterval(() => {
+                    compileDots.value = '.'.repeat((++d % 4))
+                }, 250)
+                setTimeout(() => {
+                    clearInterval(dotInterval)
+                    phase.value = 'welcome'
+                    let fi = 0
+                    const fontInterval = setInterval(() => {
+                        welcomeFont.value = FONTS[fi++ % FONTS.length]
+                    }, 350)
+                    setTimeout(() => {
+                        clearInterval(fontInterval)
+                        welcomeFont.value = '"Inter", sans-serif'
+                    }, 3200)
+                }, 1400)
+            }, 400)
+        }
+    }, 22)
+})
+
+// ── CLI tool cards ──────────────────────────────────────────────────────────
+
+const tools = [
+    { cmd: 'hopper install',  icon: '⬇',  name: 'Install',  desc: 'Add stdlib modules or packages from the registry. Hopper manages dependencies for you — no CMake, no conan, no vcpkg.' },
+    { cmd: 'hopper build',    icon: '⚙',  name: 'Build',    desc: 'Compile your project to a native executable. One command, zero config — the project manifest is written in Hopper itself.' },
+    { cmd: 'hopper run',      icon: '▶',  name: 'Run',      desc: 'Build and execute in one step. Works on hosted platforms and outputs the exit code for shell scripting.' },
+    { cmd: 'hopper test',     icon: '✓',  name: 'Test',     desc: 'Run the built-in test suite. Test functions live alongside the code they test — no separate framework required.' },
+    { cmd: 'hopper check',    icon: '🛡',  name: 'Check',   desc: 'Compile with AddressSanitizer, ThreadSanitizer, or UBSan to catch memory errors, data races, and undefined behaviour.' },
+    { cmd: 'hopper debug',    icon: '🐛',  name: 'Debug',   desc: 'Launch a debug build with full symbol information. Integrates with GDB and LLDB out of the box.' },
+    { cmd: 'hopper profile',  icon: '📊', name: 'Profile',  desc: 'Generate profiling data with perf or Instruments. Find the hot paths before you optimise the wrong thing.' },
+    { cmd: 'hopper flash',    icon: '⚡',  name: 'Flash',   desc: 'Write a bare-metal image directly to an SD card or flash device. From source to hardware in one command.' },
+    { cmd: 'hopper format',   icon: '✎',  name: 'Format',   desc: 'Reformat source files using the opinionated built-in style. No config — like gofmt, the style is the language.' },
+]
+
+// ── Code layer examples ───────────────────────────────────────────────────────
+
+const asmCode = `// Inline assembly — direct x86-64 syscall
+function sysWrite(int fd, address buf, int len) int {
+    int n = 0
+    asm {
+        rax = 1     // SYS_write
+        rdi = fd    // file descriptor
+        rsi = buf   // buffer address
+        rdx = len   // byte count
+        syscall
+        n = rax     // capture return value
+    }
+    return n
+}`
+
+const driverCode = `// Hardware driver — MMIO registers via strict
+strict int GPFSEL4 = 0x20200010
+strict int GPSET1  = 0x20200020
+strict int GPCLR1  = 0x2020002C
+
+class GpioPin {
+    int bit
+    constructor(int pin) {
+        self.bit = pin - 32
+        GPFSEL4 = GPFSEL4 | (1 << 21)  // output
+    }
+    function set()   { GPSET1 = 1 << self.bit }
+    function clear() { GPCLR1 = 1 << self.bit }
+}`
+
+const libraryCode = `// LED library — built on the GPIO driver
+import GpioPin from drivers
+
+function delay(int cycles) {
+    int i = 0
+    while (i < cycles) { i = i + 1 }
+}
+
+class Led {
+    GpioPin pin
+    constructor(int gpio) {
+        self.pin = GpioPin(gpio)
+    }
+    function on()  { self.pin.set()   }
+    function off() { self.pin.clear() }
+    function blink(int ms) {
+        self.on()
+        delay(ms * 250)
+        self.off()
+        delay(ms * 250)
+    }
+}`
+
+const mainCode = `// Entry point — clean, readable application code
+import Led from lib.led
+
+entry main {
+    Led led = Led(47)    // GPIO 47 — Pi Zero ACT LED
+
+    while (true) {
+        led.blink(500)   // 1 Hz blink
+    }
+}`
 </script>
 
 <template>
   <div class="page">
 
+    <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+
     <header class="hero">
       <div class="hero-inner">
-        <h1>Hopper</h1>
-        <p class="tagline">The ultimate systems and hardware programming language.</p>
-        <p class="sub">From bare metal to high-level abstractions — one language, no compromises.</p>
+        <h1 class="hero-title">The Hopper Programming Language</h1>
+        <p class="hero-sub">
+          A strongly typed language for hardware, systems, and low-level applications.
+        </p>
+
+        <div class="hero-demo">
+          <div class="demo-terminal" v-if="phase !== 'welcome'">
+            <div class="terminal-bar">
+              <span class="dot red" /><span class="dot yellow" /><span class="dot green" />
+              <span class="terminal-file">main.hop</span>
+            </div>
+            <pre class="terminal-body"><code>{{ typedCode }}<span v-if="phase === 'typing'" class="cursor">▊</span></code></pre>
+            <div v-if="phase === 'compiling'" class="compile-line">
+              <span class="prompt">$</span>
+              <span> hopper build main.hop</span>
+              <span class="compile-dots">{{ compileDots }}</span>
+            </div>
+          </div>
+
+          <div v-if="phase === 'welcome'" class="welcome-display">
+            <div class="welcome-text" :style="{ fontFamily: welcomeFont }">
+              Welcome to Hopper
+            </div>
+            <p class="welcome-sub">Your program compiled successfully.</p>
+          </div>
+        </div>
       </div>
     </header>
 
-    <section class="thesis">
-      <div class="container">
-        <span class="label">The Thesis</span>
-        <p class="thesis-statement">
-          The toolchain is complicated because the language failed.<br>
-          Fix the language, and the toolchain becomes simple.
-        </p>
-        <p>
-          Every bare-metal C project ships with a linker script, a startup file, a Makefile,
-          and a handful of pragma hacks. That complexity isn't accidental — it's the bill
-          that comes due for every design decision the language couldn't make cleanly.
-          Decades of duct tape on top of duct tape.
-        </p>
-        <p>
-          Hopper is built from the ground up for systems and hardware programming.
-          It gives you direct access to hardware, full control over memory, and modern
-          language features — without any of the legacy baggage.
-        </p>
-      </div>
-    </section>
+    <!-- ── Unified Build System ──────────────────────────────────────────── -->
 
-    <section class="what">
+    <section class="toolchain">
       <div class="container">
-        <span class="label">What is Hopper</span>
-        <div class="what-grid">
-          <div class="what-card">
-            <h3>A systems language</h3>
-            <p>Strongly typed, multiparadigm, and designed for low-level control. Functions, classes, templates, structs, generics — everything you need to write an OS, a compiler, or a database from scratch.</p>
-          </div>
-          <div class="what-card">
-            <h3>A hardware language</h3>
-            <p>First-class bare metal support. Vector tables, MMIO registers, interrupt handlers, and entry points are all expressed in Hopper itself — not in separate linker scripts or assembly files.</p>
-          </div>
-          <div class="what-card">
-            <h3>A self-describing toolchain</h3>
-            <p>A Hopper program can describe its own hardware layout. The language and the linker speak the same language because they are the same language. It's all code — not instructions to an external tool.</p>
-          </div>
-          <div class="what-card">
-            <h3>A clean foundation</h3>
-            <p>No global variables. No footguns. No syntax inherited from 1972 that exists only because removing it would break everything. Hopper is simple because it was designed to be — not simplified after the fact.</p>
+        <span class="label">Unified Build System</span>
+        <p class="section-sub">Install, build, test, debug, profile, and flash — all from one tool. No Makefile. No CMake. No separate package manager.</p>
+        <div class="tool-grid">
+          <div class="tool-card" v-for="t in tools" :key="t.cmd">
+            <div class="tool-header">
+              <span class="tool-icon">{{ t.icon }}</span>
+              <code class="tool-cmd">{{ t.cmd }}</code>
+            </div>
+            <p class="tool-desc">{{ t.desc }}</p>
           </div>
         </div>
       </div>
     </section>
+
+    <!-- ── What We're Solving ────────────────────────────────────────────── -->
+
+    <section class="why">
+      <div class="container">
+        <span class="label">A Different Approach</span>
+        <p class="section-sub">Systems programming has three dominant languages. Each one made important trade-offs. Hopper starts from a different set of them.</p>
+        <div class="lang-grid">
+          <div class="lang-card">
+            <div class="lang-name c">C</div>
+            <p class="lang-desc">Brilliant simplicity and proven staying power. But C was designed in 1972 for machines with 64 KB of RAM. No generics, no classes, string handling is manual labour, and the toolchain complexity it creates is staggering.</p>
+            <p class="lang-take">Hopper inherits C's simplicity and hardware access — without the 50 years of workarounds.</p>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name cpp">C++</div>
+            <p class="lang-desc">Extraordinarily powerful, but tries to be everything to everyone. Multiple incompatible paradigms, decades of accumulated features, and no two codebases that agree on which subset to use. The complexity ceiling is enormous.</p>
+            <p class="lang-take">Hopper is intentionally focused. One way to do each thing. No subset problem.</p>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name rust">Rust</div>
+            <p class="lang-desc">Rigorous memory safety with zero runtime cost — impressive engineering. But the ownership and borrow checker model is a significant cognitive barrier, especially for embedded and real-time work where you just need to write to a register.</p>
+            <p class="lang-take">Hopper keeps you close to the metal. Safety through strong types and explicit operations, not through the compiler fighting you.</p>
+          </div>
+          <div class="lang-card featured">
+            <div class="lang-name hopper">Hopper</div>
+            <p class="lang-desc">Strongly typed. Hardware-first. Classes, templates, and structs work identically on bare metal and on a full OS. Inline assembly lives in the source file, not in a separate .s file. The toolchain is one command.</p>
+            <p class="lang-take">Expressive where it matters. Minimal where it doesn't.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── It's All Code ────────────────────────────────────────────────── -->
+
+    <section class="layers">
+      <div class="container">
+        <span class="label">It's All Code</span>
+        <p class="section-sub">From raw syscalls to clean application logic — one language, one toolchain, one syntax.</p>
+
+        <!-- Row 1: ASM left, description right -->
+        <div class="layer-row">
+          <div class="layer-code">
+            <CodeBlock :code="asmCode" label="Assembly" />
+          </div>
+          <div class="layer-desc">
+            <h3>Inline Assembly</h3>
+            <p>Write x86-64 instructions directly inside Hopper functions using scoped <code>asm {}</code> blocks. No string literals, no quotes — register assignments and raw instructions sit alongside normal code.</p>
+            <p>The compiler wires Hopper variables directly into LLVM inline asm constraints. Your variables reach the hardware.</p>
+          </div>
+        </div>
+
+        <div class="layer-connector">
+          <span class="connector-dot" /><span class="connector-dot" /><span class="connector-dot" />
+        </div>
+
+        <!-- Row 2: description left, driver right -->
+        <div class="layer-row reverse">
+          <div class="layer-desc">
+            <h3>Hardware Driver</h3>
+            <p>Memory-mapped I/O registers are declared with <code>strict</code> — named aliases for hardware addresses. Reading or writing them generates direct load/store instructions with no indirection.</p>
+            <p>Wrap them in a class and you have a type-safe, zero-overhead driver with no external headers.</p>
+          </div>
+          <div class="layer-code">
+            <CodeBlock :code="driverCode" label="Driver" />
+          </div>
+        </div>
+
+        <div class="layer-connector">
+          <span class="connector-dot" /><span class="connector-dot" /><span class="connector-dot" />
+        </div>
+
+        <!-- Row 3: library left, description right -->
+        <div class="layer-row">
+          <div class="layer-code">
+            <CodeBlock :code="libraryCode" label="Library" />
+          </div>
+          <div class="layer-desc">
+            <h3>Library Layer</h3>
+            <p>Build higher-level abstractions on top of your drivers using the same class system. Import, compose, and encapsulate — <code>import</code> works identically whether you're on bare metal or a hosted OS.</p>
+            <p>No virtual dispatch unless you ask for it. No hidden cost.</p>
+          </div>
+        </div>
+
+        <div class="layer-connector">
+          <span class="connector-dot" /><span class="connector-dot" /><span class="connector-dot" />
+        </div>
+
+        <!-- Row 4: description left, main right -->
+        <div class="layer-row reverse">
+          <div class="layer-desc">
+            <h3>Entry Point</h3>
+            <p>The application code is clean and readable. <code>entry main</code> is unambiguous — there's no signature confusion, no implicit argc/argv unless you declare them.</p>
+            <p>The complexity stays in the layers below. The caller sees the abstraction, not the hardware.</p>
+          </div>
+          <div class="layer-code">
+            <CodeBlock :code="mainCode" label="Main" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── The Separation ───────────────────────────────────────────────── -->
 
     <section class="separation">
       <div class="container">
@@ -116,176 +362,19 @@ import { RouterLink } from 'vue-router'
             <p class="sep-col-note">What makes it extensible.</p>
           </div>
         </div>
-        <p class="sep-payoff">
-          The application developer writes route handlers in Hopper+. Every byte that moves
-          through the network is handled by Hopper underneath. And when the end user wants to
-          extend the application — write a shell script, add a plugin, mod a game — they reach
-          for Hopper Script. Like Lua in a game engine, or Python in Blender. One language family,
-          owned end to end. No foreign boundary at any layer.
-        </p>
       </div>
     </section>
 
-    <section class="code-example">
+    <!-- ── Footer ───────────────────────────────────────────────────────── -->
+
+    <footer class="site-footer">
       <div class="container">
-        <span class="label">It's all code</span>
-        <p class="section-desc">Hardware description, program logic, and entry point — all in one language.</p>
-        <RouterLink to="/vs-c" class="compare-link">See Hopper vs C: memory operations side by side →</RouterLink>
-        <pre><code><span class="comment">// vector table — burned into flash by the linker</span>
-<span class="kw">bind</span> <span class="hex">0x00000004</span> <span class="op">=</span> reset<span class="op">::</span>address
-<span class="kw">bind</span> <span class="hex">0x0000003c</span> <span class="op">=</span> timer<span class="op">::</span>address
-
-<span class="comment">// hardware registers — strict load/store aliases</span>
-<span class="kw">strict</span> <span class="type">int</span> uart_dr <span class="op">=</span> <span class="hex">0x40021000</span>
-<span class="kw">strict</span> <span class="type">int</span> uart_sr <span class="op">=</span> <span class="hex">0x40021004</span>
-
-<span class="comment">// classes and templates work anywhere — even bare metal</span>
-<span class="kw">template</span> Buffer<span class="op">&lt;</span>T<span class="op">&gt;</span> {
-    T value
-    <span class="kw">constructor</span>(T v) { self.value <span class="op">=</span> v }
-    <span class="kw">function</span> get() T { <span class="kw">return</span> self.value }
-}
-
-<span class="comment">// unambiguous program entry point</span>
-<span class="kw">entry</span> main {
-    Buffer<span class="op">&lt;</span><span class="type">int</span><span class="op">&gt;</span> b <span class="op">=</span> Buffer(<span class="num">42</span>)
-    uart_dr <span class="op">=</span> b.get()
-}</code></pre>
-      </div>
-    </section>
-
-    <section class="features">
-      <div class="container">
-        <span class="label">Language Features</span>
-        <div class="feature-grid">
-          <div class="feature">
-            <h4>Classes &amp; Methods</h4>
-            <p>Full OOP with constructors, destructors, and operator overloading.</p>
-          </div>
-          <div class="feature">
-            <h4>Templates</h4>
-            <p>Monomorphized generics. <code>Box&lt;int&gt;</code> and <code>Box&lt;float&gt;</code> compile to separate concrete types.</p>
-          </div>
-          <div class="feature">
-            <h4>Structs</h4>
-            <p>Memory-layout-only types with explicit padding. Full control over wire format.</p>
-          </div>
-          <div class="feature">
-            <h4>Extern Functions</h4>
-            <p>Call into C, assembly, or any foreign ABI. Variadic functions supported.</p>
-          </div>
-          <div class="feature">
-            <h4>Type Aliases</h4>
-            <p>Clean aliasing for complex types. Improve readability without runtime cost.</p>
-          </div>
-          <div class="feature">
-            <h4>Defer</h4>
-            <p>Resource cleanup that runs when a scope exits, regardless of control flow.</p>
-          </div>
-          <div class="feature">
-            <h4>Address Operations</h4>
-            <p><code>value::address</code> and <code>ptr::value</code> for explicit pointer manipulation.</p>
-          </div>
-          <div class="feature">
-            <h4>Strong Typing</h4>
-            <p>Explicit casts required. No silent narrowing. No implicit conversions.</p>
-          </div>
+        <div class="footer-status">
+          <span class="status-badge">Pre-Alpha</span>
+          <span class="version">Version 0.1.0</span>
         </div>
-      </div>
-    </section>
-
-    <section class="principles">
-      <div class="container">
-        <span class="label">Design Principles</span>
-        <div class="grid">
-          <div class="card">
-            <h3>No global variables</h3>
-            <p>One of the most common sources of bugs and complexity in systems code — gone. State is explicit, scoped, and owned. Libraries handle what they need. Nothing hides.</p>
-          </div>
-          <div class="card">
-            <h3>No OS required</h3>
-            <p>Hopper runs on the machine, not on top of an abstraction. Write firmware, bootloaders, and operating systems — Hopper doesn't depend on any of them.</p>
-          </div>
-          <div class="card">
-            <h3>Hardware is just code</h3>
-            <p>Vector tables, memory-mapped registers, and interrupt handlers are expressed in Hopper — not in a separate language bolted on the side. One syntax for everything.</p>
-          </div>
-          <div class="card">
-            <h3>No legacy baggage</h3>
-            <p>Every feature earns its place. Hopper is shaped by what systems programming should be — not by decisions made in 1972 that nobody can change because everything depends on them.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="layers">
-      <div class="container">
-        <span class="label">The Vision</span>
-        <p class="vision-statement">One language. Three altitudes. Each tier built on the one below it — in Hopper itself.</p>
-        <p class="vision-sub">
-          Hopper builds the runtime. That runtime becomes the foundation Hopper+ runs on.
-          Hopper+ builds the Shell. The same grammar and type system runs at every level —
-          <code>int</code> is <code>int</code> everywhere. The language doesn't fracture as you move up the stack.
-          You don't learn a new language. You just have more of it available.
-        </p>
-        <div class="layer-stack">
-          <div class="layer top future">
-            <div class="layer-info">
-              <div class="layer-name">Hopper Shell</div>
-              <div class="layer-analogy">like early Python / JS</div>
-            </div>
-            <div class="layer-desc">An embedded scripting layer that binds to application functionality. Drop it into any Hopper+ application and let users extend behavior without recompiling. Built on Hopper+.</div>
-          </div>
-          <div class="layer mid future">
-            <div class="layer-info">
-              <div class="layer-name">Hopper+</div>
-              <div class="layer-analogy">like C# / Java</div>
-            </div>
-            <div class="layer-desc">The application tier. Shares ~90% of Hopper's syntax and type system. Hardware primitives removed, high-level abstractions added. Built entirely on Hopper — no foreign runtime.</div>
-          </div>
-          <div class="layer bottom">
-            <div class="layer-info">
-              <div class="layer-name">Hopper</div>
-              <div class="layer-analogy">like Assembly / C</div>
-            </div>
-            <div class="layer-desc">The machine tier. Hardware access, bare metal execution, OS kernels, compilers, firmware. No dependencies. The foundation everything else is built on.</div>
-          </div>
-        </div>
-        <p class="future-note">Hopper+ and Hopper Shell are long-term goals — not a roadmap, a direction.</p>
-      </div>
-    </section>
-
-    <section class="roadmap">
-      <div class="container">
-        <span class="label">Roadmap</span>
-        <div class="steps">
-          <div class="step done">
-            <span class="step-label">Now</span>
-            <h3>Language Core</h3>
-            <p>Functions, classes, templates, structs, <code>entry</code>, <code>bind</code>, <code>strict</code>, LLVM IR codegen. 13/13 tests passing.</p>
-          </div>
-          <div class="step">
-            <span class="step-label">Next</span>
-            <h3>Toolchain</h3>
-            <p><code>sizeof(T)</code>, heap allocator, build tool, linker script generator, startup file written in Hopper.</p>
-          </div>
-          <div class="step">
-            <span class="step-label">Then</span>
-            <h3>Bare Metal Targets</h3>
-            <p>AVR (Arduino Uno), ARM Cortex-M (STM32, RP2040), bare metal stdlib using <code>strict</code> and <code>bind</code>.</p>
-          </div>
-          <div class="step goal">
-            <span class="step-label">Goal</span>
-            <h3>Self-hosting toolchain</h3>
-            <p>Write an Arduino program in Hopper. One command. No C toolchain. The compiler, linker, and stdlib all written in Hopper itself.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <footer>
-      <div class="container">
-        <p>Hopper v0.1 — prototype. Everything is open to change.</p>
+        <p class="footer-timeline">Expected Alpha: January 2027</p>
+        <p class="footer-note">Hopper is under active development. Everything is open to change.</p>
       </div>
     </footer>
 
@@ -293,565 +382,469 @@ import { RouterLink } from 'vue-router'
 </template>
 
 <style scoped>
-/* ── Palette ──────────────────────────────────────────
-   blue:   #2563eb   (Hopper)
-   green:  #059669   (Hopper+)
-   amber:  #d97706   (Hopper Script)
-   bg:     #faf9f6   (warm off-white)
-   card:   #ffffff
-   text:   #111827
-   muted:  #6b7280
-   border: #e5e7eb
-──────────────────────────────────────────────────── */
-.page {
-  min-height: 100vh;
-  background: #faf9f6;
-}
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.page { background: #fff; }
 
 .container {
-  width: 100%;
-  margin: auto;
+  max-width: 1100px;
+  margin: 0 auto;
   padding: 0 5vw;
-  text-align: center;
 }
 
 .label {
-  display: block;
+  display: inline-block;
   font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #9ca3af;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
+  color: #2563eb;
+  margin-bottom: 0.75rem;
 }
 
-.section-desc {
-  color: #6b7280;
-  margin-bottom: 2rem;
-  font-size: 1rem;
+.section-sub {
+  font-size: 1.05rem;
+  color: #4b5563;
+  max-width: 700px;
+  margin-bottom: 2.5rem;
   line-height: 1.7;
 }
 
-/* ── Hero ── */
+/* ── Hero ───────────────────────────────────────────────────────────────── */
 .hero {
-  padding: 9rem 5vw 8rem;
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
+  background: linear-gradient(160deg, #eff6ff 0%, #f9fafb 60%);
+  border-bottom: 1px solid #e5e7eb;
+  padding: 5rem 0 4rem;
 }
 
 .hero-inner {
-  max-width: 900px;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 5vw;
 }
 
-.hero h1 {
-  font-size: 9rem;
-  font-weight: 800;
-  letter-spacing: -6px;
+.hero-title {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 900;
   color: #111827;
-  line-height: 0.9;
-  margin-bottom: 2.5rem;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0 0 1rem;
 }
 
-.tagline {
-  font-size: 1.5rem;
+.hero-sub {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0 0 2.5rem;
+  max-width: 600px;
+}
+
+/* ── Demo Terminal ──────────────────────────────────────────────────────── */
+.hero-demo {
+  max-width: 620px;
+}
+
+.demo-terminal {
+  background: #0f172a;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  font-family: 'Fira Code', 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  background: #1e293b;
+}
+
+.dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+}
+.dot.red    { background: #ef4444; }
+.dot.yellow { background: #f59e0b; }
+.dot.green  { background: #22c55e; }
+
+.terminal-file {
+  margin-left: 0.5rem;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.terminal-body {
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  min-height: 200px;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.terminal-body code {
+  font-family: inherit;
+}
+
+.cursor {
+  animation: blink 1s step-end infinite;
+  color: #60a5fa;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.compile-line {
+  padding: 0.6rem 1.5rem;
+  background: #0f172a;
+  border-top: 1px solid #1e293b;
+  font-size: 0.82rem;
+  color: #22c55e;
+}
+
+.prompt { color: #6366f1; }
+
+.compile-dots {
+  display: inline-block;
+  min-width: 24px;
+  color: #94a3b8;
+}
+
+/* ── Welcome Display ────────────────────────────────────────────────────── */
+.welcome-display {
+  text-align: center;
+  padding: 2.5rem 2rem;
+  background: #0f172a;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.welcome-text {
+  display: block;
+  font-size: clamp(1.5rem, 4vw, 2.75rem);
+  font-weight: 700;
+  color: #22c55e;
+  transition: font-family 0.1s;
+  margin-bottom: 0.75rem;
+}
+
+.welcome-sub {
+  color: #64748b;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* ── Toolchain ──────────────────────────────────────────────────────────── */
+.toolchain {
+  padding: 5rem 0;
+  background: #fff;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.tool-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tool-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.08);
+}
+
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.tool-icon {
+  font-size: 1.1rem;
+}
+
+.tool-cmd {
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.tool-desc {
+  font-size: 0.875rem;
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Why ────────────────────────────────────────────────────────────────── */
+.why {
+  padding: 5rem 0;
+  background: #f9fafb;
+  border-top: 1px solid #f3f4f6;
+}
+
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.lang-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
+.lang-card.featured {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb20, 0 4px 20px rgba(37,99,235,0.08);
+}
+
+.lang-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.lang-name.c    { color: #059669; }
+.lang-name.cpp  { color: #7c3aed; }
+.lang-name.rust { color: #d97706; }
+.lang-name.hopper { color: #2563eb; }
+
+.lang-desc {
+  font-size: 0.875rem;
+  color: #4b5563;
+  line-height: 1.65;
+  margin-bottom: 0.75rem;
+}
+
+.lang-take {
+  font-size: 0.83rem;
   color: #374151;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
+  font-style: italic;
+  border-left: 2px solid #e5e7eb;
+  padding-left: 0.75rem;
+  margin: 0;
 }
 
-.sub {
-  font-size: 1.05rem;
-  color: #9ca3af;
+.lang-card.featured .lang-take {
+  border-left-color: #2563eb;
+  color: #1d4ed8;
 }
 
-/* ── Thesis ── */
-.thesis {
-  padding: 6rem 0;
-  background: #faf9f6;
-  border-bottom: 1px solid #e5e7eb;
+/* ── Layers (It's All Code) ─────────────────────────────────────────────── */
+.layers {
+  padding: 5rem 0;
+  background: #fff;
 }
 
-.thesis-statement {
-  font-size: 2.5rem;
+.layer-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: start;
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .layer-row { grid-template-columns: 1fr; }
+  .layer-row.reverse .layer-desc { order: -1; }
+}
+
+.layer-row.reverse .layer-code  { order: 2; }
+.layer-row.reverse .layer-desc  { order: 1; }
+
+.layer-desc {
+  padding: 1rem 0;
+}
+
+.layer-desc h3 {
+  font-size: 1.2rem;
   font-weight: 700;
   color: #111827;
-  line-height: 1.3;
-  margin-bottom: 2rem;
-  max-width: 860px;
+  margin: 0 0 0.75rem;
 }
 
-.thesis p {
-  color: #6b7280;
-  max-width: 780px;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-  line-height: 1.8;
-}
-
-/* ── What ── */
-.what {
-  padding: 6rem 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.what-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1.5rem;
-}
-
-.what-card {
-  padding: 2rem;
-  background: #faf9f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  border-top: 3px solid #2563eb;
-}
-
-.what-card:nth-child(2) { border-top-color: #059669; }
-.what-card:nth-child(3) { border-top-color: #d97706; }
-.what-card:nth-child(4) { border-top-color: #7c3aed; }
-
-.what-card h3 {
-  font-size: 1.05rem;
-  color: #111827;
-  margin-bottom: 0.75rem;
-  font-weight: 600;
-}
-
-.what-card p {
+.layer-desc p {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: #4b5563;
   line-height: 1.7;
+  margin-bottom: 0.75rem;
 }
 
-.compare-link {
-  display: inline-block;
-  margin-bottom: 2rem;
-  font-size: 0.9rem;
+.layer-desc p:last-child { margin-bottom: 0; }
+
+.layer-desc code {
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-size: 0.85em;
+  background: #eff6ff;
   color: #2563eb;
-  text-decoration: none;
-  font-weight: 500;
-  border-bottom: 1px solid #bfdbfe;
-  padding-bottom: 2px;
-  transition: color 0.15s, border-color 0.15s;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
 }
 
-.compare-link:hover {
-  color: #1d4ed8;
-  border-color: #2563eb;
+.layer-connector {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 2rem 0;
 }
 
-/* ── Separation ── */
+.connector-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #d1d5db;
+}
+
+/* ── Separation ─────────────────────────────────────────────────────────── */
 .separation {
-  padding: 6rem 0;
-  background: #faf9f6;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 5rem 0;
+  background: #f9fafb;
+  border-top: 1px solid #f3f4f6;
 }
 
 .sep-statement {
-  font-size: 2.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: #111827;
-  line-height: 1.3;
-  margin-bottom: 2rem;
-  max-width: 860px;
+  line-height: 1.45;
+  margin: 0 0 1.5rem;
 }
 
 .sep-body {
-  font-size: 1rem;
-  color: #6b7280;
-  max-width: 860px;
-  line-height: 1.8;
+  font-size: 0.95rem;
+  color: #4b5563;
+  line-height: 1.75;
+  max-width: 720px;
   margin-bottom: 1rem;
-}
-
-.sep-body em {
-  color: #111827;
-  font-style: normal;
-  font-weight: 600;
 }
 
 .sep-example {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 0;
-  margin: 3rem 0;
+  margin: 2.5rem 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .sep-col {
   flex: 1;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-top: 3px solid #2563eb;
-  border-radius: 12px;
-  padding: 2rem;
+  padding: 1.75rem;
+  background: #fff;
 }
 
-.sep-col.right {
-  border-top-color: #059669;
-}
-
-.sep-col.script {
-  border-top-color: #d97706;
-}
-
-.sep-col-label {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #2563eb;
-  margin-bottom: 0.2rem;
-}
-
-.sep-col-label.hopper-plus  { color: #059669; }
-.sep-col-label.hopper-script { color: #d97706; }
-
-.sep-col-sub {
-  font-size: 0.7rem;
-  color: #9ca3af;
-  margin-bottom: 1.5rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  font-weight: 600;
-}
-
-.sep-col ul {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1.25rem;
-}
-
-.sep-col ul li {
-  font-size: 0.9rem;
-  color: #374151;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.sep-col ul li::before {
-  content: '→ ';
-  color: #d1d5db;
-}
-
-.sep-col-note {
-  font-size: 0.8rem;
-  color: #9ca3af;
-  font-style: italic;
-}
+.sep-col.right   { background: #f0fdf4; }
+.sep-col.script  { background: #fffbeb; }
 
 .sep-divider {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 1.25rem;
-  font-size: 1.25rem;
-  color: #d1d5db;
-  margin-top: 3rem;
+  width: 44px;
   flex-shrink: 0;
+  background: #f9fafb;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #9ca3af;
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
 }
 
-.sep-payoff {
-  font-size: 1rem;
-  color: #6b7280;
-  max-width: 860px;
-  line-height: 1.8;
-}
-
-.sep-payoff em {
-  color: #111827;
-  font-style: normal;
-  font-weight: 600;
-}
-
-/* ── Code ── */
-.code-example {
-  padding: 6rem 0;
-  background: #1e1e2e;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.code-example .label { color: #6272a4; }
-.code-example .section-desc { color: #8892b0; }
-.code-example .compare-link {
-  color: #79b8ff;
-  border-bottom-color: #2a4a7a;
-}
-.code-example .compare-link:hover { color: #a8d8ff; border-bottom-color: #79b8ff; }
-
-pre {
-  background: #12121e;
-  border: 1px solid #2d2d3d;
-  border-radius: 12px;
-  padding: 2.5rem;
-  overflow-x: auto;
-  font-size: 0.9rem;
-  line-height: 2;
-  margin-top: 1.5rem;
-}
-
-code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.comment { color: #44475a; }
-.kw      { color: #79b8ff; }
-.type    { color: #56d364; }
-.hex     { color: #f78c6c; }
-.num     { color: #e0af68; }
-.op      { color: #6272a4; }
-
-/* ── Features ── */
-.features {
-  padding: 6rem 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-}
-
-.feature {
-  padding: 1.75rem 2rem;
-  border-left: 3px solid #2563eb;
-  margin-right: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.feature:nth-child(4n+2) { border-left-color: #059669; }
-.feature:nth-child(4n+3) { border-left-color: #d97706; }
-.feature:nth-child(4n+4) { border-left-color: #7c3aed; }
-
-.feature h4 {
+.sep-col-label {
   font-size: 0.95rem;
+  font-weight: 800;
   color: #111827;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
+  margin-bottom: 0.25rem;
 }
 
-.feature p {
+.sep-col-label.hopper-plus   { color: #059669; }
+.sep-col-label.hopper-script { color: #d97706; }
+
+.sep-col-sub {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-bottom: 0.75rem;
+}
+
+.sep-col ul {
+  padding-left: 1.1rem;
+  margin: 0 0 0.75rem;
   font-size: 0.875rem;
-  color: #6b7280;
-  line-height: 1.6;
-}
-
-.feature code {
-  font-size: 0.8rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-/* ── Principles ── */
-.principles {
-  padding: 6rem 0;
-  background: #faf9f6;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1.5rem;
-}
-
-.card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 2rem;
-}
-
-.card h3 {
-  font-size: 1rem;
-  color: #111827;
-  margin-bottom: 0.6rem;
-  font-weight: 600;
-}
-
-.card p {
-  font-size: 0.9rem;
-  color: #6b7280;
+  color: #4b5563;
   line-height: 1.7;
 }
 
-.card code {
-  font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-/* ── Layers ── */
-.layers {
-  padding: 6rem 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.vision-statement {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 1rem;
-  max-width: 860px;
-}
-
-.vision-sub {
-  font-size: 1rem;
-  color: #6b7280;
-  max-width: 860px;
-  line-height: 1.8;
-  margin-bottom: 2.5rem;
-}
-
-.vision-sub code {
-  font-size: 0.85rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.future-note {
-  margin-top: 1.5rem;
-  font-size: 0.85rem;
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.layer-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-width: 1000px;
-}
-
-.layer {
-  padding: 1.75rem 2rem;
-  border-radius: 10px;
-  display: flex;
-  gap: 2.5rem;
-  align-items: flex-start;
-}
-
-.layer.top    { background: #fefce8; border: 1px solid #fde68a; }
-.layer.mid    { background: #f0fdf4; border: 1px solid #bbf7d0; }
-.layer.bottom { background: #eff6ff; border: 1px solid #bfdbfe; }
-.layer.future { opacity: 0.6; }
-
-.layer-info {
-  min-width: 160px;
-}
-
-.layer-name {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.layer.bottom .layer-name { color: #2563eb; }
-.layer.mid    .layer-name { color: #059669; }
-.layer.top    .layer-name { color: #d97706; }
-
-.layer-analogy {
-  font-size: 0.72rem;
-  color: #9ca3af;
-  margin-top: 0.25rem;
+.sep-col-note {
+  font-size: 0.78rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.layer-desc {
-  font-size: 0.9rem;
   color: #6b7280;
-  line-height: 1.7;
+  margin: 0;
 }
 
-/* ── Roadmap ── */
-.roadmap {
-  padding: 6rem 0;
-  background: #faf9f6;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.steps {
-  border-left: 2px solid #e5e7eb;
-  padding-left: 2.5rem;
-}
-
-.step {
-  padding-bottom: 2.5rem;
-  position: relative;
-}
-
-.step::before {
-  content: '';
-  position: absolute;
-  left: -2.85rem;
-  top: 0.4rem;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  border: 2px solid #d1d5db;
-}
-
-.step.done::before { background: #2563eb; border-color: #2563eb; }
-.step.goal::before { background: #059669; border-color: #059669; }
-
-.step-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #9ca3af;
-  font-weight: 600;
-}
-
-.step.done .step-label { color: #2563eb; }
-.step.goal .step-label { color: #059669; }
-
-.step h3 {
-  font-size: 1.05rem;
-  color: #111827;
-  margin: 0.3rem 0 0.5rem;
-  font-weight: 600;
-}
-
-.step p {
-  font-size: 0.9rem;
-  color: #6b7280;
-  max-width: 600px;
-  line-height: 1.7;
-}
-
-.step code {
-  font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-/* ── Footer ── */
-footer {
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.site-footer {
   padding: 3rem 0;
-  background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  background: #0f172a;
+  border-top: 1px solid #1e293b;
   text-align: center;
 }
 
-footer p {
+.footer-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #f59e0b20;
+  color: #f59e0b;
+  border: 1px solid #f59e0b50;
+  padding: 0.2rem 0.6rem;
+  border-radius: 100px;
+}
+
+.version {
   font-size: 0.85rem;
-  color: #9ca3af;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.footer-timeline {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 0.25rem;
+}
+
+.footer-note {
+  font-size: 0.75rem;
+  color: #475569;
+  margin: 0;
 }
 </style>
