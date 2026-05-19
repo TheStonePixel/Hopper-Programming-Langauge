@@ -1,0 +1,13 @@
+{
+  "name": "hopperc",
+  "version": "0.0.1",
+  "description": "Self-hosted Hopper compiler — bootstrap implementation written in Hopper",
+  "license": "Apache-2.0",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "io":   "core",
+    "file": "io",
+    "fs":   "io"
+  }
+}

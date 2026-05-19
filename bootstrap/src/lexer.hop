@@ -1,0 +1,712 @@
+// lexer.hop — Hopper source tokenizer.
+//
+// Reads a source buffer and produces a flat array of tokens.
+// Each token stores its kind, a heap-allocated null-terminated text copy,
+// and its source location (line, col).
+//
+// Usage:
+//   Lexer lx = Lexer(sourceBuf, sourceLen)
+//   lx.scan()
+//   int n = lx.count
+//   int k = lx.getKind(0)    // first token kind
+//   address t = lx.getText(0) // first token text
+
+import io from core
+
+// ── TokenBuffer ──────────────────────────────────────────────────────────────
+// Flat dynamic array of tokens stored as 4 parallel int/address arrays.
+// Stride: each slot is 8 bytes regardless of field type (pointer-sized).
+
+const TOKEN_STRIDE = 8
+
+class TokenBuffer {
+    address kinds
+    address texts
+    address lines
+    address cols
+    int     count
+    int     cap
+
+    constructor(int initialCap) {
+        self.kinds = allocate initialCap * TOKEN_STRIDE
+        self.texts = allocate initialCap * TOKEN_STRIDE
+        self.lines = allocate initialCap * TOKEN_STRIDE
+        self.cols  = allocate initialCap * TOKEN_STRIDE
+        self.count = 0
+        self.cap   = initialCap
+    }
+
+    destructor() {
+        // Free text copies (each text was heap-allocated by the lexer).
+        int i = 0
+        while (i < self.count) {
+            address ts = self.texts + (i * TOKEN_STRIDE)
+            address t = ts::value
+            if (t != null) { deallocate t }
+            i = i + 1
+        }
+        deallocate self.kinds
+        deallocate self.texts
+        deallocate self.lines
+        deallocate self.cols
+    }
+
+    function getKind(int i) int {
+        address slot = self.kinds + (i * TOKEN_STRIDE)
+        int k = slot::value
+        return k
+    }
+
+    function getText(int i) address {
+        address slot = self.texts + (i * TOKEN_STRIDE)
+        address t = slot::value
+        return t
+    }
+
+    function getLine(int i) int {
+        address slot = self.lines + (i * TOKEN_STRIDE)
+        int l = slot::value
+        return l
+    }
+
+    function getCol(int i) int {
+        address slot = self.cols + (i * TOKEN_STRIDE)
+        int c = slot::value
+        return c
+    }
+
+    function add(int kind, address text, int line, int col) {
+        if (self.count >= self.cap) {
+            self.grow()
+        }
+        address ks = self.kinds + (self.count * TOKEN_STRIDE)
+        ks::value = kind
+        address ts = self.texts + (self.count * TOKEN_STRIDE)
+        ts::value = text
+        address ls = self.lines + (self.count * TOKEN_STRIDE)
+        ls::value = line
+        address cs = self.cols + (self.count * TOKEN_STRIDE)
+        cs::value = col
+        self.count = self.count + 1
+    }
+
+    function grow() {
+        int newCap = self.cap * 2
+        address newKinds = allocate newCap * TOKEN_STRIDE
+        address newTexts = allocate newCap * TOKEN_STRIDE
+        address newLines = allocate newCap * TOKEN_STRIDE
+        address newCols  = allocate newCap * TOKEN_STRIDE
+        int i = 0
+        while (i < self.count) {
+            int off = i * TOKEN_STRIDE
+            address src = self.kinds + off
+            address dst = newKinds  + off
+            int v = src::value
+            dst::value = v
+
+            src = self.texts + off
+            dst = newTexts   + off
+            address tv = src::value
+            dst::value = tv
+
+            src = self.lines + off
+            dst = newLines   + off
+            v = src::value
+            dst::value = v
+
+            src = self.cols + off
+            dst = newCols   + off
+            v = src::value
+            dst::value = v
+
+            i = i + 1
+        }
+        deallocate self.kinds
+        deallocate self.texts
+        deallocate self.lines
+        deallocate self.cols
+        self.kinds = newKinds
+        self.texts = newTexts
+        self.lines = newLines
+        self.cols  = newCols
+        self.cap   = newCap
+    }
+}
+
+// ── Lexer ─────────────────────────────────────────────────────────────────────
+
+class Lexer {
+    address src      // source buffer (not owned)
+    int     srcLen
+    int     pos      // current byte offset
+    int     line
+    int     col
+    int     errors   // error count
+
+    // Output: populated by scan().
+    address kinds
+    address texts
+    address lines
+    address cols
+    int     count
+    int     cap
+
+    constructor(address source, int len) {
+        self.src    = source
+        self.srcLen = len
+        self.pos    = 0
+        self.line   = 1
+        self.col    = 1
+        self.errors = 0
+        // Initialise token storage (reuse TokenBuffer layout inline).
+        int initCap = 4096
+        self.kinds = allocate initCap * TOKEN_STRIDE
+        self.texts = allocate initCap * TOKEN_STRIDE
+        self.lines = allocate initCap * TOKEN_STRIDE
+        self.cols  = allocate initCap * TOKEN_STRIDE
+        self.count = 0
+        self.cap   = initCap
+    }
+
+    destructor() {
+        deallocate self.kinds
+        deallocate self.texts
+        deallocate self.lines
+        deallocate self.cols
+    }
+
+    // ── public ────────────────────────────────────────────────────────────────
+
+    function getKind(int i) int {
+        address slot = self.kinds + (i * TOKEN_STRIDE)
+        int k = slot::value
+        return k
+    }
+
+    function getText(int i) address {
+        address slot = self.texts + (i * TOKEN_STRIDE)
+        address t = slot::value
+        return t
+    }
+
+    function getLine(int i) int {
+        address slot = self.lines + (i * TOKEN_STRIDE)
+        int l = slot::value
+        return l
+    }
+
+    function getCol(int i) int {
+        address slot = self.cols + (i * TOKEN_STRIDE)
+        int c = slot::value
+        return c
+    }
+
+    // Scan the entire source and populate the token arrays.
+    function scan() {
+        while (true) {
+            self.skipWhitespaceAndComments()
+            if (self.pos >= self.srcLen) {
+                self.emit(TK_EOF, null, self.line, self.col)
+                return
+            }
+            byte c = self.peek()
+            int  ci = cast c
+
+            // Newline
+            if (ci == 10) {      // '\n'
+                int tokLine = self.line
+                int tokCol  = self.col
+                self.advance()
+                self.emitNoText(TK_NEWLINE, tokLine, tokCol)
+                continue
+            }
+
+            // '\r\n'
+            if (ci == 13) {      // '\r'
+                self.advance()
+                continue
+            }
+
+            // Identifiers and keywords
+            if (self.isAlpha(ci)) {
+                self.scanIdent()
+                continue
+            }
+
+            // Numbers
+            if (self.isDigit(ci)) {
+                self.scanNumber()
+                continue
+            }
+
+            // String literal
+            if (ci == 34) {      // '"'
+                self.scanString()
+                continue
+            }
+
+            // Char literal
+            if (ci == 39) {      // '\''
+                self.scanChar()
+                continue
+            }
+
+            // U+XXXX unicode literal
+            if (ci == 85) {      // 'U'
+                // peek ahead for '+'
+                if (self.pos + 1 < self.srcLen) {
+                    address nx = self.src + (self.pos + 1)
+                    byte nb = nx::value
+                    int nbi = cast nb
+                    if (nbi == 43) {   // '+'
+                        self.scanUnicode()
+                        continue
+                    }
+                }
+                self.scanIdent()
+                continue
+            }
+
+            // Punctuation and operators
+            self.scanSymbol()
+        }
+    }
+
+    // ── private helpers ───────────────────────────────────────────────────────
+
+    function peek() byte {
+        address p = self.src + self.pos
+        byte b = p::value
+        return b
+    }
+
+    function peekAt(int offset) byte {
+        address p = self.src + (self.pos + offset)
+        byte b = p::value
+        return b
+    }
+
+    function advance() byte {
+        address p = self.src + self.pos
+        byte b = p::value
+        self.pos = self.pos + 1
+        int bi = cast b
+        if (bi == 10) {   // '\n'
+            self.line = self.line + 1
+            self.col  = 1
+        } else {
+            self.col = self.col + 1
+        }
+        return b
+    }
+
+    function isAlpha(int c) bool {
+        if (c >= 65 && c <= 90)  { return true }   // A-Z
+        if (c >= 97 && c <= 122) { return true }   // a-z
+        if (c == 95)             { return true }   // _
+        return false
+    }
+
+    function isAlphaNum(int c) bool {
+        if (self.isAlpha(c))     { return true }
+        if (c >= 48 && c <= 57)  { return true }   // 0-9
+        return false
+    }
+
+    function isDigit(int c) bool {
+        return c >= 48 && c <= 57
+    }
+
+    function isHexDigit(int c) bool {
+        if (c >= 48 && c <= 57)  { return true }   // 0-9
+        if (c >= 65 && c <= 70)  { return true }   // A-F
+        if (c >= 97 && c <= 102) { return true }   // a-f
+        return false
+    }
+
+    function skipWhitespaceAndComments() {
+        while (self.pos < self.srcLen) {
+            byte c = self.peek()
+            int  ci = cast c
+            // spaces and tabs
+            if (ci == 32 || ci == 9) {
+                self.advance()
+                continue
+            }
+            // line comment: // to end of line
+            if (ci == 47 && self.pos + 1 < self.srcLen) {
+                byte nc = self.peekAt(1)
+                int  nci = cast nc
+                if (nci == 47) {
+                    self.advance()
+                    self.advance()
+                    while (self.pos < self.srcLen) {
+                        byte cc = self.peek()
+                        int cci = cast cc
+                        if (cci == 10 || cci == 13) { break }
+                        self.advance()
+                    }
+                    continue
+                }
+            }
+            break
+        }
+    }
+
+    function scanIdent() {
+        int  startLine = self.line
+        int  startCol  = self.col
+        int  start     = self.pos
+        while (self.pos < self.srcLen) {
+            byte c  = self.peek()
+            int  ci = cast c
+            if (self.isAlphaNum(ci)) {
+                self.advance()
+            } else {
+                break
+            }
+        }
+        int  len  = self.pos - start
+        address sp = self.src + start
+        int  kind = keywordKind(sp, len)
+        address text = self.copyText(sp, len)
+        self.emit(kind, text, startLine, startCol)
+    }
+
+    function scanNumber() {
+        int startLine = self.line
+        int startCol  = self.col
+        int start     = self.pos
+
+        byte c0 = self.peek()
+        int  c0i = cast c0
+
+        // Possible hex: 0x...
+        if (c0i == 48 && self.pos + 1 < self.srcLen) {
+            byte c1 = self.peekAt(1)
+            int  c1i = cast c1
+            if (c1i == 120 || c1i == 88) {   // 'x' or 'X'
+                self.advance()  // consume '0'
+                self.advance()  // consume 'x'
+                while (self.pos < self.srcLen) {
+                    byte hc  = self.peek()
+                    int  hci = cast hc
+                    if (self.isHexDigit(hci)) {
+                        self.advance()
+                    } else {
+                        break
+                    }
+                }
+                int len = self.pos - start
+                address sp = self.src + start
+                address text = self.copyText(sp, len)
+                self.emit(TK_HEX_LIT, text, startLine, startCol)
+                return
+            }
+        }
+
+        // Integer or float
+        while (self.pos < self.srcLen) {
+            byte dc  = self.peek()
+            int  dci = cast dc
+            if (self.isDigit(dci)) {
+                self.advance()
+            } else {
+                break
+            }
+        }
+
+        // Float: digit '.' digit
+        int isFloat = 0
+        if (self.pos < self.srcLen) {
+            byte dc  = self.peek()
+            int  dci = cast dc
+            if (dci == 46) {   // '.'
+                if (self.pos + 1 < self.srcLen) {
+                    byte dc2  = self.peekAt(1)
+                    int  dc2i = cast dc2
+                    if (self.isDigit(dc2i)) {
+                        isFloat = 1
+                        self.advance()  // consume '.'
+                        while (self.pos < self.srcLen) {
+                            byte fc  = self.peek()
+                            int  fci = cast fc
+                            if (self.isDigit(fci)) {
+                                self.advance()
+                            } else {
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        int len = self.pos - start
+        address sp = self.src + start
+        address text = self.copyText(sp, len)
+        if (isFloat == 1) {
+            self.emit(TK_FLOAT_LIT, text, startLine, startCol)
+        } else {
+            self.emit(TK_INT_LIT, text, startLine, startCol)
+        }
+    }
+
+    function scanString() {
+        int startLine = self.line
+        int startCol  = self.col
+        self.advance()  // consume opening '"'
+
+        // Count max length (may be smaller due to escape processing).
+        // Scan to closing '"', recording start.
+        int start = self.pos
+        // Build the actual string value without the surrounding quotes,
+        // processing escape sequences.
+        address buf = allocate 4096
+        int bufLen  = 0
+
+        while (self.pos < self.srcLen) {
+            byte c  = self.peek()
+            int  ci = cast c
+            if (ci == 34) {   // '"'
+                self.advance()
+                break
+            }
+            if (ci == 92) {   // '\'
+                self.advance()
+                byte esc  = self.advance()
+                int  esci = cast esc
+                byte mapped = self.mapEscape(esci)
+                address bp = buf + bufLen
+                bp::value = mapped
+                bufLen = bufLen + 1
+            } else {
+                self.advance()
+                address bp = buf + bufLen
+                bp::value = c
+                bufLen = bufLen + 1
+            }
+        }
+        address nullTerm = buf + bufLen
+        byte zero = 0
+        nullTerm::value = zero
+
+        address text = self.copyText(buf, bufLen)
+        deallocate buf
+        self.emit(TK_STRING_LIT, text, startLine, startCol)
+    }
+
+    function scanChar() {
+        int startLine = self.line
+        int startCol  = self.col
+        int start     = self.pos
+        self.advance()  // consume '\''
+
+        byte val = 0
+        byte c   = self.peek()
+        int  ci  = cast c
+        if (ci == 92) {   // '\' escape
+            self.advance()
+            byte esc  = self.advance()
+            int  esci = cast esc
+            val = self.mapEscape(esci)
+        } else {
+            val = self.advance()
+        }
+        // consume closing '\''
+        if (self.pos < self.srcLen) {
+            byte cq = self.peek()
+            int  cqi = cast cq
+            if (cqi == 39) { self.advance() }
+        }
+        int len = self.pos - start
+        address sp = self.src + start
+        address text = self.copyText(sp, len)
+        self.emit(TK_CHAR_LIT, text, startLine, startCol)
+    }
+
+    function scanUnicode() {
+        int startLine = self.line
+        int startCol  = self.col
+        int start     = self.pos
+        self.advance()  // 'U'
+        self.advance()  // '+'
+        while (self.pos < self.srcLen) {
+            byte hc  = self.peek()
+            int  hci = cast hc
+            if (self.isHexDigit(hci)) {
+                self.advance()
+            } else {
+                break
+            }
+        }
+        int len = self.pos - start
+        address sp = self.src + start
+        address text = self.copyText(sp, len)
+        self.emit(TK_UNICODE_LIT, text, startLine, startCol)
+    }
+
+    function scanSymbol() {
+        int startLine = self.line
+        int startCol  = self.col
+        byte c  = self.peek()
+        int  ci = cast c
+        self.advance()
+
+        // Two-character symbols
+        if (self.pos < self.srcLen) {
+            byte nc  = self.peek()
+            int  nci = cast nc
+
+            if (ci == 58 && nci == 58) { self.advance(); self.emitNoText(TK_DCOLON,   startLine, startCol); return } // ::
+            if (ci == 61 && nci == 61) { self.advance(); self.emitNoText(TK_EQEQ,     startLine, startCol); return } // ==
+            if (ci == 33 && nci == 61) { self.advance(); self.emitNoText(TK_BANGEQ,   startLine, startCol); return } // !=
+            if (ci == 60 && nci == 61) { self.advance(); self.emitNoText(TK_LTEQ,     startLine, startCol); return } // <=
+            if (ci == 62 && nci == 61) { self.advance(); self.emitNoText(TK_GTEQ,     startLine, startCol); return } // >=
+            if (ci == 38 && nci == 38) { self.advance(); self.emitNoText(TK_AMPAMP,   startLine, startCol); return } // &&
+            if (ci == 124 && nci == 124){ self.advance(); self.emitNoText(TK_PIPEPIPE, startLine, startCol); return } // ||
+            if (ci == 60 && nci == 60) { self.advance(); self.emitNoText(TK_LSHIFT,   startLine, startCol); return } // <<
+            if (ci == 62 && nci == 62) { self.advance(); self.emitNoText(TK_RSHIFT,   startLine, startCol); return } // >>
+
+            // ... three dots
+            if (ci == 46 && nci == 46) {
+                if (self.pos + 1 < self.srcLen) {
+                    byte nc2  = self.peekAt(1)
+                    int  nc2i = cast nc2
+                    if (nc2i == 46) {
+                        self.advance()
+                        self.advance()
+                        self.emitNoText(TK_ELLIPSIS, startLine, startCol)
+                        return
+                    }
+                }
+            }
+        }
+
+        // Single-character symbols
+        if (ci == 40)  { self.emitNoText(TK_LPAREN,   startLine, startCol); return }
+        if (ci == 41)  { self.emitNoText(TK_RPAREN,   startLine, startCol); return }
+        if (ci == 123) { self.emitNoText(TK_LBRACE,   startLine, startCol); return }
+        if (ci == 125) { self.emitNoText(TK_RBRACE,   startLine, startCol); return }
+        if (ci == 91)  { self.emitNoText(TK_LBRACKET, startLine, startCol); return }
+        if (ci == 93)  { self.emitNoText(TK_RBRACKET, startLine, startCol); return }
+        if (ci == 44)  { self.emitNoText(TK_COMMA,    startLine, startCol); return }
+        if (ci == 46)  { self.emitNoText(TK_DOT,      startLine, startCol); return }
+        if (ci == 58)  { self.emitNoText(TK_COLON,    startLine, startCol); return }
+        if (ci == 43)  { self.emitNoText(TK_PLUS,     startLine, startCol); return }
+        if (ci == 45)  { self.emitNoText(TK_MINUS,    startLine, startCol); return }
+        if (ci == 42)  { self.emitNoText(TK_STAR,     startLine, startCol); return }
+        if (ci == 47)  { self.emitNoText(TK_SLASH,    startLine, startCol); return }
+        if (ci == 37)  { self.emitNoText(TK_PERCENT,  startLine, startCol); return }
+        if (ci == 61)  { self.emitNoText(TK_EQ,       startLine, startCol); return }
+        if (ci == 60)  { self.emitNoText(TK_LT,       startLine, startCol); return }
+        if (ci == 62)  { self.emitNoText(TK_GT,       startLine, startCol); return }
+        if (ci == 38)  { self.emitNoText(TK_AMP,      startLine, startCol); return }
+        if (ci == 124) { self.emitNoText(TK_PIPE,     startLine, startCol); return }
+        if (ci == 94)  { self.emitNoText(TK_CARET,    startLine, startCol); return }
+        if (ci == 33)  { self.emitNoText(TK_BANG,     startLine, startCol); return }
+        if (ci == 126) { self.emitNoText(TK_TILDE,    startLine, startCol); return }
+
+        // Unknown character — emit error token
+        self.errors = self.errors + 1
+        address errText = allocate 2
+        address ep = errText
+        ep::value = c
+        address ep1 = errText + 1
+        byte ez = 0
+        ep1::value = ez
+        self.emit(TK_ERROR, errText, startLine, startCol)
+    }
+
+    // Map escape character code to its byte value.
+    function mapEscape(int esc) byte {
+        if (esc == 110) { byte nl = 10;  return nl }   // \n
+        if (esc == 116) { byte tb = 9;   return tb }   // \t
+        if (esc == 114) { byte cr = 13;  return cr }   // \r
+        if (esc == 48)  { byte nz = 0;   return nz }   // \0
+        if (esc == 92)  { byte bs = 92;  return bs }   // \\
+        if (esc == 34)  { byte dq = 34;  return dq }   // \"
+        if (esc == 39)  { byte sq = 39;  return sq }   // \'
+        // Default: return the character itself.
+        byte fb = cast esc
+        return fb
+    }
+
+    // Allocate a null-terminated heap copy of src[0..len).
+    function copyText(address src, int len) address {
+        address buf = allocate len + 1
+        int i = 0
+        while (i < len) {
+            address sp = src + i
+            address dp = buf + i
+            byte b = sp::value
+            dp::value = b
+            i = i + 1
+        }
+        address term = buf + len
+        byte z = 0
+        term::value = z
+        return buf
+    }
+
+    // Add a token with text.
+    function emit(int kind, address text, int line, int col) {
+        if (self.count >= self.cap) { self.growBuf() }
+        address ks = self.kinds + (self.count * TOKEN_STRIDE)
+        ks::value = kind
+        address ts = self.texts + (self.count * TOKEN_STRIDE)
+        ts::value = text
+        address ls = self.lines + (self.count * TOKEN_STRIDE)
+        ls::value = line
+        address cs = self.cols + (self.count * TOKEN_STRIDE)
+        cs::value = col
+        self.count = self.count + 1
+    }
+
+    // Add a token with no text (punctuation / keywords without payloads).
+    function emitNoText(int kind, int line, int col) {
+        self.emit(kind, null, line, col)
+    }
+
+    function growBuf() {
+        int newCap = self.cap * 2
+        address newKinds = allocate newCap * TOKEN_STRIDE
+        address newTexts = allocate newCap * TOKEN_STRIDE
+        address newLines = allocate newCap * TOKEN_STRIDE
+        address newCols  = allocate newCap * TOKEN_STRIDE
+        int i = 0
+        while (i < self.count) {
+            int off = i * TOKEN_STRIDE
+            address sk = self.kinds + off
+            address dk = newKinds  + off
+            int v = sk::value
+            dk::value = v
+
+            address st = self.texts + off
+            address dt = newTexts   + off
+            address tv = st::value
+            dt::value = tv
+
+            address sl = self.lines + off
+            address dl = newLines   + off
+            v = sl::value
+            dl::value = v
+
+            address sc = self.cols + off
+            address dc = newCols   + off
+            v = sc::value
+            dc::value = v
+
+            i = i + 1
+        }
+        deallocate self.kinds
+        deallocate self.texts
+        deallocate self.lines
+        deallocate self.cols
+        self.kinds = newKinds
+        self.texts = newTexts
+        self.lines = newLines
+        self.cols  = newCols
+        self.cap   = newCap
+    }
+}
