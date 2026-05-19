@@ -1,7 +1,7 @@
 // TEST: factory constructs shapes with correct geometry
 // EXPECT: circle:    area=75  perimeter=30
 // EXPECT: rectangle: area=24  perimeter=20
-// EXPECT: triangle:  area=6   perimeter=10
+// EXPECT: triangle:  area=6  perimeter=10
 
 extern function printf(string fmt, ...) int
 
