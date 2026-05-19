@@ -11,7 +11,8 @@ const route = useRoute()
         <li><RouterLink to="/"       :class="{ active: route.path === '/' }">Home</RouterLink></li>
         <li><RouterLink to="/syntax" :class="{ active: route.path === '/syntax' }">Syntax</RouterLink></li>
         <li><RouterLink to="/vs-c"   :class="{ active: route.path === '/vs-c' }">vs C</RouterLink></li>
-        <li><RouterLink to="/about"  :class="{ active: route.path === '/about' }">About</RouterLink></li>
+        <li><RouterLink to="/programs" :class="{ active: route.path === '/programs' }">Programs</RouterLink></li>
+        <li><RouterLink to="/about"   :class="{ active: route.path === '/about' }">About</RouterLink></li>
       </ul>
     </div>
   </nav>
