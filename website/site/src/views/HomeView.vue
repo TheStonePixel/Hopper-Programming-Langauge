@@ -187,18 +187,43 @@ function nodeBox(el) {
     }
 }
 
-function svgCurve(x1, y1, x2, y2) {
-    const mid = (y1 + y2) / 2
-    return `M${x1},${y1} C${x1},${mid} ${x2},${mid} ${x2},${y2}`
+// Build an orthogonal SVG path (H/V segments only) with rounded corners.
+// pts: [[x,y], ...] — every turn must be a 90° angle (H then V or V then H).
+// r:   corner radius in px.
+function orthoPath(pts, r = 12) {
+    if (pts.length < 2) return ''
+    let d = `M${pts[0][0]},${pts[0][1]}`
+    for (let i = 1; i < pts.length; i++) {
+        const [x0, y0] = pts[i - 1]
+        const [x1, y1] = pts[i]
+        const [x2, y2] = i < pts.length - 1 ? pts[i + 1] : [x1, y1]
+        if (i === pts.length - 1) {
+            // last segment — go straight to end
+            d += ` L${x1},${y1}`
+        } else {
+            // shorten this segment by r before the corner, then Q through the corner
+            const dx0 = x1 - x0, dy0 = y1 - y0
+            const dx1 = x2 - x1, dy1 = y2 - y1
+            const len0 = Math.sqrt(dx0 * dx0 + dy0 * dy0)
+            const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1)
+            const rc   = Math.min(r, len0 / 2, len1 / 2)
+            // approach point (rc before the corner)
+            const ax = x1 - (dx0 / len0) * rc
+            const ay = y1 - (dy0 / len0) * rc
+            // departure point (rc after the corner)
+            const bx = x1 + (dx1 / len1) * rc
+            const by = y1 + (dy1 / len1) * rc
+            d += ` L${ax},${ay} Q${x1},${y1} ${bx},${by}`
+        }
+    }
+    return d
 }
 
-function addCircle(svg, cx, cy, r = 5, fill = '#2563eb') {
+function dot(svg, cx, cy, r = 4, fill = '#2563eb', opacity = 0.75) {
     const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-    c.setAttribute('cx', cx)
-    c.setAttribute('cy', cy)
-    c.setAttribute('r',  r)
-    c.setAttribute('fill', fill)
-    c.setAttribute('opacity', '0.7')
+    c.setAttribute('cx', cx); c.setAttribute('cy', cy)
+    c.setAttribute('r',  r);  c.setAttribute('fill', fill)
+    c.setAttribute('opacity', opacity)
     svg.appendChild(c)
 }
 
@@ -207,7 +232,6 @@ function drawTreeLines() {
     const svg     = treeSvg.value
     if (!wrapper || !svg) return
 
-    // clear previous
     while (svg.firstChild) svg.removeChild(svg.firstChild)
 
     const W = wrapper.offsetWidth
@@ -224,32 +248,59 @@ function drawTreeLines() {
     const s  = nodeBox(refSyscall.value)
     const e  = nodeBox(refEntry.value)
 
-    // merge1: where asm + bitfield converge
-    const m1x = (a.cx + b.cx) / 2
-    const m1y = Math.max(a.bottom, b.bottom) + 28
+    const G  = 30  // routing gap (px between node edge and turn)
+    const R  = 12  // corner radius
 
-    // merge2: where unique + trunk meet before class
-    const m2y = cl.top - 28
+    // Vertical trunk X: centre of the gap between the two columns
+    const tx = (a.right + b.left) / 2
 
-    const connections = [
-        // asm and bitfield down to shared merge point
-        { x1: a.cx, y1: a.bottom, x2: m1x,  y2: m1y  },
-        { x1: b.cx, y1: b.bottom, x2: m1x,  y2: m1y  },
-        // trunk branches left to manual memory
-        { x1: m1x,  y1: m1y,     x2: m.cx,  y2: m.top  },
-        // memory down to Unique<T>
-        { x1: m.cx, y1: m.bottom, x2: u.cx,  y2: u.top  },
-        // trunk continues down toward class
-        { x1: m1x,  y1: m1y,     x2: cl.cx, y2: m2y    },
-        // Unique<T> curves right into class
-        { x1: u.cx, y1: u.bottom, x2: cl.cx, y2: cl.top },
-        // class down to entry
-        { x1: cl.cx, y1: cl.bottom, x2: e.cx, y2: e.top },
-        // syscall curves in to entry
-        { x1: s.cx, y1: s.bottom,  x2: e.cx, y2: e.top  },
+    // Key Y levels
+    const busY     = Math.max(a.bottom, b.bottom) + G      // horizontal bus connecting asm + bitfield
+    const memBrY   = m.top  - G                            // where trunk T-junctions left to memory
+    const clBrY    = cl.top - G                            // where trunk turns right into class top
+    const underY   = Math.max(u.bottom, cl.bottom) + G     // underpass: unique routes under to class bottom
+    const entY     = e.top  - G                            // where class + syscall converge before entry
+
+    // ── Path definitions (waypoints for orthoPath) ───────────────────────────
+    //
+    //  [asm]                [bitfield]
+    //    |                      |
+    //  busY ────── tx ──────── busY     ← horizontal bus
+    //               |
+    //            memBrY ─── [memory]   ← T-branch left
+    //               |          |
+    //               |       [unique]
+    //               |          |
+    //            clBrY ─── [class]     ← turn right into class top
+    //                          |    ←─ unique underpass into class bottom
+    //                          |
+    //  [syscall] ─── entY ─── entY     ← converge before entry
+    //                          |
+    //                       [entry]
+
+    const segments = [
+        // asm drops to bus
+        { pts: [[a.cx, a.bottom], [a.cx, busY]], delay: 0 },
+        // bitfield drops to bus
+        { pts: [[b.cx, b.bottom], [b.cx, busY]], delay: 1 },
+        // horizontal bus across the top
+        { pts: [[a.cx, busY], [b.cx, busY]], delay: 2 },
+        // trunk drops from bus midpoint, T-branches left to memory
+        { pts: [[tx, busY], [tx, memBrY]], delay: 3 },
+        { pts: [[tx, memBrY], [m.cx, memBrY], [m.cx, m.top]], delay: 4 },
+        // memory straight down to Unique<T>
+        { pts: [[m.cx, m.bottom], [u.cx, u.top]], delay: 5 },
+        // trunk continues down, turns right into class top
+        { pts: [[tx, memBrY], [tx, clBrY], [cl.cx, clBrY], [cl.cx, cl.top]], delay: 6 },
+        // Unique<T> underpass: goes below both nodes, rises into class bottom
+        { pts: [[u.cx, u.bottom], [u.cx, underY], [cl.cx, underY], [cl.cx, cl.bottom]], delay: 7 },
+        // class drops to entry converge point, then into entry top
+        { pts: [[cl.cx, cl.bottom], [cl.cx, entY], [e.cx, entY], [e.cx, e.top]], delay: 8 },
+        // syscall routes right to entry converge point
+        { pts: [[s.cx, s.bottom], [s.cx, entY], [e.cx, entY], [e.cx, e.top]], delay: 9 },
     ]
 
-    // ensure keyframe exists
+    // ensure keyframe
     if (!document.getElementById('hopper-tree-kf')) {
         const st = document.createElement('style')
         st.id = 'hopper-tree-kf'
@@ -257,27 +308,27 @@ function drawTreeLines() {
         document.head.appendChild(st)
     }
 
-    connections.forEach(({ x1, y1, x2, y2 }, idx) => {
-        const d    = svgCurve(x1, y1, x2, y2)
+    segments.forEach(({ pts, delay }) => {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-        path.setAttribute('d', d)
+        path.setAttribute('d', orthoPath(pts, R))
         path.setAttribute('fill', 'none')
         path.setAttribute('stroke', '#2563eb')
         path.setAttribute('stroke-width', '1.75')
         path.setAttribute('stroke-opacity', '0.45')
         path.setAttribute('stroke-linecap', 'round')
-
+        path.setAttribute('stroke-linejoin', 'round')
         const len = path.getTotalLength()
         path.style.strokeDasharray  = len
         path.style.strokeDashoffset = len
-        path.style.animation = `hopperDrawPath 0.65s ease ${idx * 0.09}s forwards`
+        path.style.animation = `hopperDrawPath 0.5s ease ${delay * 0.1}s forwards`
         svg.appendChild(path)
     })
 
-    // junction dots
-    addCircle(svg, m1x, m1y)
-    addCircle(svg, cl.cx, m2y, 4, '#7c3aed')
-    addCircle(svg, e.cx,  e.top - 4, 6, '#059669')
+    // Junction / merge dots (drawn after paths so they sit on top)
+    dot(svg, tx,    busY,   5, '#2563eb')          // bus midpoint — trunk origin
+    dot(svg, tx,    memBrY, 4, '#7c3aed')          // T-junction to memory
+    dot(svg, tx,    clBrY,  4, '#2563eb')          // trunk turns into class
+    dot(svg, e.cx,  entY,   5, '#059669')          // class + syscall converge before entry
 }
 
 // ── Hero + tree mount ─────────────────────────────────────────────────────────
