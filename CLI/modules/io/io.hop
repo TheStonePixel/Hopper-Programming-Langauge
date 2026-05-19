@@ -4,7 +4,7 @@
 // No extern printf/scanf required.
 //
 // Usage:
-//   import io from io
+//   import io from core
 //
 //   print(42)          — decimal integer
 //   print("hello")     — null-terminated string

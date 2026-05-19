@@ -2,7 +2,7 @@
 // EXPECT: hello from hopper
 // EXPECT: read ok
 
-import io from io
+import io from core
 import file from io
 
 entry main(int argc, address argv) {

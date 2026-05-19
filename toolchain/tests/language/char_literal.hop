@@ -1,7 +1,7 @@
 // EXPECT: Hello, Lenny
 // EXPECT: tab:	end
 // EXPECT: 65
-import String from ascii
+import ascii from string
 import io from linux
 
 entry main {

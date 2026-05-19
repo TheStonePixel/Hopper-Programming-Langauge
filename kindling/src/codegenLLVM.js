@@ -1,4 +1,11 @@
 import { buildAstFromSource } from "./astBuilder.js";
+import {
+    emitRequiresChecks,
+    emitEnsuresChecks,
+    emitInvariantChecks,
+    emitConstrainCheck,
+    strictAnalyze,
+} from "./codegenConstraints.js";
 
 // ── module-level registries ────────────────────────────────────────────────
 
@@ -17,6 +24,9 @@ const bitfieldTypes      = new Map();   // name → BitfieldDecl
 const enumTypes          = new Map();   // enum name → Map(variantName → int value)
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
+let   wordBits = 64;                    // native integer width: 64 for x86-64, 32 for ARM32
+let   contractsUsed = false;            // true when any requires/ensures/invariant/constrain is present
+let   releaseMode   = false;            // --release: skip all contract IR emission
 
 function resetAll() {
     stringConstants.clear();
@@ -34,6 +44,9 @@ function resetAll() {
     enumTypes.clear();
     instantiatedClasses = [];
     stringCounter = 0;
+    wordBits = 64;
+    contractsUsed = false;
+    releaseMode   = false;
 }
 
 function addStringConstant(value) {
@@ -344,6 +357,7 @@ function callbackFnTypeSig(t) {
 // ── type helpers ───────────────────────────────────────────────────────────
 
 function llvmType(t) {
+    const wordTy = wordBits === 32 ? "i32" : "i64";
     if (!t) return "void";
     if (typeAliases.has(t)) return llvmType(typeAliases.get(t));
     // Check class/struct registries before hard-coded keywords so that
@@ -351,7 +365,7 @@ function llvmType(t) {
     if (classTypes.has(t))    return `%class.${t}`;
     if (structTypes.has(t))   return `%struct.${t}`;
     if (bitfieldTypes.has(t)) return bitfieldLLType(bitfieldTypes.get(t));
-    if (t === "int")          return "i64";
+    if (t === "int")          return wordTy;
     if (t === "bool")         return "i1";
     if (t === "bit")          return "i1";
     if (t === "byte" || t === "char")         return "i8";
@@ -360,7 +374,7 @@ function llvmType(t) {
     if (t === "string")       return "i8*";
     if (t === "String")       return "i8*";   // fallback: bare String with no class registered
     if (t === "address")      return "i8*";
-    if (t === "unsignedint")  return "i64";
+    if (t === "unsignedint")  return wordTy;
     if (t === "unsignedbyte") return "i8";
     if (t.startsWith("address:")) return llvmType(t.substring(8)) + "*";
     if (t.startsWith("callback(")) return "i8*";  // stored as opaque pointer
@@ -570,7 +584,8 @@ function emitCast(ir, srcVal, srcType, targetType) {
     }
     // int ↔ address (inttoptr / ptrtoint) — natural in systems code
     if ((srcType === "int" || srcType === "unsignedint") && targetType === "address") {
-        ir.emit(`${tmp} = inttoptr i64 ${srcVal} to i8*`);
+        const wordT = wordBits === 32 ? "i32" : "i64";
+        ir.emit(`${tmp} = inttoptr ${wordT} ${srcVal} to i8*`);
         return { value: tmp, type: "address" };
     }
     if (srcType === "address" && (targetType === "int" || targetType === "unsignedint")) {
@@ -640,13 +655,22 @@ function genExpr(ir, expr) {
 
         case "Var": {
             const c = moduleConstants.get(expr.name);
-            if (c) return { value: String(c.value), type: c.type };
+            if (c) {
+                if (c.type === "string") {
+                    const strName = addStringConstant(c.value);
+                    const len     = stringByteLen(c.value) + 1;
+                    const tmp     = ir.newTmp();
+                    ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
+                    return { value: tmp, type: "string" };
+                }
+                return { value: String(c.value), type: c.type };
+            }
 
             const mmio = mmioBindings.get(expr.name);
             if (mmio) {
                 const ptr = ir.newTmp();
                 const tmp = ir.newTmp();
-                ir.emit(`${ptr} = inttoptr i64 ${mmio.addr} to ${mmio.llType}*`);
+                ir.emit(`${ptr} = inttoptr ${wordBits === 32 ? "i32" : "i64"} ${mmio.addr} to ${mmio.llType}*`);
                 ir.emit(`${tmp} = load volatile ${mmio.llType}, ${mmio.llType}* ${ptr}`);
                 return { value: tmp, type: mmio.hType };
             }
@@ -671,12 +695,20 @@ function genExpr(ir, expr) {
         }
 
         case "FieldAccess": {
-            // Enum access: ErrorCode.NOT_FOUND → integer literal
+            // Enum access: Color.Red → int or string constant
             if (enumTypes.has(expr.object)) {
-                const variants = enumTypes.get(expr.object);
-                if (!variants.has(expr.field))
+                const en = enumTypes.get(expr.object);
+                if (!en.variants.has(expr.field))
                     throw new Error(`Unknown enum variant: ${expr.object}.${expr.field}`);
-                return { value: String(variants.get(expr.field)), type: "int" };
+                const v = en.variants.get(expr.field);
+                if (v.kind === "string") {
+                    const strName = addStringConstant(v.value);
+                    const len     = stringByteLen(v.value) + 1;
+                    const tmp     = ir.newTmp();
+                    ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
+                    return { value: tmp, type: "string" };
+                }
+                return { value: String(v.value), type: "int" };
             }
             // Check MMIO (strict) bitfield first — uses volatile load
             const mmioFA = mmioBindings.get(expr.object);
@@ -685,7 +717,7 @@ function genExpr(ir, expr) {
                 const { llType } = bitfieldLayout(bf);
                 const { offset, width, fieldType } = bitfieldFieldInfo(bf, expr.field);
                 const ptr = ir.newTmp();
-                ir.emit(`${ptr} = inttoptr i64 ${mmioFA.addr} to ${llType}*`);
+                ir.emit(`${ptr} = inttoptr ${wordBits === 32 ? "i32" : "i64"} ${mmioFA.addr} to ${llType}*`);
                 const container = ir.newTmp();
                 ir.emit(`${container} = load volatile ${llType}, ${llType}* ${ptr}`);
                 const shifted = ir.newTmp();
@@ -1384,6 +1416,10 @@ function genStmt(ir, stmt, retType) {
                 } else {
                     ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
                 }
+                if (!releaseMode && stmt.constrain) {
+                    contractsUsed = true;
+                    emitConstrainCheck(ir, init.value, llType, stmt.constrain);
+                }
             }
 
             ir.vars.set(stmt.name, { ptr, type: llType, hType });
@@ -1395,7 +1431,7 @@ function genStmt(ir, stmt, retType) {
             if (mmio) {
                 const val = genExpr(ir, stmt.expr);
                 const ptr = ir.newTmp();
-                ir.emit(`${ptr} = inttoptr i64 ${mmio.addr} to ${mmio.llType}*`);
+                ir.emit(`${ptr} = inttoptr ${wordBits === 32 ? "i32" : "i64"} ${mmio.addr} to ${mmio.llType}*`);
                 ir.emit(`store volatile ${mmio.llType} ${val.value}, ${mmio.llType}* ${ptr}`);
                 break;
             }
@@ -1459,7 +1495,7 @@ function genStmt(ir, stmt, retType) {
                 const fieldMask = (1n << BigInt(width)) - 1n;
                 const clearMask = ~(fieldMask << BigInt(offset)) & ((1n << 64n) - 1n);
                 const ptr = ir.newTmp();
-                ir.emit(`${ptr} = inttoptr i64 ${mmioFW.addr} to ${llType}*`);
+                ir.emit(`${ptr} = inttoptr ${wordBits === 32 ? "i32" : "i64"} ${mmioFW.addr} to ${llType}*`);
                 const current = ir.newTmp();
                 ir.emit(`${current} = load volatile ${llType}, ${llType}* ${ptr}`);
                 const cleared = ir.newTmp();
@@ -1738,6 +1774,10 @@ function genStmt(ir, stmt, retType) {
             const endLbl  = ir.newLabel("while.end.");
             ir.emit(`br label %${condLbl}`);
             ir.emit(`${condLbl}:`);
+            if (!releaseMode && stmt.invariants && stmt.invariants.length > 0) {
+                contractsUsed = true;
+                emitInvariantChecks(ir, stmt.invariants, genExpr, ensureBool);
+            }
             const condI1 = ensureBool(ir, genExpr(ir, stmt.cond));
             ir.emit(`br i1 ${condI1}, label %${bodyLbl}, label %${endLbl}`);
             ir.emit(`${bodyLbl}:`);
@@ -1780,9 +1820,12 @@ function genStmt(ir, stmt, retType) {
 
         case "ReturnStmt": {
             emitDeferred(ir);
-            const normRetT = retType ? normalizeType(retType) : null;
+            const normRetT   = retType ? normalizeType(retType) : null;
+            const hasEnsures = (ir.ensures || []).length > 0;
+
             if (stmt.expr && normRetT && classTypes.has(normRetT)) {
                 // Class return: load the struct from its alloca and ret by value.
+                // ensures not checked on class returns (struct binding not yet supported).
                 const llRetT = `%class.${normRetT}`;
                 let structVal;
                 if (stmt.expr.kind === "Var") {
@@ -1790,25 +1833,33 @@ function genStmt(ir, stmt, retType) {
                     structVal = ir.newTmp();
                     ir.emit(`${structVal} = load ${llRetT}, ${llRetT}* ${varEntry.ptr}`);
                 } else {
-                    const result = genExpr(ir, stmt.expr);
-                    // genExpr for a class-returning call already gives a struct value
-                    structVal = result.value;
+                    const res = genExpr(ir, stmt.expr);
+                    structVal = res.value;
                 }
                 ir.emit(`ret ${llRetT} ${structVal}`);
             } else if (stmt.expr) {
+                let retVal;
+                const llRetT = llvmType(retType);
                 if (stmt.expr.kind === "CastExpr") {
                     const inner = genExpr(ir, stmt.expr.expr);
-                    const casted = emitCast(ir, inner.value, inner.type, retType);
-                    ir.emit(`ret ${llvmType(retType)} ${casted.value}`);
+                    retVal = emitCast(ir, inner.value, inner.type, retType).value;
                 } else {
-                    const val     = genExpr(ir, stmt.expr);
-                    const coerced = val.type !== retType
-                        ? emitCast(ir, val.value, val.type, retType)
-                        : val;
-                    ir.emit(`ret ${llvmType(retType)} ${coerced.value}`);
+                    const val = genExpr(ir, stmt.expr);
+                    retVal = (val.type !== retType)
+                        ? emitCast(ir, val.value, val.type, retType).value
+                        : val.value;
                 }
+                if (hasEnsures) {
+                    emitEnsuresChecks(ir, ir.ensures, retVal, llRetT, retType, genExpr, ensureBool);
+                }
+                ir.emit(`ret ${llRetT} ${retVal}`);
             } else {
-                ir.emit(`ret void`);
+                if (retType && retType !== "void") {
+                    const llRet = llvmType(retType);
+                    ir.emit(`ret ${llRet} ${llvmZeroValue(llRet)}`);
+                } else {
+                    ir.emit(`ret void`);
+                }
             }
             break;
         }
@@ -1898,6 +1949,13 @@ function genFunction(fn) {
             ir.vars.set(p.name, { ptr, type: lt, hType: normT });
         }
     });
+
+    if (!releaseMode && fn.requires && fn.requires.length > 0) {
+        contractsUsed = true;
+        emitRequiresChecks(ir, fn.requires, genExpr, ensureBool);
+    }
+    ir.ensures = (!releaseMode && fn.ensures) ? fn.ensures : [];
+    if (ir.ensures.length > 0) contractsUsed = true;
 
     genBlock(ir, fn.body, fn.returnType);
     emitDeferred(ir);
@@ -2150,8 +2208,12 @@ function emitClassIR(cls, out, fnCode) {
     }
 }
 
-function genModule(ast) {
+function genModule(ast, opts = {}) {
+    const { target = "host", release = false, strict = false } = opts;
     resetAll();
+    releaseMode = release;
+    if (target === "armv6-bare") wordBits = 32;
+    if (strict) strictAnalyze(ast);
 
     // Interfaces — registered before classes so implements checking can find them
     for (const iface of ast.interfaces || []) {
@@ -2186,8 +2248,8 @@ function genModule(ast) {
 
     for (const en of ast.enums || []) {
         const variants = new Map();
-        for (const v of en.variants) variants.set(v.name, v.value);
-        enumTypes.set(en.name, variants);
+        for (const v of en.variants) variants.set(v.name, { value: v.value, kind: v.kind || "int" });
+        enumTypes.set(en.name, { variants, enumKind: en.enumKind || "int" });
     }
 
     // Register regular struct and class types first (monomorphization may reference them)
@@ -2244,6 +2306,13 @@ function genModule(ast) {
     }
 
     let out     = "; Hopper module\n\n";
+
+    // Bare-metal ARM32 target header — pointers and int are 32-bit
+    if (target === "armv6-bare") {
+        out += `target datalayout = "e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64"\n`;
+        out += `target triple = "armv6-none-eabi"\n\n`;
+    }
+
     const typeDefs = [];
     const fnCode   = [];
 
@@ -2267,9 +2336,13 @@ function genModule(ast) {
 
     if (typeDefs.length > 0) out += typeDefs.join("") + "\n";
 
-    // Runtime heap declarations — backing allocate/deallocate directives
-    out += `declare i8* @malloc(i64)\n`;
-    out += `declare void @free(i8*)\n\n`;
+    // Runtime heap declarations — only for hosted targets (bare-metal provides no libc)
+    if (target !== "armv6-bare") {
+        out += `declare i8* @malloc(i64)\n`;
+        out += `declare void @free(i8*)\n`;
+        if (!releaseMode) out += `declare void @abort()\n`;
+        out += `\n`;
+    }
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
 
@@ -2285,8 +2358,11 @@ function genModule(ast) {
     const bindGlobals = (ast.binds || []).map(b => genBind(b));
     if (bindGlobals.length > 0) out += bindGlobals.join("\n") + "\n\n";
 
+    const emittedExterns = new Set();
     for (const fn of ast.functions) {
         if (fn.isExtern) {
+            if (emittedExterns.has(fn.name)) continue;
+            emittedExterns.add(fn.name);
             const ret    = fn.returnType === null ? "void" : llvmType(fn.returnType);
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
             const vararg = fn.isVariadic ? (params ? ", ..." : "...") : "";

@@ -1,0 +1,7 @@
+{
+  "name": "iterator",
+  "version": "0.1.0",
+  "description": "Iterator pattern — ArrayIter and RangeIter behind a shared interface",
+  "type": "program",
+  "main": "iterator.hop"
+}

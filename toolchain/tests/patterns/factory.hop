@@ -1,0 +1,66 @@
+// TEST: factory constructs shapes with correct geometry
+// EXPECT: circle:    area=75  perimeter=30
+// EXPECT: rectangle: area=24  perimeter=20
+// EXPECT: triangle:  area=6   perimeter=10
+
+extern function printf(string fmt, ...) int
+
+enum ShapeKind {
+    Circle    = 0
+    Rectangle = 1
+    Triangle  = 2
+}
+
+class Shape {
+    int kind
+    int a
+    int b
+
+    constructor(int k, int x, int y) {
+        self.kind = k
+        self.a    = x
+        self.b    = y
+    }
+
+    function area() int {
+        if (self.kind == ShapeKind.Circle)    { return self.a * self.a * 3 }
+        if (self.kind == ShapeKind.Rectangle) { return self.a * self.b }
+        if (self.kind == ShapeKind.Triangle)  { return (self.a * self.b) / 2 }
+        return 0
+    }
+
+    function perimeter() int {
+        if (self.kind == ShapeKind.Circle)    { return self.a * 6 }
+        if (self.kind == ShapeKind.Rectangle) { return 2 * (self.a + self.b) }
+        if (self.kind == ShapeKind.Triangle)  { return self.a + self.b + self.a }
+        return 0
+    }
+
+    function print() {
+        if (self.kind == ShapeKind.Circle)    { printf("circle:    area=%lld  perimeter=%lld\n", self.area(), self.perimeter()) }
+        if (self.kind == ShapeKind.Rectangle) { printf("rectangle: area=%lld  perimeter=%lld\n", self.area(), self.perimeter()) }
+        if (self.kind == ShapeKind.Triangle)  { printf("triangle:  area=%lld  perimeter=%lld\n", self.area(), self.perimeter()) }
+    }
+}
+
+function makeCircle(int radius) Shape {
+    Shape s = Shape(ShapeKind.Circle, radius, 0)
+    return s
+}
+function makeRectangle(int w, int h) Shape {
+    Shape s = Shape(ShapeKind.Rectangle, w, h)
+    return s
+}
+function makeTriangle(int base, int h) Shape {
+    Shape s = Shape(ShapeKind.Triangle, base, h)
+    return s
+}
+
+entry main {
+    Shape c = makeCircle(5)
+    Shape r = makeRectangle(6, 4)
+    Shape t = makeTriangle(3, 4)
+    c.print()
+    r.print()
+    t.print()
+}

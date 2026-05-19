@@ -1,0 +1,75 @@
+// TEST: TestSuite basic pass
+// EXPECT: PASS  one equals one
+// EXPECT: PASS  addition works
+
+// TEST: TestSuite checkEq failure detail
+// EXPECT: FAIL  wrong sum  (got 5, want 4)
+
+// TEST: TestSuite checkStrEq pass
+// EXPECT: PASS  greeting matches
+
+// TEST: TestSuite checkStrEq failure detail
+// EXPECT: FAIL  greeting mismatch  (got "hi", want "hello")
+
+// TEST: TestSuite checkNull pass
+// EXPECT: PASS  ptr is null
+
+// TEST: TestSuite checkNotNull pass
+// EXPECT: PASS  ptr is not null
+
+// TEST: TestSuite summary line
+// EXPECT: PASS  first
+// EXPECT: PASS  second
+// EXPECT: suite: 2 passed, 0 failed
+
+// TEST: strEq helper
+// EXPECT: strEq same -> 1
+// EXPECT: strEq diff -> 0
+
+import test from core
+extern function printf(string fmt, ...) int
+
+entry main {
+    // basic check
+    TestSuite t1 = TestSuite("basic")
+    t1.check(1 == 1, "one equals one")
+    t1.check(2 + 2 == 4, "addition works")
+
+    // checkEq failure prints got/want
+    TestSuite t2 = TestSuite("eq-fail")
+    t2.checkEq(2 + 3, 4, "wrong sum")
+
+    // checkStrEq pass
+    TestSuite t3 = TestSuite("str-pass")
+    t3.checkStrEq("hello", "hello", "greeting matches")
+
+    // checkStrEq failure
+    TestSuite t4 = TestSuite("str-fail")
+    t4.checkStrEq("hi", "hello", "greeting mismatch")
+
+    // checkNull pass
+    TestSuite t5 = TestSuite("null-pass")
+    t5.checkNull(null, "ptr is null")
+
+    // checkNotNull pass
+    address p = allocate 1
+    TestSuite t6 = TestSuite("notnull-pass")
+    t6.checkNotNull(p, "ptr is not null")
+    deallocate p
+
+    // done() summary — t7 has 2 passes, exits cleanly
+    TestSuite t7 = TestSuite("suite")
+    t7.check(true, "first")
+    t7.check(true, "second")
+    t7.done()
+
+    // strEq helper in test.hop
+    bool eq1 = strEq("hello", "hello")
+    bool eq2 = strEq("hello", "world")
+    int r1 = 0
+    int r2 = 0
+    if (eq1) { r1 = 1 }
+    if (eq2) { r2 = 1 }
+    printf("strEq same -> %lld\n", r1)
+    printf("strEq diff -> %lld\n", r2)
+}

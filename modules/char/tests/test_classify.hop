@@ -5,7 +5,7 @@
 // EXPECT: lower: false true false
 // EXPECT: hex: true true true false
 
-import io from io
+import io from core
 import char from char
 
 entry main(int argc, address argv) {

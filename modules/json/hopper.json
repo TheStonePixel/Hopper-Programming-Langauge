@@ -1,0 +1,8 @@
+{
+  "name": "json",
+  "version": "0.1.0",
+  "description": "JSON parser and value types",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "src/json.hop"
+}

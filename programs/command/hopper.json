@@ -1,0 +1,6 @@
+{
+  "name": "command",
+  "version": "0.1.0",
+  "type": "program",
+  "main": "command.hop"
+}

@@ -1,0 +1,88 @@
+// pipeline.hop — Pipeline / Middleware pattern
+//
+// A Pipeline is an ordered array of single-int transforms.
+// run() feeds a value through every stage in sequence.
+// Pipelines compose freely — build different processing chains
+// from the same small, reusable functions.
+//
+// Demonstrates: function composition via Array<address>,
+//               reusable stages, data transformation chains.
+//
+// Build: hopper build pipeline.hop
+
+import array from ds
+
+extern function printf(string fmt, ...) int
+
+// ── Pipeline — ordered transform chain ───────────────────────────────────────
+
+class Pipeline {
+    Array<address> stages
+
+    constructor() {
+        self.stages = Array(8)
+    }
+
+    function pipe(address stage) {
+        self.stages.push(stage)
+    }
+
+    function run(int input) int {
+        int val = input
+        int i = 0
+        while (i < self.stages.len()) {
+            address fn = self.stages.get(i)
+            callback(int) int stage = cast fn
+            val = stage(val)
+            i = i + 1
+        }
+        return val
+    }
+}
+
+// ── stages — pure transforms ──────────────────────────────────────────────────
+
+function times2(int n) int  { return n * 2 }
+function addTen(int n) int  { return n + 10 }
+function negate(int n) int  { return 0 - n }
+function square(int n) int  { return n * n }
+
+function clamp100(int n) int {
+    if (n > 100) { return 100 }
+    return n
+}
+
+function absolute(int n) int {
+    if (n < 0) { return 0 - n }
+    return n
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    // normalise pipeline: scale, shift, clamp
+    Pipeline norm = Pipeline()
+    norm.pipe(times2::address)
+    norm.pipe(addTen::address)
+    norm.pipe(clamp100::address)
+
+    printf("norm(5)  = %lld\n", norm.run(5))    // 5*2+10=20
+    printf("norm(40) = %lld\n", norm.run(40))   // 40*2+10=90
+    printf("norm(50) = %lld\n", norm.run(50))   // 50*2+10=110 -> 100
+
+    // magnitude pipeline: square then take absolute
+    Pipeline mag = Pipeline()
+    mag.pipe(square::address)
+    mag.pipe(absolute::address)
+
+    printf("\nmag(-3) = %lld\n", mag.run(-3))   // 9
+    printf("mag(4)  = %lld\n",  mag.run(4))    // 16
+
+    // sign-flip then absolute — same result via different path
+    Pipeline flip = Pipeline()
+    flip.pipe(negate::address)
+    flip.pipe(absolute::address)
+
+    printf("\nflip(7)  = %lld\n", flip.run(7))   // -7 -> 7
+    printf("flip(-5) = %lld\n",  flip.run(-5))  // 5 -> 5
+}

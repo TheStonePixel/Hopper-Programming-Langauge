@@ -1,0 +1,8 @@
+{
+  "name": "string",
+  "version": "0.1.0",
+  "description": "String types \u2014 IString interface, ASCII and UTF-8 implementations",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "src/IString.hop"
+}

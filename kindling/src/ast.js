@@ -23,8 +23,8 @@ export function EntryDecl(name, body = null, address = null, params = []) {
     return { kind: "EntryDecl", name, body, address, params };
 }
 
-export function FunctionDecl(name, params, returnType, body, isExtern = false, isVariadic = false) {
-    return { kind: "FunctionDecl", name, params, returnType, body, isExtern, isVariadic };
+export function FunctionDecl(name, params, returnType, body, isExtern = false, isVariadic = false, requires = [], ensures = []) {
+    return { kind: "FunctionDecl", name, params, returnType, body, isExtern, isVariadic, requires, ensures };
 }
 
 // struct = memory layout only, no methods, no default values
@@ -98,8 +98,8 @@ export function ConstDecl(name, value, type) {
 
 // enum — named integer type with compile-time variants
 // variants: [{ name, value }]  (values assigned sequentially, or explicit)
-export function EnumDecl(name, variants) {
-    return { kind: "EnumDecl", name, variants };
+export function EnumDecl(name, variants, enumKind = "int") {
+    return { kind: "EnumDecl", name, variants, enumKind };
 }
 
 // template = parameterized class, monomorphized per instantiation
@@ -128,8 +128,8 @@ export function Param(name, type) {
     return { kind: "Param", name, type };
 }
 
-export function VarDecl(name, type, init) {
-    return { kind: "VarDecl", name, type, init };
+export function VarDecl(name, type, init, constrain = null) {
+    return { kind: "VarDecl", name, type, init, constrain };
 }
 
 export function Assign(name, expr) {
@@ -144,8 +144,8 @@ export function IfStmt(cond, thenBlock, elseBlock) {
     return { kind: "IfStmt", cond, thenBlock, elseBlock };
 }
 
-export function WhileStmt(cond, body) {
-    return { kind: "WhileStmt", cond, body };
+export function WhileStmt(cond, body, invariants = []) {
+    return { kind: "WhileStmt", cond, body, invariants };
 }
 
 export function ForStmt(init, cond, update, body) {

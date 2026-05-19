@@ -1,15 +1,99 @@
 <script setup>
-import { RouterLink } from 'vue-router'
+import CodeBlock from '../components/CodeBlock.vue'
+
+const codes = {
+    c0: `int n = 42;
+int *ptr = &n;
+
+printf("%d\\n", *ptr);   // 42`,
+    c1: `int n = 42
+address ptr = n::address
+
+printf("%d\\n", ptr::value)   // 42`,
+    c2: `*ptr = 99;
+printf("%d\\n", n);   // 99 — n was modified`,
+    c3: `ptr::value = 99
+printf("%d\\n", n)   // 99 — n was modified`,
+    c4: `int n = 42;
+char b = 0;
+int *ptr = &n;
+
+printf("%zu\\n", sizeof(n));    // 4 or 8 — platform dependent
+printf("%zu\\n", sizeof(b));    // 1
+printf("%zu\\n", sizeof(ptr));  // 8`,
+    c5: `int n = 42
+byte b = 0
+address ptr = n::address
+
+printf("%d\\n", n::size)    // 8 — always
+printf("%d\\n", b::size)    // 1
+printf("%d\\n", ptr::size)  // 8`,
+    c6: `struct Point { int x; int y; };
+struct Point p;
+
+printf("%zu\\n", sizeof(p));   // 8 or 16 — depends on platform`,
+    c7: `struct Point {
+    int x
+    int y
+}
+
+Point p
+printf("%d\\n", p::size)   // 16 — always (int is 64-bit)`,
+    c8: `int arr[5] = {10, 20, 30, 40, 50};
+int *elem = &arr[2];
+
+printf("%d\\n", *elem);   // 30
+*elem = 99;
+printf("%d\\n", arr[2]);  // 99`,
+    c9: `int arr[5] = [10, 20, 30, 40, 50]
+address elem = arr[2]::address
+
+printf("%d\\n", elem::value)  // 30
+elem::value = 99
+printf("%d\\n", arr[2])       // 99`,
+    c10: `int *walk = &arr[0];
+
+printf("%d\\n", *(walk + 1));  // 20
+printf("%d\\n", *(walk + 3));  // 40`,
+    c11: `address walk = arr[0]::address
+
+address step1 = walk + 1   // advances one int (8 bytes)
+address step3 = walk + 3
+printf("%d\\n", step1::value)  // 20
+printf("%d\\n", step3::value)  // 40`,
+    c12: `int *maybe = NULL;   // NULL is #define 0
+
+if (maybe == NULL) {
+    printf("null\\n");
+}`,
+    c13: `address maybe = null   // null is a keyword
+
+if (maybe == null) {
+    printf("null\\n")
+}`,
+    c14: `int a = 7, bv = 13;
+int *pa = &a, *pb = &bv;
+
+int tmp = *pa;
+*pa = *pb;
+*pb = tmp;
+
+printf("%d %d\\n", a, bv);   // 13 7`,
+    c15: `int a = 7
+int bv = 13
+address pa = a::address
+address pb = bv::address
+
+int tmp = pa::value
+pa::value = pb::value
+pb::value = tmp
+
+printf("%d %d\\n", a, bv)   // 13 7`,
+}
 </script>
 
 <template>
   <div class="page">
-
-    <nav class="topnav">
-      <div class="container">
-        <RouterLink to="/" class="back">← Hopper</RouterLink>
-      </div>
-    </nav>
 
     <header class="page-header">
       <div class="container">
@@ -35,20 +119,8 @@ import { RouterLink } from 'vue-router'
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="type">int</span> n <span class="op">=</span> <span class="num">42</span><span class="op">;</span>
-<span class="type">int</span> <span class="op">*</span>ptr <span class="op">=</span> <span class="op">&amp;</span>n<span class="op">;</span>
-
-printf(<span class="str">"%d\n"</span><span class="op">,</span> <span class="op">*</span>ptr)<span class="op">;</span>   <span class="comment">// 42</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="type">int</span> n <span class="op">=</span> <span class="num">42</span>
-<span class="kw">address</span> ptr <span class="op">=</span> n<span class="op">::</span>address
-
-printf(<span class="str">"%d\n"</span><span class="op">,</span> ptr<span class="op">::</span>value)   <span class="comment">// 42</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c0" />
+          <CodeBlock label="Hopper" :code="codes.c1" />
         </div>
       </div>
     </section>
@@ -65,16 +137,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> ptr<span class="
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="op">*</span>ptr <span class="op">=</span> <span class="num">99</span><span class="op">;</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> n)<span class="op">;</span>   <span class="comment">// 99 — n was modified</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code>ptr<span class="op">::</span>value <span class="op">=</span> <span class="num">99</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> n)   <span class="comment">// 99 — n was modified</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c2" />
+          <CodeBlock label="Hopper" :code="codes.c3" />
         </div>
       </div>
     </section>
@@ -92,26 +156,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> n)   <span class
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="type">int</span> n <span class="op">=</span> <span class="num">42</span><span class="op">;</span>
-<span class="type">char</span> b <span class="op">=</span> <span class="num">0</span><span class="op">;</span>
-<span class="type">int</span> <span class="op">*</span>ptr <span class="op">=</span> <span class="op">&amp;</span>n<span class="op">;</span>
-
-printf(<span class="str">"%zu\n"</span><span class="op">,</span> sizeof(n))<span class="op">;</span>    <span class="comment">// 4 or 8 — platform dependent</span>
-printf(<span class="str">"%zu\n"</span><span class="op">,</span> sizeof(b))<span class="op">;</span>    <span class="comment">// 1</span>
-printf(<span class="str">"%zu\n"</span><span class="op">,</span> sizeof(ptr))<span class="op">;</span>  <span class="comment">// 8</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="type">int</span> n <span class="op">=</span> <span class="num">42</span>
-<span class="type">byte</span> b <span class="op">=</span> <span class="num">0</span>
-<span class="kw">address</span> ptr <span class="op">=</span> n<span class="op">::</span>address
-
-printf(<span class="str">"%d\n"</span><span class="op">,</span> n<span class="op">::</span>size)    <span class="comment">// 8 — always</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> b<span class="op">::</span>size)    <span class="comment">// 1</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> ptr<span class="op">::</span>size)  <span class="comment">// 8</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c4" />
+          <CodeBlock label="Hopper" :code="codes.c5" />
         </div>
       </div>
     </section>
@@ -128,23 +174,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> ptr<span class="
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="kw">struct</span> Point <span class="op">{</span> <span class="type">int</span> x<span class="op">;</span> <span class="type">int</span> y<span class="op">;</span> <span class="op">};</span>
-<span class="kw">struct</span> Point p<span class="op">;</span>
-
-printf(<span class="str">"%zu\n"</span><span class="op">,</span> sizeof(p))<span class="op">;</span>   <span class="comment">// 8 or 16 — depends on platform</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="kw">struct</span> Point <span class="op">{</span>
-    <span class="type">int</span> x
-    <span class="type">int</span> y
-<span class="op">}</span>
-
-Point p
-printf(<span class="str">"%d\n"</span><span class="op">,</span> p<span class="op">::</span>size)   <span class="comment">// 16 — always (int is 64-bit)</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c6" />
+          <CodeBlock label="Hopper" :code="codes.c7" />
         </div>
       </div>
     </section>
@@ -162,24 +193,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> p<span class="op
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="type">int</span> arr<span class="op">[</span><span class="num">5</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span><span class="num">10</span><span class="op">,</span> <span class="num">20</span><span class="op">,</span> <span class="num">30</span><span class="op">,</span> <span class="num">40</span><span class="op">,</span> <span class="num">50</span><span class="op">};</span>
-<span class="type">int</span> <span class="op">*</span>elem <span class="op">=</span> <span class="op">&amp;</span>arr<span class="op">[</span><span class="num">2</span><span class="op">];</span>
-
-printf(<span class="str">"%d\n"</span><span class="op">,</span> <span class="op">*</span>elem)<span class="op">;</span>   <span class="comment">// 30</span>
-<span class="op">*</span>elem <span class="op">=</span> <span class="num">99</span><span class="op">;</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> arr<span class="op">[</span><span class="num">2</span><span class="op">]</span>)<span class="op">;</span>  <span class="comment">// 99</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="type">int</span> arr<span class="op">[</span><span class="num">5</span><span class="op">]</span> <span class="op">=</span> <span class="op">[</span><span class="num">10</span><span class="op">,</span> <span class="num">20</span><span class="op">,</span> <span class="num">30</span><span class="op">,</span> <span class="num">40</span><span class="op">,</span> <span class="num">50</span><span class="op">]</span>
-<span class="kw">address</span> elem <span class="op">=</span> arr<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">::</span>address
-
-printf(<span class="str">"%d\n"</span><span class="op">,</span> elem<span class="op">::</span>value)  <span class="comment">// 30</span>
-elem<span class="op">::</span>value <span class="op">=</span> <span class="num">99</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> arr<span class="op">[</span><span class="num">2</span><span class="op">]</span>)       <span class="comment">// 99</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c8" />
+          <CodeBlock label="Hopper" :code="codes.c9" />
         </div>
       </div>
     </section>
@@ -197,22 +212,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> arr<span class="
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="type">int</span> <span class="op">*</span>walk <span class="op">=</span> <span class="op">&amp;</span>arr<span class="op">[</span><span class="num">0</span><span class="op">];</span>
-
-printf(<span class="str">"%d\n"</span><span class="op">,</span> <span class="op">*</span>(walk <span class="op">+</span> <span class="num">1</span>))<span class="op">;</span>  <span class="comment">// 20</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> <span class="op">*</span>(walk <span class="op">+</span> <span class="num">3</span>))<span class="op">;</span>  <span class="comment">// 40</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="kw">address</span> walk <span class="op">=</span> arr<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">::</span>address
-
-<span class="kw">address</span> step1 <span class="op">=</span> walk <span class="op">+</span> <span class="num">1</span>   <span class="comment">// advances one int (8 bytes)</span>
-<span class="kw">address</span> step3 <span class="op">=</span> walk <span class="op">+</span> <span class="num">3</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> step1<span class="op">::</span>value)  <span class="comment">// 20</span>
-printf(<span class="str">"%d\n"</span><span class="op">,</span> step3<span class="op">::</span>value)  <span class="comment">// 40</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c10" />
+          <CodeBlock label="Hopper" :code="codes.c11" />
         </div>
       </div>
     </section>
@@ -230,22 +231,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> step3<span class
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="type">int</span> <span class="op">*</span>maybe <span class="op">=</span> NULL<span class="op">;</span>   <span class="comment">// NULL is #define 0</span>
-
-<span class="kw">if</span> (maybe <span class="op">==</span> NULL) <span class="op">{</span>
-    printf(<span class="str">"null\n"</span>)<span class="op">;</span>
-<span class="op">}</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="kw">address</span> maybe <span class="op">=</span> <span class="kw">null</span>   <span class="comment">// null is a keyword</span>
-
-<span class="kw">if</span> (maybe <span class="op">==</span> <span class="kw">null</span>) <span class="op">{</span>
-    printf(<span class="str">"null\n"</span>)
-<span class="op">}</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c12" />
+          <CodeBlock label="Hopper" :code="codes.c13" />
         </div>
       </div>
     </section>
@@ -263,30 +250,8 @@ printf(<span class="str">"%d\n"</span><span class="op">,</span> step3<span class
           </p>
         </div>
         <div class="pair">
-          <div class="block">
-            <div class="block-label c-label">C</div>
-            <pre><code><span class="type">int</span> a <span class="op">=</span> <span class="num">7</span><span class="op">,</span> bv <span class="op">=</span> <span class="num">13</span><span class="op">;</span>
-<span class="type">int</span> <span class="op">*</span>pa <span class="op">=</span> <span class="op">&amp;</span>a<span class="op">,</span> <span class="op">*</span>pb <span class="op">=</span> <span class="op">&amp;</span>bv<span class="op">;</span>
-
-<span class="type">int</span> tmp <span class="op">=</span> <span class="op">*</span>pa<span class="op">;</span>
-<span class="op">*</span>pa <span class="op">=</span> <span class="op">*</span>pb<span class="op">;</span>
-<span class="op">*</span>pb <span class="op">=</span> tmp<span class="op">;</span>
-
-printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class="op">,</span> bv)<span class="op">;</span>   <span class="comment">// 13 7</span></code></pre>
-          </div>
-          <div class="block">
-            <div class="block-label hop-label">Hopper</div>
-            <pre><code><span class="type">int</span> a <span class="op">=</span> <span class="num">7</span>
-<span class="type">int</span> bv <span class="op">=</span> <span class="num">13</span>
-<span class="kw">address</span> pa <span class="op">=</span> a<span class="op">::</span>address
-<span class="kw">address</span> pb <span class="op">=</span> bv<span class="op">::</span>address
-
-<span class="type">int</span> tmp <span class="op">=</span> pa<span class="op">::</span>value
-pa<span class="op">::</span>value <span class="op">=</span> pb<span class="op">::</span>value
-pb<span class="op">::</span>value <span class="op">=</span> tmp
-
-printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class="op">,</span> bv)   <span class="comment">// 13 7</span></code></pre>
-          </div>
+          <CodeBlock label="C" :code="codes.c14" />
+          <CodeBlock label="Hopper" :code="codes.c15" />
         </div>
       </div>
     </section>
@@ -321,26 +286,9 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
   font-weight: 600;
 }
 
-/* ── Top Nav ── */
-.topnav {
-  padding: 1.25rem 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.back {
-  font-size: 0.9rem;
-  color: #6b7280;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.15s;
-}
-
-.back:hover { color: #111827; }
-
 /* ── Page Header ── */
 .page-header {
-  padding: 5rem 0 4rem;
+  padding: 4rem 0 3.5rem;
   background: #ffffff;
   border-bottom: 2px solid #e5e7eb;
 }
@@ -399,79 +347,12 @@ printf(<span class="str">"%d %d\n"</span><span class="op">,</span> a<span class=
   line-height: 1.7;
 }
 
-.compare-header code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
 /* ── Code Pair ── */
 .pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
 }
-
-.block {
-  display: flex;
-  flex-direction: column;
-}
-
-.block-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  padding: 0.4rem 0.85rem;
-  border-radius: 6px 6px 0 0;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  width: fit-content;
-  font-weight: 700;
-}
-
-.c-label {
-  color: #6b7280;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-bottom: none;
-}
-
-.hop-label {
-  color: #2563eb;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-bottom: none;
-}
-
-pre {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  border-radius: 0 6px 6px 6px;
-  padding: 1.75rem;
-  overflow-x: auto;
-  font-size: 0.875rem;
-  line-height: 2;
-  margin: 0;
-  flex: 1;
-}
-
-.block:has(.hop-label) pre {
-  background: #f0f7ff;
-  border-color: #bfdbfe;
-}
-
-code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.comment { color: #9ca3af; }
-.kw      { color: #2563eb; }
-.type    { color: #059669; }
-.str     { color: #d97706; }
-.num     { color: #7c3aed; }
-.op      { color: #9ca3af; }
 
 /* ── Footer ── */
 footer {

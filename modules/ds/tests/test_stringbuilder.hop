@@ -4,7 +4,7 @@
 // EXPECT: flags: true false
 // EXPECT: len: 10
 
-import io from io
+import io from core
 import stringbuilder from ds
 
 entry main(int argc, address argv) {

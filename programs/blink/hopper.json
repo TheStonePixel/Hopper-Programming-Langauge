@@ -1,0 +1,12 @@
+{
+  "name": "blink",
+  "version": "0.1.0",
+  "description": "Pi Zero ACT LED + UART blink — bare-metal Hopper demo",
+  "license": "Apache-2.0",
+  "type": "program",
+  "board": "pi-zero",
+  "main": "blink.hop",
+  "flash": {
+    "mount": null
+  }
+}

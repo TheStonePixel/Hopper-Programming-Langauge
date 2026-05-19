@@ -26,7 +26,7 @@ import io     from io
 import result from core
 import error  from core
 import unique from Pointer
-import String from utf8
+import utf8 from string
 import sys    from linux
 
 // ── Rng ───────────────────────────────────────────────────────────────────────

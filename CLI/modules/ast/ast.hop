@@ -1,4 +1,4 @@
-import String from utf8
+import utf8 from string
 
 template Declaration<T> {
  String kind = "Declaration"

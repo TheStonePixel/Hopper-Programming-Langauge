@@ -1,0 +1,8 @@
+{
+  "name": "char",
+  "version": "0.1.0",
+  "description": "Character classification and conversion utilities",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "src/char.hop"
+}

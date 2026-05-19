@@ -1,0 +1,84 @@
+// state.hop — State / Finite State Machine pattern
+//
+// Machine transitions between Idle, Running, Paused, and Stopped
+// driven by events.  Invalid transitions are silently ignored.
+// All state logic lives in one place — send() — keeping the caller
+// unaware of the transition rules.
+//
+// Demonstrates: enum-driven FSM, guarded transitions,
+//               decoupled event dispatch.
+//
+// Build: hopper build state.hop
+
+extern function printf(string fmt, ...) int
+
+enum State {
+    Idle    = 0
+    Running = 1
+    Paused  = 2
+    Stopped = 3
+}
+
+enum Event {
+    Start  = 0
+    Pause  = 1
+    Resume = 2
+    Stop   = 3
+}
+
+function stateName(int s) string {
+    if (s == State.Idle)    { return "IDLE" }
+    if (s == State.Running) { return "RUNNING" }
+    if (s == State.Paused)  { return "PAUSED" }
+    if (s == State.Stopped) { return "STOPPED" }
+    return "?"
+}
+
+class Machine {
+    int state
+
+    constructor() {
+        self.state = State.Idle
+    }
+
+    function send(int event) {
+        int old  = self.state
+        int next = self.state
+
+        if (self.state == State.Idle    && event == Event.Start)  { next = State.Running }
+        if (self.state == State.Running && event == Event.Pause)  { next = State.Paused  }
+        if (self.state == State.Running && event == Event.Stop)   { next = State.Stopped }
+        if (self.state == State.Paused  && event == Event.Resume) { next = State.Running }
+        if (self.state == State.Paused  && event == Event.Stop)   { next = State.Stopped }
+
+        if (next != old) {
+            printf("%s -> %s\n", stateName(old), stateName(next))
+            self.state = next
+        }
+    }
+
+    function current() string {
+        return stateName(self.state)
+    }
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    Machine m = Machine()
+
+    m.send(Event.Start)   // IDLE -> RUNNING
+    m.send(Event.Pause)   // RUNNING -> PAUSED
+    m.send(Event.Stop)    // invalid from PAUSED via direct Stop — actually valid!
+    printf("state: %s\n\n", m.current())
+
+    // full happy path
+    Machine m2 = Machine()
+    m2.send(Event.Start)   // IDLE    -> RUNNING
+    m2.send(Event.Pause)   // RUNNING -> PAUSED
+    m2.send(Event.Resume)  // PAUSED  -> RUNNING
+    m2.send(Event.Pause)   // RUNNING -> PAUSED
+    m2.send(Event.Stop)    // PAUSED  -> STOPPED
+    m2.send(Event.Start)   // ignored: already STOPPED
+    printf("state: %s\n", m2.current())
+}

@@ -13,7 +13,7 @@
 // EXPECT: reverse: ynneL ,olleH
 // EXPECT: slice: Lenny
 // EXPECT: find sub: 7
-import String from ascii
+import ascii from string
 import io from linux
 
 function println(String s) {

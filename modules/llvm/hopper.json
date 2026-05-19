@@ -1,0 +1,8 @@
+{
+  "name": "llvm",
+  "version": "0.1.0",
+  "description": "LLVM C API bindings for IR construction and compilation",
+  "license": "Apache-2.0",
+  "type": "library",
+  "main": "src/llvm.hop"
+}

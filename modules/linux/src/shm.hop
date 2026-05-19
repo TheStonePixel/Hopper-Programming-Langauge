@@ -1,0 +1,15 @@
+// Linux System V shared memory — architecture-neutral.
+// Delegates to modules/target/shm.hop, which selects the ISA.
+//
+// Imported functions: shmget shmat shmdt shmctl
+//
+// For new code prefer mmap(MAP_SHARED) — SysV shm is here for compatibility.
+//
+// ── IPC flags ────────────────────────────────────────────────────────────────
+//   IPC_PRIVATE=0  IPC_CREAT=512  IPC_EXCL=1024
+//   IPC_RMID=0  IPC_SET=1  IPC_STAT=2
+//
+// ── shmat flags ───────────────────────────────────────────────────────────────
+//   SHM_RDONLY=0x1000  SHM_RND=0x2000  SHM_REMAP=0x4000
+
+import shm from sys

@@ -1,0 +1,355 @@
+// TEST: literal string search
+// EXPECT: literal in middle = 1
+// EXPECT: literal not found = 0
+// EXPECT: literal exact = 1
+
+// TEST: dot wildcard
+// EXPECT: dot any char = 1
+// EXPECT: dot no newline = 0
+
+// TEST: start anchor ^
+// EXPECT: caret match = 1
+// EXPECT: caret no match = 0
+
+// TEST: end anchor $
+// EXPECT: dollar match = 1
+// EXPECT: dollar no match = 0
+
+// TEST: star quantifier *
+// EXPECT: star zero = 1
+// EXPECT: star one = 1
+// EXPECT: star many = 1
+
+// TEST: plus quantifier +
+// EXPECT: plus zero = 0
+// EXPECT: plus one = 1
+// EXPECT: plus many = 1
+
+// TEST: question quantifier ?
+// EXPECT: quest zero = 1
+// EXPECT: quest one = 1
+// EXPECT: quest two = 0
+
+// TEST: character class [...]
+// EXPECT: class e = 1
+// EXPECT: class a = 1
+// EXPECT: class x = 0
+
+// TEST: negated class [^...]
+// EXPECT: neg class x = 1
+// EXPECT: neg class e = 0
+
+// TEST: range [a-z]
+// EXPECT: range lower = 1
+// EXPECT: range digit in alpha = 0
+
+// TEST: \d digit shorthand
+// EXPECT: digit match = 1
+// EXPECT: digit no alpha = 0
+
+// TEST: \w word char shorthand
+// EXPECT: word match = 1
+// EXPECT: word space = 0
+
+// TEST: \s whitespace shorthand
+// EXPECT: space match = 1
+// EXPECT: space alpha = 0
+
+// TEST: anchored reMatchAt
+// EXPECT: matchat hit = 1
+// EXPECT: matchat miss = 0
+
+// TEST: combined patterns
+// EXPECT: email-like = 1
+// EXPECT: digits only line = 1
+
+import regex from regex
+import assert from core
+extern function printf(string fmt, ...) int
+
+entry main {
+
+    // ── literal string search ────────────────────────────────────────────────
+    string s1p = "hello"
+    address p1 = cast s1p
+    string s1t = "say hello world"
+    address t1 = cast s1t
+    bool r1 = reMatch(p1, t1)
+    assert(r1 == true, "literal in middle\n")
+    printf("literal in middle = %lld\n", r1)
+
+    string s2p = "nope"
+    address p2 = cast s2p
+    bool r2 = reMatch(p2, t1)
+    assert(r2 == false, "literal not found\n")
+    printf("literal not found = %lld\n", r2)
+
+    string s3p = "hello"
+    address p3 = cast s3p
+    string s3t = "hello"
+    address t3 = cast s3t
+    bool r3 = reMatch(p3, t3)
+    assert(r3 == true, "literal exact\n")
+    printf("literal exact = %lld\n", r3)
+
+    // ── dot wildcard ─────────────────────────────────────────────────────────
+    string s4p = "h.llo"
+    address p4 = cast s4p
+    string s4t = "hello"
+    address t4 = cast s4t
+    bool r4 = reMatch(p4, t4)
+    assert(r4 == true, "dot any char\n")
+    printf("dot any char = %lld\n", r4)
+
+    // dot should NOT match newline
+    string s5p = "a.b"
+    address p5 = cast s5p
+    string s5t = "a\nb"
+    address t5 = cast s5t
+    bool r5 = reMatch(p5, t5)
+    assert(r5 == false, "dot no newline\n")
+    printf("dot no newline = %lld\n", r5)
+
+    // ── start anchor ^ ───────────────────────────────────────────────────────
+    string s6p = "^hello"
+    address p6 = cast s6p
+    string s6t = "hello world"
+    address t6 = cast s6t
+    bool r6 = reMatch(p6, t6)
+    assert(r6 == true, "caret match\n")
+    printf("caret match = %lld\n", r6)
+
+    string s7p = "^hello"
+    address p7 = cast s7p
+    string s7t = "world hello"
+    address t7 = cast s7t
+    bool r7 = reMatch(p7, t7)
+    assert(r7 == false, "caret no match\n")
+    printf("caret no match = %lld\n", r7)
+
+    // ── end anchor $ ─────────────────────────────────────────────────────────
+    string s8p = "world$"
+    address p8 = cast s8p
+    string s8t = "hello world"
+    address t8 = cast s8t
+    bool r8 = reMatch(p8, t8)
+    assert(r8 == true, "dollar match\n")
+    printf("dollar match = %lld\n", r8)
+
+    string s9p = "world$"
+    address p9 = cast s9p
+    string s9t = "world hello"
+    address t9 = cast s9t
+    bool r9 = reMatch(p9, t9)
+    assert(r9 == false, "dollar no match\n")
+    printf("dollar no match = %lld\n", r9)
+
+    // ── star quantifier * ────────────────────────────────────────────────────
+    // he*llo: h, then zero or more 'e', then llo
+    string s10p = "he*llo"
+    address p10 = cast s10p
+
+    string s10t0 = "hllo"
+    address t10_0 = cast s10t0
+    bool r10_0 = reMatch(p10, t10_0)
+    assert(r10_0 == true, "star zero\n")
+    printf("star zero = %lld\n", r10_0)
+
+    string s10t1 = "hello"
+    address t10_1 = cast s10t1
+    bool r10_1 = reMatch(p10, t10_1)
+    assert(r10_1 == true, "star one\n")
+    printf("star one = %lld\n", r10_1)
+
+    string s10t2 = "heeello"
+    address t10_2 = cast s10t2
+    bool r10_2 = reMatch(p10, t10_2)
+    assert(r10_2 == true, "star many\n")
+    printf("star many = %lld\n", r10_2)
+
+    // ── plus quantifier + ────────────────────────────────────────────────────
+    // he+llo: h, then one or more 'e', then llo
+    string s11p = "he+llo"
+    address p11 = cast s11p
+
+    string s11t0 = "hllo"
+    address t11_0 = cast s11t0
+    bool r11_0 = reMatch(p11, t11_0)
+    assert(r11_0 == false, "plus zero\n")
+    printf("plus zero = %lld\n", r11_0)
+
+    string s11t1 = "hello"
+    address t11_1 = cast s11t1
+    bool r11_1 = reMatch(p11, t11_1)
+    assert(r11_1 == true, "plus one\n")
+    printf("plus one = %lld\n", r11_1)
+
+    string s11t2 = "heeello"
+    address t11_2 = cast s11t2
+    bool r11_2 = reMatch(p11, t11_2)
+    assert(r11_2 == true, "plus many\n")
+    printf("plus many = %lld\n", r11_2)
+
+    // ── question quantifier ? ────────────────────────────────────────────────
+    // he?llo: h, then zero or one 'e', then llo
+    string s12p = "he?llo"
+    address p12 = cast s12p
+
+    string s12t0 = "hllo"
+    address t12_0 = cast s12t0
+    bool r12_0 = reMatch(p12, t12_0)
+    assert(r12_0 == true, "quest zero\n")
+    printf("quest zero = %lld\n", r12_0)
+
+    string s12t1 = "hello"
+    address t12_1 = cast s12t1
+    bool r12_1 = reMatch(p12, t12_1)
+    assert(r12_1 == true, "quest one\n")
+    printf("quest one = %lld\n", r12_1)
+
+    string s12t2 = "heello"
+    address t12_2 = cast s12t2
+    bool r12_2 = reMatch(p12, t12_2)
+    assert(r12_2 == false, "quest two\n")
+    printf("quest two = %lld\n", r12_2)
+
+    // ── character class [...] ────────────────────────────────────────────────
+    // h[aeiou]llo matches vowel in second position
+    string s13p = "h[aeiou]llo"
+    address p13 = cast s13p
+
+    string s13te = "hello"
+    address t13_e = cast s13te
+    bool r13_e = reMatch(p13, t13_e)
+    assert(r13_e == true, "class e\n")
+    printf("class e = %lld\n", r13_e)
+
+    string s13ta = "hallo"
+    address t13_a = cast s13ta
+    bool r13_a = reMatch(p13, t13_a)
+    assert(r13_a == true, "class a\n")
+    printf("class a = %lld\n", r13_a)
+
+    string s13tx = "hxllo"
+    address t13_x = cast s13tx
+    bool r13_x = reMatch(p13, t13_x)
+    assert(r13_x == false, "class x\n")
+    printf("class x = %lld\n", r13_x)
+
+    // ── negated class [^...] ─────────────────────────────────────────────────
+    string s14p = "h[^aeiou]llo"
+    address p14 = cast s14p
+
+    string s14tx = "hxllo"
+    address t14_x = cast s14tx
+    bool r14_x = reMatch(p14, t14_x)
+    assert(r14_x == true, "neg class x\n")
+    printf("neg class x = %lld\n", r14_x)
+
+    string s14te = "hello"
+    address t14_e = cast s14te
+    bool r14_e = reMatch(p14, t14_e)
+    assert(r14_e == false, "neg class e\n")
+    printf("neg class e = %lld\n", r14_e)
+
+    // ── range [a-z] ──────────────────────────────────────────────────────────
+    string s15p = "[a-z]+"
+    address p15 = cast s15p
+
+    string s15tl = "hello"
+    address t15_l = cast s15tl
+    bool r15_l = reMatch(p15, t15_l)
+    assert(r15_l == true, "range lower\n")
+    printf("range lower = %lld\n", r15_l)
+
+    // digits not in [a-z]
+    string s15td = "123"
+    address t15_d = cast s15td
+    bool r15_d = reMatch(p15, t15_d)
+    assert(r15_d == false, "range digit in alpha\n")
+    printf("range digit in alpha = %lld\n", r15_d)
+
+    // ── \d digit shorthand ───────────────────────────────────────────────────
+    string s16p = "\\d+"
+    address p16 = cast s16p
+
+    string s16td = "abc123def"
+    address t16_d = cast s16td
+    bool r16_d = reMatch(p16, t16_d)
+    assert(r16_d == true, "digit match\n")
+    printf("digit match = %lld\n", r16_d)
+
+    string s16ta = "abc"
+    address t16_a = cast s16ta
+    bool r16_a = reMatch(p16, t16_a)
+    assert(r16_a == false, "digit no alpha\n")
+    printf("digit no alpha = %lld\n", r16_a)
+
+    // ── \w word char shorthand ───────────────────────────────────────────────
+    string s17p = "\\w+"
+    address p17 = cast s17p
+
+    string s17tw = "hello_123"
+    address t17_w = cast s17tw
+    bool r17_w = reMatch(p17, t17_w)
+    assert(r17_w == true, "word match\n")
+    printf("word match = %lld\n", r17_w)
+
+    // space is not \w
+    string s17ts = "   "
+    address t17_s = cast s17ts
+    bool r17_s = reMatch(p17, t17_s)
+    assert(r17_s == false, "word space\n")
+    printf("word space = %lld\n", r17_s)
+
+    // ── \s whitespace shorthand ──────────────────────────────────────────────
+    string s18p = "\\s"
+    address p18 = cast s18p
+
+    string s18ts = "hello world"
+    address t18_s = cast s18ts
+    bool r18_s = reMatch(p18, t18_s)
+    assert(r18_s == true, "space match\n")
+    printf("space match = %lld\n", r18_s)
+
+    string s18ta = "hello"
+    address t18_a = cast s18ta
+    bool r18_a = reMatch(p18, t18_a)
+    assert(r18_a == false, "space alpha\n")
+    printf("space alpha = %lld\n", r18_a)
+
+    // ── anchored reMatchAt ───────────────────────────────────────────────────
+    string s19p = "hel"
+    address p19 = cast s19p
+
+    string s19th = "hello"
+    address t19_h = cast s19th
+    bool r19_h = reMatchAt(p19, t19_h)
+    assert(r19_h == true, "matchat hit\n")
+    printf("matchat hit = %lld\n", r19_h)
+
+    string s19tm = "world"
+    address t19_m = cast s19tm
+    bool r19_m = reMatchAt(p19, t19_m)
+    assert(r19_m == false, "matchat miss\n")
+    printf("matchat miss = %lld\n", r19_m)
+
+    // ── combined patterns ────────────────────────────────────────────────────
+    // email-like: word chars, @, word chars, dot, word chars
+    string s20p = "\\w+@\\w+\\.\\w+"
+    address p20 = cast s20p
+    string s20t = "user@example.com"
+    address t20 = cast s20t
+    bool r20 = reMatch(p20, t20)
+    assert(r20 == true, "email-like\n")
+    printf("email-like = %lld\n", r20)
+
+    // all-digits line
+    string s21p = "^[0-9]+$"
+    address p21 = cast s21p
+    string s21t = "12345"
+    address t21 = cast s21t
+    bool r21 = reMatch(p21, t21)
+    assert(r21 == true, "digits only line\n")
+    printf("digits only line = %lld\n", r21)
+}

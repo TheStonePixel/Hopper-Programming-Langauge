@@ -3,7 +3,7 @@
 // EXPECT: digitValue: 0 9 -1
 // EXPECT: hexValue: 0 9 10 15 10 15 -1
 
-import io from io
+import io from core
 import char from char
 
 entry main(int argc, address argv) {

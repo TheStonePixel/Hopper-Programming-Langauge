@@ -1,0 +1,23 @@
+// Linux System V semaphores — architecture-neutral.
+// Delegates to modules/target/sem.hop, which selects the ISA.
+//
+// Imported functions: semget semop semctl
+//
+// For new code prefer futex-based semaphores (linux/thread) — these exist for
+// cross-process synchronization and compatibility.
+//
+// ── IPC flags ────────────────────────────────────────────────────────────────
+//   IPC_PRIVATE=0  IPC_CREAT=512  IPC_EXCL=1024
+//   IPC_RMID=0  IPC_SET=1  IPC_STAT=2
+//
+// ── semop flags ───────────────────────────────────────────────────────────────
+//   IPC_NOWAIT=0x800  SEM_UNDO=0x1000
+//
+// ── semctl cmd ────────────────────────────────────────────────────────────────
+//   GETPID=11  GETVAL=12  GETALL=13  GETNCNT=14  GETZCNT=15
+//   SETVAL=16  SETALL=17
+//
+// ── struct sembuf ─────────────────────────────────────────────────────────────
+//   sem_num(int16)  sem_op(int16)  sem_flg(int16)
+
+import sem from sys

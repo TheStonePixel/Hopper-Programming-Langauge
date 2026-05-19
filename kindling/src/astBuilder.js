@@ -159,18 +159,26 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const variants = [];
         let next = 0;
+        let kind = "int";   // inferred from first variant that has an explicit value
         for (const v of ctx.enumVariant()) {
             const varName = v.Identifier().getText();
+            const strLit  = v.StringLiteral ? v.StringLiteral() : null;
             const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
-            if (intLit) {
-                const negative = v.children.some(c => c.getText && c.getText() === '-');
-                next = parseInt(intLit.getText(), 10);
-                if (negative) next = -next;
+            if (strLit) {
+                kind = "string";
+                const raw = unescapeHopperString(strLit.getText().slice(1, -1));
+                variants.push({ name: varName, value: raw, kind: "string" });
+            } else {
+                if (intLit) {
+                    const negative = v.children.some(c => c.getText && c.getText() === '-');
+                    next = parseInt(intLit.getText(), 10);
+                    if (negative) next = -next;
+                }
+                variants.push({ name: varName, value: next, kind: "int" });
+                next += 1;
             }
-            variants.push({ name: varName, value: next });
-            next += 1;
         }
-        return EnumDecl(name, variants);
+        return EnumDecl(name, variants, kind);
     }
 
     // ── const ──────────────────────────────────────────────────────────────
@@ -437,13 +445,16 @@ export class AstBuilder extends HopperVisitor {
     // ── functions ──────────────────────────────────────────────────────────
 
     visitFuncDecl(ctx) {
-        const name = ctx.Identifier().getText();
+        const name       = ctx.Identifier().getText();
         const returnType = ctx.type().getText();
-        const params = ctx.paramList()
+        const params     = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
-        const body = this.visit(ctx.block());
-        return FunctionDecl(name, params, returnType, body, false);
+        const contracts  = (ctx.contractClause() || []).map(c => this.visit(c)).filter(Boolean);
+        const requires   = contracts.filter(c => c.kind === "RequiresClause").map(c => c.expr);
+        const ensures    = contracts.filter(c => c.kind === "EnsuresClause").map(c => c.expr);
+        const body       = this.visit(ctx.block());
+        return FunctionDecl(name, params, returnType, body, false, false, requires, ensures);
     }
 
     visitExternFuncDecl(ctx) {
@@ -456,12 +467,15 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitProcDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const params = ctx.paramList()
+        const name      = ctx.Identifier().getText();
+        const params    = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
-        const body = this.visit(ctx.block());
-        return FunctionDecl(name, params, null, body, false);
+        const contracts = (ctx.contractClause() || []).map(c => this.visit(c)).filter(Boolean);
+        const requires  = contracts.filter(c => c.kind === "RequiresClause").map(c => c.expr);
+        const ensures   = contracts.filter(c => c.kind === "EnsuresClause").map(c => c.expr);
+        const body      = this.visit(ctx.block());
+        return FunctionDecl(name, params, null, body, false, false, requires, ensures);
     }
 
     visitExternProcDecl(ctx) {
@@ -491,22 +505,25 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitVarDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const type = ctx.type().getText();
-        const initExpr = this.visit(ctx.expression());
-        return VarDecl(name, type, initExpr);
+        const name      = ctx.Identifier().getText();
+        const type      = ctx.type().getText();
+        const initExpr  = this.visit(ctx.expression());
+        const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
+        return VarDecl(name, type, initExpr, constrain);
     }
 
     visitAllocateVarDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const type = ctx.type().getText();
-        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())));
+        const name      = ctx.Identifier().getText();
+        const type      = ctx.type().getText();
+        const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
+        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())), constrain);
     }
 
     visitVarDeclNoInit(ctx) {
-        const name = ctx.Identifier().getText();
-        const type = ctx.type().getText();
-        return VarDecl(name, type, null);
+        const name      = ctx.Identifier().getText();
+        const type      = ctx.type().getText();
+        const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
+        return VarDecl(name, type, null, constrain);
     }
 
     visitAssign(ctx) {
@@ -558,24 +575,34 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitAsmStmt(ctx) {
-        const lines = ctx.asmBlock().asmLine().map(l => this.visit(l));
+        // AsmBlock token text: `asm { ... }` — parse line by line
+        const raw     = ctx.AsmBlock().getText();
+        const content = raw.replace(/^asm\s*\{/, '').replace(/\}$/, '');
+        const lines   = content.split('\n').flatMap(line => {
+            // strip trailing inline comment, then trim
+            const ci   = line.indexOf('//');
+            let   text = (ci >= 0 ? line.slice(0, ci) : line).trim();
+            if (!text) return [];
+
+            // reg/var = literal or identifier  →  AsmLineAssign
+            const m = text.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);
+            if (m) {
+                const dest    = m[1];
+                const srcText = m[2].trim();
+                let src;
+                if (/^0x[0-9a-fA-F]+$/i.test(srcText))
+                    src = HexLiteral(parseInt(srcText, 16));
+                else if (/^[0-9]+$/.test(srcText))
+                    src = IntLiteral(parseInt(srcText, 10));
+                else
+                    src = Var(srcText);
+                return [{ kind: "AsmLineAssign", dest, src }];
+            }
+
+            // everything else: raw instruction text  →  AsmLineOp
+            return [{ kind: "AsmLineOp", op: text }];
+        });
         return AsmStmt(lines);
-    }
-
-    visitAsmLineAssign(ctx) {
-        const dest = ctx.Identifier().getText();
-        const src  = this.visitAsmOperand(ctx.asmOperand());
-        return { kind: "AsmLineAssign", dest, src };
-    }
-
-    visitAsmLineOp(ctx) {
-        return { kind: "AsmLineOp", op: ctx.Identifier().getText() };
-    }
-
-    visitAsmOperand(ctx) {
-        if (ctx.IntegerLiteral()) return IntLiteral(parseInt(ctx.IntegerLiteral().getText(), 10));
-        if (ctx.HexLiteral())     return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
-        return Var(ctx.Identifier().getText());
     }
 
     visitArrayAssign(ctx) {
@@ -592,7 +619,8 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitWhileStmt(ctx) {
-        return WhileStmt(this.visit(ctx.expression()), this.visit(ctx.block()));
+        const invariants = (ctx.invariantClause() || []).map(c => this.visit(c));
+        return WhileStmt(this.visit(ctx.expression()), this.visit(ctx.block()), invariants);
     }
 
     visitForStmt(ctx) {
@@ -621,13 +649,11 @@ export class AstBuilder extends HopperVisitor {
     visitFreeParam()  { return null; }
     visitFixedParam() { return null; }
 
-    // ── compile-time contract stubs (not yet implemented) ──────────────────
-    // requires / ensures / invariant / constrain are reserved and parsed
-    // but silently ignored until the constraint system is built.
-    visitRequiresClause()  { return null; }
-    visitEnsuresClause()   { return null; }
-    visitInvariantClause() { return null; }
-    visitConstrainClause() { return null; }
+    // ── compile-time contract clauses ─────────────────────────────────────
+    visitRequiresClause(ctx) { return { kind: "RequiresClause", expr: this.visit(ctx.expression()) }; }
+    visitEnsuresClause(ctx)  { return { kind: "EnsuresClause",  expr: this.visit(ctx.expression()) }; }
+    visitInvariantClause(ctx){ return this.visit(ctx.expression()); }
+    visitConstrainClause(ctx){ return ctx.type().getText(); }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
         return ReturnStmt(expr);
@@ -888,14 +914,16 @@ function resolveModuleFiles(moduleName, names, baseDir) {
 }
 
 function filesToLoad(moduleDir, names) {
+    // Prefer src/ subdirectory if present (standard module layout)
+    const srcDir  = path.join(moduleDir, "src");
+    const loadDir = fs.existsSync(srcDir) ? srcDir : moduleDir;
+
     if (names) {
-        // named import: load only requested files
-        return names.map(n => path.join(moduleDir, n + ".hop"));
+        return names.map(n => path.join(loadDir, n + ".hop"));
     } else {
-        // whole module: load all .hop files
-        return fs.readdirSync(moduleDir)
+        return fs.readdirSync(loadDir)
             .filter(f => f.endsWith(".hop"))
-            .map(f => path.join(moduleDir, f));
+            .map(f => path.join(loadDir, f));
     }
 }
 

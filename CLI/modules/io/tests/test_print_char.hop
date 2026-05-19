@@ -3,7 +3,7 @@
 // EXPECT: hello
 // EXPECT: world
 
-import io from io
+import io from core
 
 entry main(int argc, address argv) {
     println(true)

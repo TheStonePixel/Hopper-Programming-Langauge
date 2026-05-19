@@ -1,0 +1,192 @@
+// fs.hop — filesystem operations backed by Linux syscalls.
+//
+// FileSystem: stateless OS interface — cwd, exists, isDirectory, isFile,
+//             makeDirectory, changeDirectory.
+// Directory:  sequential directory traversal via getdents64. Skips "." and "..".
+//             next() returns Path("") when exhausted.
+//
+// linux_dirent64 layout: ino(8) off(8) reclen(2) type(1) name(variable)
+// struct stat: st_mode at byte offset 24 (4 bytes, little-endian)
+//   S_IFDIR type nibble: st_mode[25:24] / 4096 == 4
+//   S_IFREG type nibble: st_mode[25:24] / 4096 == 8
+//
+// Usage:
+//   import fs from io
+//
+//   FileSystem fsys = FileSystem()
+//   Path cwd    = fsys.cwd()
+//   bool exists = fsys.exists(Path("/tmp"))
+//   bool isDir  = fsys.isDirectory(Path("/usr"))
+//   fsys.makeDirectory(Path("/tmp/myproject"))
+//
+//   Directory dir = Directory(Path("/tmp"))
+//   while (true) {
+//       Path entry = dir.next()
+//       if (entry.length() == 0) { break }
+//       print(entry.str())
+//       newline()
+//   }
+//   dir.close()
+
+import unique from Pointer
+import path from path
+import fs from linux
+
+// ── FileSystem ────────────────────────────────────────────────────────────────
+// No internal state. Every method is a thin wrapper around a syscall.
+
+class FileSystem {
+
+    constructor() { }
+
+    destructor() { }
+
+    // Current working directory as a Path. Returns Path(".") on failure.
+    function cwd() Path {
+        Unique<byte> buf = Unique(4096)
+        int result = getcwd(buf.ptr(), 4096)
+        if (result <= 0) {
+            buf.destroy()
+            Path fallback = Path(".")
+            return fallback
+        }
+        Path p = Path(buf.ptr())
+        buf.destroy()
+        return p
+    }
+
+    // True if the path exists (any type). Uses F_OK = 0.
+    function exists(Path path) bool {
+        int result = access(path.str(), 0)
+        return result == 0
+    }
+
+    // True if the path is a directory.
+    function isDirectory(Path path) bool {
+        Unique<byte> statBuf = Unique(144)
+        int result = stat(path.str(), statBuf.ptr())
+        if (result != 0) {
+            statBuf.destroy()
+            return false
+        }
+        byte b0 = statBuf.get(24)
+        byte b1 = statBuf.get(25)
+        int v0 = cast b0
+        int v1 = cast b1
+        int mode = v0 + (v1 * 256)
+        statBuf.destroy()
+        int typeNibble = mode / 4096
+        return typeNibble == 4
+    }
+
+    // True if the path is a regular file.
+    function isFile(Path path) bool {
+        Unique<byte> statBuf = Unique(144)
+        int result = stat(path.str(), statBuf.ptr())
+        if (result != 0) {
+            statBuf.destroy()
+            return false
+        }
+        byte b0 = statBuf.get(24)
+        byte b1 = statBuf.get(25)
+        int v0 = cast b0
+        int v1 = cast b1
+        int mode = v0 + (v1 * 256)
+        statBuf.destroy()
+        int typeNibble = mode / 4096
+        return typeNibble == 8
+    }
+
+    // Create a directory with permissions 0755. Returns true on success.
+    function makeDirectory(Path path) bool {
+        int result = mkdir(path.str(), 493)
+        return result == 0
+    }
+
+    // Change the process working directory. Returns true on success.
+    function changeDirectory(Path path) bool {
+        int result = chdir(path.str())
+        return result == 0
+    }
+}
+
+// ── Directory ─────────────────────────────────────────────────────────────────
+// Opens a directory for entry-by-entry traversal using getdents64.
+// Entries "." and ".." are skipped. next() returns Path("") when exhausted.
+// Always call close() when done.
+
+class Directory {
+    int fd
+    Path location
+    Unique<byte> buf
+    int bytesRead
+    int position
+
+    constructor(Path path) {
+        self.fd = open(path.str(), 65536, 0)
+        self.location = Path(path.str())
+        self.buf = Unique(4096)
+        self.bytesRead = 0
+        self.position = 0
+    }
+
+    destructor() {
+        self.buf.destroy()
+    }
+
+    // Close the underlying file descriptor. Idempotent.
+    function close() {
+        if (self.fd >= 0) {
+            close(self.fd)
+            self.fd = -1
+        }
+    }
+
+    // The path this Directory was opened on.
+    function path() Path {
+        return self.location
+    }
+
+    // Next entry as a full path. Returns Path("") when exhausted.
+    // Refills the getdents64 buffer automatically. Skips "." and "..".
+    function next() Path {
+        while (true) {
+            if (self.position >= self.bytesRead) {
+                int newBytes = getdents64(self.fd, self.buf.ptr(), 4096)
+                if (newBytes <= 0) {
+                    Path empty = Path("")
+                    return empty
+                }
+                self.bytesRead = newBytes
+                self.position = 0
+            }
+            byte rlo = self.buf.get(self.position + 16)
+            byte rhi = self.buf.get(self.position + 17)
+            int rloInt = cast rlo
+            int rhiInt = cast rhi
+            int reclen = (rloInt & 255) + ((rhiInt & 255) * 256)
+            address nameAddr = self.buf.ptr() + self.position + 19
+            self.position = self.position + reclen
+            byte c0 = nameAddr::value
+            int c0i = cast c0
+            bool isDot = false
+            if (c0i == '.') {
+                address p1 = nameAddr + 1
+                byte c1 = p1::value
+                int c1i = cast c1
+                if (c1i == 0) { isDot = true }
+                if (c1i == '.') {
+                    address p2 = p1 + 1
+                    byte c2 = p2::value
+                    int c2i = cast c2
+                    if (c2i == 0) { isDot = true }
+                }
+            }
+            if (!isDot) {
+                Path fullPath = Path(self.location.str())
+                fullPath.join(nameAddr)
+                return fullPath
+            }
+        }
+    }
+}
