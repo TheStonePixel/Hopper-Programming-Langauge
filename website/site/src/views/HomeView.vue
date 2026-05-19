@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import CodeBlock from '../components/CodeBlock.vue'
 
 // ── Hero typing animation ────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ entry main {
 }`
 
 const typedCode   = ref('')
-const phase       = ref('typing')   // 'typing' | 'compiling' | 'welcome' | 'done'
+const phase       = ref('typing')
 const welcomeFont = ref('"Inter", sans-serif')
 const compileDots = ref('')
 const fadeOut     = ref(false)
@@ -61,32 +61,270 @@ const FONTS = [
     '"Inter", sans-serif',
 ]
 
+// ── Tree code snippets ────────────────────────────────────────────────────────
+
+const treeAsm = `// Raw CPU query — no OS, no libc required
+
+function cpuId() int {
+    int leaf = 0
+    asm {
+        xor eax, eax   // CPUID leaf 0
+        cpuid
+        leaf = eax
+    }
+    return leaf
+}`
+
+const treeBitfield = `// Hardware registers as named, typed variables
+
+bitfield UartCR1 {
+    bit re      // receiver enable
+    bit te      // transmitter enable
+    pad 11
+    bit ue      // USART enable
+    pad 18
+}
+
+strict UartCR1 uart_cr1 = 0x4001100C
+strict UartCR1 uart_dr  = 0x40011004
+
+bind 0x00000004 = isr_uart::address`
+
+const treeMemory = `// Manual memory — you decide the lifetime
+
+// T::size is a compile-time byte-width query
+address rxBuf = allocate 256 * byte::size
+address txBuf = allocate 64  * int::size
+
+// pointer arithmetic and typed dereference
+address ptr  = rxBuf + 4
+ptr::value   = 0xFF
+
+// explicit release — no hidden runtime
+deallocate rxBuf
+deallocate txBuf`
+
+const treeUnique = `// Unique<T> — ownership with automatic cleanup
+
+template Unique<T> {
+    address ptr
+    int     len
+
+    constructor(int n) {
+        self.ptr = allocate n * T::size
+        self.len = n
+    }
+
+    function get() address { return self.ptr }
+    function size() int    { return self.len  }
+
+    destructor() {
+        deallocate self.ptr   // freed when scope ends
+    }
+}`
+
+const treeClass = `// Class: composes every layer into one abstraction
+
+class UartDriver {
+    Unique<byte> rxBuf
+
+    constructor() {
+        self.rxBuf  = Unique(256)
+        uart_cr1.te = 1   // bitfield write → volatile store
+        uart_cr1.re = 1
+        uart_cr1.ue = 1
+    }
+
+    function send(byte c) {
+        while (uart_cr1.te == 0) {}
+        uart_dr.data = c
+    }
+
+    function recv() byte {
+        while (uart_cr1.re == 0) {}
+        return uart_dr.data
+    }
+}`
+
+const treeSyscall = `// Linux write syscall — same asm syntax, any target
+
+function write(int fd, address buf, int len) int {
+    int n = 0
+    asm {
+        rax = 1        // SYS_write
+        rdi = fd
+        rsi = buf
+        rdx = len
+        syscall
+        n = rax
+    }
+    return n
+}`
+
+const treeEntry = `// sys-probe.hop — the whole stack, one entry point
+
+import UartDriver from driver
+import write      from sys
+
+// Hopper is 🔥
+function isAwesome() bool { return true }
+
+entry main {
+    UartDriver uart = UartDriver()
+    int leaf = cpuId()
+
+    if (leaf > 0) { uart.send(79) }  // 'O'
+    else          { uart.send(70) }  // 'F'
+
+    write(1, uart.rxBuf.get(), uart.rxBuf.size())
+
+    if (isAwesome()) {
+        write(1, "Welcome To Hopper", 17)
+    }
+}`
+
+// ── Tree SVG drawing ──────────────────────────────────────────────────────────
+
+const treeWrapper = ref(null)
+const treeSvg     = ref(null)
+const refAsm      = ref(null)
+const refBitfield = ref(null)
+const refMemory   = ref(null)
+const refUnique   = ref(null)
+const refClass    = ref(null)
+const refSyscall  = ref(null)
+const refEntry    = ref(null)
+
+function nodeBox(el) {
+    const wr = treeWrapper.value.getBoundingClientRect()
+    const r  = el.getBoundingClientRect()
+    return {
+        cx:     r.left + r.width  / 2 - wr.left,
+        cy:     r.top  + r.height / 2 - wr.top,
+        top:    r.top    - wr.top,
+        bottom: r.bottom - wr.top,
+        left:   r.left   - wr.left,
+        right:  r.right  - wr.left,
+    }
+}
+
+function svgCurve(x1, y1, x2, y2) {
+    const mid = (y1 + y2) / 2
+    return `M${x1},${y1} C${x1},${mid} ${x2},${mid} ${x2},${y2}`
+}
+
+function addCircle(svg, cx, cy, r = 5, fill = '#2563eb') {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+    c.setAttribute('cx', cx)
+    c.setAttribute('cy', cy)
+    c.setAttribute('r',  r)
+    c.setAttribute('fill', fill)
+    c.setAttribute('opacity', '0.7')
+    svg.appendChild(c)
+}
+
+function drawTreeLines() {
+    const wrapper = treeWrapper.value
+    const svg     = treeSvg.value
+    if (!wrapper || !svg) return
+
+    // clear previous
+    while (svg.firstChild) svg.removeChild(svg.firstChild)
+
+    const W = wrapper.offsetWidth
+    const H = wrapper.scrollHeight
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+    svg.style.width  = `${W}px`
+    svg.style.height = `${H}px`
+
+    const a  = nodeBox(refAsm.value)
+    const b  = nodeBox(refBitfield.value)
+    const m  = nodeBox(refMemory.value)
+    const u  = nodeBox(refUnique.value)
+    const cl = nodeBox(refClass.value)
+    const s  = nodeBox(refSyscall.value)
+    const e  = nodeBox(refEntry.value)
+
+    // merge1: where asm + bitfield converge
+    const m1x = (a.cx + b.cx) / 2
+    const m1y = Math.max(a.bottom, b.bottom) + 28
+
+    // merge2: where unique + trunk meet before class
+    const m2y = cl.top - 28
+
+    const connections = [
+        // asm and bitfield down to shared merge point
+        { x1: a.cx, y1: a.bottom, x2: m1x,  y2: m1y  },
+        { x1: b.cx, y1: b.bottom, x2: m1x,  y2: m1y  },
+        // trunk branches left to manual memory
+        { x1: m1x,  y1: m1y,     x2: m.cx,  y2: m.top  },
+        // memory down to Unique<T>
+        { x1: m.cx, y1: m.bottom, x2: u.cx,  y2: u.top  },
+        // trunk continues down toward class
+        { x1: m1x,  y1: m1y,     x2: cl.cx, y2: m2y    },
+        // Unique<T> curves right into class
+        { x1: u.cx, y1: u.bottom, x2: cl.cx, y2: cl.top },
+        // class down to entry
+        { x1: cl.cx, y1: cl.bottom, x2: e.cx, y2: e.top },
+        // syscall curves in to entry
+        { x1: s.cx, y1: s.bottom,  x2: e.cx, y2: e.top  },
+    ]
+
+    // ensure keyframe exists
+    if (!document.getElementById('hopper-tree-kf')) {
+        const st = document.createElement('style')
+        st.id = 'hopper-tree-kf'
+        st.textContent = '@keyframes hopperDrawPath { to { stroke-dashoffset: 0; } }'
+        document.head.appendChild(st)
+    }
+
+    connections.forEach(({ x1, y1, x2, y2 }, idx) => {
+        const d    = svgCurve(x1, y1, x2, y2)
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+        path.setAttribute('d', d)
+        path.setAttribute('fill', 'none')
+        path.setAttribute('stroke', '#2563eb')
+        path.setAttribute('stroke-width', '1.75')
+        path.setAttribute('stroke-opacity', '0.45')
+        path.setAttribute('stroke-linecap', 'round')
+
+        const len = path.getTotalLength()
+        path.style.strokeDasharray  = len
+        path.style.strokeDashoffset = len
+        path.style.animation = `hopperDrawPath 0.65s ease ${idx * 0.09}s forwards`
+        svg.appendChild(path)
+    })
+
+    // junction dots
+    addCircle(svg, m1x, m1y)
+    addCircle(svg, cl.cx, m2y, 4, '#7c3aed')
+    addCircle(svg, e.cx,  e.top - 4, 6, '#059669')
+}
+
+// ── Hero + tree mount ─────────────────────────────────────────────────────────
+
+let ro = null
+
 onMounted(() => {
+    // hero typing
     let i = 0
     const typeInterval = setInterval(() => {
         typedCode.value = DEMO_CODE.slice(0, ++i)
         if (i >= DEMO_CODE.length) {
             clearInterval(typeInterval)
-
-            // brief pause, then show compile line
             setTimeout(() => {
                 phase.value = 'compiling'
                 let d = 0
                 const dotInterval = setInterval(() => {
-                    compileDots.value = '.'.repeat((++d % 4))
+                    compileDots.value = '.'.repeat(++d % 4)
                 }, 200)
-
-                // compile finishes → show welcome
                 setTimeout(() => {
                     clearInterval(dotInterval)
                     phase.value = 'welcome'
-
                     let fi = 0
                     const fontInterval = setInterval(() => {
                         welcomeFont.value = FONTS[fi++ % FONTS.length]
                     }, 550)
-
-                    // settle on final font, then fade to static title
                     setTimeout(() => {
                         clearInterval(fontInterval)
                         welcomeFont.value = '"Inter", sans-serif'
@@ -99,137 +337,15 @@ onMounted(() => {
             }, 500)
         }
     }, 18)
+
+    // tree SVG — delay to let Shiki render code block heights
+    setTimeout(drawTreeLines, 600)
+
+    ro = new ResizeObserver(() => drawTreeLines())
+    nextTick(() => { if (treeWrapper.value) ro.observe(treeWrapper.value) })
 })
 
-// ── Code layers ──────────────────────────────────────────────────────────────
-
-const layerAsm = `// Inline assembly — raw hardware, typed Hopper variables
-
-function cpuMaxLeaf() int {
-    int leaf = 0
-    asm {
-        xor eax, eax   // CPUID leaf 0: get max supported leaf
-        cpuid
-        leaf = eax     // result flows back into Hopper variable
-    }
-    return leaf
-}
-
-function sysWrite(int fd, address buf, int len) {
-    asm {
-        rax = 1        // SYS_write
-        rdi = fd
-        rsi = buf
-        rdx = len
-        syscall
-    }
-}`
-
-const layerMmio = `// Memory-mapped I/O — hardware registers as named variables
-
-strict int UART_DR = 0x09000000   // PL011 data register
-strict int UART_FR = 0x09000018   // flag register
-
-function uartReady() bool {
-    return (UART_FR & 0x20) == 0  // TX FIFO not full
-}
-
-function uartPut(int c) {
-    while (!uartReady()) {}
-    UART_DR = c                   // direct store to hardware
-}
-
-function uartPuts(address str, int len) {
-    int i = 0
-    while (i < len) { uartPut(str[i]); i = i + 1 }
-}`
-
-const layerTypes = `// Enums and structs — describe hardware state precisely
-
-enum Arch   { X86_64, AArch64, RiscV, Unknown }
-enum Health { Healthy, Degraded, Failed }
-
-struct CpuInfo {
-    Arch arch
-    int  maxLeaf
-    int  coreCount
-}
-
-struct ProbeResult {
-    CpuInfo cpu
-    Health  status
-    bool    uartOk
-}`
-
-const layerTemplates = `// Generic templates — one definition, any value type
-
-template<T>
-struct Buffer {
-    T   data
-    int head
-    int count
-    int cap
-}
-
-template<T>
-function push(Buffer<T> b, T item) Buffer<T> {
-    b.data  = item
-    b.head  = (b.head + 1) % b.cap
-    b.count = b.count + 1
-    return b
-}
-
-template<T>
-function full(Buffer<T> b) bool {
-    return b.count >= b.cap
-}`
-
-const layerClass = `// Class composition — all layers in one abstraction
-
-import CpuInfo     from types
-import ProbeResult from types
-import Buffer      from buffer
-
-class SystemProbe {
-    CpuInfo      cpu
-    Buffer<int>  log
-
-    constructor(Arch arch) {
-        self.cpu = CpuInfo(arch, cpuMaxLeaf(), 4)
-        self.log = Buffer(0, 0, 0, 64)
-    }
-
-    function run() ProbeResult {
-        self.log = push(self.log, self.cpu.maxLeaf)
-        uartPut(self.cpu.coreCount + 48)
-        return ProbeResult(self.cpu, Health.Healthy, true)
-    }
-}`
-
-const layerEntry = `// sys-probe.hop — hardware diagnostics CLI, start to finish
-
-import SystemProbe  from probe
-import ProbeResult  from types
-import io           from std
-
-// Hopper is 🔥
-function isAwesome() bool {
-    return true
-}
-
-entry main {
-    SystemProbe probe = SystemProbe(Arch.X86_64)
-    ProbeResult result = probe.run()
-
-    if (result.status == Health.Healthy) {
-        io.print("CPU OK — max leaf: " + result.cpu.maxLeaf)
-    }
-    if (result.uartOk) { io.print("UART OK") }
-
-    if (isAwesome()) {
-        io.print("Welcome To Hopper")
-    }
-}`
+onUnmounted(() => { if (ro) ro.disconnect() })
 
 // ── CLI tools ────────────────────────────────────────────────────────────────
 
@@ -254,10 +370,12 @@ const tools = [
     <header class="hero">
       <div class="hero-inner">
 
-        <!-- Static title (always visible) -->
-        <h1 class="hero-title">The Hopper Programming Language</h1>
+        <!-- Title hidden until animation completes -->
+        <h1 class="hero-title" :class="{ visible: phase === 'done' }">
+          The Hopper Programming Language
+        </h1>
 
-        <!-- Typing terminal (phases: typing / compiling) -->
+        <!-- Typing terminal -->
         <transition name="fade">
           <div v-if="phase === 'typing' || phase === 'compiling'" class="demo-wrap">
             <div class="demo-terminal">
@@ -273,9 +391,9 @@ const tools = [
           </div>
         </transition>
 
-        <!-- Welcome display (font cycling then fade out) -->
+        <!-- Welcome font-cycling display -->
         <transition name="fade">
-          <div v-if="phase === 'welcome'" class="welcome-wrap" :class="{ 'fading': fadeOut }">
+          <div v-if="phase === 'welcome'" class="welcome-wrap" :class="{ fading: fadeOut }">
             <div class="welcome-text" :style="{ fontFamily: welcomeFont }">
               Welcome to Hopper
             </div>
@@ -285,8 +403,8 @@ const tools = [
           </div>
         </transition>
 
-        <!-- Language description shown after animation settles -->
-        <p class="hero-desc" :class="{ visible: phase === 'done' || phase === 'welcome' }">
+        <!-- Language description fades in with the title -->
+        <p class="hero-desc" :class="{ visible: phase === 'done' }">
           Hopper is a freestanding compiled language built on a single principle: every feature earns
           its place. The type system, module system, template engine, and memory model compose from one
           coherent core — no legacy compromises, no bolted-on afterthoughts. Statically typed. Compiled
@@ -296,102 +414,71 @@ const tools = [
       </div>
     </header>
 
-    <!-- ── It's All Code — vertical timeline ─────────────────────────────── -->
+    <!-- ── It's All Code — DAG tree ──────────────────────────────────────── -->
 
     <section class="layers">
       <div class="container">
         <span class="label">It's All Code</span>
-        <h2 class="section-title">One language. From registers to programs.</h2>
-        <p class="section-sub">Every layer of this hardware diagnostics tool is real, runnable Hopper. Write to bare-metal CPU registers and print structured output in the same syntax, with the same type system, in the same file.</p>
+        <h2 class="section-title">From bare metal to application.</h2>
+        <p class="section-sub">Every node below is real, runnable Hopper. Each layer solves a specific problem — and every arrow is a dependency. Follow them down to see how the language composes.</p>
 
-        <div class="timeline">
+        <div class="tree-wrapper" ref="treeWrapper">
 
-          <!-- Layer 1: Inline ASM -->
-          <div class="tl-row">
-            <div class="tl-code">
-              <CodeBlock :code="layerAsm" label="asm.hop" />
+          <!-- SVG overlay for connecting lines -->
+          <svg class="tree-svg" ref="treeSvg" aria-hidden="true" />
+
+          <!-- Row 1: two root nodes -->
+          <div class="tree-row tree-row-two">
+            <div class="tree-node" ref="refAsm">
+              <div class="node-badge badge-asm">Inline Assembly</div>
+              <CodeBlock :code="treeAsm" label="asm.hop" />
+              <p class="node-desc">The <code>asm {}</code> block puts raw x86 instructions inside typed Hopper functions. Register names bind directly to Hopper variables — no constraint strings, no quoted templates. Direct CPU access without leaving the language.</p>
             </div>
-            <div class="tl-spine">
-              <div class="tl-node">1</div>
-              <div class="tl-line" />
-            </div>
-            <div class="tl-desc">
-              <h3>Inline Assembly</h3>
-              <p><code>asm {}</code> puts raw x86 instructions inside typed Hopper functions. Register names bind to Hopper variables — no quoted strings, no constraint syntax, no separate assembler. This solves the hardest problem in systems programming: talking directly to the CPU without leaving the language.</p>
+            <div class="tree-node" ref="refBitfield">
+              <div class="node-badge badge-hw">Hardware Registers</div>
+              <CodeBlock :code="treeBitfield" label="uart.hop" />
+              <p class="node-desc"><code>bitfield</code> maps a struct layout to exact bit positions. <code>strict</code> binds a name to a physical address — volatile load/store is automatic. <code>bind</code> places a function pointer at an interrupt vector address. Hardware becomes named, typed, safe.</p>
             </div>
           </div>
 
-          <!-- Layer 2: MMIO -->
-          <div class="tl-row reverse">
-            <div class="tl-desc">
-              <h3>Memory-Mapped I/O</h3>
-              <p><code>strict</code> binds a name to a fixed memory address. Reading or writing it compiles to a direct load or store — no pointer casts, no <code>volatile</code>, no extern header. Hardware registers become named, typed, first-class language citizens.</p>
-            </div>
-            <div class="tl-spine">
-              <div class="tl-node">2</div>
-              <div class="tl-line" />
-            </div>
-            <div class="tl-code">
-              <CodeBlock :code="layerMmio" label="uart.hop" />
+          <!-- Row 2: manual memory (left only) -->
+          <div class="tree-row tree-row-left">
+            <div class="tree-node" ref="refMemory">
+              <div class="node-badge badge-mem">Manual Memory</div>
+              <CodeBlock :code="treeMemory" label="memory.hop" />
+              <p class="node-desc"><code>allocate</code> and <code>deallocate</code> are keywords, not library calls. <code>T::size</code> queries the compile-time byte width of any type, enabling typed generic allocation. Pointer arithmetic and dereference use the <code>::</code> operator — consistent and readable.</p>
             </div>
           </div>
 
-          <!-- Layer 3: Types -->
-          <div class="tl-row">
-            <div class="tl-code">
-              <CodeBlock :code="layerTypes" label="types.hop" />
+          <!-- Row 3: Unique<T> (left) + class (right) -->
+          <div class="tree-row tree-row-two">
+            <div class="tree-node" ref="refUnique">
+              <div class="node-badge badge-mem">Unique&lt;T&gt;</div>
+              <CodeBlock :code="treeUnique" label="unique.hop" />
+              <p class="node-desc">A destructor guarantees the buffer is freed when the owner goes out of scope. No garbage collector. No runtime. The compiler inserts the <code>deallocate</code>. <code>Unique&lt;T&gt;</code> is written in Hopper — it's not a compiler primitive, it's just a template.</p>
             </div>
-            <div class="tl-spine">
-              <div class="tl-node">3</div>
-              <div class="tl-line" />
-            </div>
-            <div class="tl-desc">
-              <h3>Value Types &amp; Enums</h3>
-              <p>Enums model hardware states without magic numbers. Structs pack data exactly as written — no implicit heap, no hidden copy. Once your types are right, the compiler enforces correctness everywhere they're used.</p>
-            </div>
-          </div>
-
-          <!-- Layer 4: Templates -->
-          <div class="tl-row reverse">
-            <div class="tl-desc">
-              <h3>Generic Templates</h3>
-              <p>Write <code>Buffer&lt;T&gt;</code> once. Use it for <code>int</code>, <code>CpuInfo</code>, or any struct you define — no runtime boxing, no type erasure, no overhead. Generic code in Hopper is a compile-time substitution, not a runtime cost.</p>
-            </div>
-            <div class="tl-spine">
-              <div class="tl-node">4</div>
-              <div class="tl-line" />
-            </div>
-            <div class="tl-code">
-              <CodeBlock :code="layerTemplates" label="buffer.hop" />
+            <div class="tree-node" ref="refClass">
+              <div class="node-badge badge-class">Class Composition</div>
+              <CodeBlock :code="treeClass" label="driver.hop" />
+              <p class="node-desc">The class composes bitfield registers, Unique ownership, and type-safe methods into one portable unit. Writing <code>uart_cr1.te = 1</code> generates a volatile read-modify-write on the MMIO register. The hardware complexity is internal; the interface is clean.</p>
             </div>
           </div>
 
-          <!-- Layer 5: Class -->
-          <div class="tl-row">
-            <div class="tl-code">
-              <CodeBlock :code="layerClass" label="probe.hop" />
-            </div>
-            <div class="tl-spine">
-              <div class="tl-node">5</div>
-              <div class="tl-line" />
-            </div>
-            <div class="tl-desc">
-              <h3>Class Composition</h3>
-              <p>Classes compose every layer into one portable, testable unit. <code>self</code> is always explicit. Constructors are plain functions. No hidden dispatch, no virtual tables unless you ask — the hardware complexity lives inside, the interface stays clean.</p>
+          <!-- Row 4: linux syscall (left only) -->
+          <div class="tree-row tree-row-left">
+            <div class="tree-node" ref="refSyscall">
+              <div class="node-badge badge-asm">Linux Syscall</div>
+              <CodeBlock :code="treeSyscall" label="sys.hop" />
+              <p class="node-desc">The same <code>asm {}</code> syntax that queries CPUID also invokes syscalls. One construct for all raw hardware interfaces — bare-metal UART or Linux kernel, same language, same rules.</p>
             </div>
           </div>
 
-          <!-- Layer 6: Entry (no line below last node) -->
-          <div class="tl-row reverse last">
-            <div class="tl-desc">
-              <h3>Application Entry</h3>
-              <p><code>entry main</code> is unambiguous and minimal — no hidden signature, no runtime startup preamble. Everything from layers 1 through 5 composes here: inline assembly, MMIO, value types, generics, and classes. One language, the whole stack.</p>
-            </div>
-            <div class="tl-spine">
-              <div class="tl-node">6</div>
-            </div>
-            <div class="tl-code">
-              <CodeBlock :code="layerEntry" label="sys-probe.hop" />
+          <!-- Row 5: entry (centered, full-width feel) -->
+          <div class="tree-row tree-row-center">
+            <div class="tree-node tree-node-entry" ref="refEntry">
+              <div class="node-badge badge-entry">Application Entry</div>
+              <CodeBlock :code="treeEntry" label="sys-probe.hop" />
+              <p class="node-desc"><code>entry main</code> is a declaration, not a function. No hidden signature, no runtime startup preamble. Every layer above composes here — inline assembly, MMIO registers, manual memory, smart ownership, class abstraction, and a Linux syscall — in one clean program.</p>
             </div>
           </div>
 
@@ -491,6 +578,13 @@ const tools = [
   </div>
 </template>
 
+<!-- Global keyframe for SVG path draw-on animation (cannot be scoped) -->
+<style>
+@keyframes hopperDrawPath {
+  to { stroke-dashoffset: 0; }
+}
+</style>
+
 <style scoped>
 /* ── Reset / layout ──────────────────────────────────────────────────────── */
 .page { background: #fff; }
@@ -549,6 +643,13 @@ const tools = [
   letter-spacing: -0.04em;
   line-height: 1.05;
   margin-bottom: 2rem;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.hero-title.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ── Terminal ────────────────────────────────────────────────────────────── */
@@ -609,7 +710,7 @@ const tools = [
   color: #22c55e;
   font-family: inherit;
 }
-.prompt { color: #818cf8; }
+.prompt      { color: #818cf8; }
 .compile-dots { color: #475569; min-width: 20px; display: inline-block; }
 
 /* ── Welcome display ─────────────────────────────────────────────────────── */
@@ -644,7 +745,7 @@ const tools = [
   max-width: 720px;
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition: opacity 0.6s ease 0.2s, transform 0.6s ease 0.2s;
 }
 .hero-desc.visible {
   opacity: 1;
@@ -655,101 +756,99 @@ const tools = [
 .fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
 .fade-enter-from, .fade-leave-to       { opacity: 0; }
 
-/* ── Layers / timeline ───────────────────────────────────────────────────── */
+/* ── Tree wrapper ────────────────────────────────────────────────────────── */
 .layers {
   padding: 5rem 0;
   background: #fff;
 }
 
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+.tree-wrapper {
+  position: relative;
 }
 
-.tl-row {
+.tree-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* ── Tree rows ───────────────────────────────────────────────────────────── */
+.tree-row {
   display: grid;
-  grid-template-columns: 1fr 56px 1fr;
-  align-items: start;
-  gap: 0 2rem;
+  gap: 2rem 3rem;
+  margin-bottom: 3rem;
 }
 
-.tl-row.reverse .tl-code { order: 3; }
-.tl-row.reverse .tl-spine { order: 2; }
-.tl-row.reverse .tl-desc  { order: 1; }
-
-@media (max-width: 768px) {
-  .tl-row { grid-template-columns: 40px 1fr; }
-  .tl-row .tl-code, .tl-row.reverse .tl-code  { order: 3; grid-column: 2; }
-  .tl-row .tl-spine, .tl-row.reverse .tl-spine { order: 1; grid-column: 1; }
-  .tl-row .tl-desc, .tl-row.reverse .tl-desc   { order: 2; grid-column: 2; }
+.tree-row-two {
+  grid-template-columns: 1fr 1fr;
 }
 
-/* Vertical spine */
-.tl-spine {
+.tree-row-left {
+  grid-template-columns: 1fr 1fr;
+}
+.tree-row-left .tree-node {
+  grid-column: 1;
+}
+
+.tree-row-center {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 1.5rem;
-}
-
-.tl-node {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #2563eb;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  z-index: 1;
-  box-shadow: 0 0 0 4px #eff6ff;
 }
 
-.tl-line {
-  width: 2px;
-  flex: 1;
-  min-height: 60px;
-  background: linear-gradient(to bottom, #2563eb40, #2563eb20);
-  margin-top: 6px;
+.tree-node {
+  min-width: 0;
 }
 
-.tl-desc {
-  padding: 1.25rem 0 2.5rem;
+.tree-node-entry {
+  width: min(640px, 100%);
 }
 
-.tl-desc h3 {
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: #111827;
-  margin: 0 0 0.6rem;
-  letter-spacing: -0.02em;
+/* ── Node badges ─────────────────────────────────────────────────────────── */
+.node-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 100px;
+  margin-bottom: 0.6rem;
 }
 
-.tl-desc p {
-  font-size: 0.9rem;
+.badge-asm   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.badge-hw    { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.badge-mem   { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+.badge-class { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.badge-entry { background: #f0fdf4; color: #059669; border: 1px solid #a7f3d0; }
+
+/* ── Node description ────────────────────────────────────────────────────── */
+.node-desc {
+  font-size: 0.82rem;
   color: #4b5563;
   line-height: 1.75;
-  margin: 0;
+  margin: 0.5rem 0 0;
 }
 
-.tl-desc code {
+.node-desc code {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.85em;
   background: #eff6ff;
   color: #2563eb;
-  padding: 0.1em 0.35em;
+  padding: 0.1em 0.3em;
   border-radius: 3px;
 }
 
-.tl-code { padding-bottom: 2rem; }
-.tl-row.last .tl-code,
-.tl-row.last .tl-desc { padding-bottom: 0; }
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .tree-row-two,
+  .tree-row-left { grid-template-columns: 1fr; }
+  .tree-row-left .tree-node { grid-column: auto; }
+  .tree-svg { display: none; }
+}
 
-/* ── Toolchain ──────────────────────────────────────────────────────────── */
+/* ── Toolchain ───────────────────────────────────────────────────────────── */
 .toolchain {
   padding: 5rem 0;
   background: #f9fafb;
@@ -819,8 +918,8 @@ const tools = [
   padding: 2rem;
   background: #fff;
 }
-.sep-col.green  { background: #f0fdf4; }
-.sep-col.amber  { background: #fffbeb; }
+.sep-col.green { background: #f0fdf4; }
+.sep-col.amber { background: #fffbeb; }
 
 .sep-divider {
   display: flex;
