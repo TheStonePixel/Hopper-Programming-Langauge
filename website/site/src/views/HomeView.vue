@@ -4,46 +4,40 @@ import CodeBlock from '../components/CodeBlock.vue'
 
 // ── Hero typing animation ────────────────────────────────────────────────────
 
-const DEMO_CODE = `// Hopper — from bare-metal registers to full application logic
+const DEMO_CODE = `// welcome.hop — a complete Hopper program
 
-strict int GPFSEL4 = 0x20200010   // GPIO function select
-strict int GPSET1  = 0x20200020   // GPIO set register
-strict int GPCLR1  = 0x2020002C   // GPIO clear register
+import io from std
 
-struct Pin {
-    int gpio
-    int bit
+enum Mood { Excited, Curious, Ready }
+
+struct Greeter {
+    string name
+    Mood   mood
 }
 
-class Led {
-    Pin pin
-
-    constructor(int gpio) {
-        self.pin = Pin(gpio, gpio - 32)
-        GPFSEL4 = GPFSEL4 | (1 << 21)   // set to output
-    }
-
-    function on()  { GPSET1 = 1 << self.pin.bit }
-    function off() { GPCLR1 = 1 << self.pin.bit }
-
-    function blink(int ms) {
-        self.on()
-        delay(ms * 1000)
-        self.off()
-        delay(ms * 1000)
-    }
+template<T>
+function describe(T item) {
+    io.print("Describing: " + item.name)
 }
 
-function delay(int cycles) {
-    int i = 0
-    while (i < cycles) { i = i + 1 }
+class WelcomeMessage {
+    Greeter greeter
+    string  language
+
+    constructor(string lang) {
+        self.language = lang
+        self.greeter  = Greeter("Hopper", Mood.Excited)
+    }
+
+    function display() {
+        describe(self.greeter)
+        io.print("Welcome to " + self.language + "!")
+    }
 }
 
 entry main {
-    Led led = Led(47)       // GPIO 47 — Pi Zero ACT LED
-    while (true) {
-        led.blink(500)      // 1 Hz blink
-    }
+    WelcomeMessage msg = WelcomeMessage("Hopper")
+    msg.display()
 }`
 
 const typedCode   = ref('')
@@ -88,7 +82,7 @@ onMounted(() => {
                     let fi = 0
                     const fontInterval = setInterval(() => {
                         welcomeFont.value = FONTS[fi++ % FONTS.length]
-                    }, 300)
+                    }, 550)
 
                     // settle on final font, then fade to static title
                     setTimeout(() => {
@@ -98,7 +92,7 @@ onMounted(() => {
                             fadeOut.value = true
                             setTimeout(() => { phase.value = 'done' }, 600)
                         }, 800)
-                    }, 3000)
+                    }, 6000)
                 }, 1200)
             }, 500)
         }
@@ -107,69 +101,79 @@ onMounted(() => {
 
 // ── Code layers ──────────────────────────────────────────────────────────────
 
-const layerAsm = `// Layer 1 — Inline assembly: raw syscall, no libc
+const layerTypes = `// Layer 1 — Enums and structs: the building blocks
 
-function sysWrite(int fd, address buf, int len) int {
-    int n = 0
-    asm {
-        rax = 1     // SYS_write
-        rdi = fd
-        rsi = buf
-        rdx = len
-        syscall
-        n = rax
-    }
-    return n
-}`
+enum Status { Active, Idle, Done }
 
-const layerDriver = `// Layer 2 — Hardware driver: MMIO via strict
-
-strict int GPFSEL4 = 0x20200010
-strict int GPSET1  = 0x20200020
-strict int GPCLR1  = 0x2020002C
-
-class GpioPin {
-    int bit
-    constructor(int gpio) {
-        self.bit = gpio - 32
-        GPFSEL4 = GPFSEL4 | (1 << 21)   // output mode
-    }
-    function set()   { GPSET1 = 1 << self.bit }
-    function clear() { GPCLR1 = 1 << self.bit }
-}`
-
-const layerLibrary = `// Layer 3 — Library: built on top of the driver
-
-import GpioPin from drivers
-
-function delay(int cycles) {
-    int i = 0
-    while (i < cycles) { i = i + 1 }
+struct Job {
+    int    id
+    Status status
+    int    priority
 }
 
-class Led {
-    GpioPin pin
-    constructor(int gpio) { self.pin = GpioPin(gpio) }
-    function on()  { self.pin.set()   }
-    function off() { self.pin.clear() }
-    function blink(int ms) {
-        self.on()
-        delay(ms * 1000)
-        self.off()
-        delay(ms * 1000)
+function isReady(Job j) bool {
+    return j.status == Status.Idle && j.priority > 0
+}`
+
+const layerTemplates = `// Layer 2 — Templates: write once, works for any type
+
+template<T>
+struct Queue {
+    T   head
+    int count
+}
+
+template<T>
+function enqueue(Queue<T> q, T item) Queue<T> {
+    q.head  = item
+    q.count = q.count + 1
+    return q
+}
+
+template<T>
+function size(Queue<T> q) int {
+    return q.count
+}`
+
+const layerClasses = `// Layer 3 — Classes compose structs and templates
+
+import Job   from jobs
+import Queue from std.collections
+
+class Scheduler {
+    Queue<Job> queue
+    int        processed
+
+    constructor() {
+        self.queue     = Queue(0)
+        self.processed = 0
+    }
+
+    function submit(Job j) {
+        self.queue = enqueue(self.queue, j)
+    }
+
+    function run() {
+        if (isReady(self.queue.head)) {
+            self.processed = self.processed + 1
+        }
     }
 }`
 
-const layerMain = `// Layer 4 — Entry point: clean application code
+const layerEntry = `// Layer 4 — Entry: clean program start, no boilerplate
 
-import Led from lib.led
+import Scheduler from scheduler
+import Job       from jobs
+import Status    from jobs
 
 entry main {
-    Led led = Led(47)    // Pi Zero ACT LED
+    Scheduler s = Scheduler()
 
-    while (true) {
-        led.blink(500)   // 1 Hz
-    }
+    s.submit(Job(1, Status.Idle, 10))
+    s.submit(Job(2, Status.Idle,  5))
+    s.submit(Job(3, Status.Done,  1))
+
+    s.run()
 }`
 
 // ── CLI tools ────────────────────────────────────────────────────────────────
@@ -204,11 +208,11 @@ const tools = [
             <div class="demo-terminal">
               <div class="terminal-bar">
                 <span class="dot red"/><span class="dot yellow"/><span class="dot green"/>
-                <span class="terminal-file">blink.hop</span>
+                <span class="terminal-file">welcome.hop</span>
               </div>
               <pre class="terminal-body"><code>{{ typedCode }}<span v-if="phase === 'typing'" class="cursor">▊</span></code></pre>
               <div v-if="phase === 'compiling'" class="compile-line">
-                <span class="prompt">$</span> hopper build blink.hop<span class="compile-dots">{{ compileDots }}</span>
+                <span class="prompt">$</span> hopper build welcome.hop<span class="compile-dots">{{ compileDots }}</span>
               </div>
             </div>
           </div>
@@ -228,11 +232,10 @@ const tools = [
 
         <!-- Language description shown after animation settles -->
         <p class="hero-desc" :class="{ visible: phase === 'done' || phase === 'welcome' }">
-          Hopper is a hardware-first, statically typed compiled programming language designed for
-          systems programming, embedded firmware, and bare-metal hardware control. It lets you write
-          device drivers, operating systems, and full application logic in a single consistent syntax —
-          register aliases, inline assembly, and bare-metal entry points are first-class language
-          features, not bolted-on afterthoughts.
+          Hopper is a freestanding compiled language built on a single principle: every feature earns
+          its place. The type system, module system, template engine, and memory model compose from one
+          coherent core — no legacy compromises, no bolted-on afterthoughts. Statically typed. Compiled
+          to native code. Fast, expressive, and correct by construction.
         </p>
 
       </div>
@@ -243,53 +246,53 @@ const tools = [
     <section class="layers">
       <div class="container">
         <span class="label">It's All Code</span>
-        <h2 class="section-title">From hardware registers to application logic.<br>One language. One toolchain.</h2>
-        <p class="section-sub">Every layer is real, runnable Hopper. The same class system that drives a GPIO pin assembles your application — no context switch, no FFI boundary, no separate language.</p>
+        <h2 class="section-title">One language, every abstraction.</h2>
+        <p class="section-sub">From value types to generic algorithms to class hierarchies to program entry — every concept in Hopper builds on the last. No context switch, no FFI boundary, no separate dialect.</p>
 
         <div class="timeline">
 
-          <!-- Layer 1: ASM -->
+          <!-- Layer 1: Value Types -->
           <div class="tl-row">
             <div class="tl-code">
-              <CodeBlock :code="layerAsm" label="asm.hop" />
+              <CodeBlock :code="layerTypes" label="jobs.hop" />
             </div>
             <div class="tl-spine">
               <div class="tl-node">1</div>
               <div class="tl-line" />
             </div>
             <div class="tl-desc">
-              <h3>Inline Assembly</h3>
-              <p>Raw hardware access through scoped <code>asm {}</code> blocks. Register assignments wire Hopper variables directly into LLVM inline asm constraints — no quoted strings, no macros.</p>
+              <h3>Value Types &amp; Enums</h3>
+              <p>Enums and structs define the shape of your data precisely. No class overhead, no implicit heap allocation — just value types that compose exactly as written.</p>
             </div>
           </div>
 
-          <!-- Layer 2: Driver -->
+          <!-- Layer 2: Templates -->
           <div class="tl-row reverse">
             <div class="tl-desc">
-              <h3>Hardware Driver</h3>
-              <p><code>strict</code> binds a name to a memory-mapped register address. Reading and writing it generates a direct load or store — no pointer casts, no <code>volatile</code>, no extern header.</p>
+              <h3>Generic Templates</h3>
+              <p>Write an algorithm once and apply it to any type. <code>Queue&lt;T&gt;</code> works for <code>Job</code>, <code>int</code>, or any struct you define — no runtime boxing, no type erasure.</p>
             </div>
             <div class="tl-spine">
               <div class="tl-node">2</div>
               <div class="tl-line" />
             </div>
             <div class="tl-code">
-              <CodeBlock :code="layerDriver" label="driver.hop" />
+              <CodeBlock :code="layerTemplates" label="collections.hop" />
             </div>
           </div>
 
-          <!-- Layer 3: Library -->
+          <!-- Layer 3: Classes -->
           <div class="tl-row">
             <div class="tl-code">
-              <CodeBlock :code="layerLibrary" label="led.hop" />
+              <CodeBlock :code="layerClasses" label="scheduler.hop" />
             </div>
             <div class="tl-spine">
               <div class="tl-node">3</div>
               <div class="tl-line" />
             </div>
             <div class="tl-desc">
-              <h3>Library Layer</h3>
-              <p>The same class system works on bare metal and on a full OS. <code>import</code> composes modules at any layer. No virtual dispatch unless you ask — zero hidden overhead.</p>
+              <h3>Class Composition</h3>
+              <p>Classes compose structs and templates into stateful abstractions. Constructors initialise, methods operate, <code>self</code> is always explicit — no hidden state, no surprise dispatch.</p>
             </div>
           </div>
 
@@ -297,13 +300,13 @@ const tools = [
           <div class="tl-row reverse last">
             <div class="tl-desc">
               <h3>Application Entry</h3>
-              <p><code>entry main</code> is unambiguous — no signature confusion, no argc/argv unless declared. The hardware complexity stays in the layers below. The caller sees only the abstraction.</p>
+              <p><code>entry main</code> is unambiguous. No signature confusion, no runtime preamble. Compose your types, construct your objects, run your program. Every concept from layers 1–3 is right there.</p>
             </div>
             <div class="tl-spine">
               <div class="tl-node">4</div>
             </div>
             <div class="tl-code">
-              <CodeBlock :code="layerMain" label="main.hop" />
+              <CodeBlock :code="layerEntry" label="main.hop" />
             </div>
           </div>
 
