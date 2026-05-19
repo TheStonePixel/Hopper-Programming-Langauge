@@ -4,40 +4,42 @@ import CodeBlock from '../components/CodeBlock.vue'
 
 // ── Hero typing animation ────────────────────────────────────────────────────
 
-const DEMO_CODE = `// welcome.hop — a complete Hopper program
+const DEMO_CODE = `// welcome.hop
+// Hopper is 🔥
 
 import io from std
 
-enum Mood { Excited, Curious, Ready }
+enum Status { Ok, Fail }
 
-struct Greeter {
-    string name
-    Mood   mood
+struct Report {
+    Status status
+    int    code
 }
 
-template<T>
-function describe(T item) {
-    io.print("Describing: " + item.name)
+function probe() Report {
+    int leaf = 0
+    asm {
+        xor eax, eax   // CPUID leaf 0
+        cpuid
+        leaf = eax
+    }
+    return Report(Status.Ok, leaf)
 }
 
-class WelcomeMessage {
-    Greeter greeter
-    string  language
-
-    constructor(string lang) {
-        self.language = lang
-        self.greeter  = Greeter("Hopper", Mood.Excited)
-    }
-
-    function display() {
-        describe(self.greeter)
-        io.print("Welcome to " + self.language + "!")
-    }
+function isAwesome() bool {
+    return true
 }
 
 entry main {
-    WelcomeMessage msg = WelcomeMessage("Hopper")
-    msg.display()
+    Report r = probe()
+
+    if (r.status == Status.Ok) {
+        io.print("System ready")
+    }
+
+    if (isAwesome()) {
+        io.print("Welcome To Hopper")
+    }
 }`
 
 const typedCode   = ref('')
@@ -101,79 +103,132 @@ onMounted(() => {
 
 // ── Code layers ──────────────────────────────────────────────────────────────
 
-const layerTypes = `// Layer 1 — Enums and structs: the building blocks
+const layerAsm = `// Inline assembly — raw hardware, typed Hopper variables
 
-enum Status { Active, Idle, Done }
-
-struct Job {
-    int    id
-    Status status
-    int    priority
+function cpuMaxLeaf() int {
+    int leaf = 0
+    asm {
+        xor eax, eax   // CPUID leaf 0: get max supported leaf
+        cpuid
+        leaf = eax     // result flows back into Hopper variable
+    }
+    return leaf
 }
 
-function isReady(Job j) bool {
-    return j.status == Status.Idle && j.priority > 0
+function sysWrite(int fd, address buf, int len) {
+    asm {
+        rax = 1        // SYS_write
+        rdi = fd
+        rsi = buf
+        rdx = len
+        syscall
+    }
 }`
 
-const layerTemplates = `// Layer 2 — Templates: write once, works for any type
+const layerMmio = `// Memory-mapped I/O — hardware registers as named variables
+
+strict int UART_DR = 0x09000000   // PL011 data register
+strict int UART_FR = 0x09000018   // flag register
+
+function uartReady() bool {
+    return (UART_FR & 0x20) == 0  // TX FIFO not full
+}
+
+function uartPut(int c) {
+    while (!uartReady()) {}
+    UART_DR = c                   // direct store to hardware
+}
+
+function uartPuts(address str, int len) {
+    int i = 0
+    while (i < len) { uartPut(str[i]); i = i + 1 }
+}`
+
+const layerTypes = `// Enums and structs — describe hardware state precisely
+
+enum Arch   { X86_64, AArch64, RiscV, Unknown }
+enum Health { Healthy, Degraded, Failed }
+
+struct CpuInfo {
+    Arch arch
+    int  maxLeaf
+    int  coreCount
+}
+
+struct ProbeResult {
+    CpuInfo cpu
+    Health  status
+    bool    uartOk
+}`
+
+const layerTemplates = `// Generic templates — one definition, any value type
 
 template<T>
-struct Queue {
-    T   head
+struct Buffer {
+    T   data
+    int head
     int count
+    int cap
 }
 
 template<T>
-function enqueue(Queue<T> q, T item) Queue<T> {
-    q.head  = item
-    q.count = q.count + 1
-    return q
+function push(Buffer<T> b, T item) Buffer<T> {
+    b.data  = item
+    b.head  = (b.head + 1) % b.cap
+    b.count = b.count + 1
+    return b
 }
 
 template<T>
-function size(Queue<T> q) int {
-    return q.count
+function full(Buffer<T> b) bool {
+    return b.count >= b.cap
 }`
 
-const layerClasses = `// Layer 3 — Classes compose structs and templates
+const layerClass = `// Class composition — all layers in one abstraction
 
-import Job   from jobs
-import Queue from std.collections
+import CpuInfo     from types
+import ProbeResult from types
+import Buffer      from buffer
 
-class Scheduler {
-    Queue<Job> queue
-    int        processed
+class SystemProbe {
+    CpuInfo      cpu
+    Buffer<int>  log
 
-    constructor() {
-        self.queue     = Queue(0)
-        self.processed = 0
+    constructor(Arch arch) {
+        self.cpu = CpuInfo(arch, cpuMaxLeaf(), 4)
+        self.log = Buffer(0, 0, 0, 64)
     }
 
-    function submit(Job j) {
-        self.queue = enqueue(self.queue, j)
-    }
-
-    function run() {
-        if (isReady(self.queue.head)) {
-            self.processed = self.processed + 1
-        }
+    function run() ProbeResult {
+        self.log = push(self.log, self.cpu.maxLeaf)
+        uartPut(self.cpu.coreCount + 48)
+        return ProbeResult(self.cpu, Health.Healthy, true)
     }
 }`
 
-const layerEntry = `// Layer 4 — Entry: clean program start, no boilerplate
+const layerEntry = `// sys-probe.hop — hardware diagnostics CLI, start to finish
 
-import Scheduler from scheduler
-import Job       from jobs
-import Status    from jobs
+import SystemProbe  from probe
+import ProbeResult  from types
+import io           from std
+
+// Hopper is 🔥
+function isAwesome() bool {
+    return true
+}
 
 entry main {
-    Scheduler s = Scheduler()
+    SystemProbe probe = SystemProbe(Arch.X86_64)
+    ProbeResult result = probe.run()
 
-    s.submit(Job(1, Status.Idle, 10))
-    s.submit(Job(2, Status.Idle,  5))
-    s.submit(Job(3, Status.Done,  1))
+    if (result.status == Health.Healthy) {
+        io.print("CPU OK — max leaf: " + result.cpu.maxLeaf)
+    }
+    if (result.uartOk) { io.print("UART OK") }
 
-    s.run()
+    if (isAwesome()) {
+        io.print("Welcome To Hopper")
+    }
 }`
 
 // ── CLI tools ────────────────────────────────────────────────────────────────
@@ -246,67 +301,97 @@ const tools = [
     <section class="layers">
       <div class="container">
         <span class="label">It's All Code</span>
-        <h2 class="section-title">One language, every abstraction.</h2>
-        <p class="section-sub">From value types to generic algorithms to class hierarchies to program entry — every concept in Hopper builds on the last. No context switch, no FFI boundary, no separate dialect.</p>
+        <h2 class="section-title">One language. From registers to programs.</h2>
+        <p class="section-sub">Every layer of this hardware diagnostics tool is real, runnable Hopper. Write to bare-metal CPU registers and print structured output in the same syntax, with the same type system, in the same file.</p>
 
         <div class="timeline">
 
-          <!-- Layer 1: Value Types -->
+          <!-- Layer 1: Inline ASM -->
           <div class="tl-row">
             <div class="tl-code">
-              <CodeBlock :code="layerTypes" label="jobs.hop" />
+              <CodeBlock :code="layerAsm" label="asm.hop" />
             </div>
             <div class="tl-spine">
               <div class="tl-node">1</div>
               <div class="tl-line" />
             </div>
             <div class="tl-desc">
-              <h3>Value Types &amp; Enums</h3>
-              <p>Enums and structs define the shape of your data precisely. No class overhead, no implicit heap allocation — just value types that compose exactly as written.</p>
+              <h3>Inline Assembly</h3>
+              <p><code>asm {}</code> puts raw x86 instructions inside typed Hopper functions. Register names bind to Hopper variables — no quoted strings, no constraint syntax, no separate assembler. This solves the hardest problem in systems programming: talking directly to the CPU without leaving the language.</p>
             </div>
           </div>
 
-          <!-- Layer 2: Templates -->
+          <!-- Layer 2: MMIO -->
           <div class="tl-row reverse">
             <div class="tl-desc">
-              <h3>Generic Templates</h3>
-              <p>Write an algorithm once and apply it to any type. <code>Queue&lt;T&gt;</code> works for <code>Job</code>, <code>int</code>, or any struct you define — no runtime boxing, no type erasure.</p>
+              <h3>Memory-Mapped I/O</h3>
+              <p><code>strict</code> binds a name to a fixed memory address. Reading or writing it compiles to a direct load or store — no pointer casts, no <code>volatile</code>, no extern header. Hardware registers become named, typed, first-class language citizens.</p>
             </div>
             <div class="tl-spine">
               <div class="tl-node">2</div>
               <div class="tl-line" />
             </div>
             <div class="tl-code">
-              <CodeBlock :code="layerTemplates" label="collections.hop" />
+              <CodeBlock :code="layerMmio" label="uart.hop" />
             </div>
           </div>
 
-          <!-- Layer 3: Classes -->
+          <!-- Layer 3: Types -->
           <div class="tl-row">
             <div class="tl-code">
-              <CodeBlock :code="layerClasses" label="scheduler.hop" />
+              <CodeBlock :code="layerTypes" label="types.hop" />
             </div>
             <div class="tl-spine">
               <div class="tl-node">3</div>
               <div class="tl-line" />
             </div>
             <div class="tl-desc">
-              <h3>Class Composition</h3>
-              <p>Classes compose structs and templates into stateful abstractions. Constructors initialise, methods operate, <code>self</code> is always explicit — no hidden state, no surprise dispatch.</p>
+              <h3>Value Types &amp; Enums</h3>
+              <p>Enums model hardware states without magic numbers. Structs pack data exactly as written — no implicit heap, no hidden copy. Once your types are right, the compiler enforces correctness everywhere they're used.</p>
             </div>
           </div>
 
-          <!-- Layer 4: Entry (no line below last node) -->
-          <div class="tl-row reverse last">
+          <!-- Layer 4: Templates -->
+          <div class="tl-row reverse">
             <div class="tl-desc">
-              <h3>Application Entry</h3>
-              <p><code>entry main</code> is unambiguous. No signature confusion, no runtime preamble. Compose your types, construct your objects, run your program. Every concept from layers 1–3 is right there.</p>
+              <h3>Generic Templates</h3>
+              <p>Write <code>Buffer&lt;T&gt;</code> once. Use it for <code>int</code>, <code>CpuInfo</code>, or any struct you define — no runtime boxing, no type erasure, no overhead. Generic code in Hopper is a compile-time substitution, not a runtime cost.</p>
             </div>
             <div class="tl-spine">
               <div class="tl-node">4</div>
+              <div class="tl-line" />
             </div>
             <div class="tl-code">
-              <CodeBlock :code="layerEntry" label="main.hop" />
+              <CodeBlock :code="layerTemplates" label="buffer.hop" />
+            </div>
+          </div>
+
+          <!-- Layer 5: Class -->
+          <div class="tl-row">
+            <div class="tl-code">
+              <CodeBlock :code="layerClass" label="probe.hop" />
+            </div>
+            <div class="tl-spine">
+              <div class="tl-node">5</div>
+              <div class="tl-line" />
+            </div>
+            <div class="tl-desc">
+              <h3>Class Composition</h3>
+              <p>Classes compose every layer into one portable, testable unit. <code>self</code> is always explicit. Constructors are plain functions. No hidden dispatch, no virtual tables unless you ask — the hardware complexity lives inside, the interface stays clean.</p>
+            </div>
+          </div>
+
+          <!-- Layer 6: Entry (no line below last node) -->
+          <div class="tl-row reverse last">
+            <div class="tl-desc">
+              <h3>Application Entry</h3>
+              <p><code>entry main</code> is unambiguous and minimal — no hidden signature, no runtime startup preamble. Everything from layers 1 through 5 composes here: inline assembly, MMIO, value types, generics, and classes. One language, the whole stack.</p>
+            </div>
+            <div class="tl-spine">
+              <div class="tl-node">6</div>
+            </div>
+            <div class="tl-code">
+              <CodeBlock :code="layerEntry" label="sys-probe.hop" />
             </div>
           </div>
 
