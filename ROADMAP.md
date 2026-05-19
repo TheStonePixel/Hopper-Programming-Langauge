@@ -146,6 +146,11 @@ UART communication helpers
 Battleship (3 versions), LED blink (bare-metal ARM), calculator, htop clone, JSON reader,
 pgrep, sort demo, TUI demo, directory tree printer
 
+**Design pattern programs** (`programs/observer/`, `programs/strategy/`, `programs/factory/`,
+`programs/builder/`, `programs/iterator/`, `programs/raii/`, `programs/visitor/`,
+`programs/command/`, `programs/state/`, `programs/pipeline/`, `programs/decorator/`) — 11
+fully working programs, each with a corresponding test in `toolchain/tests/patterns/`
+
 ### Examples (`examples/`)
 - `embedded/stm32f411/uart.hop` — 9 bitfield defs + 6 strict declarations for STM32F411
   USART peripherals; zero vendor SDK
@@ -252,17 +257,26 @@ Items are grouped by theme, not strict priority — pick what fits the current s
 Writing real Hopper programs validates that the language is expressive and elegant. Each
 program below should compile, run correctly, and serve as a reference for that pattern.
 
-- [ ] **Observer pattern** — `interface Observer`, `class EventEmitter<T>`, subscriber
-  list, notify loop
-- [ ] **Strategy pattern** — `callback` as strategy, `class Sorter` that accepts a
-  comparison callback
-- [ ] **Factory pattern** — `class ShapeFactory`, `interface Shape`, dispatch on enum tag
-- [ ] **Builder pattern** — `class QueryBuilder` with method chaining (each method returns
-  `self::address`)
-- [ ] **Iterator protocol** — `interface Iterator<T>` with `next() Result<T, _>`,
-  implemented for `Array<T>` and `LinkedList<T>`
-- [ ] **RAII resource wrapper** — class with constructor/destructor; demonstrate that
-  resources are always freed even through early returns
+- [x] **Observer pattern** — `Observable` class with `Array<address>` listeners, callback
+  dispatch via `cast`
+- [x] **Strategy pattern** — `callback` as strategy field, `Validator` swaps strategies at
+  runtime
+- [x] **Factory pattern** — `class ShapeFactory`, `enum ShapeKind`, dispatch on enum tag
+- [x] **Builder pattern** — `RequestBuilder` with chained setters, `build()` returns
+  `HttpRequest`
+- [x] **Iterator protocol** — `interface Iterator`, `ArrayIter` and `RangeIter`
+  implementations
+- [x] **RAII resource wrapper** — `Buffer` class with `defer buf.release()` for guaranteed
+  cleanup through early returns
+- [x] **Visitor pattern** — `Shape.accept(address visitor)` dispatches via callback cast;
+  visitors are plain functions
+- [x] **Command pattern** — commands as `callback(address) int` functions; `CommandQueue`
+  with undo/replay via `Array<address>`
+- [x] **State machine** — `Machine` class with enum states; guarded transitions via `&&`
+  conditions
+- [x] **Pipeline** — `Pipeline` with `Array<address>` stages, `pipe()` / `run()` API
+- [x] **Decorator** — `LogDecorator` (print on call) and `MemoDecorator` (single-entry
+  cache) wrapping any `callback(int) int`
 
 ### Website
 
