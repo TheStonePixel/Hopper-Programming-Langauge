@@ -370,6 +370,41 @@ function getpid() int {
     }
     return pid
 }`,
+    c29: `// requires — precondition checked at function entry
+function divide(int a, int b) int
+    requires b != 0
+{
+    return a / b
+}
+
+// ensures — postcondition checked before every return
+// 'result' is bound to the return value inside ensures clauses
+function clamp(int val, int lo, int hi) int
+    requires lo <= hi
+    ensures result >= lo && result <= hi
+{
+    if (val < lo) { return lo }
+    if (val > hi) { return hi }
+    return val
+}
+
+// invariant — checked at every loop-head evaluation
+function sum(int n) int {
+    int total = 0
+    int i = 0
+    while (i <= n)
+        invariant i >= 0 && total >= 0
+    {
+        total = total + i
+        i = i + 1
+    }
+    return total
+}
+
+// constrain — narrows storage to a smaller type's range
+// fails at runtime (debug) or compile time (--strict) if out of range
+int x = 42 constrain [byte]     // ok: 42 fits in [-128..127]
+int y = 300 constrain [byte]    // runtime abort in debug, compile error in strict`,
 }
 </script>
 
@@ -407,6 +442,7 @@ function getpid() int {
           <a href="#aliases">Type Aliases</a>
           <a href="#defer">Defer</a>
           <a href="#asm">Inline Assembly</a>
+          <a href="#contracts">Contracts</a>
           <a href="#operators">Operators</a>
         </nav>
       </aside>
@@ -613,6 +649,35 @@ function getpid() int {
           <h2>Inline Assembly</h2>
           <p>The <code>asm</code> block emits raw instructions. Inputs and outputs are bound by name to Hopper variables.</p>
           <CodeBlock :code="codes.c28" />
+        </section>
+
+        <!-- Contracts -->
+        <section id="contracts">
+          <h2>Contracts</h2>
+          <p>
+            Hopper's contract system lets you express correctness properties directly in source.
+            Contracts are checked at runtime in debug builds and can be verified statically in
+            <code>--strict</code> mode. They compile away entirely in <code>--release</code> builds.
+          </p>
+          <table class="type-table">
+            <thead><tr><th>Keyword</th><th>Where</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>requires</code></td><td>function header</td><td>Precondition — must hold when the function is called</td></tr>
+              <tr><td><code>ensures</code></td><td>function header</td><td>Postcondition — must hold before every return; <code>result</code> names the return value</td></tr>
+              <tr><td><code>invariant</code></td><td>while header</td><td>Loop invariant — must hold at every loop-head evaluation</td></tr>
+              <tr><td><code>constrain [T]</code></td><td>variable declaration</td><td>Narrows the variable's valid range to type <code>T</code>'s bounds</td></tr>
+            </tbody>
+          </table>
+          <CodeBlock :code="codes.c29" />
+          <h3>Compile modes</h3>
+          <table class="type-table">
+            <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+            <tbody>
+              <tr><td><em>(default)</em></td><td>All contracts emit runtime assertions — abort on violation</td></tr>
+              <tr><td><code>--strict</code></td><td>Constant-folding pre-pass turns provable violations into compile errors; remaining contracts still check at runtime</td></tr>
+              <tr><td><code>--release</code></td><td>All contract IR stripped — no overhead at runtime</td></tr>
+            </tbody>
+          </table>
         </section>
 
         <!-- Operators -->

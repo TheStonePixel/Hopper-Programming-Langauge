@@ -39,6 +39,11 @@ const router = createRouter({
       name: 'vsc',
       component: () => import('../views/VsCView.vue'),
     },
+    {
+      path: '/benchmark',
+      name: 'benchmark',
+      component: () => import('../views/BenchmarkView.vue'),
+    },
   ],
 })
 
