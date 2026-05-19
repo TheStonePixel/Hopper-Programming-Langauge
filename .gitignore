@@ -7,4 +7,6 @@ src/generated/
 .DS_Store
 benchmarking/battleship
 benchmarking/battleship_O0
+benchmarking/battleship_c_O0
+benchmarking/battleship_c_O2
 
