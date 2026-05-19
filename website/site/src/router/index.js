@@ -15,6 +15,21 @@ const router = createRouter({
       component: () => import('../views/SyntaxView.vue'),
     },
     {
+      path: '/programs',
+      name: 'programs',
+      component: () => import('../views/ProgramsView.vue'),
+    },
+    {
+      path: '/examples',
+      name: 'examples',
+      component: () => import('../views/ExamplesView.vue'),
+    },
+    {
+      path: '/docs',
+      name: 'docs',
+      component: () => import('../views/DocsView.vue'),
+    },
+    {
       path: '/about',
       name: 'about',
       component: () => import('../views/AboutView.vue'),
@@ -23,11 +38,6 @@ const router = createRouter({
       path: '/vs-c',
       name: 'vsc',
       component: () => import('../views/VsCView.vue'),
-    },
-    {
-      path: '/programs',
-      name: 'programs',
-      component: () => import('../views/ProgramsView.vue'),
     },
   ],
 })

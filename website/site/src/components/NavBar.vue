@@ -8,11 +8,10 @@ const route = useRoute()
     <div class="nav-inner">
       <RouterLink to="/" class="nav-logo">Hopper</RouterLink>
       <ul class="nav-links">
-        <li><RouterLink to="/"       :class="{ active: route.path === '/' }">Home</RouterLink></li>
-        <li><RouterLink to="/syntax" :class="{ active: route.path === '/syntax' }">Syntax</RouterLink></li>
-        <li><RouterLink to="/vs-c"   :class="{ active: route.path === '/vs-c' }">vs C</RouterLink></li>
+        <li><RouterLink to="/docs"     :class="{ active: route.path === '/docs' }">Documentation</RouterLink></li>
+        <li><RouterLink to="/syntax"   :class="{ active: route.path === '/syntax' }">Syntax</RouterLink></li>
         <li><RouterLink to="/programs" :class="{ active: route.path === '/programs' }">Programs</RouterLink></li>
-        <li><RouterLink to="/about"   :class="{ active: route.path === '/about' }">About</RouterLink></li>
+        <li><RouterLink to="/examples" :class="{ active: route.path === '/examples' }">Examples</RouterLink></li>
       </ul>
     </div>
   </nav>
@@ -33,6 +32,8 @@ const route = useRoute()
   gap: 2.5rem;
   padding: 0 5vw;
   height: 56px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .nav-logo {

@@ -111,12 +111,12 @@ entry main {
 function sysWrite(int fd, address buf, int len) int {
     int n = 0
     asm {
-        "mov rax, 1"       // syscall: write
-        "mov rdi, fd"
-        "mov rsi, buf"
-        "mov rdx, len"
-        "syscall"
-        "n" = "rax"        // capture return value
+        rax = 1        // syscall: write
+        rdi = fd       // file descriptor
+        rsi = buf      // buffer address
+        rdx = len      // byte count
+        syscall
+        n = rax        // capture return value
     }
     return n
 }
@@ -124,47 +124,40 @@ function sysWrite(int fd, address buf, int len) int {
 function sysRead(int fd, address buf, int len) int {
     int n = 0
     asm {
-        "mov rax, 0"       // syscall: read
-        "mov rdi, fd"
-        "mov rsi, buf"
-        "mov rdx, len"
-        "syscall"
-        "n" = "rax"
+        rax = 0        // syscall: read
+        rdi = fd
+        rsi = buf
+        rdx = len
+        syscall
+        n = rax
     }
     return n
 }
 
 function sysExit(int code) {
     asm {
-        "mov rax, 60"      // syscall: exit
-        "mov rdi, code"
-        "syscall"
+        rax = 60       // syscall: exit
+        rdi = code
+        syscall
     }
 }
 
-function cpuVendor(address out) {
+function getCpuId() int {
+    int leaf = 0
+    int info = 0
     asm {
-        "xor eax, eax"     // CPUID leaf 0 → vendor string
-        "cpuid"
-        "mov [out],   ebx"
-        "mov [out+4], edx"
-        "mov [out+8], ecx"
+        rax = leaf     // CPUID leaf 0
+        cpuid          // raw instruction — Hopper passes it through unchanged
+        info = rax
     }
+    return info
 }
 
 entry main {
     string hello = "Hello from Hopper (no libc)\\n"
     sysWrite(1, hello::address, 28)
 
-    address vendor = allocate 13
-    cpuVendor(vendor)
-    address term = vendor + 12
-    term::value = cast 10   // newline
-
-    sysWrite(1, "CPU: "::address, 5)
-    sysWrite(1, vendor, 13)
-
-    deallocate vendor
+    int cpuid = getCpuId()
     sysExit(0)
 }`,
   },
