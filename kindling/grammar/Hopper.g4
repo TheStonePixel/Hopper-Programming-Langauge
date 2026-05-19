@@ -70,15 +70,16 @@ aliasDecl
 functionDecl
     : 'extern' 'function' Identifier '(' externParamList? ')' type   # ExternFuncDecl
     | 'extern' 'function' Identifier '(' externParamList? ')'        # ExternProcDecl
-    | 'function' Identifier '(' paramList? ')' type contractClause* block   # FuncDecl
-    | 'function' Identifier '(' paramList? ')' contractClause* block        # ProcDecl
+    | 'function' Identifier '(' paramList? ')' type (NEWLINE+ contractClause)* block   # FuncDecl
+    | 'function' Identifier '(' paramList? ')' (NEWLINE+ contractClause)* block        # ProcDecl
     ;
 
-// Compile-time contract clauses (Hoare Logic) — reserved, not yet implemented
-// NEWLINEs allowed before each clause so they can appear on their own lines.
+// Compile-time contract clauses (Hoare Logic)
+// NEWLINE is handled at the call site ((NEWLINE+ contractClause)*) so the
+// trailing newline before '{' is consumed by block's NEWLINE* instead of here.
 contractClause
-    : NEWLINE+ 'requires' expression   # RequiresClause
-    | NEWLINE+ 'ensures'  expression   # EnsuresClause
+    : 'requires' expression   # RequiresClause
+    | 'ensures'  expression   # EnsuresClause
     ;
 
 // struct = memory layout only, no methods, no default values
@@ -228,8 +229,9 @@ type
     ;
 
 // blocks: statements separated by NEWLINEs
+// NEWLINE* before '{' allows the brace to appear on its own line after a contract or condition.
 block
-    : '{'
+    : NEWLINE* '{'
       NEWLINE*
       ( statement (NEWLINE+ statement)*
         NEWLINE* )?
@@ -252,7 +254,7 @@ statement
     | Identifier '::' 'value' '=' expression                    # DerefAssign
     | expression                                                # ExprStmt
     | 'if' '(' expression ')' block ('else' block)?             # IfStmt
-    | 'while' '(' expression ')' invariantClause* block         # WhileStmt
+    | 'while' '(' expression ')' (NEWLINE+ invariantClause)* block  # WhileStmt
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
     | 'break'                                                   # BreakStmt
     | 'continue'                                                # ContinueStmt

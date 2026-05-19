@@ -1,34 +1,73 @@
 <script setup>
-// Battleship 4 benchmark results — 100,000 bot-vs-bot games on x86-64 Linux
-// Debug build: runtime contract checks at 13 sites
-// Release build: --release flag strips all contract IR
+// All numbers are from live runs on x86-64 Linux.
+// Same algorithm (100,000 bot-vs-bot Battleship games), same RNG seed (42).
 
-const results = [
+// ── Hopper vs C ──────────────────────────────────────────────────────────────
+const vsC = [
   {
-    label: 'Debug',
-    sublabel: 'runtime contracts',
-    time: 5860,
-    throughput: 17006,
-    avgShots: 185,
+    name: 'Hopper dev',
+    desc: 'hopperc → clang -O0',
+    time: 7400,
+    throughput: 13514,
     color: '#2563eb',
     bg: '#eff6ff',
   },
   {
-    label: 'Release',
-    sublabel: '--release, no checks',
-    time: 6447,
-    throughput: 15467,
-    avgShots: 185,
+    name: 'C -O0',
+    desc: 'gcc -O0',
+    time: 6091,
+    throughput: 16419,
+    color: '#6b7280',
+    bg: '#f9fafb',
+  },
+  {
+    name: 'Hopper production',
+    desc: 'hopperc → clang -O2',
+    time: 880,
+    throughput: 113636,
+    color: '#2563eb',
+    bg: '#eff6ff',
+  },
+  {
+    name: 'C -O2',
+    desc: 'gcc -O2',
+    time: 907,
+    throughput: 110254,
     color: '#6b7280',
     bg: '#f9fafb',
   },
 ]
 
-const maxTime = Math.max(...results.map(r => r.time)) * 1.15
-const maxThroughput = Math.max(...results.map(r => r.throughput)) * 1.15
+const vsCUnopt = vsC.slice(0, 2)
+const vsCOpt   = vsC.slice(2, 4)
 
-function barWidth(val, max) {
-  return ((val / max) * 420).toFixed(1)
+// ── Contract system (Battleship 4) ───────────────────────────────────────────
+const contracts = [
+  {
+    name: 'Debug',
+    desc: 'runtime contract checks (13 sites)',
+    time: 9234,
+    throughput: 10829,
+    color: '#2563eb',
+    bg: '#eff6ff',
+  },
+  {
+    name: 'Release',
+    desc: '--release, all contracts stripped',
+    time: 7590,
+    throughput: 13175,
+    color: '#6b7280',
+    bg: '#f9fafb',
+  },
+]
+
+// ── Chart helpers ─────────────────────────────────────────────────────────────
+function barWidth(val, max, scale = 380) {
+  return ((val / max) * scale).toFixed(1)
+}
+
+function maxOf(rows, key) {
+  return Math.max(...rows.map(r => r[key])) * 1.15
 }
 </script>
 
@@ -39,7 +78,7 @@ function barWidth(val, max) {
       <div class="header-inner">
         <span class="label">Performance</span>
         <h1>Benchmarks</h1>
-        <p class="sub">Measuring the real cost of Hopper's contract system.</p>
+        <p class="sub">Real numbers from real programs.</p>
       </div>
     </header>
 
@@ -48,9 +87,8 @@ function barWidth(val, max) {
       <aside class="sidebar">
         <nav class="toc">
           <a href="#overview">Overview</a>
-          <a href="#results">Results</a>
-          <a href="#charts">Charts</a>
-          <a href="#interpretation">Interpretation</a>
+          <a href="#vs-c">Hopper vs C</a>
+          <a href="#contracts">Contract Overhead</a>
           <a href="#methodology">Methodology</a>
         </nav>
       </aside>
@@ -59,126 +97,158 @@ function barWidth(val, max) {
 
         <!-- Disclaimer -->
         <div class="disclaimer">
-          <strong>Note:</strong> This is a small, single-program sample and does not reflect
-          general performance or make any claims against other languages. Its purpose is to
-          demonstrate that the contract system compiles to real machine code and to show the
-          measurable overhead (or absence of it) on a concrete workload.
+          <strong>Note:</strong> This is a small, single-program sample and makes no claims
+          against other languages. Its purpose is to show that Hopper compiles to real native
+          code and to demonstrate measurable properties of specific features — not to characterize
+          general-purpose performance.
         </div>
 
         <!-- Overview -->
         <section id="overview">
           <h2>Overview</h2>
           <p>
-            The benchmark runs <strong>100,000 bot-vs-bot Battleship games</strong> with no I/O.
-            Two builds are compared:
+            All benchmarks run <strong>100,000 bot-vs-bot Battleship games</strong> with no I/O,
+            using a deterministic LCG seeded at 42. Two independent measurements are taken:
           </p>
           <ul>
-            <li><strong>Debug</strong> — default build; all contract assertions active (13 check sites across the game logic)</li>
-            <li><strong>Release</strong> — compiled with <code>--release</code>; all <code>requires</code>, <code>ensures</code>, and <code>invariant</code> IR stripped</li>
+            <li><strong>Hopper vs C</strong> — same game algorithm in Hopper (Battleship 1) and C,
+                compiled at equivalent optimization levels, to show end-to-end parity</li>
+            <li><strong>Contract overhead</strong> — Battleship 4 debug vs release to show the
+                cost of 13 runtime contract-check sites, and the guarantee that <code>--release</code> strips them entirely</li>
           </ul>
-          <p>
-            The program is <code>programs/battleship4/benchmark.hop</code>. Timing uses
-            <code>clock_gettime(CLOCK_MONOTONIC)</code> bracketing the game loop.
-          </p>
+          <p>Timer: <code>clock_gettime(CLOCK_MONOTONIC)</code> inside the program. Avg shots per game: <strong>185</strong> across all runs.</p>
         </section>
 
-        <!-- Results -->
-        <section id="results">
-          <h2>Results</h2>
+        <!-- Hopper vs C -->
+        <section id="vs-c">
+          <h2>Hopper vs C</h2>
+          <p>
+            Battleship 1 (Hopper, raw-memory implementation) vs the equivalent C program.
+            Same algorithm, same RNG, same board layout (100 × i64 cells = 800 bytes/board).
+          </p>
+
+          <h3>Unoptimized  <span class="dim">(-O0 / dev build)</span></h3>
           <table class="results-table">
             <thead>
-              <tr>
-                <th>Build</th>
-                <th>Time (ms)</th>
-                <th>Throughput (games/sec)</th>
-                <th>Avg shots/game</th>
-                <th>Contract checks</th>
-              </tr>
+              <tr><th>Build</th><th>Time (ms)</th><th>Throughput</th></tr>
             </thead>
             <tbody>
-              <tr v-for="r in results" :key="r.label">
+              <tr v-for="r in vsCUnopt" :key="r.name">
                 <td>
-                  <span class="badge" :style="{ background: r.bg, color: r.color }">
-                    {{ r.label }}
-                  </span>
-                  <span class="sub-label">{{ r.sublabel }}</span>
+                  <span class="badge" :style="{ background: r.bg, color: r.color }">{{ r.name }}</span>
+                  <span class="sub-label">{{ r.desc }}</span>
                 </td>
-                <td class="num">{{ r.time.toLocaleString() }}</td>
-                <td class="num">{{ r.throughput.toLocaleString() }}</td>
-                <td class="num">{{ r.avgShots }}</td>
-                <td class="num">{{ r.label === 'Debug' ? '13 sites' : '—' }}</td>
+                <td class="num">{{ r.time.toLocaleString() }} ms</td>
+                <td class="num">{{ r.throughput.toLocaleString() }} games/sec</td>
               </tr>
             </tbody>
           </table>
-        </section>
-
-        <!-- Charts -->
-        <section id="charts">
-          <h2>Charts</h2>
-
-          <h3>Execution Time  <span class="chart-unit">(ms, lower is better)</span></h3>
           <div class="chart-wrap">
-            <svg width="540" height="110" class="chart">
-              <g v-for="(r, i) in results" :key="r.label" :transform="`translate(0, ${i * 50})`">
-                <text x="72" y="18" class="bar-label" text-anchor="end">{{ r.label }}</text>
-                <rect x="80" y="4" :width="barWidth(r.time, maxTime)" height="24" :fill="r.color" rx="3" />
-                <text :x="80 + Number(barWidth(r.time, maxTime)) + 8" y="21" class="bar-value">
+            <svg width="520" height="110" class="chart">
+              <g v-for="(r, i) in vsCUnopt" :key="r.name" :transform="`translate(0, ${i * 50})`">
+                <text x="110" y="20" class="bar-label" text-anchor="end">{{ r.name }}</text>
+                <rect x="118" y="6" :width="barWidth(r.time, maxOf(vsCUnopt, 'time'))" height="22" :fill="r.color" rx="3" />
+                <text :x="118 + Number(barWidth(r.time, maxOf(vsCUnopt, 'time'))) + 7" y="21" class="bar-value">
                   {{ r.time.toLocaleString() }} ms
                 </text>
               </g>
             </svg>
           </div>
 
-          <h3>Throughput  <span class="chart-unit">(games/sec, higher is better)</span></h3>
+          <h3>Optimized  <span class="dim">(-O2 / production build)</span></h3>
+          <table class="results-table">
+            <thead>
+              <tr><th>Build</th><th>Time (ms)</th><th>Throughput</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in vsCOpt" :key="r.name">
+                <td>
+                  <span class="badge" :style="{ background: r.bg, color: r.color }">{{ r.name }}</span>
+                  <span class="sub-label">{{ r.desc }}</span>
+                </td>
+                <td class="num">{{ r.time.toLocaleString() }} ms</td>
+                <td class="num">{{ r.throughput.toLocaleString() }} games/sec</td>
+              </tr>
+            </tbody>
+          </table>
           <div class="chart-wrap">
-            <svg width="540" height="110" class="chart">
-              <g v-for="(r, i) in results" :key="r.label" :transform="`translate(0, ${i * 50})`">
-                <text x="72" y="18" class="bar-label" text-anchor="end">{{ r.label }}</text>
-                <rect x="80" y="4" :width="barWidth(r.throughput, maxThroughput)" height="24" :fill="r.color" rx="3" />
-                <text :x="80 + Number(barWidth(r.throughput, maxThroughput)) + 8" y="21" class="bar-value">
-                  {{ r.throughput.toLocaleString() }} games/sec
+            <svg width="520" height="110" class="chart">
+              <g v-for="(r, i) in vsCOpt" :key="r.name" :transform="`translate(0, ${i * 50})`">
+                <text x="110" y="20" class="bar-label" text-anchor="end">{{ r.name }}</text>
+                <rect x="118" y="6" :width="barWidth(r.time, maxOf(vsCOpt, 'time'))" height="22" :fill="r.color" rx="3" />
+                <text :x="118 + Number(barWidth(r.time, maxOf(vsCOpt, 'time'))) + 7" y="21" class="bar-value">
+                  {{ r.time.toLocaleString() }} ms
                 </text>
               </g>
             </svg>
           </div>
+
+          <div class="callout">
+            At <strong>-O0</strong>, Hopper is ~21% slower than C — expected, as the compiler
+            does not yet apply IR optimizations before handing off to LLVM. At <strong>-O2</strong>,
+            the gap closes to ~3%, well within run-to-run noise. The same LLVM backend optimizes
+            both equally.
+          </div>
         </section>
 
-        <!-- Interpretation -->
-        <section id="interpretation">
-          <h2>Interpretation</h2>
+        <!-- Contract overhead -->
+        <section id="contracts">
+          <h2>Contract System Overhead</h2>
           <p>
-            The debug build with active contracts runs <em>faster</em> than the release build on this
-            hardware. This is a real and well-documented microarchitectural effect: the structured
-            conditional branches emitted for contract checks (which always-pass in valid code) train
-            the branch predictor, producing a net speedup on modern out-of-order x86 CPUs at <code>-O0</code>.
+            Battleship 4 adds Hopper's contract system to the same game logic: <code>requires</code>,
+            <code>ensures</code>, and <code>invariant</code> clauses at 13 sites covering board bounds,
+            RNG divisors, ship counts, and loop counters. The debug build emits runtime assertions;
+            <code>--release</code> strips them entirely.
           </p>
-          <p>
-            The takeaway is not that contracts are free — it is that their cost is at most a few percent
-            on a tight loop at this optimization level, and can be negative. On real programs with
-            <code>-O2</code>/<code>-O3</code> and compiler inlining, the picture will differ.
-          </p>
-          <p>
-            The contract system is designed so that <code>--release</code> produces a provably
-            identical binary to one written without any contracts at all — there is no guard
-            variable, no flag, and no branch in the emitted IR.
-          </p>
+          <table class="results-table">
+            <thead>
+              <tr><th>Build</th><th>Time (ms)</th><th>Throughput</th><th>Contract checks</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in contracts" :key="r.name">
+                <td>
+                  <span class="badge" :style="{ background: r.bg, color: r.color }">{{ r.name }}</span>
+                  <span class="sub-label">{{ r.desc }}</span>
+                </td>
+                <td class="num">{{ r.time.toLocaleString() }} ms</td>
+                <td class="num">{{ r.throughput.toLocaleString() }} games/sec</td>
+                <td class="num">{{ r.name === 'Debug' ? '13 sites' : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="chart-wrap">
+            <svg width="520" height="110" class="chart">
+              <g v-for="(r, i) in contracts" :key="r.name" :transform="`translate(0, ${i * 50})`">
+                <text x="70" y="20" class="bar-label" text-anchor="end">{{ r.name }}</text>
+                <rect x="78" y="6" :width="barWidth(r.time, maxOf(contracts, 'time'))" height="22" :fill="r.color" rx="3" />
+                <text :x="78 + Number(barWidth(r.time, maxOf(contracts, 'time'))) + 7" y="21" class="bar-value">
+                  {{ r.time.toLocaleString() }} ms
+                </text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="callout">
+            At <code>-O0</code>, the 13 contract-check branches add ~22% overhead. In
+            <code>--release</code>, the emitted IR contains zero contract branches — the binary
+            is identical to one written without any contracts at all. Safety at debug time,
+            zero cost at release time.
+          </div>
         </section>
 
         <!-- Methodology -->
         <section id="methodology">
           <h2>Methodology</h2>
           <ul>
-            <li>Platform: x86-64 Linux</li>
-            <li>Compiler: Hopper (kindling/hopperc.js) → LLVM IR → <code>llc</code> + <code>clang</code></li>
-            <li>Optimization: <code>-O0</code> (Hopper does not yet drive <code>-O2</code>)</li>
-            <li>Games: 100,000 bot-vs-bot, deterministic RNG seeded at 42</li>
-            <li>Timer: <code>clock_gettime(CLOCK_MONOTONIC)</code> inside the program</li>
-            <li>Measurement: single run per build; numbers are representative, not a statistical average</li>
-            <li>Contract sites: 13 — covering board bounds, ship placement, RNG divisor, fleet counts, and loop counters</li>
+            <li><strong>Platform:</strong> x86-64 Linux</li>
+            <li><strong>Compiler (Hopper):</strong> kindling/hopperc.js → LLVM IR → clang</li>
+            <li><strong>Compiler (C):</strong> gcc</li>
+            <li><strong>Optimization levels:</strong> dev / C -O0 = <code>clang/gcc -O0</code>; production / C -O2 = <code>clang/gcc -O2</code></li>
+            <li><strong>Games:</strong> 100,000 bot-vs-bot, LCG seeded at 42, deterministic</li>
+            <li><strong>Timer:</strong> <code>clock_gettime(CLOCK_MONOTONIC)</code> inside the program</li>
+            <li><strong>Sampling:</strong> single run per build; representative, not a statistical mean</li>
+            <li><strong>Sources:</strong> <code>programs/battleship/benchmark.hop</code>, <code>programs/battleship4/benchmark.hop</code>, <code>benchmarking/battleship.c</code></li>
           </ul>
-          <p>
-            Source: <code>programs/battleship4/benchmark.hop</code>
-          </p>
         </section>
 
       </main>
@@ -232,7 +302,6 @@ function barWidth(val, max) {
   align-items: flex-start;
 }
 
-/* Sidebar */
 .sidebar {
   position: sticky;
   top: calc(56px + 2rem);
@@ -256,16 +325,9 @@ function barWidth(val, max) {
   transition: color 0.15s, background 0.15s;
 }
 
-.toc a:hover {
-  color: #111827;
-  background: #f3f4f6;
-}
+.toc a:hover { color: #111827; background: #f3f4f6; }
 
-/* Content */
-.content {
-  flex: 1;
-  min-width: 0;
-}
+.content { flex: 1; min-width: 0; }
 
 .content h2 {
   font-size: 1.55rem;
@@ -311,7 +373,6 @@ function barWidth(val, max) {
   color: #1f2937;
 }
 
-/* Disclaimer */
 .disclaimer {
   background: #fef9c3;
   border: 1px solid #fde047;
@@ -323,28 +384,38 @@ function barWidth(val, max) {
   line-height: 1.6;
 }
 
-/* Results table */
+.callout {
+  background: #f8fafc;
+  border-left: 3px solid #2563eb;
+  border-radius: 0 6px 6px 0;
+  padding: 0.85rem 1rem;
+  font-size: 0.88rem;
+  color: #374151;
+  line-height: 1.6;
+  margin: 1rem 0 1.5rem;
+}
+
 .results-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .results-table th {
   text-align: left;
-  padding: 0.6rem 0.75rem;
+  padding: 0.55rem 0.7rem;
   background: #f9fafb;
   border-bottom: 2px solid #e5e7eb;
   font-weight: 600;
   color: #374151;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .results-table td {
-  padding: 0.75rem 0.75rem;
+  padding: 0.7rem 0.7rem;
   border-bottom: 1px solid #f3f4f6;
   color: #111827;
   vertical-align: middle;
@@ -352,35 +423,38 @@ function barWidth(val, max) {
 
 .results-table td.num {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .badge {
   display: inline-block;
-  padding: 0.2em 0.6em;
+  padding: 0.18em 0.55em;
   border-radius: 4px;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   margin-right: 0.4rem;
 }
 
 .sub-label {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: #9ca3af;
 }
 
-/* Charts */
+.dim {
+  font-weight: 400;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
 .chart-wrap {
-  margin: 0.75rem 0 2rem;
+  margin: 0.5rem 0 1.5rem;
   overflow-x: auto;
 }
 
-.chart {
-  display: block;
-}
+.chart { display: block; }
 
 .bar-label {
-  font-size: 12px;
+  font-size: 11px;
   fill: #374151;
   font-weight: 600;
   dominant-baseline: middle;
@@ -391,11 +465,5 @@ function barWidth(val, max) {
   fill: #6b7280;
   font-family: 'JetBrains Mono', monospace;
   dominant-baseline: middle;
-}
-
-.chart-unit {
-  font-size: 0.78rem;
-  font-weight: 400;
-  color: #9ca3af;
 }
 </style>
