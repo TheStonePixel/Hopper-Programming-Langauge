@@ -67,7 +67,8 @@ and where the language is going.
 | Grammar | `grammar/Hopper.g4` | Complete — contract/invariant NEWLINE handling fixed |
 | AST builder | `src/astBuilder.js` (973 lines) | Complete |
 | AST node defs | `src/ast.js` | Complete |
-| LLVM IR codegen | `src/codegenLLVM.js` (2,354 lines) | Complete |
+| LLVM IR codegen | `src/codegenLLVM.js` (2,390 lines) | Complete — monolithic; split planned |
+| Constraint codegen | `src/codegenConstraints.js` | Complete — requires/ensures/invariant/constrain, --release, --strict |
 | Code formatter | `src/formatter.js` | Complete |
 | Compiler driver | `hopperc.js` | Complete — `--release` (strips contracts) and `--strict` (compile-time proof pass) flags |
 | CLI binary | `hopper` (Node.js executable) | Complete |
@@ -294,6 +295,13 @@ program below should compile, run correctly, and serve as a reference for that p
 
 ### Toolchain
 
+- [ ] **Split `codegenLLVM.js`** — 2,390 lines is too large to bootstrap. Natural boundaries:
+  - `codegenTypes.js` — type helpers, llvmType, sizeOf, bitfield layout, field lookup
+  - `codegenTemplates.js` — monomorphization, template instantiation, type substitution
+  - `codegenExpr.js` — genExpr (lines 618–1300, ~680 lines)
+  - `codegenStmt.js` — genStmt, genBlock, hoistAllocas (lines 1303–1921)
+  - `codegenDecl.js` — genFunction, genMethod, genOperator, genEntry, genBind, genModule
+  - `codegenLLVM.js` — thin orchestrator that imports and wires the above
 - [ ] **`hopper debug` command** — stub exists; wire up DWARF generation and `lldb` launch
 - [ ] **`hopper fmt` command** — formatter (`kindling/src/formatter.js`) exists; expose it
   as a CLI subcommand
