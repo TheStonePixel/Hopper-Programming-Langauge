@@ -1,5 +1,72 @@
 <script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import CodeBlock from '@/components/CodeBlock.vue'
+import { formatHopper } from '@/lib/hopperFmt.js'
+
+const message = ref('Welcome To Hopper!')
+
+function onInput(e) {
+  message.value = e.target.textContent.replace(/[\n\r]/g, '')
+}
+
+function onPaste(e) {
+  e.preventDefault()
+  const text = (e.clipboardData.getData('text/plain') || '').replace(/[\n\r]/g, '')
+  document.execCommand('insertText', false, text)
+}
+
+const codeRef = ref(null)
+const fmtFlash = ref(false)
+
+function runFmt() {
+  if (!codeRef.value) return
+  const raw = codeRef.value.innerText
+  const formatted = formatHopper(raw)
+  codeRef.value.innerText = formatted.trimEnd()
+  message.value = extractMessage(formatted)
+  fmtFlash.value = true
+  setTimeout(() => { fmtFlash.value = false }, 600)
+}
+
+function extractMessage(src) {
+  const m = src.match(/println\("([^"]*)"/)
+  return m ? m[1] : message.value
+}
+
+const FONTS = [
+  { family: "'VT323', monospace",              size: '3.5rem'  },
+  { family: "'Press Start 2P', monospace",     size: '1.35rem' },
+  { family: "'Share Tech Mono', monospace",    size: '2.25rem' },
+  { family: "'Orbitron', sans-serif",          size: '1.85rem' },
+  { family: "'Major Mono Display', monospace", size: '2.25rem' },
+]
+
+const fontIndex = ref(0)
+const isSwitching = ref(false)
+
+const fontStyle = computed(() => ({
+  fontFamily: FONTS[fontIndex.value].family,
+  fontSize:   FONTS[fontIndex.value].size,
+}))
+
+const words = computed(() => message.value.split(' '))
+
+const PROMPT_COLORS = ['#2563eb', '#10b981', '#7c3aed', '#d97706', '#0891b2']
+const promptColorIndex = ref(0)
+
+function cycleFont() {
+  isSwitching.value = true
+  setTimeout(() => {
+    fontIndex.value = (fontIndex.value + 1) % FONTS.length
+    promptColorIndex.value = (promptColorIndex.value + 1) % PROMPT_COLORS.length
+    isSwitching.value = false
+  }, 200)
+}
+
+let fontTimer
+onMounted(() => { fontTimer = setInterval(cycleFont, 4000) })
+onUnmounted(() => { clearInterval(fontTimer) })
 </script>
 
 <template>
@@ -54,6 +121,40 @@ import { RouterLink } from 'vue-router'
             <h3>A clean foundation</h3>
             <p>No global variables. No footguns. No syntax inherited from 1972 that exists only because removing it would break everything. Hopper is simple because it was designed to be — not simplified after the fact.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo">
+      <div class="container">
+        <span class="label">Try It</span>
+        <div class="demo-split">
+
+          <CodeBlock label="hello.hop">
+            <button class="fmt-btn" :class="{ flash: fmtFlash }" @click="runFmt" title="Format code (hopper fmt)">fmt</button>
+            <pre ref="codeRef" class="demo-pre" @keydown.ctrl.s.prevent="runFmt" @keydown.meta.s.prevent="runFmt"><code><span class="kw">import</span> io <span class="kw">from</span> core
+
+<span class="kw">entry</span> main {
+    println(<span class="str">"<span class="editable" contenteditable="true" spellcheck="false" @input="onInput" @paste="onPaste" @keydown.enter.prevent>Welcome To Hopper!</span>"</span>)
+}</code></pre>
+          </CodeBlock>
+
+          <div class="output-block">
+            <span class="output-label">output</span>
+            <div class="output-body">
+              <div class="output-line" :style="fontStyle">
+                <span class="out-prompt" :style="{ color: PROMPT_COLORS[promptColorIndex] }">&gt;</span>
+                <span
+                  v-for="(word, i) in words"
+                  :key="i"
+                  class="out-word"
+                  :class="{ switching: isSwitching }"
+                  :style="{ transitionDelay: isSwitching ? '0ms' : `${i * 90}ms` }"
+                >{{ word }}</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -426,6 +527,135 @@ import { RouterLink } from 'vue-router'
   line-height: 1.7;
 }
 
+/* ── Demo ── */
+.demo {
+  padding: 6rem 0;
+  background: #faf9f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.demo-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.demo-split :deep(.code-block) {
+  margin-bottom: 0 !important;
+}
+
+/* ── Source pane ── */
+.fmt-btn {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.9rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #cbd5e1;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  z-index: 1;
+}
+
+.fmt-btn:hover {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.fmt-btn.flash {
+  color: #059669;
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+}
+
+.demo-pre {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.editable {
+  color: inherit;
+  outline: none;
+  border-bottom: 1px dashed rgba(22, 163, 74, 0.55);
+  cursor: text;
+  min-width: 0.5ch;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.editable:focus {
+  background: rgba(22, 163, 74, 0.07);
+  border-bottom-color: #16a34a;
+}
+
+/* ── Output block ── */
+.output-block {
+  position: relative;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.output-label {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #cbd5e1;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+.output-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2.5rem;
+}
+
+.output-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  line-height: 1.3;
+  max-width: 100%;
+}
+
+.out-prompt {
+  flex-shrink: 0;
+  transition: color 0.5s ease;
+}
+
+.out-word {
+  color: #111827;
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+
+.out-word.switching {
+  opacity: 0;
+  filter: blur(4px);
+}
+
 .compare-link {
   display: inline-block;
   margin-bottom: 2rem;
@@ -638,15 +868,6 @@ code {
   line-height: 1.6;
 }
 
-.feature code {
-  font-size: 0.8rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
 /* ── Principles ── */
 .principles {
   padding: 6rem 0;
@@ -680,15 +901,6 @@ code {
   line-height: 1.7;
 }
 
-.card code {
-  font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
 /* ── Layers ── */
 .layers {
   padding: 6rem 0;
@@ -710,15 +922,6 @@ code {
   max-width: 860px;
   line-height: 1.8;
   margin-bottom: 2.5rem;
-}
-
-.vision-sub code {
-  font-size: 0.85rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 .future-note {
@@ -831,15 +1034,6 @@ code {
   color: #6b7280;
   max-width: 600px;
   line-height: 1.7;
-}
-
-.step code {
-  font-size: 0.82rem;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 /* ── Footer ── */
