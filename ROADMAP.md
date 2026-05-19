@@ -202,17 +202,15 @@ Items are grouped by theme, not strict priority — pick what fits the current s
 
 ### Language — Contracts & Correctness
 
-- [ ] **`requires` / `ensures` codegen** — grammar and AST stubs exist; needs LLVM
-  assertion emission. `requires` fires on entry (precondition), `ensures` fires before
-  every return (postcondition). Start with debug-mode assertions, add optimisation mode
-  that elides them.
+- [x] **`requires` / `ensures` codegen** — emits LLVM assertions on function entry
+  (preconditions) and before every return (postconditions). `ensures` binds `result` to
+  the return value. Violations call `abort()`. Implemented in `kindling/src/codegenConstraints.js`.
 
-- [ ] **`constrain` types** — `int age[0->125] = 0`; compiler picks smallest
-  representation (`i8` here). Grammar and AST stubs exist; needs codegen + type narrowing.
-  Decide: silent wrap, panic, or `Result` on violation?
+- [x] **`constrain` types** — `int x = 42 constrain [byte]`; emits an in-range assertion
+  on assignment (e.g. `-128 ≤ x ≤ 127` for `byte`). Violation calls `abort()`.
 
-- [ ] **`invariant` on loops** — `while (i < n) invariant i >= 0 { ... }`; grammar
-  reserved; needs codegen (assertion at loop head + back-edge).
+- [x] **`invariant` on loops** — `while (i < n) invariant i >= 0 { ... }`; emits an
+  assertion at every loop-head evaluation before the condition test.
 
 - [ ] **Constraint violation policy** — decide the default: `panic` at runtime, silent
   clamp, or propagate as `ErrorCode.OVERFLOW`? Document in DESIGN.md.

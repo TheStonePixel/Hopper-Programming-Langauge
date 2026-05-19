@@ -445,13 +445,16 @@ export class AstBuilder extends HopperVisitor {
     // ── functions ──────────────────────────────────────────────────────────
 
     visitFuncDecl(ctx) {
-        const name = ctx.Identifier().getText();
+        const name       = ctx.Identifier().getText();
         const returnType = ctx.type().getText();
-        const params = ctx.paramList()
+        const params     = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
-        const body = this.visit(ctx.block());
-        return FunctionDecl(name, params, returnType, body, false);
+        const contracts  = (ctx.contractClause() || []).map(c => this.visit(c)).filter(Boolean);
+        const requires   = contracts.filter(c => c.kind === "RequiresClause").map(c => c.expr);
+        const ensures    = contracts.filter(c => c.kind === "EnsuresClause").map(c => c.expr);
+        const body       = this.visit(ctx.block());
+        return FunctionDecl(name, params, returnType, body, false, false, requires, ensures);
     }
 
     visitExternFuncDecl(ctx) {
@@ -464,12 +467,15 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitProcDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const params = ctx.paramList()
+        const name      = ctx.Identifier().getText();
+        const params    = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
             : [];
-        const body = this.visit(ctx.block());
-        return FunctionDecl(name, params, null, body, false);
+        const contracts = (ctx.contractClause() || []).map(c => this.visit(c)).filter(Boolean);
+        const requires  = contracts.filter(c => c.kind === "RequiresClause").map(c => c.expr);
+        const ensures   = contracts.filter(c => c.kind === "EnsuresClause").map(c => c.expr);
+        const body      = this.visit(ctx.block());
+        return FunctionDecl(name, params, null, body, false, false, requires, ensures);
     }
 
     visitExternProcDecl(ctx) {
@@ -499,22 +505,25 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitVarDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const type = ctx.type().getText();
-        const initExpr = this.visit(ctx.expression());
-        return VarDecl(name, type, initExpr);
+        const name      = ctx.Identifier().getText();
+        const type      = ctx.type().getText();
+        const initExpr  = this.visit(ctx.expression());
+        const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
+        return VarDecl(name, type, initExpr, constrain);
     }
 
     visitAllocateVarDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const type = ctx.type().getText();
-        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())));
+        const name      = ctx.Identifier().getText();
+        const type      = ctx.type().getText();
+        const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
+        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())), constrain);
     }
 
     visitVarDeclNoInit(ctx) {
-        const name = ctx.Identifier().getText();
-        const type = ctx.type().getText();
-        return VarDecl(name, type, null);
+        const name      = ctx.Identifier().getText();
+        const type      = ctx.type().getText();
+        const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
+        return VarDecl(name, type, null, constrain);
     }
 
     visitAssign(ctx) {
@@ -610,7 +619,8 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitWhileStmt(ctx) {
-        return WhileStmt(this.visit(ctx.expression()), this.visit(ctx.block()));
+        const invariants = (ctx.invariantClause() || []).map(c => this.visit(c));
+        return WhileStmt(this.visit(ctx.expression()), this.visit(ctx.block()), invariants);
     }
 
     visitForStmt(ctx) {
@@ -639,13 +649,11 @@ export class AstBuilder extends HopperVisitor {
     visitFreeParam()  { return null; }
     visitFixedParam() { return null; }
 
-    // ── compile-time contract stubs (not yet implemented) ──────────────────
-    // requires / ensures / invariant / constrain are reserved and parsed
-    // but silently ignored until the constraint system is built.
-    visitRequiresClause()  { return null; }
-    visitEnsuresClause()   { return null; }
-    visitInvariantClause() { return null; }
-    visitConstrainClause() { return null; }
+    // ── compile-time contract clauses ─────────────────────────────────────
+    visitRequiresClause(ctx) { return { kind: "RequiresClause", expr: this.visit(ctx.expression()) }; }
+    visitEnsuresClause(ctx)  { return { kind: "EnsuresClause",  expr: this.visit(ctx.expression()) }; }
+    visitInvariantClause(ctx){ return this.visit(ctx.expression()); }
+    visitConstrainClause(ctx){ return ctx.type().getText(); }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
         return ReturnStmt(expr);

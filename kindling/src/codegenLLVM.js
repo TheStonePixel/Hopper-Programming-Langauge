@@ -1,4 +1,10 @@
 import { buildAstFromSource } from "./astBuilder.js";
+import {
+    emitRequiresChecks,
+    emitEnsuresChecks,
+    emitInvariantChecks,
+    emitConstrainCheck,
+} from "./codegenConstraints.js";
 
 // ── module-level registries ────────────────────────────────────────────────
 
@@ -18,6 +24,7 @@ const enumTypes          = new Map();   // enum name → Map(variantName → int
 let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 let   stringCounter = 0;
 let   wordBits = 64;                    // native integer width: 64 for x86-64, 32 for ARM32
+let   contractsUsed = false;            // true when any requires/ensures/invariant/constrain is present
 
 function resetAll() {
     stringConstants.clear();
@@ -36,6 +43,7 @@ function resetAll() {
     instantiatedClasses = [];
     stringCounter = 0;
     wordBits = 64;
+    contractsUsed = false;
 }
 
 function addStringConstant(value) {
@@ -1405,6 +1413,10 @@ function genStmt(ir, stmt, retType) {
                 } else {
                     ir.emit(`store ${llType} ${init.value}, ${llType}* ${ptr}`);
                 }
+                if (stmt.constrain) {
+                    contractsUsed = true;
+                    emitConstrainCheck(ir, init.value, llType, stmt.constrain);
+                }
             }
 
             ir.vars.set(stmt.name, { ptr, type: llType, hType });
@@ -1759,6 +1771,10 @@ function genStmt(ir, stmt, retType) {
             const endLbl  = ir.newLabel("while.end.");
             ir.emit(`br label %${condLbl}`);
             ir.emit(`${condLbl}:`);
+            if (stmt.invariants && stmt.invariants.length > 0) {
+                contractsUsed = true;
+                emitInvariantChecks(ir, stmt.invariants, genExpr, ensureBool);
+            }
             const condI1 = ensureBool(ir, genExpr(ir, stmt.cond));
             ir.emit(`br i1 ${condI1}, label %${bodyLbl}, label %${endLbl}`);
             ir.emit(`${bodyLbl}:`);
@@ -1801,9 +1817,12 @@ function genStmt(ir, stmt, retType) {
 
         case "ReturnStmt": {
             emitDeferred(ir);
-            const normRetT = retType ? normalizeType(retType) : null;
+            const normRetT   = retType ? normalizeType(retType) : null;
+            const hasEnsures = (ir.ensures || []).length > 0;
+
             if (stmt.expr && normRetT && classTypes.has(normRetT)) {
                 // Class return: load the struct from its alloca and ret by value.
+                // ensures not checked on class returns (struct binding not yet supported).
                 const llRetT = `%class.${normRetT}`;
                 let structVal;
                 if (stmt.expr.kind === "Var") {
@@ -1811,23 +1830,26 @@ function genStmt(ir, stmt, retType) {
                     structVal = ir.newTmp();
                     ir.emit(`${structVal} = load ${llRetT}, ${llRetT}* ${varEntry.ptr}`);
                 } else {
-                    const result = genExpr(ir, stmt.expr);
-                    // genExpr for a class-returning call already gives a struct value
-                    structVal = result.value;
+                    const res = genExpr(ir, stmt.expr);
+                    structVal = res.value;
                 }
                 ir.emit(`ret ${llRetT} ${structVal}`);
             } else if (stmt.expr) {
+                let retVal;
+                const llRetT = llvmType(retType);
                 if (stmt.expr.kind === "CastExpr") {
                     const inner = genExpr(ir, stmt.expr.expr);
-                    const casted = emitCast(ir, inner.value, inner.type, retType);
-                    ir.emit(`ret ${llvmType(retType)} ${casted.value}`);
+                    retVal = emitCast(ir, inner.value, inner.type, retType).value;
                 } else {
-                    const val     = genExpr(ir, stmt.expr);
-                    const coerced = val.type !== retType
-                        ? emitCast(ir, val.value, val.type, retType)
-                        : val;
-                    ir.emit(`ret ${llvmType(retType)} ${coerced.value}`);
+                    const val = genExpr(ir, stmt.expr);
+                    retVal = (val.type !== retType)
+                        ? emitCast(ir, val.value, val.type, retType).value
+                        : val.value;
                 }
+                if (hasEnsures) {
+                    emitEnsuresChecks(ir, ir.ensures, retVal, llRetT, retType, genExpr, ensureBool);
+                }
+                ir.emit(`ret ${llRetT} ${retVal}`);
             } else {
                 if (retType && retType !== "void") {
                     const llRet = llvmType(retType);
@@ -1924,6 +1946,13 @@ function genFunction(fn) {
             ir.vars.set(p.name, { ptr, type: lt, hType: normT });
         }
     });
+
+    if (fn.requires && fn.requires.length > 0) {
+        contractsUsed = true;
+        emitRequiresChecks(ir, fn.requires, genExpr, ensureBool);
+    }
+    ir.ensures = fn.ensures || [];
+    if (ir.ensures.length > 0) contractsUsed = true;
 
     genBlock(ir, fn.body, fn.returnType);
     emitDeferred(ir);
@@ -2305,7 +2334,8 @@ function genModule(ast, opts = {}) {
     // Runtime heap declarations — only for hosted targets (bare-metal provides no libc)
     if (target !== "armv6-bare") {
         out += `declare i8* @malloc(i64)\n`;
-        out += `declare void @free(i8*)\n\n`;
+        out += `declare void @free(i8*)\n`;
+        out += `declare void @abort()\n\n`;
     }
 
     // Constants are compile-time substitutions only — no LLVM globals emitted
