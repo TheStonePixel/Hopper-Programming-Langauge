@@ -1,13 +1,30 @@
 <script setup>
-defineProps({
-  label: { type: String, default: '' }
+import { ref, watchEffect } from 'vue'
+import { highlight } from '@/lib/highlight.js'
+
+const props = defineProps({
+  label: { type: String, default: '' },
+  code:  { type: String, default: '' },
+})
+
+const highlighted = ref('')
+
+watchEffect(async () => {
+  if (props.code) {
+    highlighted.value = await highlight(props.code)
+  }
 })
 </script>
 
 <template>
   <div class="code-block">
     <span v-if="label" class="code-label">{{ label }}</span>
-    <slot />
+
+    <!-- Auto-highlighted path: plain code string → Shiki -->
+    <div v-if="code" class="shiki-wrap" v-html="highlighted" />
+
+    <!-- Slot path: interactive content (home demo, manual spans) -->
+    <slot v-else />
   </div>
 </template>
 
@@ -37,7 +54,21 @@ defineProps({
   z-index: 1;
 }
 
-/* ── Pre / code ── */
+/* Shiki wraps the output in <pre><code>, inherit our design tokens */
+.shiki-wrap :deep(pre) {
+  margin: 0;
+  padding: 1.5rem 1.75rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.9;
+  background: transparent !important;  /* let CodeBlock background show */
+}
+
+.shiki-wrap :deep(code) {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Slot path — legacy manual-span colour classes kept for home demo */
 .code-block :deep(pre) {
   margin: 0;
   padding: 1.5rem 1.75rem;
@@ -52,7 +83,6 @@ defineProps({
   color: #1e293b;
 }
 
-/* ── Token colors (supports both naming conventions) ── */
 .code-block :deep(.c),
 .code-block :deep(.comment) { color: #94a3b8; font-style: italic; }
 .code-block :deep(.kw)      { color: #2563eb; font-weight: 600; }

@@ -1,5 +1,376 @@
 <script setup>
 import CodeBlock from '../components/CodeBlock.vue'
+
+const codes = {
+    c0: `// declaration with initializer
+int x = 42
+bool ready = true
+float pi = 3.14
+byte b = 255
+string greeting = "hello"
+address ptr = null
+
+// reassignment (same type, no keyword)
+x = 100
+
+// hex literals
+int flags = 0xFF00
+
+// char literals
+char newline = '\\n'
+
+// no implicit widening — cast explicitly
+int big = cast b     // byte → int`,
+    c1: `// function that returns a value
+function add(int a, int b) int {
+    return a + b
+}
+
+// procedure — no return type means void
+function greet(string name) {
+    println(name)
+}
+
+// multiple parameters of different types
+function clamp(int val, int lo, int hi) int {
+    if (val < lo) { return lo }
+    if (val > hi) { return hi }
+    return val
+}
+
+// address parameter — pointer passing
+function strlen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte c = p::value
+        int ci = cast c
+        if (ci == 0) { return n }
+        n = n + 1
+    }
+    return n
+}
+
+// callback parameter — function pointer type
+function apply(int x, callback(int) int fn) int {
+    return fn(x)
+}`,
+    c2: `if (x > 0) {
+    println("positive")
+} else {
+    println("non-positive")
+}
+
+// braces always required — no single-line if`,
+    c3: `int i = 0
+while (i < 10) {
+    i = i + 1
+}
+
+// infinite loop
+while (true) {
+    // break to exit
+    break
+}`,
+    c4: `for (int i = 0; i < 10; i = i + 1) {
+    // i is scoped to the loop
+}
+
+// all three clauses are optional
+for (;; i = i + 1) { ... }
+for (int i = 0; i < n;) { i = i + 2 }`,
+    c5: `for (int i = 0; i < 100; i = i + 1) {
+    if (i == 5) { continue }   // skip 5
+    if (i == 10) { break }     // stop at 10
+}
+
+function early(int n) int {
+    if (n < 0) { return 0 }     // early return
+    return n * 2
+}`,
+    c6: `class Counter {
+    int value
+
+    constructor(int start) {
+        self.value = start
+    }
+
+    destructor() {
+        // cleanup, if needed
+    }
+
+    function increment() {
+        self.value = self.value + 1
+    }
+
+    function get() int {
+        return self.value
+    }
+
+    operator +(int n) int {
+        return self.value + n
+    }
+}
+
+// instantiation
+Counter c = Counter(10)
+c.increment()
+int n = c.get()
+int m = c + 5`,
+    c7: `operator ==(int other) bool {
+    return self.value == other
+}
+
+operator [](int i) int {
+    // subscript read: obj[i]
+    return self.data.get(i)
+}
+
+operator [] =(int i, int v) {
+    // subscript write: obj[i] = v
+    self.data.set(i, v)
+}`,
+    c8: `struct Point {
+    int x
+    int y
+}
+
+struct UartRegs {
+    int dr     // data register
+    int sr     // status register
+    pad 8      // reserved bytes
+    int cr     // control register
+}
+
+// instantiation
+Point p
+p.x = 3
+p.y = 4`,
+    c9: `bitfield StatusReg {
+    bit  txEmpty        // 1 bit
+    bit  rxFull         // 1 bit
+    pad  4             // 4 reserved bits
+    byte errorCode      // 8 bits
+    bit  enabled[4]    // 4-element bit array
+}
+
+strict int uart_sr = 0x40021004
+// read field using cast and mask in practice`,
+    c10: `template Box<T> {
+    T value
+
+    constructor(T v) {
+        self.value = v
+    }
+
+    function get() T {
+        return self.value
+    }
+
+    function set(T v) {
+        self.value = v
+    }
+}
+
+Box<int>   intBox   = Box(42)
+Box<float> floatBox = Box(3.14)
+int        n        = intBox.get()`,
+    c11: `template Vec3<float> {
+    float x
+    float y
+    float z
+
+    constructor(float x, float y, float z) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+}
+
+Vec3 v = Vec3(1.0, 0.0, 0.0)   // no <> needed`,
+    c12: `template Pair<K, V> {
+    K key
+    V val
+
+    constructor(K k, V v) {
+        self.key = k
+        self.val = v
+    }
+}
+
+Pair<int, bool> p = Pair(1, true)`,
+    c13: `// built-in String<T> template — dynamic byte/int string
+String<byte> s = String()
+s.append("hello")
+int len = s.length()`,
+    c14: `enum Color {
+    Red    = 0
+    Green  = 1
+    Blue   = 2
+    Custom = 10
+    AfterCustom           // auto-increments to 11
+}
+
+int c = Color.Red
+if (c == Color.Blue) { ... }`,
+    c15: `enum Direction {
+    North = "north"
+    South = "south"
+    East  = "east"
+    West  = "west"
+}
+
+address heading = Direction.North
+// heading is a pointer to the string "north"`,
+    c16: `enum JsonKind {
+    NONE     // = 0
+    BOOL     // = 1
+    INT      // = 2
+    STRING   // = 3
+    ARRAY    // = 4
+    OBJECT   // = 5
+}`,
+    c17: `interface Printable {
+    function print()
+}
+
+interface Comparable {
+    function compareTo(int other) int
+}
+
+class Score implements Printable, Comparable {
+    int value
+
+    constructor(int v) { self.value = v }
+
+    function print() {
+        println(self.value)
+    }
+
+    function compareTo(int other) int {
+        if (self.value < other) { return -1 }
+        if (self.value > other) { return  1 }
+        return 0
+    }
+}`,
+    c18: `// import specific names from a module
+import io from core        // print, println from core module
+import file from io        // fileRead, fileWrite
+import mem from core       // allocate helpers
+
+// import whole module
+import linux               // all of linux module`,
+    c19: `// basic entry
+entry main {
+    println("hello")
+}
+
+// with parameters (e.g. argc/argv on Linux)
+entry main(int argc, string[] argv) {
+    println(argv[0])
+}
+
+// address form — jump to a pre-existing symbol
+entry main = startup::address`,
+    c20: `int x = 42
+
+// take the address of a variable
+address p = x::address
+
+// read through an address (dereference)
+int v = p::value
+
+// write through an address
+p::value = 99
+
+// size of a type or variable in bytes
+int s = x::size
+
+// address arithmetic
+address next = p + 8
+
+// address of array element
+address ep = arr[3]::address`,
+    c21: `// allocate N bytes on the heap
+address buf = allocate 256
+
+// allocate with a type (class or struct)
+Node node = allocate 1   // sizeof(Node) bytes
+
+// free
+deallocate buf`,
+    c22: `byte  b   = 200
+int   n   = cast b        // byte → int
+float f   = cast n        // int → float
+int   raw = cast f        // float → int (truncates)`,
+    c23: `// creates a named alias for a memory-mapped address
+// reads/writes compile to direct load/store at that address
+strict int  uart_dr = 0x40021000   // data register
+strict int  uart_sr = 0x40021004   // status register
+strict byte gpio_in = 0x48000010
+
+// use like ordinary variables
+uart_dr = 0x41           // write 'A' to UART
+int status = uart_sr    // read status`,
+    c24: `// places a function pointer at a specific address
+// the linker writes the address into the binary
+bind 0x00000004 = reset::address    // ARM reset vector
+bind 0x0000003c = timer::address    // timer interrupt
+
+function reset() {
+    // hardware reset handler
+}
+
+function timer() {
+    // timer interrupt service routine
+}`,
+    c25: `// simple C function
+extern function strlen(string s) int
+extern function memcpy(address dst, address src, int n) address
+
+// variadic C function (printf)
+extern function printf(string fmt, ...) int
+extern function fprintf(int fd, string fmt, ...) int
+
+// no return value (void)
+extern function exit(int code)
+
+// use exactly like Hopper functions
+printf("%d items\\n", 42)`,
+    c26: `alias Size    = int
+alias NodePtr = address
+alias IntBox  = Box<int>
+
+Size len = 1024
+IntBox b = Box(7)`,
+    c27: `function readFile(string path) bool {
+    int fd = open(path, 0, 0)
+    if (fd < 0) { return false }
+    defer close(fd)          // runs on every return path
+
+    // ... do work ...
+    return true
+}`,
+    c28: `// Linux syscall (x86-64)
+function exit(int code) {
+    asm {
+        rax = 60      // syscall: exit
+        rdi = code    // exit code from Hopper variable
+        syscall
+    }
+}
+
+// read return value
+function getpid() int {
+    int pid
+    asm {
+        rax = 39      // syscall: getpid
+        syscall
+        pid = rax     // write register back to Hopper variable
+    }
+    return pid
+}`,
+}
 </script>
 
 <template>
@@ -70,69 +441,14 @@ import CodeBlock from '../components/CodeBlock.vue'
         <section id="variables">
           <h2>Variables</h2>
           <p>Declare with type first. An initializer is required unless the variable is a struct or class instance that will be populated field-by-field.</p>
-          <CodeBlock>
-          <pre><code><span class="c">// declaration with initializer</span>
-<span class="kw">int</span> x = <span class="num">42</span>
-<span class="kw">bool</span> ready = <span class="kw2">true</span>
-<span class="kw">float</span> pi = <span class="num">3.14</span>
-<span class="kw">byte</span> b = <span class="num">255</span>
-<span class="kw">string</span> greeting = <span class="str">"hello"</span>
-<span class="kw">address</span> ptr = <span class="kw2">null</span>
-
-<span class="c">// reassignment (same type, no keyword)</span>
-x = <span class="num">100</span>
-
-<span class="c">// hex literals</span>
-<span class="kw">int</span> flags = <span class="hex">0xFF00</span>
-
-<span class="c">// char literals</span>
-<span class="kw">char</span> newline = <span class="str">'\n'</span>
-
-<span class="c">// no implicit widening — cast explicitly</span>
-<span class="kw">int</span> big = <span class="kw">cast</span> b     <span class="c">// byte → int</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c0" />
         </section>
 
         <!-- Functions -->
         <section id="functions">
           <h2>Functions</h2>
           <p>Functions have explicit return types. A function with no return value omits the type.</p>
-          <CodeBlock>
-          <pre><code><span class="c">// function that returns a value</span>
-<span class="kw">function</span> add(<span class="kw">int</span> a, <span class="kw">int</span> b) <span class="kw">int</span> {
-    <span class="kw">return</span> a + b
-}
-
-<span class="c">// procedure — no return type means void</span>
-<span class="kw">function</span> greet(<span class="kw">string</span> name) {
-    println(name)
-}
-
-<span class="c">// multiple parameters of different types</span>
-<span class="kw">function</span> clamp(<span class="kw">int</span> val, <span class="kw">int</span> lo, <span class="kw">int</span> hi) <span class="kw">int</span> {
-    <span class="kw">if</span> (val &lt; lo) { <span class="kw">return</span> lo }
-    <span class="kw">if</span> (val &gt; hi) { <span class="kw">return</span> hi }
-    <span class="kw">return</span> val
-}
-
-<span class="c">// address parameter — pointer passing</span>
-<span class="kw">function</span> strlen(<span class="kw">address</span> s) <span class="kw">int</span> {
-    <span class="kw">int</span> n = <span class="num">0</span>
-    <span class="kw">while</span> (<span class="kw">true</span>) {
-        <span class="kw">address</span> p = s + n
-        <span class="kw">byte</span> c = p<span class="op">::</span>value
-        <span class="kw">int</span> ci = <span class="kw">cast</span> c
-        <span class="kw">if</span> (ci == <span class="num">0</span>) { <span class="kw">return</span> n }
-        n = n + <span class="num">1</span>
-    }
-    <span class="kw">return</span> n
-}
-
-<span class="c">// callback parameter — function pointer type</span>
-<span class="kw">function</span> apply(<span class="kw">int</span> x, <span class="kw">callback</span>(<span class="kw">int</span>) <span class="kw">int</span> fn) <span class="kw">int</span> {
-    <span class="kw">return</span> fn(x)
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c1" />
         </section>
 
         <!-- Control Flow -->
@@ -140,150 +456,41 @@ x = <span class="num">100</span>
           <h2>Control Flow</h2>
 
           <h3>if / else</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">if</span> (x &gt; <span class="num">0</span>) {
-    println(<span class="str">"positive"</span>)
-} <span class="kw">else</span> {
-    println(<span class="str">"non-positive"</span>)
-}
-
-<span class="c">// braces always required — no single-line if</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c2" />
 
           <h3>while</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">int</span> i = <span class="num">0</span>
-<span class="kw">while</span> (i &lt; <span class="num">10</span>) {
-    i = i + <span class="num">1</span>
-}
-
-<span class="c">// infinite loop</span>
-<span class="kw">while</span> (<span class="kw">true</span>) {
-    <span class="c">// break to exit</span>
-    <span class="kw">break</span>
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c3" />
 
           <h3>for</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; <span class="num">10</span>; i = i + <span class="num">1</span>) {
-    <span class="c">// i is scoped to the loop</span>
-}
-
-<span class="c">// all three clauses are optional</span>
-<span class="kw">for</span> (;; i = i + <span class="num">1</span>) { ... }
-<span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; n;) { i = i + <span class="num">2</span> }</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c4" />
 
           <h3>break / continue / return</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; <span class="num">100</span>; i = i + <span class="num">1</span>) {
-    <span class="kw">if</span> (i == <span class="num">5</span>) { <span class="kw">continue</span> }   <span class="c">// skip 5</span>
-    <span class="kw">if</span> (i == <span class="num">10</span>) { <span class="kw">break</span> }     <span class="c">// stop at 10</span>
-}
-
-<span class="kw">function</span> early(<span class="kw">int</span> n) <span class="kw">int</span> {
-    <span class="kw">if</span> (n &lt; <span class="num">0</span>) { <span class="kw">return</span> <span class="num">0</span> }     <span class="c">// early return</span>
-    <span class="kw">return</span> n * <span class="num">2</span>
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c5" />
         </section>
 
         <!-- Classes -->
         <section id="classes">
           <h2>Classes</h2>
           <p>Classes bundle data and behavior. They support constructors, destructors, methods, and operator overloading. The <code>self</code> keyword refers to the current instance.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">class</span> Counter {
-    <span class="kw">int</span> value
-
-    <span class="kw">constructor</span>(<span class="kw">int</span> start) {
-        self.value = start
-    }
-
-    <span class="kw">destructor</span>() {
-        <span class="c">// cleanup, if needed</span>
-    }
-
-    <span class="kw">function</span> increment() {
-        self.value = self.value + <span class="num">1</span>
-    }
-
-    <span class="kw">function</span> get() <span class="kw">int</span> {
-        <span class="kw">return</span> self.value
-    }
-
-    <span class="kw">operator</span> +(<span class="kw">int</span> n) <span class="kw">int</span> {
-        <span class="kw">return</span> self.value + n
-    }
-}
-
-<span class="c">// instantiation</span>
-Counter c = Counter(<span class="num">10</span>)
-c.increment()
-<span class="kw">int</span> n = c.get()
-<span class="kw">int</span> m = c + <span class="num">5</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c6" />
 
           <h3>Operator overloading</h3>
           <p>Any arithmetic, comparison, bitwise, or subscript operator can be overloaded:</p>
-          <CodeBlock>
-          <pre><code><span class="kw">operator</span> ==(<span class="kw">int</span> other) <span class="kw">bool</span> {
-    <span class="kw">return</span> self.value == other
-}
-
-<span class="kw">operator</span> [](<span class="kw">int</span> i) <span class="kw">int</span> {
-    <span class="c">// subscript read: obj[i]</span>
-    <span class="kw">return</span> self.data.get(i)
-}
-
-<span class="kw">operator</span> [] =(<span class="kw">int</span> i, <span class="kw">int</span> v) {
-    <span class="c">// subscript write: obj[i] = v</span>
-    self.data.set(i, v)
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c7" />
         </section>
 
         <!-- Structs -->
         <section id="structs">
           <h2>Structs</h2>
           <p>Structs are memory-layout-only types — fields are packed sequentially with no padding unless you add it explicitly. No methods, no constructors.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">struct</span> Point {
-    <span class="kw">int</span> x
-    <span class="kw">int</span> y
-}
-
-<span class="kw">struct</span> UartRegs {
-    <span class="kw">int</span> dr     <span class="c">// data register</span>
-    <span class="kw">int</span> sr     <span class="c">// status register</span>
-    <span class="kw">pad</span> <span class="num">8</span>      <span class="c">// reserved bytes</span>
-    <span class="kw">int</span> cr     <span class="c">// control register</span>
-}
-
-<span class="c">// instantiation</span>
-Point p
-p.x = <span class="num">3</span>
-p.y = <span class="num">4</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c8" />
         </section>
 
         <!-- Bitfields -->
         <section id="bitfields">
           <h2>Bitfields</h2>
           <p>Bitfields pack fields at the bit level, starting from LSB. Used for hardware register layouts and compact flags.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">bitfield</span> StatusReg {
-    <span class="kw">bit</span>  txEmpty        <span class="c">// 1 bit</span>
-    <span class="kw">bit</span>  rxFull         <span class="c">// 1 bit</span>
-    <span class="kw">pad</span>  <span class="num">4</span>             <span class="c">// 4 reserved bits</span>
-    <span class="kw">byte</span> errorCode      <span class="c">// 8 bits</span>
-    <span class="kw">bit</span>  enabled[<span class="num">4</span>]    <span class="c">// 4-element bit array</span>
-}
-
-<span class="kw">strict</span> <span class="kw">int</span> uart_sr = <span class="hex">0x40021004</span>
-<span class="c">// read field using cast and mask in practice</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c9" />
         </section>
 
         <!-- Templates -->
@@ -292,67 +499,16 @@ p.y = <span class="num">4</span></code></pre>
           <p>Templates are parameterized classes, monomorphized at each use site. Type parameters are free variables (<code>T</code>); fixed parameters are concrete primitive types.</p>
 
           <h3>Free type parameters</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">template</span> Box&lt;T&gt; {
-    T value
-
-    <span class="kw">constructor</span>(T v) {
-        self.value = v
-    }
-
-    <span class="kw">function</span> get() T {
-        <span class="kw">return</span> self.value
-    }
-
-    <span class="kw">function</span> set(T v) {
-        self.value = v
-    }
-}
-
-Box&lt;<span class="kw">int</span>&gt;   intBox   = Box(<span class="num">42</span>)
-Box&lt;<span class="kw">float</span>&gt; floatBox = Box(<span class="num">3.14</span>)
-<span class="kw">int</span>        n        = intBox.get()</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c10" />
 
           <h3>Fixed-type parameters (no angle brackets at use site)</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">template</span> Vec3&lt;<span class="kw">float</span>&gt; {
-    <span class="kw">float</span> x
-    <span class="kw">float</span> y
-    <span class="kw">float</span> z
-
-    <span class="kw">constructor</span>(<span class="kw">float</span> x, <span class="kw">float</span> y, <span class="kw">float</span> z) {
-        self.x = x
-        self.y = y
-        self.z = z
-    }
-}
-
-Vec3 v = Vec3(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)   <span class="c">// no &lt;&gt; needed</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c11" />
 
           <h3>Multiple type parameters</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">template</span> Pair&lt;K, V&gt; {
-    K key
-    V val
-
-    <span class="kw">constructor</span>(K k, V v) {
-        self.key = k
-        self.val = v
-    }
-}
-
-Pair&lt;<span class="kw">int</span>, <span class="kw">bool</span>&gt; p = Pair(<span class="num">1</span>, <span class="kw2">true</span>)</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c12" />
 
           <h3>String template</h3>
-          <CodeBlock>
-          <pre><code><span class="c">// built-in String&lt;T&gt; template — dynamic byte/int string</span>
-String&lt;<span class="kw">byte</span>&gt; s = String()
-s.append(<span class="str">"hello"</span>)
-<span class="kw">int</span> len = s.length()</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c13" />
         </section>
 
         <!-- Enums -->
@@ -361,90 +517,28 @@ s.append(<span class="str">"hello"</span>)
           <p>Enums are compile-time constants. Variants can be integer-backed or string-backed. Values are erased at runtime — an int enum becomes a literal integer, a string enum becomes a pointer to a string constant.</p>
 
           <h3>Integer-backed enum</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">enum</span> Color {
-    Red    = <span class="num">0</span>
-    Green  = <span class="num">1</span>
-    Blue   = <span class="num">2</span>
-    Custom = <span class="num">10</span>
-    AfterCustom           <span class="c">// auto-increments to 11</span>
-}
-
-<span class="kw">int</span> c = Color.Red
-<span class="kw">if</span> (c == Color.Blue) { ... }</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c14" />
 
           <h3>String-backed enum</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">enum</span> Direction {
-    North = <span class="str">"north"</span>
-    South = <span class="str">"south"</span>
-    East  = <span class="str">"east"</span>
-    West  = <span class="str">"west"</span>
-}
-
-<span class="kw">address</span> heading = Direction.North
-<span class="c">// heading is a pointer to the string "north"</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c15" />
 
           <h3>Auto-increment</h3>
           <p>Integer variants without an explicit value increment from the previous value. The first variant defaults to 0.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">enum</span> JsonKind {
-    NONE     <span class="c">// = 0</span>
-    BOOL     <span class="c">// = 1</span>
-    INT      <span class="c">// = 2</span>
-    STRING   <span class="c">// = 3</span>
-    ARRAY    <span class="c">// = 4</span>
-    OBJECT   <span class="c">// = 5</span>
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c16" />
         </section>
 
         <!-- Interfaces -->
         <section id="interfaces">
           <h2>Interfaces</h2>
           <p>Interfaces define compile-time method contracts. A class that <code>implements</code> an interface is checked at compile time to provide every declared method.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">interface</span> Printable {
-    <span class="kw">function</span> print()
-}
-
-<span class="kw">interface</span> Comparable {
-    <span class="kw">function</span> compareTo(<span class="kw">int</span> other) <span class="kw">int</span>
-}
-
-<span class="kw">class</span> Score <span class="kw">implements</span> Printable, Comparable {
-    <span class="kw">int</span> value
-
-    <span class="kw">constructor</span>(<span class="kw">int</span> v) { self.value = v }
-
-    <span class="kw">function</span> print() {
-        println(self.value)
-    }
-
-    <span class="kw">function</span> compareTo(<span class="kw">int</span> other) <span class="kw">int</span> {
-        <span class="kw">if</span> (self.value &lt; other) { <span class="kw">return</span> -<span class="num">1</span> }
-        <span class="kw">if</span> (self.value &gt; other) { <span class="kw">return</span>  <span class="num">1</span> }
-        <span class="kw">return</span> <span class="num">0</span>
-    }
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c17" />
         </section>
 
         <!-- Imports -->
         <section id="imports">
           <h2>Imports &amp; Modules</h2>
           <p>Modules are directories under <code>modules/</code>. Import individual names or an entire module.</p>
-          <CodeBlock>
-          <pre><code><span class="c">// import specific names from a module</span>
-<span class="kw">import</span> io <span class="kw">from</span> core        <span class="c">// print, println from core module</span>
-<span class="kw">import</span> file <span class="kw">from</span> io        <span class="c">// fileRead, fileWrite</span>
-<span class="kw">import</span> mem <span class="kw">from</span> core       <span class="c">// allocate helpers</span>
-
-<span class="c">// import whole module</span>
-<span class="kw">import</span> linux               <span class="c">// all of linux module</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c18" />
 
           <p>The core library includes:</p>
           <table class="type-table">
@@ -462,20 +556,7 @@ s.append(<span class="str">"hello"</span>)
         <section id="entry">
           <h2>Entry Point</h2>
           <p>Every Hopper program has exactly one <code>entry</code>. It is not a function — it is a named jump target. On Linux it becomes the ELF entry point; on bare metal it becomes the reset handler address.</p>
-          <CodeBlock>
-          <pre><code><span class="c">// basic entry</span>
-<span class="kw">entry</span> main {
-    println(<span class="str">"hello"</span>)
-}
-
-<span class="c">// with parameters (e.g. argc/argv on Linux)</span>
-<span class="kw">entry</span> main(<span class="kw">int</span> argc, <span class="kw">string</span>[] argv) {
-    println(argv[<span class="num">0</span>])
-}
-
-<span class="c">// address form — jump to a pre-existing symbol</span>
-<span class="kw">entry</span> main = startup<span class="op">::</span>address</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c19" />
         </section>
 
         <!-- Memory -->
@@ -484,48 +565,14 @@ s.append(<span class="str">"hello"</span>)
           <p>Hopper exposes raw memory operations explicitly. There are no implicit heap allocations.</p>
 
           <h3>Address and dereference</h3>
-          <CodeBlock>
-          <pre><code><span class="kw">int</span> x = <span class="num">42</span>
-
-<span class="c">// take the address of a variable</span>
-<span class="kw">address</span> p = x<span class="op">::</span>address
-
-<span class="c">// read through an address (dereference)</span>
-<span class="kw">int</span> v = p<span class="op">::</span>value
-
-<span class="c">// write through an address</span>
-p<span class="op">::</span>value = <span class="num">99</span>
-
-<span class="c">// size of a type or variable in bytes</span>
-<span class="kw">int</span> s = x<span class="op">::</span>size
-
-<span class="c">// address arithmetic</span>
-<span class="kw">address</span> next = p + <span class="num">8</span>
-
-<span class="c">// address of array element</span>
-<span class="kw">address</span> ep = arr[<span class="num">3</span>]<span class="op">::</span>address</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c20" />
 
           <h3>Heap allocation</h3>
-          <CodeBlock>
-          <pre><code><span class="c">// allocate N bytes on the heap</span>
-<span class="kw">address</span> buf = <span class="kw">allocate</span> <span class="num">256</span>
-
-<span class="c">// allocate with a type (class or struct)</span>
-Node node = <span class="kw">allocate</span> <span class="kw">1</span>   <span class="c">// sizeof(Node) bytes</span>
-
-<span class="c">// free</span>
-<span class="kw">deallocate</span> buf</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c21" />
 
           <h3>cast</h3>
           <p>Explicit numeric widening or reinterpretation. No implicit casts anywhere.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">byte</span>  b   = <span class="num">200</span>
-<span class="kw">int</span>   n   = <span class="kw">cast</span> b        <span class="c">// byte → int</span>
-<span class="kw">float</span> f   = <span class="kw">cast</span> n        <span class="c">// int → float</span>
-<span class="kw">int</span>   raw = <span class="kw">cast</span> f        <span class="c">// float → int (truncates)</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c22" />
         </section>
 
         <!-- Hardware -->
@@ -534,111 +581,38 @@ Node node = <span class="kw">allocate</span> <span class="kw">1</span>   <span c
           <p>Hopper expresses hardware layout directly in source. No separate linker scripts or startup assembly files required.</p>
 
           <h3>strict — MMIO register alias</h3>
-          <CodeBlock>
-          <pre><code><span class="c">// creates a named alias for a memory-mapped address</span>
-<span class="c">// reads/writes compile to direct load/store at that address</span>
-<span class="kw">strict</span> <span class="kw">int</span>  uart_dr = <span class="hex">0x40021000</span>   <span class="c">// data register</span>
-<span class="kw">strict</span> <span class="kw">int</span>  uart_sr = <span class="hex">0x40021004</span>   <span class="c">// status register</span>
-<span class="kw">strict</span> <span class="kw">byte</span> gpio_in = <span class="hex">0x48000010</span>
-
-<span class="c">// use like ordinary variables</span>
-uart_dr = <span class="num">0x41</span>           <span class="c">// write 'A' to UART</span>
-<span class="kw">int</span> status = uart_sr    <span class="c">// read status</span></code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c23" />
 
           <h3>bind — vector table entry</h3>
-          <CodeBlock>
-          <pre><code><span class="c">// places a function pointer at a specific address</span>
-<span class="c">// the linker writes the address into the binary</span>
-<span class="kw">bind</span> <span class="hex">0x00000004</span> = reset<span class="op">::</span>address    <span class="c">// ARM reset vector</span>
-<span class="kw">bind</span> <span class="hex">0x0000003c</span> = timer<span class="op">::</span>address    <span class="c">// timer interrupt</span>
-
-<span class="kw">function</span> reset() {
-    <span class="c">// hardware reset handler</span>
-}
-
-<span class="kw">function</span> timer() {
-    <span class="c">// timer interrupt service routine</span>
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c24" />
         </section>
 
         <!-- Extern -->
         <section id="extern">
           <h2>Extern &amp; FFI</h2>
           <p>Call into C libraries or any foreign ABI. Extern functions declare a signature and resolve at link time.</p>
-          <CodeBlock>
-          <pre><code><span class="c">// simple C function</span>
-<span class="kw">extern function</span> strlen(<span class="kw">string</span> s) <span class="kw">int</span>
-<span class="kw">extern function</span> memcpy(<span class="kw">address</span> dst, <span class="kw">address</span> src, <span class="kw">int</span> n) <span class="kw">address</span>
-
-<span class="c">// variadic C function (printf)</span>
-<span class="kw">extern function</span> printf(<span class="kw">string</span> fmt, ...) <span class="kw">int</span>
-<span class="kw">extern function</span> fprintf(<span class="kw">int</span> fd, <span class="kw">string</span> fmt, ...) <span class="kw">int</span>
-
-<span class="c">// no return value (void)</span>
-<span class="kw">extern function</span> exit(<span class="kw">int</span> code)
-
-<span class="c">// use exactly like Hopper functions</span>
-printf(<span class="str">"%d items\n"</span>, <span class="num">42</span>)</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c25" />
         </section>
 
         <!-- Aliases -->
         <section id="aliases">
           <h2>Type Aliases</h2>
           <p>An alias creates a new name for an existing type. No runtime cost; purely a compile-time name.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">alias</span> Size    = <span class="kw">int</span>
-<span class="kw">alias</span> NodePtr = <span class="kw">address</span>
-<span class="kw">alias</span> IntBox  = Box&lt;<span class="kw">int</span>&gt;
-
-Size len = <span class="num">1024</span>
-IntBox b = Box(<span class="num">7</span>)</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c26" />
         </section>
 
         <!-- Defer -->
         <section id="defer">
           <h2>Defer</h2>
           <p><code>defer</code> runs an expression when the surrounding function returns, regardless of which <code>return</code> is taken. Useful for cleanup.</p>
-          <CodeBlock>
-          <pre><code><span class="kw">function</span> readFile(<span class="kw">string</span> path) <span class="kw">bool</span> {
-    <span class="kw">int</span> fd = open(path, <span class="num">0</span>, <span class="num">0</span>)
-    <span class="kw">if</span> (fd &lt; <span class="num">0</span>) { <span class="kw">return</span> <span class="kw2">false</span> }
-    <span class="kw">defer</span> close(fd)          <span class="c">// runs on every return path</span>
-
-    <span class="c">// ... do work ...</span>
-    <span class="kw">return</span> <span class="kw2">true</span>
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c27" />
         </section>
 
         <!-- Asm -->
         <section id="asm">
           <h2>Inline Assembly</h2>
           <p>The <code>asm</code> block emits raw instructions. Inputs and outputs are bound by name to Hopper variables.</p>
-          <CodeBlock>
-          <pre><code><span class="c">// Linux syscall (x86-64)</span>
-<span class="kw">function</span> exit(<span class="kw">int</span> code) {
-    <span class="kw">asm</span> {
-        rax = <span class="num">60</span>      <span class="c">// syscall: exit</span>
-        rdi = code    <span class="c">// exit code from Hopper variable</span>
-        syscall
-    }
-}
-
-<span class="c">// read return value</span>
-<span class="kw">function</span> getpid() <span class="kw">int</span> {
-    <span class="kw">int</span> pid
-    <span class="kw">asm</span> {
-        rax = <span class="num">39</span>      <span class="c">// syscall: getpid</span>
-        syscall
-        pid = rax     <span class="c">// write register back to Hopper variable</span>
-    }
-    <span class="kw">return</span> pid
-}</code></pre>
-          </CodeBlock>
+          <CodeBlock :code="codes.c28" />
         </section>
 
         <!-- Operators -->
