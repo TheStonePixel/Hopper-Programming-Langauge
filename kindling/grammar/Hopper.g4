@@ -245,7 +245,7 @@ statement
     | 'return' expression?                                      # ReturnStmt
     | 'defer' expression                                        # DeferStmt
     | 'deallocate' expression                                   # DeallocateStmt
-    | 'asm' asmBlock                                            # AsmStmt
+    | AsmBlock                                                     # AsmStmt
     ;
 
 // Compile-time constraint clause — reserved, not yet implemented
@@ -258,21 +258,6 @@ constrainClause
 // e.g.  while (i < n) invariant i >= 0 { ... }
 invariantClause
     : 'invariant' expression
-    ;
-
-asmBlock
-    : '{' NEWLINE* (asmLine (NEWLINE+ asmLine)* NEWLINE*)? '}'
-    ;
-
-asmLine
-    : Identifier '=' asmOperand    # AsmLineAssign
-    | Identifier                   # AsmLineOp
-    ;
-
-asmOperand
-    : IntegerLiteral
-    | HexLiteral
-    | Identifier
     ;
 
 forInit
@@ -362,3 +347,8 @@ LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 
 // spaces and tabs only
 WS              : [ \t]+ -> skip ;
+
+// Capture the entire asm { ... } block as one token so that raw x86 instruction
+// syntax (commas, brackets, register names, etc.) needs no special parser rules.
+// The AST builder parses the line content from the token text.
+AsmBlock        : 'asm' [ \t]* '{' ~[}]* '}' ;

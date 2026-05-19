@@ -533,24 +533,34 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitAsmStmt(ctx) {
-        const lines = ctx.asmBlock().asmLine().map(l => this.visit(l));
+        // AsmBlock token text: `asm { ... }` — parse line by line
+        const raw     = ctx.AsmBlock().getText();
+        const content = raw.replace(/^asm\s*\{/, '').replace(/\}$/, '');
+        const lines   = content.split('\n').flatMap(line => {
+            // strip trailing inline comment, then trim
+            const ci   = line.indexOf('//');
+            let   text = (ci >= 0 ? line.slice(0, ci) : line).trim();
+            if (!text) return [];
+
+            // reg/var = literal or identifier  →  AsmLineAssign
+            const m = text.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);
+            if (m) {
+                const dest    = m[1];
+                const srcText = m[2].trim();
+                let src;
+                if (/^0x[0-9a-fA-F]+$/i.test(srcText))
+                    src = HexLiteral(parseInt(srcText, 16));
+                else if (/^[0-9]+$/.test(srcText))
+                    src = IntLiteral(parseInt(srcText, 10));
+                else
+                    src = Var(srcText);
+                return [{ kind: "AsmLineAssign", dest, src }];
+            }
+
+            // everything else: raw instruction text  →  AsmLineOp
+            return [{ kind: "AsmLineOp", op: text }];
+        });
         return AsmStmt(lines);
-    }
-
-    visitAsmLineAssign(ctx) {
-        const dest = ctx.Identifier().getText();
-        const src  = this.visitAsmOperand(ctx.asmOperand());
-        return { kind: "AsmLineAssign", dest, src };
-    }
-
-    visitAsmLineOp(ctx) {
-        return { kind: "AsmLineOp", op: ctx.Identifier().getText() };
-    }
-
-    visitAsmOperand(ctx) {
-        if (ctx.IntegerLiteral()) return IntLiteral(parseInt(ctx.IntegerLiteral().getText(), 10));
-        if (ctx.HexLiteral())     return HexLiteral(parseInt(ctx.HexLiteral().getText(), 16));
-        return Var(ctx.Identifier().getText());
     }
 
     visitArrayAssign(ctx) {
