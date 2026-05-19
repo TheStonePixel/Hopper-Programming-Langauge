@@ -1,0 +1,84 @@
+// TEST: default build uses sensible values
+// EXPECT: GET  http://host:80/  timeout=30s
+
+// TEST: custom build overrides defaults
+// EXPECT: POST  https://host:443/api/data  timeout=60s
+
+// TEST: partial override leaves defaults intact
+// EXPECT: GET  http://host:9090/metrics  timeout=5s
+
+extern function printf(string fmt, ...) int
+
+class HttpRequest {
+    string method
+    string path
+    int    port
+    int    timeout
+    int    tls
+
+    constructor(string m, string p, int port, int timeout, int tls) {
+        self.method  = m
+        self.path    = p
+        self.port    = port
+        self.timeout = timeout
+        self.tls     = tls
+    }
+
+    function print() {
+        string scheme = "http"
+        if (self.tls == 1) { scheme = "https" }
+        printf("%s  %s://host:%lld%s  timeout=%llds\n", self.method, scheme, self.port, self.path, self.timeout)
+    }
+}
+
+class RequestBuilder {
+    string method
+    string path
+    int    port
+    int    timeout
+    int    tls
+
+    constructor() {
+        self.method  = "GET"
+        self.path    = "/"
+        self.port    = 80
+        self.timeout = 30
+        self.tls     = 0
+    }
+
+    function setMethod(string m) { self.method = m }
+    function setPath(string p)   { self.path   = p }
+    function setPort(int p)      { self.port   = p }
+    function setTimeout(int t)   { self.timeout = t }
+
+    function withTls() {
+        self.tls  = 1
+        self.port = 443
+    }
+
+    function build() HttpRequest {
+        HttpRequest req = HttpRequest(self.method, self.path, self.port, self.timeout, self.tls)
+        return req
+    }
+}
+
+entry main {
+    RequestBuilder b1 = RequestBuilder()
+    HttpRequest r1 = b1.build()
+    r1.print()
+
+    RequestBuilder b2 = RequestBuilder()
+    b2.setMethod("POST")
+    b2.setPath("/api/data")
+    b2.withTls()
+    b2.setTimeout(60)
+    HttpRequest r2 = b2.build()
+    r2.print()
+
+    RequestBuilder b3 = RequestBuilder()
+    b3.setPath("/metrics")
+    b3.setPort(9090)
+    b3.setTimeout(5)
+    HttpRequest r3 = b3.build()
+    r3.print()
+}

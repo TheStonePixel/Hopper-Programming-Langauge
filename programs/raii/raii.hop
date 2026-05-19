@@ -1,0 +1,77 @@
+// raii.hop — Resource lifecycle management
+//
+// Buffer wraps a heap allocation with a named acquire/release protocol.
+// defer guarantees release() runs before every return path — including
+// early returns — so there is never a leak regardless of control flow.
+//
+// This is the idiomatic Hopper pattern: constructor initialises, defer
+// schedules the paired release at scope entry, body runs safely in between.
+//
+// Demonstrates: constructor, explicit release method, defer for RAII
+//               guarantee, early-return safety, raw allocation with defer.
+//
+// Build: hopper build raii.hop
+
+extern function printf(string fmt, ...) int
+
+// ── RAII heap buffer ──────────────────────────────────────────────────────────
+
+class Buffer {
+    address data
+    int     size
+
+    constructor(int n) {
+        self.data = allocate n
+        self.size = n
+        printf("Buffer(%lld): acquired\n", n)
+    }
+
+    function release() {
+        printf("Buffer(%lld): released\n", self.size)
+        deallocate self.data
+    }
+}
+
+function freeBlock(address p) {
+    deallocate p
+}
+
+// ── defer guarantees release even through early return ────────────────────────
+
+function process(int earlyExit) {
+    Buffer buf = Buffer(64)
+    defer buf.release()       // scheduled at scope entry; runs before any return
+
+    printf("processing\n")
+    if (earlyExit == 1) {
+        printf("early return\n")
+        return                // defer fires here
+    }
+    printf("normal exit\n")
+                              // defer fires here
+}
+
+// ── raw allocation guarded with defer ─────────────────────────────────────────
+
+function rawDemo() {
+    address mem = allocate 128
+    defer freeBlock(mem)
+
+    printf("raw block in use\n")
+    printf("returning\n")
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    printf("=== early return ===\n")
+    process(1)
+
+    printf("\n=== normal exit ===\n")
+    process(0)
+
+    printf("\n=== raw allocation ===\n")
+    rawDemo()
+
+    printf("\ndone\n")
+}
