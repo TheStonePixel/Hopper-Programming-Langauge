@@ -4,42 +4,21 @@ import CodeBlock from '../components/CodeBlock.vue'
 
 // ── Hero typing animation ────────────────────────────────────────────────────
 
-const DEMO_CODE = `// welcome.hop
-// Hopper is 🔥
+const DEMO_CODE = `import String from UTF8
+import io from core
 
-import io from std
-
-enum Status { Ok, Fail }
-
-struct Report {
-    Status status
-    int    code
-}
-
-function probe() Report {
-    int leaf = 0
-    asm {
-        xor eax, eax   // CPUID leaf 0
-        cpuid
-        leaf = eax
-    }
-    return Report(Status.Ok, leaf)
-}
-
-function isAwesome() bool {
+function alwaysTrue() bool {
     return true
 }
 
-entry main {
-    Report r = probe()
-
-    if (r.status == Status.Ok) {
-        io.print("System ready")
-    }
+entry main(int argc, string[] argv) {
+    callback isAwesome = alwaysTrue() bool
 
     if (isAwesome()) {
-        io.print("Welcome To Hopper")
+        print("Welcome To Hopper")
     }
+
+    return 0
 }`
 
 const typedCode   = ref('')
