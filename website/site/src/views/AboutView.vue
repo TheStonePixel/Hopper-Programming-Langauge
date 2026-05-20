@@ -134,7 +134,7 @@
     <!-- Memento Mori -->
     <section class="section alt">
       <div class="inner">
-        <h2>Memento Mori</h2>
+        <h2>All Things Must Die</h2>
         <p>I do not expect Hopper to last forever. Nothing does.</p>
         <p>
           If Hopper succeeds, eventually something better should replace it. That is healthy.
@@ -151,7 +151,6 @@
         </p>
         <div class="memento-block">
           <p class="memento-text">Memento mori.</p>
-          <p class="memento-translation">remember that you will die</p>
         </div>
       </div>
     </section>
