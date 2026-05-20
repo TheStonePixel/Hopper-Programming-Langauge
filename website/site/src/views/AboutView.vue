@@ -262,14 +262,14 @@
     <section class="section alt">
       <div class="inner">
         <h2>What I Believe</h2>
-        <div class="beliefs">
-          <div class="belief">I believe systems programming should expose the machine instead of hiding it.</div>
-          <div class="belief">I believe the runtime cost of code should be obvious from the source.</div>
-          <div class="belief">I believe abstraction is useful only when it preserves clarity and control.</div>
-          <div class="belief">I believe languages become fragile when they grow faster than their users can fully understand them.</div>
-          <div class="belief">I believe stability matters more than novelty.</div>
-          <div class="belief">I believe "finished" is one of the highest compliments a language can earn.</div>
-        </div>
+        <ul class="beliefs">
+          <li>I believe systems programming should expose the machine instead of hiding it.</li>
+          <li>I believe the runtime cost of code should be obvious from the source.</li>
+          <li>I believe abstraction is useful only when it preserves clarity and control.</li>
+          <li>I believe languages become fragile when they grow faster than their users can fully understand them.</li>
+          <li>I believe stability matters more than novelty.</li>
+          <li>I believe "finished" is one of the highest compliments a language can earn.</li>
+        </ul>
         <p>
           A language that changes constantly forces its users to continuously relearn the
           foundation beneath them. A language that stabilizes becomes infrastructure.
@@ -363,10 +363,10 @@
       </div>
     </section>
 
-    <!-- Impermanence -->
+    <!-- Memento Mori -->
     <section class="section alt">
       <div class="inner">
-        <h2>Impermanence</h2>
+        <h2>Memento Mori</h2>
         <p>
           I do not expect Hopper to last forever. Nothing does.
         </p>
@@ -383,7 +383,10 @@
           I would rather Hopper become stable, useful, and eventually obsolete than endlessly
           "modernized." All things are impermanent.
         </p>
-        <p class="memento">Memento mori.</p>
+        <div class="memento-block">
+          <p class="memento-text">Memento mori.</p>
+          <p class="memento-translation">remember that you will die</p>
+        </div>
       </div>
     </section>
 
@@ -753,16 +756,28 @@
 
 /* ── Beliefs ── */
 .beliefs {
+  list-style: none;
+  padding: 0;
   margin: 1.75rem 0;
-  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
-.belief {
+.beliefs li {
   font-size: 0.975rem;
   color: #374151;
   line-height: 1.75;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  padding-left: 1.25rem;
+  position: relative;
+}
+
+.beliefs li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: #2563eb;
+  font-weight: 700;
 }
 
 /* ── Language cards ── */
@@ -798,10 +813,24 @@
 }
 
 /* ── Memento ── */
-.memento {
+.memento-block {
+  margin-top: 2.5rem;
+}
+
+.memento-text {
+  font-size: 1.4rem;
   font-style: italic;
+  font-weight: 600;
+  color: #111827 !important;
+  margin: 0 !important;
+}
+
+.memento-translation {
+  font-size: 0.85rem;
   color: #9ca3af !important;
-  margin-top: 1.5rem;
+  font-style: italic;
+  margin: 0.35rem 0 0 !important;
+  letter-spacing: 0.02em;
 }
 
 /* ── Final Principle ── */
