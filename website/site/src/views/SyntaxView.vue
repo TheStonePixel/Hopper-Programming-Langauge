@@ -1,5 +1,8 @@
 <script setup>
-import CodeBlock from '../components/CodeBlock.vue'
+import CodeBlock from '@/components/CodeBlock.vue'
+import PageShell from '@/components/PageShell.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import SidebarLayout from '@/components/SidebarLayout.vue'
 
 const codes = {
     c0: `// declaration with initializer
@@ -409,50 +412,44 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 </script>
 
 <template>
-  <div class="page">
+  <PageShell>
 
-    <header class="page-header">
-      <div class="header-inner">
-        <span class="label">Reference</span>
-        <h1>Syntax Guide</h1>
-        <p class="sub">Everything Hopper can do, with working examples.</p>
-      </div>
-    </header>
+    <PageHeader
+      label="Reference"
+      title="Syntax Guide"
+      sub="Everything Hopper can do, with working examples."
+      width="lg"
+      size="sm"
+    />
 
-    <div class="layout">
+    <SidebarLayout width="lg">
 
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <nav class="toc">
-          <a href="#types">Types</a>
-          <a href="#variables">Variables</a>
-          <a href="#functions">Functions</a>
-          <a href="#control">Control Flow</a>
-          <a href="#classes">Classes</a>
-          <a href="#structs">Structs</a>
-          <a href="#bitfields">Bitfields</a>
-          <a href="#templates">Templates</a>
-          <a href="#enums">Enums</a>
-          <a href="#interfaces">Interfaces</a>
-          <a href="#imports">Imports &amp; Modules</a>
-          <a href="#entry">Entry Point</a>
-          <a href="#memory">Memory Operations</a>
-          <a href="#hardware">Hardware</a>
-          <a href="#extern">Extern &amp; FFI</a>
-          <a href="#aliases">Type Aliases</a>
-          <a href="#defer">Defer</a>
-          <a href="#asm">Inline Assembly</a>
-          <a href="#contracts">Contracts</a>
-          <a href="#operators">Operators</a>
-        </nav>
-      </aside>
-
-      <!-- Content -->
-      <main class="content">
+      <template #sidebar>
+        <a href="#types">Types</a>
+        <a href="#variables">Variables</a>
+        <a href="#functions">Functions</a>
+        <a href="#control">Control Flow</a>
+        <a href="#classes">Classes</a>
+        <a href="#structs">Structs</a>
+        <a href="#bitfields">Bitfields</a>
+        <a href="#templates">Templates</a>
+        <a href="#enums">Enums</a>
+        <a href="#interfaces">Interfaces</a>
+        <a href="#imports">Imports &amp; Modules</a>
+        <a href="#entry">Entry Point</a>
+        <a href="#memory">Memory Operations</a>
+        <a href="#hardware">Hardware</a>
+        <a href="#extern">Extern &amp; FFI</a>
+        <a href="#aliases">Type Aliases</a>
+        <a href="#defer">Defer</a>
+        <a href="#asm">Inline Assembly</a>
+        <a href="#contracts">Contracts</a>
+        <a href="#operators">Operators</a>
+      </template>
 
         <!-- Types -->
         <section id="types">
-          <h2>Types</h2>
+          <h2 v-reveal>Types</h2>
           <p>Hopper is strongly typed. Every variable has an explicit type; implicit conversions do not exist.</p>
           <table class="type-table">
             <thead><tr><th>Type</th><th>Width</th><th>Description</th></tr></thead>
@@ -475,21 +472,21 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Variables -->
         <section id="variables">
-          <h2>Variables</h2>
+          <h2 v-reveal>Variables</h2>
           <p>Declare with type first. An initializer is required unless the variable is a struct or class instance that will be populated field-by-field.</p>
           <CodeBlock :code="codes.c0" />
         </section>
 
         <!-- Functions -->
         <section id="functions">
-          <h2>Functions</h2>
+          <h2 v-reveal>Functions</h2>
           <p>Functions have explicit return types. A function with no return value omits the type.</p>
           <CodeBlock :code="codes.c1" />
         </section>
 
         <!-- Control Flow -->
         <section id="control">
-          <h2>Control Flow</h2>
+          <h2 v-reveal>Control Flow</h2>
 
           <h3>if / else</h3>
           <CodeBlock :code="codes.c2" />
@@ -506,7 +503,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Classes -->
         <section id="classes">
-          <h2>Classes</h2>
+          <h2 v-reveal>Classes</h2>
           <p>Classes bundle data and behavior. They support constructors, destructors, methods, and operator overloading. The <code>self</code> keyword refers to the current instance.</p>
           <CodeBlock :code="codes.c6" />
 
@@ -517,21 +514,21 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Structs -->
         <section id="structs">
-          <h2>Structs</h2>
+          <h2 v-reveal>Structs</h2>
           <p>Structs are memory-layout-only types — fields are packed sequentially with no padding unless you add it explicitly. No methods, no constructors.</p>
           <CodeBlock :code="codes.c8" />
         </section>
 
         <!-- Bitfields -->
         <section id="bitfields">
-          <h2>Bitfields</h2>
+          <h2 v-reveal>Bitfields</h2>
           <p>Bitfields pack fields at the bit level, starting from LSB. Used for hardware register layouts and compact flags.</p>
           <CodeBlock :code="codes.c9" />
         </section>
 
         <!-- Templates -->
         <section id="templates">
-          <h2>Templates</h2>
+          <h2 v-reveal>Templates</h2>
           <p>Templates are parameterized classes, monomorphized at each use site. Type parameters are free variables (<code>T</code>); fixed parameters are concrete primitive types.</p>
 
           <h3>Free type parameters</h3>
@@ -549,7 +546,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Enums -->
         <section id="enums">
-          <h2>Enums</h2>
+          <h2 v-reveal>Enums</h2>
           <p>Enums are compile-time constants. Variants can be integer-backed or string-backed. Values are erased at runtime — an int enum becomes a literal integer, a string enum becomes a pointer to a string constant.</p>
 
           <h3>Integer-backed enum</h3>
@@ -565,14 +562,14 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Interfaces -->
         <section id="interfaces">
-          <h2>Interfaces</h2>
+          <h2 v-reveal>Interfaces</h2>
           <p>Interfaces define compile-time method contracts. A class that <code>implements</code> an interface is checked at compile time to provide every declared method.</p>
           <CodeBlock :code="codes.c17" />
         </section>
 
         <!-- Imports -->
         <section id="imports">
-          <h2>Imports &amp; Modules</h2>
+          <h2 v-reveal>Imports &amp; Modules</h2>
           <p>Modules are directories under <code>modules/</code>. Import individual names or an entire module.</p>
           <CodeBlock :code="codes.c18" />
 
@@ -590,14 +587,14 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Entry -->
         <section id="entry">
-          <h2>Entry Point</h2>
+          <h2 v-reveal>Entry Point</h2>
           <p>Every Hopper program has exactly one <code>entry</code>. It is not a function — it is a named jump target. On Linux it becomes the ELF entry point; on bare metal it becomes the reset handler address.</p>
           <CodeBlock :code="codes.c19" />
         </section>
 
         <!-- Memory -->
         <section id="memory">
-          <h2>Memory Operations</h2>
+          <h2 v-reveal>Memory Operations</h2>
           <p>Hopper exposes raw memory operations explicitly. There are no implicit heap allocations.</p>
 
           <h3>Address and dereference</h3>
@@ -613,7 +610,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Hardware -->
         <section id="hardware">
-          <h2>Hardware &amp; Bare Metal</h2>
+          <h2 v-reveal>Hardware &amp; Bare Metal</h2>
           <p>Hopper expresses hardware layout directly in source. No separate linker scripts or startup assembly files required.</p>
 
           <h3>strict — MMIO register alias</h3>
@@ -625,35 +622,35 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Extern -->
         <section id="extern">
-          <h2>Extern &amp; FFI</h2>
+          <h2 v-reveal>Extern &amp; FFI</h2>
           <p>Call into C libraries or any foreign ABI. Extern functions declare a signature and resolve at link time.</p>
           <CodeBlock :code="codes.c25" />
         </section>
 
         <!-- Aliases -->
         <section id="aliases">
-          <h2>Type Aliases</h2>
+          <h2 v-reveal>Type Aliases</h2>
           <p>An alias creates a new name for an existing type. No runtime cost; purely a compile-time name.</p>
           <CodeBlock :code="codes.c26" />
         </section>
 
         <!-- Defer -->
         <section id="defer">
-          <h2>Defer</h2>
+          <h2 v-reveal>Defer</h2>
           <p><code>defer</code> runs an expression when the surrounding function returns, regardless of which <code>return</code> is taken. Useful for cleanup.</p>
           <CodeBlock :code="codes.c27" />
         </section>
 
         <!-- Asm -->
         <section id="asm">
-          <h2>Inline Assembly</h2>
+          <h2 v-reveal>Inline Assembly</h2>
           <p>The <code>asm</code> block emits raw instructions. Inputs and outputs are bound by name to Hopper variables.</p>
           <CodeBlock :code="codes.c28" />
         </section>
 
         <!-- Contracts -->
         <section id="contracts">
-          <h2>Contracts</h2>
+          <h2 v-reveal>Contracts</h2>
           <p>
             Hopper's contract system lets you express correctness properties directly in source.
             Contracts are checked at runtime in debug builds and can be verified statically in
@@ -682,7 +679,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Operators -->
         <section id="operators">
-          <h2>Operators</h2>
+          <h2 v-reveal>Operators</h2>
           <table class="type-table">
             <thead><tr><th>Category</th><th>Operators</th></tr></thead>
             <tbody>
@@ -698,93 +695,11 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
           <p>Precedence (highest to lowest): unary → multiplicative → additive → shift → relational → equality → bitwise AND → bitwise XOR → bitwise OR → logical AND → logical OR.</p>
         </section>
 
-      </main>
-    </div>
-  </div>
+    </SidebarLayout>
+  </PageShell>
 </template>
 
 <style scoped>
-/* ── Layout ── */
-.page {
-  min-height: 100vh;
-  background: #faf9f6;
-}
-
-.page-header {
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
-  padding: 4rem 5vw 3.5rem;
-}
-
-.header-inner { max-width: 1100px; margin: 0 auto; }
-
-.label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #9ca3af;
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
-
-.page-header h1 {
-  font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -2px;
-  color: #111827;
-  margin-bottom: 0.75rem;
-}
-
-.page-header .sub {
-  font-size: 1.05rem;
-  color: #6b7280;
-}
-
-.layout {
-  display: flex;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 3rem 5vw;
-  gap: 3rem;
-  align-items: flex-start;
-}
-
-/* ── Sidebar ── */
-.sidebar {
-  position: sticky;
-  top: calc(56px + 2rem);
-  width: 180px;
-  flex-shrink: 0;
-}
-
-.toc {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.toc a {
-  font-size: 0.85rem;
-  color: #6b7280;
-  text-decoration: none;
-  padding: 0.3rem 0.6rem;
-  border-radius: 5px;
-  transition: color 0.15s, background 0.15s;
-  font-weight: 500;
-}
-
-.toc a:hover {
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-/* ── Content ── */
-.content {
-  flex: 1;
-  min-width: 0;
-}
-
 section {
   margin-bottom: 4rem;
   scroll-margin-top: 72px;
@@ -793,27 +708,26 @@ section {
 section h2 {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 section h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-strong);
   margin: 1.5rem 0 0.6rem;
 }
 
 section p {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--color-text-soft);
   line-height: 1.8;
   margin-bottom: 1rem;
 }
 
-/* ── Tables ── */
 .type-table {
   width: 100%;
   border-collapse: collapse;
@@ -824,29 +738,21 @@ section p {
 
 .type-table th {
   padding: 0.6rem 1rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #9ca3af;
+  color: var(--color-text-faint);
   font-weight: 600;
 }
 
 .type-table td {
   padding: 0.6rem 1rem;
-  border: 1px solid #e5e7eb;
-  color: #374151;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-strong);
   line-height: 1.6;
 }
 
-.type-table tr:hover td {
-  background: #f9fafb;
-}
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  .sidebar { display: none; }
-  .layout  { padding: 2rem 5vw; }
-}
+.type-table tr:hover td { background: var(--color-surface-alt); }
 </style>

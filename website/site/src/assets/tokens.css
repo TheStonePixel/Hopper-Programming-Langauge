@@ -1,0 +1,197 @@
+:root {
+  /* ── Brand ─────────────────────────────────────────────────────────── */
+  --color-brand:              #2563eb;
+  --color-brand-hover:        #1d4ed8;
+  --color-brand-tint:         #eff6ff;
+  --color-brand-tint-border:  #bfdbfe;
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --color-text:               #111827;
+  --color-text-strong:        #374151;
+  --color-text-muted:         #4b5563;
+  --color-text-soft:          #6b7280;
+  --color-text-faint:         #9ca3af;
+  --color-text-fainter:       #d1d5db;
+  --color-text-deep:          #1e293b;
+  --color-text-on-dark:       #f9fafb;
+  --color-text-on-dark-soft:  #94a3b8;
+  --color-text-on-dark-faint: #64748b;
+  --color-text-on-dark-faintest: #475569;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────── */
+  --color-bg:                 #faf9f6;
+  --color-surface:            #ffffff;
+  --color-surface-alt:        #f9fafb;
+  --color-surface-soft:       #f8fafc;
+  --color-surface-code:       #f1f5f9;
+  --color-surface-muted:      #f3f4f6;
+  --color-surface-dark:       #0f172a;
+  --color-surface-dark-alt:   #1e293b;
+  --color-surface-dark-deeper:#0c1120;
+
+  /* ── Borders ───────────────────────────────────────────────────────── */
+  --color-border:             #e5e7eb;
+  --color-border-strong:      #e2e8f0;
+  --color-border-soft:        #f3f4f6;
+
+  /* ── Accents ───────────────────────────────────────────────────────── */
+  --color-success:            #22c55e;
+  --color-success-deep:       #059669;
+  --color-success-tint:       #f0fdf4;
+  --color-success-tint-border:#a7f3d0;
+
+  --color-warning:            #f59e0b;
+  --color-warning-deep:       #d97706;
+  --color-warning-tint:       #fffbeb;
+  --color-warning-pale:       #fef9c3;
+  --color-warning-pale-border:#fde047;
+  --color-warning-text:       #713f12;
+
+  --color-danger:             #dc2626;
+  --color-danger-tint:        #fef2f2;
+  --color-danger-tint-border: #fecaca;
+
+  --color-purple:             #7c3aed;
+  --color-purple-tint:        #f5f3ff;
+  --color-purple-tint-border: #ddd6fe;
+
+  --color-cyan:               #0891b2;
+  --color-orange:             #c2410c;
+  --color-orange-tint:        #fff7ed;
+  --color-orange-tint-border: #fed7aa;
+
+  --color-info-tint:          #e0f2fe;
+  --color-amber-bg:           #b45309;
+
+  /* highlight syntax classes */
+  --color-syntax-comment:     #94a3b8;
+  --color-syntax-keyword:     #2563eb;
+  --color-syntax-keyword-alt: #7c3aed;
+  --color-syntax-type:        #0891b2;
+  --color-syntax-string:      #16a34a;
+  --color-syntax-number:      #b45309;
+  --color-syntax-hex:         #c2410c;
+  --color-syntax-op:          #9ca3af;
+
+  /* ── Type ──────────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* ── Radii ─────────────────────────────────────────────────────────── */
+  --radius-xs:    3px;
+  --radius-sm:    4px;
+  --radius-md:    6px;
+  --radius-lg:    8px;
+  --radius-xl:    12px;
+  --radius-pill:  100px;
+
+  /* ── Shadows ───────────────────────────────────────────────────────── */
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm:    0 1px 6px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 4px 20px rgba(37, 99, 235, 0.09);
+  --shadow-lg:    0 20px 60px rgba(0, 0, 0, 0.22);
+
+  /* ── Layout ────────────────────────────────────────────────────────── */
+  --container-sm:   820px;
+  --container-md:   1040px;
+  --container-lg:   1320px;
+  --page-gutter:    5vw;
+  --nav-height:     56px;
+
+  /* ── Motion ────────────────────────────────────────────────────────── */
+  --transition-fast: 0.15s ease;
+  --transition-med:  0.3s ease;
+  --transition-slow: 0.6s ease;
+
+  /* ── Interactive card hover (shared across views) ──────────────────── */
+  --card-lift:           translateY(-2px);
+  --card-hover-border:   #93c5fd;
+  --card-hover-shadow:   0 6px 24px rgba(37, 99, 235, 0.10);
+
+  /* ── Breakpoints (reference only; media queries can't use vars) ────── */
+  /* --bp-mobile: 768px */
+}
+
+/* ── Dark theme overrides ─────────────────────────────────────────────────
+   Applied when [data-theme="dark"] is set on <html> by the bootstrap
+   script in index.html or the in-app toggle.
+   --------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  /* Brand — slightly brighter so it pops on dark surfaces */
+  --color-brand:              #3b82f6;
+  --color-brand-hover:        #60a5fa;
+  --color-brand-tint:         rgba(59, 130, 246, 0.16);
+  --color-brand-tint-border:  rgba(59, 130, 246, 0.42);
+
+  /* Text */
+  --color-text:               #e6e8ee;
+  --color-text-strong:        #cbd5e1;
+  --color-text-muted:         #a3aab8;
+  --color-text-soft:          #8b93a3;
+  --color-text-faint:         #6b7280;
+  --color-text-fainter:       #4b5563;
+  --color-text-deep:          #f1f5f9;
+  /* on-dark tokens — these were already designed for dark contexts;
+     they remain identical so the terminal / footer feel unchanged. */
+
+  /* Surfaces */
+  --color-bg:                 #0f1116;
+  --color-surface:            #161a23;
+  --color-surface-alt:        #1a1e29;
+  --color-surface-soft:       #1c2030;
+  --color-surface-code:       #1e2330;
+  --color-surface-muted:      #181c26;
+  --color-surface-dark:       #08090d;
+  --color-surface-dark-alt:   #161a23;
+  --color-surface-dark-deeper:#05060a;
+
+  /* Borders */
+  --color-border:             #2a2f3d;
+  --color-border-strong:      #353b4a;
+  --color-border-soft:        #1f2330;
+
+  /* Accent tints — semi-transparent so they layer over dark surfaces */
+  --color-success-tint:       rgba(34, 197, 94, 0.13);
+  --color-success-tint-border:rgba(34, 197, 94, 0.36);
+
+  --color-warning-tint:       rgba(245, 158, 11, 0.13);
+  --color-warning-pale:       rgba(245, 158, 11, 0.10);
+  --color-warning-pale-border:rgba(245, 158, 11, 0.32);
+  --color-warning-text:       #fbbf24;
+
+  --color-danger-tint:        rgba(220, 38, 38, 0.14);
+  --color-danger-tint-border: rgba(220, 38, 38, 0.36);
+
+  --color-purple-tint:        rgba(124, 58, 237, 0.16);
+  --color-purple-tint-border: rgba(124, 58, 237, 0.42);
+
+  --color-orange-tint:        rgba(194, 65, 12, 0.16);
+  --color-orange-tint-border: rgba(194, 65, 12, 0.42);
+
+  --color-info-tint:          rgba(8, 145, 178, 0.16);
+
+  /* Card hover for dark mode */
+  --card-hover-border:        #3b82f6;
+  --card-hover-shadow:        0 8px 28px rgba(59, 130, 246, 0.22);
+
+  /* Shadows — slightly stronger over dark surfaces */
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm:    0 1px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md:    0 4px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg:    0 20px 60px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
