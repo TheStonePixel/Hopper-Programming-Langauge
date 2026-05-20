@@ -102,7 +102,6 @@
     <section class="section">
       <div class="inner">
         <h2>On Other Languages</h2>
-        <p>Hopper is not built from rejection of the past. It is built from respect for it.</p>
         <div class="orbit-wrap">
           <div class="orbit-ring"></div>
           <div class="orbit-center">
@@ -130,7 +129,6 @@
             <div class="node-desc">Proved small languages can survive for generations.</div>
           </div>
         </div>
-        <p>Hopper borrows from all of them because all of them discovered something important.</p>
       </div>
     </section>
 
