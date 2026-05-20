@@ -312,27 +312,27 @@ function exit(int code) {
       </template>
 
       <section id="hello">
-        <h2>Hello World</h2>
+        <h2 v-reveal>Hello World</h2>
         <p>Every Hopper program has exactly one <code>entry</code>. It is the program's named jump target — not a function. On Linux it becomes the ELF entry point; on bare metal it becomes the reset handler.</p>
         <CodeBlock :code="codes.hello" />
         <p>The <code>println</code> function comes from <code>import io from core</code>. For a standalone file you can call it without importing; the compiler resolves core I/O implicitly when no import statement is present.</p>
       </section>
 
       <section id="compilation">
-        <h2>Compilation</h2>
+        <h2 v-reveal>Compilation</h2>
         <p>The <code>hopper</code> CLI drives the full pipeline: ANTLR parse → AST → LLVM IR → <code>clang</code> for machine code. All steps are in-process except the final <code>clang</code> invocation.</p>
         <CodeBlock :code="codes.compile" />
         <p>The <code>--release</code> flag strips all contract checks and enables LLVM optimisations. The <code>--strict</code> flag turns contract violations into compile-time errors instead of runtime aborts. The <code>--target=armv6-bare</code> flag switches to 32-bit ARM with no libc.</p>
       </section>
 
       <section id="project">
-        <h2>Project Layout</h2>
+        <h2 v-reveal>Project Layout</h2>
         <p>A <code>hopper.json</code> manifest declares the project name and entry file. The <code>modules/</code> directory inside your project shadows the stdlib — drop a file there to override any standard module without touching the compiler.</p>
         <CodeBlock :code="codes.project" />
       </section>
 
       <section id="types">
-        <h2>Types</h2>
+        <h2 v-reveal>Types</h2>
         <p>Hopper is strongly typed. There are no implicit conversions — every widening or reinterpretation is spelled out with <code>cast</code>.</p>
         <table class="type-table">
           <thead><tr><th>Type</th><th>Width</th><th>Description</th></tr></thead>
@@ -354,7 +354,7 @@ function exit(int code) {
       </section>
 
       <section id="operators">
-        <h2>Operators</h2>
+        <h2 v-reveal>Operators</h2>
         <table class="type-table">
           <thead><tr><th>Category</th><th>Operators</th><th>Notes</th></tr></thead>
           <tbody>
@@ -371,7 +371,7 @@ function exit(int code) {
       </section>
 
       <section id="imports">
-        <h2>Imports</h2>
+        <h2 v-reveal>Imports</h2>
         <p>Hopper has two import forms. Selective import loads specific files by name; bulk import loads every source file in a module directory.</p>
 
         <h3>Selective import</h3>
@@ -384,13 +384,13 @@ function exit(int code) {
       </section>
 
       <section id="resolution">
-        <h2>Module Resolution</h2>
+        <h2 v-reveal>Module Resolution</h2>
         <p>The compiler walks up the directory tree looking for a <code>modules/</code> folder, then falls back to the stdlib. This lets local modules shadow the stdlib without any configuration.</p>
         <CodeBlock :code="codes.moduleResolution" />
       </section>
 
       <section id="stdlib">
-        <h2>Standard Library</h2>
+        <h2 v-reveal>Standard Library</h2>
         <table class="type-table">
           <thead><tr><th>Module</th><th>Import</th><th>Provides</th></tr></thead>
           <tbody>
@@ -494,20 +494,20 @@ function exit(int code) {
       </section>
 
       <section id="address">
-        <h2>Address &amp; Dereference</h2>
+        <h2 v-reveal>Address &amp; Dereference</h2>
         <p>Hopper exposes raw memory through the <code>::</code> operator family. There are no implicit pointer types — every pointer is an <code>address</code>, and reads/writes through it are explicit.</p>
         <CodeBlock :code="codes.addressOp" />
         <p><code>T::size</code> is a compile-time constant — it resolves to the byte width of <code>T</code> (same as C's <code>sizeof</code>). Address arithmetic uses byte offsets.</p>
       </section>
 
       <section id="heap">
-        <h2>Heap Allocation</h2>
+        <h2 v-reveal>Heap Allocation</h2>
         <p><code>allocate</code> and <code>deallocate</code> are keywords, not library calls. They lower to <code>malloc</code>/<code>free</code> in the LLVM IR. Every allocation must have a matching <code>deallocate</code> — pair them with <code>defer</code> to make the cleanup automatic.</p>
         <CodeBlock :code="codes.heapAlloc" />
       </section>
 
       <section id="smart">
-        <h2>Smart Pointers</h2>
+        <h2 v-reveal>Smart Pointers</h2>
         <p>The <code>Pointer</code> module provides three ownership models. All are implemented as regular Hopper classes — no compiler magic required.</p>
         <CodeBlock :code="codes.smartPointers" />
         <table class="type-table" style="margin-top:1rem">
@@ -521,42 +521,42 @@ function exit(int code) {
       </section>
 
       <section id="defer">
-        <h2>Defer</h2>
+        <h2 v-reveal>Defer</h2>
         <p><code>defer</code> schedules an expression to run when the surrounding function returns, regardless of which <code>return</code> statement is taken. Multiple defers execute in last-in first-out order.</p>
         <CodeBlock :code="codes.deferExample" />
         <p>Use <code>defer</code> to pair every resource acquisition with its release at the point of acquisition — not at every return site.</p>
       </section>
 
       <section id="result">
-        <h2>Result&lt;T&gt;</h2>
+        <h2 v-reveal>Result&lt;T&gt;</h2>
         <p><code>Result&lt;T&gt;</code> wraps either a success value of type <code>T</code> or an <code>ErrorCode</code>. It is the standard way to propagate recoverable errors without exceptions.</p>
         <CodeBlock :code="codes.resultType" />
         <p>The full <code>ErrorCode</code> enum is in <code>core/error.hop</code> and covers I/O errors, memory errors, data errors, and system errors.</p>
       </section>
 
       <section id="strict">
-        <h2>strict — MMIO Register Aliases</h2>
+        <h2 v-reveal>strict — MMIO Register Aliases</h2>
         <p><code>strict</code> binds a name to a fixed hardware address. Every access through that name compiles to a volatile load or store — the compiler never caches the value in a register or reorders it across sequence points.</p>
         <CodeBlock :code="codes.strictMMIO" />
         <p>This is the idiomatic way to model memory-mapped I/O in Hopper. No <code>volatile</code> keyword, no pointer casts — the hardware intent is declared once, at the top of the file.</p>
       </section>
 
       <section id="bind">
-        <h2>bind — Interrupt Vector Table</h2>
+        <h2 v-reveal>bind — Interrupt Vector Table</h2>
         <p><code>bind</code> places a function pointer at a specific linker address. The linker writes the address into the binary at that location, which is how ARM Cortex-M and similar cores load their vector tables.</p>
         <CodeBlock :code="codes.bindExample" />
         <p>The function must exist in the same compilation unit. No separate startup assembly file or linker script is needed — the vector table is expressed entirely in Hopper.</p>
       </section>
 
       <section id="bitfield">
-        <h2>bitfield — Bit-Packed Hardware Registers</h2>
+        <h2 v-reveal>bitfield — Bit-Packed Hardware Registers</h2>
         <p><code>bitfield</code> packs fields at the bit level, starting from the LSB. The compiler automatically selects the smallest integer container (<code>i8</code>, <code>i16</code>, <code>i32</code>, or <code>i64</code>) that holds all the declared bits.</p>
         <CodeBlock :code="codes.bitfieldExample" />
         <p>Field reads compile to a volatile load + shift + mask. Field writes compile to a volatile load + mask + OR + volatile store — the standard read-modify-write pattern for hardware registers.</p>
       </section>
 
       <section id="contracts">
-        <h2>requires / ensures / invariant / constrain</h2>
+        <h2 v-reveal>requires / ensures / invariant / constrain</h2>
         <p>Hopper has a first-class contract system. Contracts are not comments or annotations — they are checked code. In debug builds they are runtime assertions; in strict mode they are compile-time proofs.</p>
         <CodeBlock :code="codes.contracts" />
         <ul class="bullet-list">
@@ -568,7 +568,7 @@ function exit(int code) {
       </section>
 
       <section id="contract-flags">
-        <h2>Build Flags</h2>
+        <h2 v-reveal>Build Flags</h2>
         <p>Contracts have three modes selected at build time. The same source file compiles correctly in all three.</p>
         <CodeBlock :code="codes.contractFlags" />
         <table class="type-table">
@@ -582,7 +582,7 @@ function exit(int code) {
       </section>
 
       <section id="asm">
-        <h2>Inline Assembly</h2>
+        <h2 v-reveal>Inline Assembly</h2>
         <p>The <code>asm</code> block emits raw instructions inline. Hopper variables are bound to registers by name — no GCC-style constraint strings.</p>
         <CodeBlock :code="codes.asmExample" />
         <p>Assignment <em>into</em> a register (<code>rax = value</code>) is an input binding. Assignment <em>from</em> a register (<code>variable = rax</code>) is an output binding. Bare instructions with no assignment are emitted as-is.</p>

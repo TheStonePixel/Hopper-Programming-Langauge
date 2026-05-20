@@ -20,7 +20,7 @@ import LinkButton from '@/components/LinkButton.vue'
     <!-- Why Hopper Exists -->
     <ContentSection class="phil-first">
       <span class="phil-label">Philosophy</span>
-      <h2>Why Hopper Exists</h2>
+      <h2 v-reveal>Why Hopper Exists</h2>
       <p>
         I am building Hopper because the tools I want to build require a language that does not currently exist.
       </p>
@@ -44,7 +44,7 @@ import LinkButton from '@/components/LinkButton.vue'
 
     <!-- What I Believe -->
     <ContentSection alt>
-      <h2>What I Believe</h2>
+      <h2 v-reveal>What I Believe</h2>
       <ul class="beliefs">
         <li>I believe systems programming should expose the machine instead of hiding it.</li>
         <li>I believe the runtime cost of code should be obvious from the source.</li>
@@ -66,7 +66,7 @@ import LinkButton from '@/components/LinkButton.vue'
 
     <!-- Direction -->
     <ContentSection>
-      <h2>Direction</h2>
+      <h2 v-reveal>Direction</h2>
       <p>Hopper has a single direction-setter.</p>
       <p>That is intentional.</p>
       <p>
@@ -83,7 +83,7 @@ import LinkButton from '@/components/LinkButton.vue'
 
     <!-- Determinism -->
     <ContentSection alt>
-      <h2>Determinism</h2>
+      <h2 v-reveal>Determinism</h2>
       <p>Hopper will stop. That is by design.</p>
       <p>
         A deterministic system produces the same output from the same input, every time.
@@ -128,7 +128,7 @@ import LinkButton from '@/components/LinkButton.vue'
 
     <!-- Memento Mori -->
     <ContentSection alt>
-      <h2>All Things Must Die</h2>
+      <h2 v-reveal>All Things Must Die</h2>
       <p>I do not expect Hopper to last forever. Nothing does.</p>
       <p>
         If Hopper succeeds, eventually something better should replace it. That is healthy.
@@ -159,7 +159,7 @@ import LinkButton from '@/components/LinkButton.vue'
 
     <!-- Built Openly -->
     <ContentSection alt>
-      <h2>Built openly</h2>
+      <h2 v-reveal>Built openly</h2>
       <p>
         Hopper is developed in public. The full source — compiler, standard library,
         programs, and website — is on GitHub. The language is being designed and built

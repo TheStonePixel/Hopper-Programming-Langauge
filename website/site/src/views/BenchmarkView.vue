@@ -70,7 +70,7 @@ function maxOf(rows, key) {
       </template>
 
         <!-- Disclaimer -->
-        <div class="disclaimer">
+        <div v-reveal class="disclaimer">
           <strong>Note:</strong> This is a small, single-program sample and makes no claims
           against other languages. Its purpose is to show that Hopper compiles to real native
           code and to demonstrate measurable properties of specific features — not to characterize
@@ -79,7 +79,7 @@ function maxOf(rows, key) {
 
         <!-- Overview -->
         <section id="overview">
-          <h2>Overview</h2>
+          <h2 v-reveal>Overview</h2>
           <p>
             All benchmarks run <strong>100,000 bot-vs-bot Battleship games</strong> with no I/O,
             using a deterministic LCG seeded at 42. Two independent measurements are taken:
@@ -95,7 +95,7 @@ function maxOf(rows, key) {
 
         <!-- Hopper vs C -->
         <section id="vs-c">
-          <h2>Hopper vs C</h2>
+          <h2 v-reveal>Hopper vs C</h2>
           <p>
             Battleship 1 (Hopper, raw-memory implementation) vs the equivalent C program.
             Same algorithm, same RNG, same board layout (100 × i64 cells = 800 bytes/board).
@@ -157,7 +157,7 @@ function maxOf(rows, key) {
             </svg>
           </div>
 
-          <div class="callout">
+          <div v-reveal class="callout">
             At <strong>-O0</strong>, Hopper is ~21% slower than C — expected, as the compiler
             does not yet apply IR optimizations before handing off to LLVM. At <strong>-O2</strong>,
             the gap closes to ~3%, well within run-to-run noise. The same LLVM backend optimizes
@@ -167,7 +167,7 @@ function maxOf(rows, key) {
 
         <!-- Contract overhead -->
         <section id="contracts">
-          <h2>Contract System Overhead</h2>
+          <h2 v-reveal>Contract System Overhead</h2>
           <p>
             Battleship 4 adds Hopper's contract system to the same game logic: <code>requires</code>,
             <code>ensures</code>, and <code>invariant</code> clauses at 13 sites covering board bounds,
@@ -202,7 +202,7 @@ function maxOf(rows, key) {
             </svg>
           </div>
 
-          <div class="callout">
+          <div v-reveal class="callout">
             At <code>-O0</code>, the 13 contract-check branches add ~22% overhead. In
             <code>--release</code>, the emitted IR contains zero contract branches — the binary
             is identical to one written without any contracts at all. Safety at debug time,
@@ -212,7 +212,7 @@ function maxOf(rows, key) {
 
         <!-- Methodology -->
         <section id="methodology">
-          <h2>Methodology</h2>
+          <h2 v-reveal>Methodology</h2>
           <ul>
             <li><strong>Platform:</strong> x86-64 Linux</li>
             <li><strong>Compiler (Hopper):</strong> kindling/hopperc.js → LLVM IR → clang</li>

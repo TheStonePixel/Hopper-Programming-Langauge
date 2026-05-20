@@ -449,7 +449,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Types -->
         <section id="types">
-          <h2>Types</h2>
+          <h2 v-reveal>Types</h2>
           <p>Hopper is strongly typed. Every variable has an explicit type; implicit conversions do not exist.</p>
           <table class="type-table">
             <thead><tr><th>Type</th><th>Width</th><th>Description</th></tr></thead>
@@ -472,21 +472,21 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Variables -->
         <section id="variables">
-          <h2>Variables</h2>
+          <h2 v-reveal>Variables</h2>
           <p>Declare with type first. An initializer is required unless the variable is a struct or class instance that will be populated field-by-field.</p>
           <CodeBlock :code="codes.c0" />
         </section>
 
         <!-- Functions -->
         <section id="functions">
-          <h2>Functions</h2>
+          <h2 v-reveal>Functions</h2>
           <p>Functions have explicit return types. A function with no return value omits the type.</p>
           <CodeBlock :code="codes.c1" />
         </section>
 
         <!-- Control Flow -->
         <section id="control">
-          <h2>Control Flow</h2>
+          <h2 v-reveal>Control Flow</h2>
 
           <h3>if / else</h3>
           <CodeBlock :code="codes.c2" />
@@ -503,7 +503,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Classes -->
         <section id="classes">
-          <h2>Classes</h2>
+          <h2 v-reveal>Classes</h2>
           <p>Classes bundle data and behavior. They support constructors, destructors, methods, and operator overloading. The <code>self</code> keyword refers to the current instance.</p>
           <CodeBlock :code="codes.c6" />
 
@@ -514,21 +514,21 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Structs -->
         <section id="structs">
-          <h2>Structs</h2>
+          <h2 v-reveal>Structs</h2>
           <p>Structs are memory-layout-only types — fields are packed sequentially with no padding unless you add it explicitly. No methods, no constructors.</p>
           <CodeBlock :code="codes.c8" />
         </section>
 
         <!-- Bitfields -->
         <section id="bitfields">
-          <h2>Bitfields</h2>
+          <h2 v-reveal>Bitfields</h2>
           <p>Bitfields pack fields at the bit level, starting from LSB. Used for hardware register layouts and compact flags.</p>
           <CodeBlock :code="codes.c9" />
         </section>
 
         <!-- Templates -->
         <section id="templates">
-          <h2>Templates</h2>
+          <h2 v-reveal>Templates</h2>
           <p>Templates are parameterized classes, monomorphized at each use site. Type parameters are free variables (<code>T</code>); fixed parameters are concrete primitive types.</p>
 
           <h3>Free type parameters</h3>
@@ -546,7 +546,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Enums -->
         <section id="enums">
-          <h2>Enums</h2>
+          <h2 v-reveal>Enums</h2>
           <p>Enums are compile-time constants. Variants can be integer-backed or string-backed. Values are erased at runtime — an int enum becomes a literal integer, a string enum becomes a pointer to a string constant.</p>
 
           <h3>Integer-backed enum</h3>
@@ -562,14 +562,14 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Interfaces -->
         <section id="interfaces">
-          <h2>Interfaces</h2>
+          <h2 v-reveal>Interfaces</h2>
           <p>Interfaces define compile-time method contracts. A class that <code>implements</code> an interface is checked at compile time to provide every declared method.</p>
           <CodeBlock :code="codes.c17" />
         </section>
 
         <!-- Imports -->
         <section id="imports">
-          <h2>Imports &amp; Modules</h2>
+          <h2 v-reveal>Imports &amp; Modules</h2>
           <p>Modules are directories under <code>modules/</code>. Import individual names or an entire module.</p>
           <CodeBlock :code="codes.c18" />
 
@@ -587,14 +587,14 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Entry -->
         <section id="entry">
-          <h2>Entry Point</h2>
+          <h2 v-reveal>Entry Point</h2>
           <p>Every Hopper program has exactly one <code>entry</code>. It is not a function — it is a named jump target. On Linux it becomes the ELF entry point; on bare metal it becomes the reset handler address.</p>
           <CodeBlock :code="codes.c19" />
         </section>
 
         <!-- Memory -->
         <section id="memory">
-          <h2>Memory Operations</h2>
+          <h2 v-reveal>Memory Operations</h2>
           <p>Hopper exposes raw memory operations explicitly. There are no implicit heap allocations.</p>
 
           <h3>Address and dereference</h3>
@@ -610,7 +610,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Hardware -->
         <section id="hardware">
-          <h2>Hardware &amp; Bare Metal</h2>
+          <h2 v-reveal>Hardware &amp; Bare Metal</h2>
           <p>Hopper expresses hardware layout directly in source. No separate linker scripts or startup assembly files required.</p>
 
           <h3>strict — MMIO register alias</h3>
@@ -622,35 +622,35 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Extern -->
         <section id="extern">
-          <h2>Extern &amp; FFI</h2>
+          <h2 v-reveal>Extern &amp; FFI</h2>
           <p>Call into C libraries or any foreign ABI. Extern functions declare a signature and resolve at link time.</p>
           <CodeBlock :code="codes.c25" />
         </section>
 
         <!-- Aliases -->
         <section id="aliases">
-          <h2>Type Aliases</h2>
+          <h2 v-reveal>Type Aliases</h2>
           <p>An alias creates a new name for an existing type. No runtime cost; purely a compile-time name.</p>
           <CodeBlock :code="codes.c26" />
         </section>
 
         <!-- Defer -->
         <section id="defer">
-          <h2>Defer</h2>
+          <h2 v-reveal>Defer</h2>
           <p><code>defer</code> runs an expression when the surrounding function returns, regardless of which <code>return</code> is taken. Useful for cleanup.</p>
           <CodeBlock :code="codes.c27" />
         </section>
 
         <!-- Asm -->
         <section id="asm">
-          <h2>Inline Assembly</h2>
+          <h2 v-reveal>Inline Assembly</h2>
           <p>The <code>asm</code> block emits raw instructions. Inputs and outputs are bound by name to Hopper variables.</p>
           <CodeBlock :code="codes.c28" />
         </section>
 
         <!-- Contracts -->
         <section id="contracts">
-          <h2>Contracts</h2>
+          <h2 v-reveal>Contracts</h2>
           <p>
             Hopper's contract system lets you express correctness properties directly in source.
             Contracts are checked at runtime in debug builds and can be verified statically in
@@ -679,7 +679,7 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 
         <!-- Operators -->
         <section id="operators">
-          <h2>Operators</h2>
+          <h2 v-reveal>Operators</h2>
           <table class="type-table">
             <thead><tr><th>Category</th><th>Operators</th></tr></thead>
             <tbody>

@@ -130,12 +130,12 @@ const links = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-left: 0.5rem;
+  width: 34px;
+  height: 34px;
+  margin-left: 0.75rem;
   padding: 0;
-  background: transparent;
-  color: var(--color-text-soft);
+  background: var(--color-surface-alt);
+  color: var(--color-text-strong);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;

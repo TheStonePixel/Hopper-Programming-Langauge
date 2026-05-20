@@ -17,7 +17,7 @@ import ContentSection from '@/components/ContentSection.vue'
 
     <!-- Design Principles -->
     <ContentSection alt>
-      <h2>Design principles</h2>
+      <h2 v-reveal>Design principles</h2>
       <div class="principles">
         <div v-reveal="0" class="principle">
           <div class="principle-num">01</div>
@@ -67,7 +67,7 @@ import ContentSection from '@/components/ContentSection.vue'
 
     <!-- Language at a glance -->
     <ContentSection>
-      <h2>Language at a glance</h2>
+      <h2 v-reveal>Language at a glance</h2>
       <div class="glance-grid">
         <div class="glance-col">
           <div class="glance-group">
@@ -118,7 +118,7 @@ import ContentSection from '@/components/ContentSection.vue'
 
     <!-- Status -->
     <ContentSection alt>
-      <h2>Current status</h2>
+      <h2 v-reveal>Current status</h2>
       <p>
         Hopper is in active prototype development. The core language is complete and
         functional. The toolchain compiles Hopper source to native binaries via LLVM,
@@ -161,7 +161,7 @@ import ContentSection from '@/components/ContentSection.vue'
 
     <!-- Vision -->
     <ContentSection>
-      <h2>Where it's going</h2>
+      <h2 v-reveal>Where it's going</h2>
       <p>
         The immediate goal is self-hosting — a Hopper compiler written in Hopper, with
         no Node.js dependency in the compilation path. This is the milestone that closes
