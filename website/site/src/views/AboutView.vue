@@ -374,8 +374,9 @@
 /* ── Language orbit ── */
 .orbit-wrap {
   position: relative;
-  width: 640px;
-  height: 640px;
+  width: 700px;
+  max-width: 100%;
+  height: 720px;
   margin: 2.5rem auto;
 }
 
@@ -383,8 +384,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 460px;
-  height: 460px;
+  width: 500px;
+  height: 500px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 1.5px solid rgba(37, 99, 235, 0.3);
@@ -414,8 +415,8 @@
 
 .orbit-node {
   position: absolute;
-  width: 140px;
-  height: 140px;
+  width: 155px;
+  height: 155px;
   border-radius: 50%;
   background: #faf9f6;
   border: 1.5px solid rgba(37, 99, 235, 0.3);
@@ -424,22 +425,22 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem;
   box-sizing: border-box;
   text-align: center;
 }
 
-/* Pentagon: container 640×640, center (320,320), radius 230px
-   C     270°: (320,  90) → 50%,   14.1%
-   C++   342°: (539, 249) → 84.2%, 38.9%
-   Ada    54°: (455, 506) → 71.1%, 79.1%
-   Forth 126°: (185, 506) → 28.9%, 79.1%
-   Lisp  198°: (101, 249) → 15.8%, 38.9% */
-.n-c     { left: 50%;   top: 14.1%; }
-.n-cpp   { left: 84.2%; top: 38.9%; }
-.n-ada   { left: 71.1%; top: 79.1%; }
-.n-forth { left: 28.9%; top: 79.1%; }
-.n-lisp  { left: 15.8%; top: 38.9%; }
+/* Pentagon: container 700×720, center (350,360), radius 250px
+   C     270°: (350, 110) → 50%,   15.3%
+   C++   342°: (588, 283) → 84.0%, 39.3%
+   Ada    54°: (497, 562) → 71.0%, 78.1%
+   Forth 126°: (203, 562) → 29.0%, 78.1%
+   Lisp  198°: (112, 283) → 16.0%, 39.3% */
+.n-c     { left: 50%;   top: 15.3%; }
+.n-cpp   { left: 84.0%; top: 39.3%; }
+.n-ada   { left: 71.0%; top: 78.1%; }
+.n-forth { left: 29.0%; top: 78.1%; }
+.n-lisp  { left: 16.0%; top: 39.3%; }
 
 .node-name {
   font-size: 0.6rem;
