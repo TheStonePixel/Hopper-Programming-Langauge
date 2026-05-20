@@ -98,7 +98,6 @@
     <!-- On Other Languages -->
     <section class="section">
       <div class="inner">
-        <h2>On Other Languages</h2>
         <div class="orbit-wrap">
           <div class="orbit-ring"></div>
           <div class="orbit-center">
@@ -387,9 +386,12 @@
   width: 440px;
   height: 440px;
   transform: translate(-50%, -50%);
-  border: 1px dashed #e5e7eb;
   border-radius: 50%;
   pointer-events: none;
+  background: conic-gradient(from 0deg, #2563eb, #7c3aed, #0ea5e9, #2563eb);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+  opacity: 0.45;
 }
 
 .orbit-center {
