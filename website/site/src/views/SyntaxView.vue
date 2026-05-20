@@ -1,5 +1,8 @@
 <script setup>
-import CodeBlock from '../components/CodeBlock.vue'
+import CodeBlock from '@/components/CodeBlock.vue'
+import PageShell from '@/components/PageShell.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import SidebarLayout from '@/components/SidebarLayout.vue'
 
 const codes = {
     c0: `// declaration with initializer
@@ -409,46 +412,40 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
 </script>
 
 <template>
-  <div class="page">
+  <PageShell>
 
-    <header class="page-header">
-      <div class="header-inner">
-        <span class="label">Reference</span>
-        <h1>Syntax Guide</h1>
-        <p class="sub">Everything Hopper can do, with working examples.</p>
-      </div>
-    </header>
+    <PageHeader
+      label="Reference"
+      title="Syntax Guide"
+      sub="Everything Hopper can do, with working examples."
+      width="lg"
+      size="sm"
+    />
 
-    <div class="layout">
+    <SidebarLayout width="lg">
 
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <nav class="toc">
-          <a href="#types">Types</a>
-          <a href="#variables">Variables</a>
-          <a href="#functions">Functions</a>
-          <a href="#control">Control Flow</a>
-          <a href="#classes">Classes</a>
-          <a href="#structs">Structs</a>
-          <a href="#bitfields">Bitfields</a>
-          <a href="#templates">Templates</a>
-          <a href="#enums">Enums</a>
-          <a href="#interfaces">Interfaces</a>
-          <a href="#imports">Imports &amp; Modules</a>
-          <a href="#entry">Entry Point</a>
-          <a href="#memory">Memory Operations</a>
-          <a href="#hardware">Hardware</a>
-          <a href="#extern">Extern &amp; FFI</a>
-          <a href="#aliases">Type Aliases</a>
-          <a href="#defer">Defer</a>
-          <a href="#asm">Inline Assembly</a>
-          <a href="#contracts">Contracts</a>
-          <a href="#operators">Operators</a>
-        </nav>
-      </aside>
-
-      <!-- Content -->
-      <main class="content">
+      <template #sidebar>
+        <a href="#types">Types</a>
+        <a href="#variables">Variables</a>
+        <a href="#functions">Functions</a>
+        <a href="#control">Control Flow</a>
+        <a href="#classes">Classes</a>
+        <a href="#structs">Structs</a>
+        <a href="#bitfields">Bitfields</a>
+        <a href="#templates">Templates</a>
+        <a href="#enums">Enums</a>
+        <a href="#interfaces">Interfaces</a>
+        <a href="#imports">Imports &amp; Modules</a>
+        <a href="#entry">Entry Point</a>
+        <a href="#memory">Memory Operations</a>
+        <a href="#hardware">Hardware</a>
+        <a href="#extern">Extern &amp; FFI</a>
+        <a href="#aliases">Type Aliases</a>
+        <a href="#defer">Defer</a>
+        <a href="#asm">Inline Assembly</a>
+        <a href="#contracts">Contracts</a>
+        <a href="#operators">Operators</a>
+      </template>
 
         <!-- Types -->
         <section id="types">
@@ -698,93 +695,11 @@ int y = 300 constrain [byte]    // runtime abort in debug, compile error in stri
           <p>Precedence (highest to lowest): unary → multiplicative → additive → shift → relational → equality → bitwise AND → bitwise XOR → bitwise OR → logical AND → logical OR.</p>
         </section>
 
-      </main>
-    </div>
-  </div>
+    </SidebarLayout>
+  </PageShell>
 </template>
 
 <style scoped>
-/* ── Layout ── */
-.page {
-  min-height: 100vh;
-  background: #faf9f6;
-}
-
-.page-header {
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
-  padding: 4rem 5vw 3.5rem;
-}
-
-.header-inner { max-width: 1100px; margin: 0 auto; }
-
-.label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #9ca3af;
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
-
-.page-header h1 {
-  font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -2px;
-  color: #111827;
-  margin-bottom: 0.75rem;
-}
-
-.page-header .sub {
-  font-size: 1.05rem;
-  color: #6b7280;
-}
-
-.layout {
-  display: flex;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 3rem 5vw;
-  gap: 3rem;
-  align-items: flex-start;
-}
-
-/* ── Sidebar ── */
-.sidebar {
-  position: sticky;
-  top: calc(56px + 2rem);
-  width: 180px;
-  flex-shrink: 0;
-}
-
-.toc {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.toc a {
-  font-size: 0.85rem;
-  color: #6b7280;
-  text-decoration: none;
-  padding: 0.3rem 0.6rem;
-  border-radius: 5px;
-  transition: color 0.15s, background 0.15s;
-  font-weight: 500;
-}
-
-.toc a:hover {
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-/* ── Content ── */
-.content {
-  flex: 1;
-  min-width: 0;
-}
-
 section {
   margin-bottom: 4rem;
   scroll-margin-top: 72px;
@@ -793,27 +708,26 @@ section {
 section h2 {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 section h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-strong);
   margin: 1.5rem 0 0.6rem;
 }
 
 section p {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--color-text-soft);
   line-height: 1.8;
   margin-bottom: 1rem;
 }
 
-/* ── Tables ── */
 .type-table {
   width: 100%;
   border-collapse: collapse;
@@ -824,29 +738,21 @@ section p {
 
 .type-table th {
   padding: 0.6rem 1rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #9ca3af;
+  color: var(--color-text-faint);
   font-weight: 600;
 }
 
 .type-table td {
   padding: 0.6rem 1rem;
-  border: 1px solid #e5e7eb;
-  color: #374151;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-strong);
   line-height: 1.6;
 }
 
-.type-table tr:hover td {
-  background: #f9fafb;
-}
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  .sidebar { display: none; }
-  .layout  { padding: 2rem 5vw; }
-}
+.type-table tr:hover td { background: var(--color-surface-alt); }
 </style>

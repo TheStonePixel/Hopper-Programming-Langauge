@@ -1,4 +1,8 @@
 <script setup>
+import PageShell from '@/components/PageShell.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import SidebarLayout from '@/components/SidebarLayout.vue'
+
 // All numbers are from live runs on x86-64 Linux.
 // Same algorithm (100,000 bot-vs-bot Battleship games), same RNG seed (42).
 
@@ -72,28 +76,24 @@ function maxOf(rows, key) {
 </script>
 
 <template>
-  <div class="page">
+  <PageShell>
 
-    <header class="page-header">
-      <div class="header-inner">
-        <span class="label">Performance</span>
-        <h1>Benchmarks</h1>
-        <p class="sub">Real numbers from real programs.</p>
-      </div>
-    </header>
+    <PageHeader
+      label="Performance"
+      title="Benchmarks"
+      sub="Real numbers from real programs."
+      width="lg"
+      size="sm"
+    />
 
-    <div class="layout">
+    <SidebarLayout width="lg">
 
-      <aside class="sidebar">
-        <nav class="toc">
-          <a href="#overview">Overview</a>
-          <a href="#vs-c">Hopper vs C</a>
-          <a href="#contracts">Contract Overhead</a>
-          <a href="#methodology">Methodology</a>
-        </nav>
-      </aside>
-
-      <main class="content">
+      <template #sidebar>
+        <a href="#overview">Overview</a>
+        <a href="#vs-c">Hopper vs C</a>
+        <a href="#contracts">Contract Overhead</a>
+        <a href="#methodology">Methodology</a>
+      </template>
 
         <!-- Disclaimer -->
         <div class="disclaimer">
@@ -251,91 +251,18 @@ function maxOf(rows, key) {
           </ul>
         </section>
 
-      </main>
-    </div>
-  </div>
+    </SidebarLayout>
+  </PageShell>
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: #faf9f6;
-}
-
-.page-header {
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
-  padding: 4rem 5vw 3.5rem;
-}
-
-.header-inner { max-width: 1100px; margin: 0 auto; }
-
-.label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #9ca3af;
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
-
-.page-header h1 {
-  font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -2px;
-  color: #111827;
-  margin-bottom: 0.75rem;
-}
-
-.page-header .sub {
-  font-size: 1.05rem;
-  color: #6b7280;
-}
-
-.layout {
-  display: flex;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 3rem 5vw;
-  gap: 3rem;
-  align-items: flex-start;
-}
-
-.sidebar {
-  position: sticky;
-  top: calc(56px + 2rem);
-  width: 180px;
-  flex-shrink: 0;
-}
-
-.toc {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.toc a {
-  display: block;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.82rem;
-  color: #6b7280;
-  text-decoration: none;
-  border-radius: 5px;
-  transition: color 0.15s, background 0.15s;
-}
-
-.toc a:hover { color: #111827; background: #f3f4f6; }
-
-.content { flex: 1; min-width: 0; }
-
 .content h2 {
   font-size: 1.55rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin: 2.5rem 0 0.75rem;
   padding-top: 2rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
 }
 
 .content h2:first-child { border-top: none; margin-top: 0; padding-top: 0; }
@@ -343,20 +270,20 @@ function maxOf(rows, key) {
 .content h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-strong);
   margin: 1.5rem 0 0.5rem;
 }
 
 .content p {
   font-size: 0.95rem;
-  color: #374151;
+  color: var(--color-text-strong);
   line-height: 1.7;
   margin-bottom: 1rem;
 }
 
 .content ul {
   font-size: 0.95rem;
-  color: #374151;
+  color: var(--color-text-strong);
   line-height: 1.7;
   padding-left: 1.4rem;
   margin-bottom: 1rem;
@@ -365,32 +292,32 @@ function maxOf(rows, key) {
 .content li { margin-bottom: 0.3rem; }
 
 .content code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 0.83rem;
-  background: #f3f4f6;
+  background: var(--color-surface-muted);
   padding: 0.1em 0.35em;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: #1f2937;
 }
 
 .disclaimer {
-  background: #fef9c3;
-  border: 1px solid #fde047;
-  border-radius: 8px;
+  background: var(--color-warning-pale);
+  border: 1px solid var(--color-warning-pale-border);
+  border-radius: var(--radius-lg);
   padding: 1rem 1.25rem;
   font-size: 0.9rem;
-  color: #713f12;
+  color: var(--color-warning-text);
   margin-bottom: 2rem;
   line-height: 1.6;
 }
 
 .callout {
-  background: #f8fafc;
-  border-left: 3px solid #2563eb;
-  border-radius: 0 6px 6px 0;
+  background: var(--color-surface-soft);
+  border-left: 3px solid var(--color-brand);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
   padding: 0.85rem 1rem;
   font-size: 0.88rem;
-  color: #374151;
+  color: var(--color-text-strong);
   line-height: 1.6;
   margin: 1rem 0 1.5rem;
 }
@@ -405,31 +332,31 @@ function maxOf(rows, key) {
 .results-table th {
   text-align: left;
   padding: 0.55rem 0.7rem;
-  background: #f9fafb;
-  border-bottom: 2px solid #e5e7eb;
+  background: var(--color-surface-alt);
+  border-bottom: 2px solid var(--color-border);
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text-strong);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .results-table td {
-  padding: 0.7rem 0.7rem;
-  border-bottom: 1px solid #f3f4f6;
-  color: #111827;
+  padding: 0.7rem;
+  border-bottom: 1px solid var(--color-border-soft);
+  color: var(--color-text);
   vertical-align: middle;
 }
 
 .results-table td.num {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 0.88rem;
 }
 
 .badge {
   display: inline-block;
   padding: 0.18em 0.55em;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 700;
   font-size: 0.8rem;
   margin-right: 0.4rem;
@@ -437,12 +364,12 @@ function maxOf(rows, key) {
 
 .sub-label {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--color-text-faint);
 }
 
 .dim {
   font-weight: 400;
-  color: #9ca3af;
+  color: var(--color-text-faint);
   font-size: 0.85rem;
 }
 
@@ -455,15 +382,15 @@ function maxOf(rows, key) {
 
 .bar-label {
   font-size: 11px;
-  fill: #374151;
+  fill: var(--color-text-strong);
   font-weight: 600;
   dominant-baseline: middle;
 }
 
 .bar-value {
   font-size: 11px;
-  fill: #6b7280;
-  font-family: 'JetBrains Mono', monospace;
+  fill: var(--color-text-soft);
+  font-family: var(--font-mono);
   dominant-baseline: middle;
 }
 </style>

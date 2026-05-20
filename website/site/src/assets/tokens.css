@@ -1,0 +1,117 @@
+:root {
+  /* ── Brand ─────────────────────────────────────────────────────────── */
+  --color-brand:              #2563eb;
+  --color-brand-hover:        #1d4ed8;
+  --color-brand-tint:         #eff6ff;
+  --color-brand-tint-border:  #bfdbfe;
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --color-text:               #111827;
+  --color-text-strong:        #374151;
+  --color-text-muted:         #4b5563;
+  --color-text-soft:          #6b7280;
+  --color-text-faint:         #9ca3af;
+  --color-text-fainter:       #d1d5db;
+  --color-text-deep:          #1e293b;
+  --color-text-on-dark:       #f9fafb;
+  --color-text-on-dark-soft:  #94a3b8;
+  --color-text-on-dark-faint: #64748b;
+  --color-text-on-dark-faintest: #475569;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────── */
+  --color-bg:                 #faf9f6;
+  --color-surface:            #ffffff;
+  --color-surface-alt:        #f9fafb;
+  --color-surface-soft:       #f8fafc;
+  --color-surface-code:       #f1f5f9;
+  --color-surface-muted:      #f3f4f6;
+  --color-surface-dark:       #0f172a;
+  --color-surface-dark-alt:   #1e293b;
+  --color-surface-dark-deeper:#0c1120;
+
+  /* ── Borders ───────────────────────────────────────────────────────── */
+  --color-border:             #e5e7eb;
+  --color-border-strong:      #e2e8f0;
+  --color-border-soft:        #f3f4f6;
+
+  /* ── Accents ───────────────────────────────────────────────────────── */
+  --color-success:            #22c55e;
+  --color-success-deep:       #059669;
+  --color-success-tint:       #f0fdf4;
+  --color-success-tint-border:#a7f3d0;
+
+  --color-warning:            #f59e0b;
+  --color-warning-deep:       #d97706;
+  --color-warning-tint:       #fffbeb;
+  --color-warning-pale:       #fef9c3;
+  --color-warning-pale-border:#fde047;
+  --color-warning-text:       #713f12;
+
+  --color-danger:             #dc2626;
+  --color-danger-tint:        #fef2f2;
+  --color-danger-tint-border: #fecaca;
+
+  --color-purple:             #7c3aed;
+  --color-purple-tint:        #f5f3ff;
+  --color-purple-tint-border: #ddd6fe;
+
+  --color-cyan:               #0891b2;
+  --color-orange:             #c2410c;
+  --color-orange-tint:        #fff7ed;
+  --color-orange-tint-border: #fed7aa;
+
+  --color-info-tint:          #e0f2fe;
+  --color-amber-bg:           #b45309;
+
+  /* highlight syntax classes */
+  --color-syntax-comment:     #94a3b8;
+  --color-syntax-keyword:     #2563eb;
+  --color-syntax-keyword-alt: #7c3aed;
+  --color-syntax-type:        #0891b2;
+  --color-syntax-string:      #16a34a;
+  --color-syntax-number:      #b45309;
+  --color-syntax-hex:         #c2410c;
+  --color-syntax-op:          #9ca3af;
+
+  /* ── Type ──────────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* ── Radii ─────────────────────────────────────────────────────────── */
+  --radius-xs:    3px;
+  --radius-sm:    4px;
+  --radius-md:    6px;
+  --radius-lg:    8px;
+  --radius-xl:    12px;
+  --radius-pill:  100px;
+
+  /* ── Shadows ───────────────────────────────────────────────────────── */
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm:    0 1px 6px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 4px 20px rgba(37, 99, 235, 0.09);
+  --shadow-lg:    0 20px 60px rgba(0, 0, 0, 0.22);
+
+  /* ── Layout ────────────────────────────────────────────────────────── */
+  --container-sm:   700px;
+  --container-md:   860px;
+  --container-lg:   1100px;
+  --page-gutter:    5vw;
+  --nav-height:     56px;
+
+  /* ── Motion ────────────────────────────────────────────────────────── */
+  --transition-fast: 0.15s ease;
+  --transition-med:  0.3s ease;
+  --transition-slow: 0.6s ease;
+
+  /* ── Breakpoints (reference only; media queries can't use vars) ────── */
+  /* --bp-mobile: 768px */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

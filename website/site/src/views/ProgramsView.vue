@@ -1,5 +1,5 @@
 <script setup>
-import CodeBlock from '../components/CodeBlock.vue'
+import CodeBlock from '@/components/CodeBlock.vue'
 
 const programs = [
 
@@ -1242,43 +1242,41 @@ function byGroup(g) {
 .programs-view {
   max-width: 900px;
   margin: 0 auto;
-  padding: 3rem 5vw 6rem;
+  padding: 3rem var(--page-gutter) 6rem;
 }
 
-/* ── Hero ── */
 .hero { margin-bottom: 2rem; }
 
 .hero h1 {
   font-size: clamp(2rem, 5vw, 2.8rem);
   font-weight: 800;
-  color: #111827;
+  color: var(--color-text);
   letter-spacing: -1px;
   margin-bottom: 0.6rem;
 }
 
 .hero-sub {
   font-size: 1.05rem;
-  color: #6b7280;
+  color: var(--color-text-soft);
   max-width: 620px;
   line-height: 1.7;
 }
 
-/* ── TOC bar ── */
 .toc-bar {
   display: flex;
   align-items: center;
   gap: 0.35rem;
   flex-wrap: wrap;
   padding: 0.6rem 0.9rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
   margin-bottom: 3.5rem;
 }
 
 .toc-label {
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--color-text-on-dark-soft);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-size: 0.65rem;
@@ -1289,15 +1287,17 @@ function byGroup(g) {
   padding: 0.2rem 0.7rem;
   color: #475569;
   text-decoration: none;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   font-size: 0.85rem;
   font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.toc-bar a:hover { background: #e0f2fe; color: #0891b2; }
+.toc-bar a:hover {
+  background: var(--color-info-tint);
+  color: var(--color-cyan);
+}
 
-/* ── Groups ── */
 .group { margin-bottom: 4.5rem; }
 
 .group-title {
@@ -1305,13 +1305,12 @@ function byGroup(g) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #94a3b8;
+  color: var(--color-text-on-dark-soft);
   margin-bottom: 1.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border-strong);
 }
 
-/* ── Cards ── */
 .program-card { margin-bottom: 2.5rem; }
 
 .card-meta {
@@ -1326,7 +1325,7 @@ function byGroup(g) {
 .card-meta h3 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   letter-spacing: -0.3px;
 }
 
@@ -1342,15 +1341,15 @@ function byGroup(g) {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   padding: 0.15rem 0.5rem;
-  border-radius: 99px;
-  background: #f1f5f9;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-code);
   color: #64748b;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border-strong);
 }
 
 .card-desc {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--color-text-soft);
   line-height: 1.7;
   margin-bottom: 0.85rem;
   max-width: 700px;

@@ -1,6 +1,16 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router'
 const route = useRoute()
+
+const links = [
+  { to: '/docs',      label: 'Documentation' },
+  { to: '/syntax',    label: 'Syntax' },
+  { to: '/programs',  label: 'Programs' },
+  { to: '/examples',  label: 'Examples' },
+  { to: '/benchmark', label: 'Benchmark' },
+  { to: '/roadmap',   label: 'Roadmap' },
+  { to: '/about',     label: 'About' },
+]
 </script>
 
 <template>
@@ -8,13 +18,11 @@ const route = useRoute()
     <div class="nav-inner">
       <RouterLink to="/" class="nav-logo">Hopper</RouterLink>
       <ul class="nav-links">
-        <li><RouterLink to="/docs"     :class="{ active: route.path === '/docs' }">Documentation</RouterLink></li>
-        <li><RouterLink to="/syntax"   :class="{ active: route.path === '/syntax' }">Syntax</RouterLink></li>
-        <li><RouterLink to="/programs" :class="{ active: route.path === '/programs' }">Programs</RouterLink></li>
-        <li><RouterLink to="/examples"  :class="{ active: route.path === '/examples' }">Examples</RouterLink></li>
-        <li><RouterLink to="/benchmark" :class="{ active: route.path === '/benchmark' }">Benchmark</RouterLink></li>
-        <li><RouterLink to="/roadmap"   :class="{ active: route.path === '/roadmap' }">Roadmap</RouterLink></li>
-        <li><RouterLink to="/about"     :class="{ active: route.path === '/about' }">About</RouterLink></li>
+        <li v-for="link in links" :key="link.to">
+          <RouterLink :to="link.to" :class="{ active: route.path === link.to }">
+            {{ link.label }}
+          </RouterLink>
+        </li>
       </ul>
     </div>
   </nav>
@@ -25,58 +33,73 @@ const route = useRoute()
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .nav-inner {
   display: flex;
   align-items: center;
   gap: 2.5rem;
-  padding: 0 5vw;
-  height: 56px;
-  max-width: 1200px;
+  padding: 0 var(--page-gutter);
+  height: var(--nav-height);
+  max-width: var(--container-lg);
   margin: 0 auto;
 }
 
 .nav-logo {
   font-size: 1.05rem;
   font-weight: 800;
-  color: #2563eb;
+  color: var(--color-brand);
   text-decoration: none;
   letter-spacing: -0.5px;
   flex-shrink: 0;
+  transition: color var(--transition-fast);
 }
 
-.nav-logo:hover { color: #1d4ed8; }
+.nav-logo:hover { color: var(--color-brand-hover); }
 
 .nav-links {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   list-style: none;
-  padding: 0;
-  margin: 0;
 }
 
 .nav-links a {
+  position: relative;
   display: inline-block;
   padding: 0.35rem 0.85rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--color-text-soft);
   text-decoration: none;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
+  border-radius: var(--radius-md);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 0;
+  height: 2px;
+  background: var(--color-brand);
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: width var(--transition-med);
 }
 
 .nav-links a:hover {
-  color: #111827;
-  background: #f3f4f6;
+  color: var(--color-text);
+  background: var(--color-surface-muted);
 }
 
 .nav-links a.active {
-  color: #2563eb;
-  background: #eff6ff;
+  color: var(--color-brand);
+  background: var(--color-brand-tint);
 }
+
+.nav-links a.active::after { width: 60%; }
 </style>
