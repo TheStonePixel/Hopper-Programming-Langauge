@@ -164,11 +164,17 @@ fully working programs, each with a corresponding test in `toolchain/tests/patte
 
 ### Website (`website/site/`)
 - **Framework**: Vue 3 + Vite, Shiki syntax highlighting (custom TextMate grammar)
-- **Routes**: `/` (Home), `/syntax`, `/programs`, `/examples`, `/docs`, `/about`, `/vs-c`, `/benchmark`
+- **Routes**: `/` (Home), `/syntax`, `/programs`, `/examples`, `/docs`, `/about`, `/roadmap`, `/vs-c`, `/benchmark`
 - **Home**: animated hero with typing → compiling → welcome phases; converging DAG tree
   SVG showing language features; orthogonal routing with rounded corners
 - **Syntax page**: comprehensive language reference with live code examples, including
   Contracts section (`requires`, `ensures`, `invariant`, `constrain`) with compile-mode table
+- **Docs page**: full language reference — types/operators tables, module system, memory
+  model, hardware model, contracts, inline assembly; sidebar navigation
+- **About page**: philosophy and design manifesto — Why Hopper Exists, What I Believe,
+  Direction, Determinism, On Other Languages (orbit layout), Memento Mori, Final Principle
+- **Roadmap page**: language status, design principles, language-at-a-glance, current
+  progress (done / in-progress / planned)
 - **VS Code extension**: syntax highlighting, bracket matching, installed via
   `npm run install:ext`
 
@@ -284,11 +290,8 @@ program below should compile, run correctly, and serve as a reference for that p
   bar charts and a disclaimer that results are illustrative, not language comparisons.
 - [ ] **Examples page** — `/examples` is sparse. Add the STM32 UART example, Battleship
   game, and JSON reader with explanatory prose.
-- [ ] **Docs page** — currently shows "coming soon". Write at minimum:
-  - Language reference (types, operators, control flow)
-  - Module system guide
-  - Hardware model guide (`bind`, `strict`, `bitfield`)
-  - Memory model (`allocate`/`deallocate`, smart pointers, `defer`)
+- [x] **Docs page** — full reference written: types/operators, module system, memory model,
+  hardware model (`bind`, `strict`, `bitfield`), contracts, inline assembly
 - [ ] **SVG tree on home page** — continue refining the converging DAG; consider adding
   labels or tooltips on hover to explain each node.
 - [ ] **`/vs-c` page** — flesh out comparison table with concrete code side-by-sides.
