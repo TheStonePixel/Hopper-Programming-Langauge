@@ -103,31 +103,34 @@
       <div class="inner">
         <h2>On Other Languages</h2>
         <p>Hopper is not built from rejection of the past. It is built from respect for it.</p>
-        <div class="lang-grid">
-          <div class="lang-card">
-            <div class="lang-name">C</div>
-            <p>Proved how much could be accomplished with a small language close to the machine.</p>
+        <div class="orbit-wrap">
+          <div class="orbit-ring"></div>
+          <div class="orbit-center">
+            <p>The problem is not that previous languages failed to teach us anything.</p>
+            <p>The problem is that the industry keeps forgetting the lessons.</p>
           </div>
-          <div class="lang-card">
-            <div class="lang-name">C++</div>
-            <p>Proved deterministic resource management and zero-overhead abstractions could scale.</p>
+          <div class="orbit-node n-c">
+            <div class="node-name">C</div>
+            <div class="node-desc">Proved how much could be accomplished with a small language close to the machine.</div>
           </div>
-          <div class="lang-card">
-            <div class="lang-name">Ada</div>
-            <p>Proved contracts and correctness systems mattered in real-world safety-critical software.</p>
+          <div class="orbit-node n-cpp">
+            <div class="node-name">C++</div>
+            <div class="node-desc">Proved deterministic resource management and zero-overhead abstractions could scale.</div>
           </div>
-          <div class="lang-card">
-            <div class="lang-name">Forth</div>
-            <p>Proved hardware description could live in user space instead of compiler internals.</p>
+          <div class="orbit-node n-ada">
+            <div class="node-name">Ada</div>
+            <div class="node-desc">Proved contracts and correctness systems mattered in real-world safety-critical software.</div>
           </div>
-          <div class="lang-card">
-            <div class="lang-name">Lisp</div>
-            <p>Proved small languages can survive for generations.</p>
+          <div class="orbit-node n-forth">
+            <div class="node-name">Forth</div>
+            <div class="node-desc">Proved hardware description could live in user space instead of compiler internals.</div>
+          </div>
+          <div class="orbit-node n-lisp">
+            <div class="node-name">Lisp</div>
+            <div class="node-desc">Proved small languages can survive for generations.</div>
           </div>
         </div>
         <p>Hopper borrows from all of them because all of them discovered something important.</p>
-        <p>The problem is not that previous languages failed to teach us anything.</p>
-        <p>The problem is that the industry keeps forgetting the lessons.</p>
       </div>
     </section>
 
@@ -374,36 +377,78 @@
   font-weight: 700;
 }
 
-/* ── Language cards ── */
-.lang-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
-  margin: 1.75rem 0;
+/* ── Language orbit ── */
+.orbit-wrap {
+  position: relative;
+  width: 600px;
+  height: 600px;
+  margin: 2.5rem auto;
 }
 
-.lang-card {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 1.25rem 1rem;
+.orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 440px;
+  height: 440px;
+  transform: translate(-50%, -50%);
+  border: 1px dashed #e5e7eb;
+  border-radius: 50%;
+  pointer-events: none;
 }
 
-.lang-name {
-  font-size: 0.65rem;
+.orbit-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 210px;
+  text-align: center;
+}
+
+.orbit-center p {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #374151;
+  line-height: 1.65;
+  margin: 0 0 0.6rem;
+  max-width: none;
+}
+
+.orbit-center p:last-child { margin-bottom: 0; }
+
+.orbit-node {
+  position: absolute;
+  width: 125px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+/* Pentagon: container 600×600, center (300,300), radius 220px
+   C     270°: (300,  80) → 50%,   13.3%
+   C++   342°: (509, 232) → 84.8%, 38.7%
+   Ada    54°: (429, 478) → 71.5%, 79.7%
+   Forth 126°: (171, 478) → 28.5%, 79.7%
+   Lisp  198°: ( 91, 232) → 15.2%, 38.7% */
+.n-c     { left: 50%;   top: 13.3%; }
+.n-cpp   { left: 84.8%; top: 38.7%; }
+.n-ada   { left: 71.5%; top: 79.7%; }
+.n-forth { left: 28.5%; top: 79.7%; }
+.n-lisp  { left: 15.2%; top: 38.7%; }
+
+.node-name {
+  font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
   color: #2563eb;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.3rem;
 }
 
-.lang-card p {
-  font-size: 0.875rem;
-  color: #6b7280;
-  line-height: 1.65;
-  margin: 0;
-  max-width: none;
+.node-desc {
+  font-size: 0.775rem;
+  color: #9ca3af;
+  line-height: 1.55;
 }
 
 /* ── Memento ── */
@@ -453,8 +498,35 @@
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .lang-grid   { grid-template-columns: 1fr 1fr; }
   .page-header h1 { font-size: 2.75rem; }
   .fp-line { font-size: 1.25rem; }
+
+  .orbit-wrap {
+    position: static;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin: 1.75rem 0;
+  }
+  .orbit-ring { display: none; }
+  .orbit-center {
+    position: static;
+    transform: none;
+    width: 100%;
+    text-align: left;
+    order: -1;
+  }
+  .orbit-node {
+    position: static;
+    transform: none;
+    width: 100%;
+    text-align: left;
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+  .node-desc { flex: 1; }
 }
 </style>
