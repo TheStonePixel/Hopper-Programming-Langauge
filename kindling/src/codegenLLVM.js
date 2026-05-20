@@ -100,8 +100,9 @@ function mangleTemplate(t) {
     return t.replace(/[<>]/g, '_').replace(/,\s*/g, '_').replace(/_+/g, '_').replace(/_$/, '');
 }
 
-// If t is a template type, return its mangled LLVM-safe name; otherwise return t unchanged.
+// If t is a type alias or template type, resolve to the concrete name.
 function normalizeType(t) {
+    if (typeAliases.has(t)) return normalizeType(typeAliases.get(t));
     if (t && t.includes('<')) return mangleTemplate(t);
     return t;
 }

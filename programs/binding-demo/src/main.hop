@@ -1,0 +1,10 @@
+import Text
+
+function announce(Text t) {
+    t.greet()
+}
+
+entry main {
+    Text s
+    announce(s)
+}

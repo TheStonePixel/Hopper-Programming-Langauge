@@ -927,7 +927,7 @@ function filesToLoad(moduleDir, names) {
     }
 }
 
-export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false } = {}) {
+export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false, bindings = null } = {}) {
     // Strip import lines before ANTLR sees them, collect import requests
     const imports = [];
     const strippedSource = source.replace(
@@ -953,6 +953,55 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     if (noImports) return ast;
 
     for (const { module: moduleName, names } of imports) {
+        // Binding import: `import Name` where Name is declared in hopper.json targets
+        if (!names && bindings && bindings.has(moduleName)) {
+            const binding = bindings.get(moduleName);
+
+            // Load interface file
+            if (!visited.has(binding.interface)) {
+                visited.add(binding.interface);
+                const ifaceAst = buildAstFromSource(fs.readFileSync(binding.interface, "utf8"), {
+                    baseDir: path.dirname(binding.interface), visited, bindings,
+                });
+                ast.interfaces.unshift(...ifaceAst.interfaces);
+                ast.functions.unshift(...ifaceAst.functions);
+                ast.consts.unshift(...ifaceAst.consts);
+            }
+
+            // Load implementation file
+            if (!visited.has(binding.implementation)) {
+                visited.add(binding.implementation);
+                const implAst = buildAstFromSource(fs.readFileSync(binding.implementation, "utf8"), {
+                    baseDir: path.dirname(binding.implementation), visited, bindings,
+                });
+
+                // Inject compliance: tell the compiler this class must satisfy the binding interface
+                const implClass = (implAst.classes || [])[0];
+                if (implClass) {
+                    implClass.interfaces = [...(implClass.interfaces || []), moduleName];
+                }
+
+                // Register a type alias: binding name → concrete class name
+                if (implClass) {
+                    ast.aliases.push({ name: moduleName, targetType: implClass.name });
+                }
+
+                ast.functions.unshift(...implAst.functions);
+                ast.structs.unshift(...implAst.structs);
+                ast.classes.unshift(...implAst.classes);
+                ast.consts.unshift(...implAst.consts);
+                ast.enums.unshift(...(implAst.enums || []));
+                ast.aliases.unshift(...implAst.aliases);
+                ast.templates.unshift(...implAst.templates);
+                ast.binds.unshift(...implAst.binds);
+                ast.stricts.unshift(...implAst.stricts);
+                ast.interfaces.unshift(...implAst.interfaces);
+            }
+
+            continue;
+        }
+
+        // Regular module import
         const files = resolveModuleFiles(moduleName, names, baseDir);
         for (const resolved of files) {
             if (visited.has(resolved)) continue;
@@ -961,6 +1010,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             const importedAst = buildAstFromSource(fs.readFileSync(resolved, "utf8"), {
                 baseDir: path.dirname(resolved),
                 visited,
+                bindings,
             });
 
             ast.functions.unshift(...importedAst.functions);

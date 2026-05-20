@@ -7,10 +7,10 @@
 //
 // Called by the native hopper CLI binary to compile .hop files.
 
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve, dirname }            from "node:path";
-import { buildAstFromSource }          from "./src/astBuilder.js";
-import { genModule }                   from "./src/codegenLLVM.js";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { resolve, dirname, join }                  from "node:path";
+import { buildAstFromSource }                      from "./src/astBuilder.js";
+import { genModule }                               from "./src/codegenLLVM.js";
 
 const args    = process.argv.slice(2);
 const oIdx    = args.indexOf("-o");
@@ -31,11 +31,38 @@ if (files.length === 0) {
     process.exit(1);
 }
 
+// Walk up from dir to find hopper.json; return resolved bindings for the target or empty Map.
+function loadBindings(sourceFile, target) {
+    let dir = dirname(resolve(sourceFile));
+    while (true) {
+        const candidate = join(dir, "hopper.json");
+        if (existsSync(candidate)) {
+            try {
+                const config = JSON.parse(readFileSync(candidate, "utf8"));
+                const targetBindings = (config.targets || {})[target] || {};
+                const bindings = new Map();
+                for (const [name, b] of Object.entries(targetBindings)) {
+                    bindings.set(name, {
+                        interface:      resolve(dir, b.interface),
+                        implementation: resolve(dir, b.implementation),
+                    });
+                }
+                return bindings;
+            } catch { /* malformed hopper.json — skip */ }
+        }
+        const parent = dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return new Map();
+}
+
 try {
-    const file = files[0];
-    const src  = readFileSync(file, "utf8");
-    const ast  = buildAstFromSource(src, { baseDir: dirname(resolve(file)) });
-    const ir   = genModule(ast, { target, release, strict });
+    const file     = files[0];
+    const src      = readFileSync(file, "utf8");
+    const bindings = loadBindings(file, target);
+    const ast      = buildAstFromSource(src, { baseDir: dirname(resolve(file)), bindings });
+    const ir       = genModule(ast, { target, release, strict });
 
     if (outFile) {
         writeFileSync(outFile, ir, "utf8");
