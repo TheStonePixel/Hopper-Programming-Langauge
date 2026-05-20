@@ -374,8 +374,8 @@
 /* ── Language orbit ── */
 .orbit-wrap {
   position: relative;
-  width: 600px;
-  height: 600px;
+  width: 640px;
+  height: 640px;
   margin: 2.5rem auto;
 }
 
@@ -383,15 +383,13 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 440px;
-  height: 440px;
+  width: 460px;
+  height: 460px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
+  border: 1.5px solid rgba(37, 99, 235, 0.3);
+  background: transparent;
   pointer-events: none;
-  background: conic-gradient(from 0deg, #2563eb, #7c3aed, #0ea5e9, #2563eb);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
-  opacity: 0.45;
 }
 
 .orbit-center {
@@ -416,32 +414,32 @@
 
 .orbit-node {
   position: absolute;
-  width: 130px;
-  height: 130px;
+  width: 140px;
+  height: 140px;
   border-radius: 50%;
   background: #faf9f6;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid rgba(37, 99, 235, 0.3);
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0.6rem;
+  padding: 1rem;
   box-sizing: border-box;
   text-align: center;
 }
 
-/* Pentagon: container 600×600, center (300,300), radius 220px
-   C     270°: (300,  80) → 50%,   13.3%
-   C++   342°: (509, 232) → 84.8%, 38.7%
-   Ada    54°: (429, 478) → 71.5%, 79.7%
-   Forth 126°: (171, 478) → 28.5%, 79.7%
-   Lisp  198°: ( 91, 232) → 15.2%, 38.7% */
-.n-c     { left: 50%;   top: 13.3%; }
-.n-cpp   { left: 84.8%; top: 38.7%; }
-.n-ada   { left: 71.5%; top: 79.7%; }
-.n-forth { left: 28.5%; top: 79.7%; }
-.n-lisp  { left: 15.2%; top: 38.7%; }
+/* Pentagon: container 640×640, center (320,320), radius 230px
+   C     270°: (320,  90) → 50%,   14.1%
+   C++   342°: (539, 249) → 84.2%, 38.9%
+   Ada    54°: (455, 506) → 71.1%, 79.1%
+   Forth 126°: (185, 506) → 28.9%, 79.1%
+   Lisp  198°: (101, 249) → 15.8%, 38.9% */
+.n-c     { left: 50%;   top: 14.1%; }
+.n-cpp   { left: 84.2%; top: 38.9%; }
+.n-ada   { left: 71.1%; top: 79.1%; }
+.n-forth { left: 28.9%; top: 79.1%; }
+.n-lisp  { left: 15.8%; top: 38.9%; }
 
 .node-name {
   font-size: 0.6rem;
