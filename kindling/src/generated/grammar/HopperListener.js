@@ -815,6 +815,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#castType.
+	enterCastType(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#castType.
+	exitCastType(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#primary.
 	enterPrimary(ctx) {
 	}

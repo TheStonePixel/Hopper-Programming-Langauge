@@ -189,8 +189,8 @@ export function Unary(op, expr) {
     return { kind: "Unary", op, expr };
 }
 
-export function CastExpr(expr) {
-    return { kind: "CastExpr", expr };
+export function CastExpr(targetType, expr) {
+    return { kind: "CastExpr", targetType, expr };
 }
 
 export function Var(name) {

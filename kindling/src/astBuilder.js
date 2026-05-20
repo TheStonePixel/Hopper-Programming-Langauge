@@ -743,8 +743,12 @@ export class AstBuilder extends HopperVisitor {
 
     visitUnary(ctx) {
         if (ctx.primary()) return this.visit(ctx.primary());
+        if (ctx.castType && ctx.castType()) {
+            const targetType = ctx.castType().getText(); // e.g. "int", "byte", "unsignedint"
+            return CastExpr(targetType, this.visit(ctx.unary()));
+        }
         const op = ctx.children[0].getText(); // '!', '-', '~', 'cast', or 'allocate'
-        if (op === "cast")     return CastExpr(this.visit(ctx.unary()));
+        if (op === "cast")     return CastExpr(null, this.visit(ctx.unary()));
         if (op === "allocate") return AllocateExpr(this.visit(ctx.unary()));
         return Unary(op, this.visit(ctx.unary()));
     }
