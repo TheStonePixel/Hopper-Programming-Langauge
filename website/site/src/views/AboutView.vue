@@ -79,22 +79,19 @@
       </div>
     </section>
 
-    <!-- Building Things That Last -->
+    <!-- Determinism -->
     <section class="section alt">
       <div class="inner">
-        <h2>Building Things That Last</h2>
-        <p>I believe long projects are completed by persistence more than brilliance.</p>
+        <h2>Determinism</h2>
+        <p>Hopper will stop. That is by design.</p>
         <p>
-          Most ambitious software projects fail slowly. Not because the ideas were impossible,
-          but because the people building them eventually stopped showing up.
+          A deterministic system produces the same output from the same input, every time.
+          A language that keeps changing violates that contract. Every new version is a new
+          variable introduced into every program ever written in it.
         </p>
-        <p>The people who finish things are usually the people still in the chair years after the excitement wears off.</p>
-        <p>I plan to still be in the chair.</p>
-        <p>
-          I also plan to leave it cleanly when the work is done. I want to build tools,
-          operating systems, compilers, runtimes, and hardware-oriented software. Hopper exists
-          to make those possible. The language itself is not the final product.
-        </p>
+        <p>The more you change a language, the more you change what it meant to have written something in it.</p>
+        <p>Hopper is not a perpetual project. It is a problem to be solved.</p>
+        <p>When the language is correct and expressive, development ends. Not because we stopped caring. Because we finished.</p>
       </div>
     </section>
 
