@@ -1,5 +1,10 @@
 <script setup>
+import { ref } from 'vue'
 import CodeBlock from '@/components/CodeBlock.vue'
+import { useScrollSpy } from '@/lib/useScrollSpy.js'
+
+const tocEl = ref(null)
+useScrollSpy(tocEl, { rootMargin: '-100px 0px -60% 0px' })
 
 const programs = [
 
@@ -1215,7 +1220,7 @@ function byGroup(g) {
       </p>
     </div>
 
-    <div class="toc-bar">
+    <div class="toc-bar" ref="tocEl">
       <span class="toc-label">Jump to</span>
       <a v-for="g in groups" :key="g.id" :href="'#' + g.id">{{ g.label }}</a>
     </div>
@@ -1284,18 +1289,28 @@ function byGroup(g) {
 }
 
 .toc-bar a {
-  padding: 0.2rem 0.7rem;
+  padding: 0.2rem 0.75rem;
   color: #475569;
   text-decoration: none;
   border-radius: var(--radius-pill);
   font-size: 0.85rem;
   font-weight: 500;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  border: 1px solid transparent;
+  transition: background var(--transition-fast),
+              color var(--transition-fast),
+              border-color var(--transition-fast);
 }
 
 .toc-bar a:hover {
   background: var(--color-info-tint);
   color: var(--color-cyan);
+}
+
+.toc-bar a.active {
+  background: var(--color-brand-tint);
+  color: var(--color-brand);
+  border-color: var(--color-brand-tint-border);
+  font-weight: 600;
 }
 
 .group { margin-bottom: 4.5rem; }

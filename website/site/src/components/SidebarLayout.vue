@@ -1,65 +1,13 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
+import { useScrollSpy } from '@/lib/useScrollSpy.js'
 
 defineProps({
   width: { type: String, default: 'lg' },
 })
 
 const sidebarEl = ref(null)
-const contentEl = ref(null)
-
-let observer = null
-let linkMap = new Map()  // id → <a> element
-
-function setActive(id) {
-  for (const [linkId, a] of linkMap) {
-    a.classList.toggle('active', linkId === id)
-  }
-}
-
-onMounted(() => {
-  if (!sidebarEl.value || !contentEl.value) return
-
-  const links = sidebarEl.value.querySelectorAll('a[href^="#"]')
-  const targets = []
-  linkMap = new Map()
-
-  links.forEach(a => {
-    const id = a.getAttribute('href').slice(1)
-    if (!id) return
-    const target = document.getElementById(id)
-    if (!target) return
-    linkMap.set(id, a)
-    targets.push(target)
-  })
-
-  if (targets.length === 0) return
-
-  // Track which sections are currently in the viewport band
-  const visible = new Set()
-  observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) visible.add(e.target.id)
-      else visible.delete(e.target.id)
-    })
-
-    // Pick the earliest (top-most) visible section in document order
-    let chosen = null
-    for (const t of targets) {
-      if (visible.has(t.id)) { chosen = t.id; break }
-    }
-    if (chosen) setActive(chosen)
-  }, {
-    rootMargin: '-80px 0px -55% 0px',
-    threshold: 0,
-  })
-
-  targets.forEach(t => observer.observe(t))
-})
-
-onBeforeUnmount(() => {
-  observer?.disconnect()
-})
+useScrollSpy(sidebarEl)
 </script>
 
 <template>
@@ -69,7 +17,7 @@ onBeforeUnmount(() => {
         <slot name="sidebar" />
       </nav>
     </aside>
-    <div class="content" ref="contentEl">
+    <div class="content">
       <slot />
     </div>
   </div>

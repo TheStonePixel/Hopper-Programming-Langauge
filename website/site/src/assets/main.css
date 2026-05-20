@@ -34,6 +34,19 @@ a {
   border-radius: var(--radius-xs);
 }
 
+/* ── v-reveal: fade + slide-up when element enters viewport ────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  will-change: opacity, transform;
+}
+
+.reveal.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ── Inline code — any <code> outside a <pre> ──────────────────────────── */
 :not(pre) > code {
   font-family: var(--font-mono);

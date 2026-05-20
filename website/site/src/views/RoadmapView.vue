@@ -19,7 +19,7 @@ import ContentSection from '@/components/ContentSection.vue'
     <ContentSection alt>
       <h2>Design principles</h2>
       <div class="principles">
-        <div class="principle">
+        <div v-reveal="0" class="principle">
           <div class="principle-num">01</div>
           <h3>Hardware is first-class</h3>
           <p>
@@ -30,7 +30,7 @@ import ContentSection from '@/components/ContentSection.vue'
           </p>
         </div>
 
-        <div class="principle">
+        <div v-reveal="80" class="principle">
           <div class="principle-num">02</div>
           <h3>Nothing is implicit</h3>
           <p>
@@ -41,7 +41,7 @@ import ContentSection from '@/components/ContentSection.vue'
           </p>
         </div>
 
-        <div class="principle">
+        <div v-reveal="160" class="principle">
           <div class="principle-num">03</div>
           <h3>Correctness is built in</h3>
           <p>
@@ -52,7 +52,7 @@ import ContentSection from '@/components/ContentSection.vue'
           </p>
         </div>
 
-        <div class="principle">
+        <div v-reveal="240" class="principle">
           <div class="principle-num">04</div>
           <h3>One language, full stack</h3>
           <p>

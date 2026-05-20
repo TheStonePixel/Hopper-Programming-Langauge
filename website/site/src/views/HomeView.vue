@@ -405,33 +405,38 @@ const tools = [
           The Hopper Programming Language
         </h1>
 
-        <!-- Typing terminal -->
-        <transition name="fade">
-          <div v-if="phase === 'typing' || phase === 'compiling'" class="demo-wrap">
-            <div class="demo-terminal">
-              <div class="terminal-bar">
-                <span class="dot red"/><span class="dot yellow"/><span class="dot green"/>
-                <span class="terminal-file">welcome.hop</span>
-              </div>
-              <pre class="terminal-body"><code>{{ typedCode }}<span v-if="phase === 'typing'" class="cursor">▊</span></code></pre>
-              <div v-if="phase === 'compiling'" class="compile-line">
-                <span class="prompt">$</span> hopper build welcome.hop<span class="compile-dots">{{ compileDots }}</span>
-              </div>
-            </div>
-          </div>
-        </transition>
+        <!-- Animation stage: holds a stable height so terminal → welcome → done doesn't pop -->
+        <div class="hero-stage" :class="{ 'is-collapsed': phase === 'done' }">
 
-        <!-- Welcome font-cycling display -->
-        <transition name="fade">
-          <div v-if="phase === 'welcome'" class="welcome-wrap" :class="{ fading: fadeOut }">
-            <div class="welcome-text" :style="{ fontFamily: welcomeFont }">
-              Welcome to Hopper
+          <!-- Typing terminal -->
+          <transition name="fade">
+            <div v-if="phase === 'typing' || phase === 'compiling'" class="demo-wrap">
+              <div class="demo-terminal">
+                <div class="terminal-bar">
+                  <span class="dot red"/><span class="dot yellow"/><span class="dot green"/>
+                  <span class="terminal-file">welcome.hop</span>
+                </div>
+                <pre class="terminal-body"><code>{{ typedCode }}<span v-if="phase === 'typing'" class="cursor">▊</span></code></pre>
+                <div v-if="phase === 'compiling'" class="compile-line">
+                  <span class="prompt">$</span> hopper build welcome.hop<span class="compile-dots">{{ compileDots }}</span>
+                </div>
+              </div>
             </div>
-            <div class="compile-success">
-              <span class="success-dot">●</span> built successfully
+          </transition>
+
+          <!-- Welcome font-cycling display -->
+          <transition name="fade">
+            <div v-if="phase === 'welcome'" class="welcome-wrap" :class="{ fading: fadeOut }">
+              <div class="welcome-text" :style="{ fontFamily: welcomeFont }">
+                Welcome to Hopper
+              </div>
+              <div class="compile-success">
+                <span class="success-dot">●</span> built successfully
+              </div>
             </div>
-          </div>
-        </transition>
+          </transition>
+
+        </div>
 
         <!-- Language description fades in with the title -->
         <p class="hero-desc" :class="{ visible: phase === 'done' }">
@@ -448,9 +453,9 @@ const tools = [
 
     <section class="layers">
       <div class="container">
-        <span class="label">It's All Code</span>
-        <h2 class="section-title">From bare metal to application.</h2>
-        <p class="section-sub">Every node below is real, runnable Hopper. Each layer solves a specific problem — and every arrow is a dependency. Follow them down to see how the language composes.</p>
+        <span v-reveal class="label">It's All Code</span>
+        <h2 v-reveal class="section-title">From bare metal to application.</h2>
+        <p v-reveal class="section-sub">Every node below is real, runnable Hopper. Each layer solves a specific problem — and every arrow is a dependency. Follow them down to see how the language composes.</p>
 
         <div class="tree-wrapper" ref="treeWrapper">
 
@@ -520,11 +525,16 @@ const tools = [
 
     <section class="toolchain">
       <div class="container">
-        <span class="label">Unified Build System</span>
-        <h2 class="section-title">One tool. Every step.</h2>
-        <p class="section-sub">Install, build, test, debug, profile, and flash from a single CLI. No Makefile. No CMake. No separate package manager.</p>
+        <span v-reveal class="label">Unified Build System</span>
+        <h2 v-reveal class="section-title">One tool. Every step.</h2>
+        <p v-reveal class="section-sub">Install, build, test, debug, profile, and flash from a single CLI. No Makefile. No CMake. No separate package manager.</p>
         <div class="tool-grid">
-          <div class="tool-card" v-for="t in tools" :key="t.cmd">
+          <div
+            v-for="(t, i) in tools"
+            :key="t.cmd"
+            v-reveal="i * 60"
+            class="tool-card"
+          >
             <h3 class="tool-name">hopper {{ t.cmd }}</h3>
             <p class="tool-desc">{{ t.desc }}</p>
           </div>
@@ -536,8 +546,8 @@ const tools = [
 
     <section class="separation">
       <div class="container">
-        <span class="label">The Separation</span>
-        <h2 class="section-title">Intentionally hostile to application development.<br>That friction is the feature.</h2>
+        <span v-reveal class="label">The Separation</span>
+        <h2 v-reveal class="section-title">Intentionally hostile to application development.<br>That friction is the feature.</h2>
         <p class="sep-body">
           C++ tried to be a systems language and an application language at the same time.
           The result is a language so complex that no two codebases agree on which subset to use.
@@ -679,8 +689,39 @@ const tools = [
 }
 .hero-title.visible { opacity: 1; transform: translateY(0); }
 
+/* ── Animation stage — stable height during phase transitions ── */
+.hero-stage {
+  position: relative;
+  min-height: 280px;
+  margin-bottom: 1.5rem;
+  transition: min-height 0.65s ease, margin-bottom 0.65s ease;
+}
+
+.hero-stage > .demo-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.hero-stage > .welcome-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.hero-stage.is-collapsed {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
 /* ── Terminal ── */
-.demo-wrap { margin-bottom: 1.5rem; }
+.demo-wrap { /* positioned by .hero-stage > * */ }
 
 .demo-terminal {
   background: var(--color-surface-dark);
@@ -743,7 +784,6 @@ const tools = [
 /* ── Welcome display ── */
 .welcome-wrap {
   text-align: left;
-  margin-bottom: 1.5rem;
   transition: opacity 0.6s ease;
 }
 .welcome-wrap.fading { opacity: 0; }

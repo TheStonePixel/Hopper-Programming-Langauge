@@ -21,8 +21,7 @@ const router = createRouter({
     },
     {
       path: '/examples',
-      name: 'examples',
-      component: () => import('../views/ExamplesView.vue'),
+      redirect: '/programs',
     },
     {
       path: '/docs',
