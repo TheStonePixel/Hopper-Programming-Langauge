@@ -13,6 +13,7 @@ const route = useRoute()
         <li><RouterLink to="/programs" :class="{ active: route.path === '/programs' }">Programs</RouterLink></li>
         <li><RouterLink to="/examples"  :class="{ active: route.path === '/examples' }">Examples</RouterLink></li>
         <li><RouterLink to="/benchmark" :class="{ active: route.path === '/benchmark' }">Benchmark</RouterLink></li>
+        <li><RouterLink to="/roadmap"   :class="{ active: route.path === '/roadmap' }">Roadmap</RouterLink></li>
         <li><RouterLink to="/about"     :class="{ active: route.path === '/about' }">About</RouterLink></li>
       </ul>
     </div>

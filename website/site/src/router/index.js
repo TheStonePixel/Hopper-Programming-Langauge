@@ -44,6 +44,11 @@ const router = createRouter({
       name: 'benchmark',
       component: () => import('../views/BenchmarkView.vue'),
     },
+    {
+      path: '/roadmap',
+      name: 'roadmap',
+      component: () => import('../views/RoadmapView.vue'),
+    },
   ],
 })
 
