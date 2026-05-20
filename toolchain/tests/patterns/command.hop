@@ -7,6 +7,11 @@
 // EXPECT: counter = 4
 
 // TEST: replay produces identical result
+// EXPECT:   inc -> 1
+// EXPECT:   inc -> 2
+// EXPECT:   dbl -> 4
+// EXPECT:   inc -> 5
+// EXPECT:   dec -> 4
 // EXPECT: counter = 4
 
 import array from ds

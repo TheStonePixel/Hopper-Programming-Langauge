@@ -64,12 +64,13 @@ and where the language is going.
 
 | Component | File | Status |
 |-----------|------|--------|
-| Grammar | `grammar/Hopper.g4` (369 lines) | Complete |
+| Grammar | `grammar/Hopper.g4` | Complete — contract/invariant NEWLINE handling fixed |
 | AST builder | `src/astBuilder.js` (973 lines) | Complete |
 | AST node defs | `src/ast.js` | Complete |
-| LLVM IR codegen | `src/codegenLLVM.js` (2,354 lines) | Complete |
+| LLVM IR codegen | `src/codegenLLVM.js` (2,390 lines) | Complete — monolithic; split planned |
+| Constraint codegen | `src/codegenConstraints.js` | Complete — requires/ensures/invariant/constrain, --release, --strict |
 | Code formatter | `src/formatter.js` | Complete |
-| Compiler driver | `hopperc.js` | Complete |
+| Compiler driver | `hopperc.js` | Complete — `--release` (strips contracts) and `--strict` (compile-time proof pass) flags |
 | CLI binary | `hopper` (Node.js executable) | Complete |
 | Build tool | `tools/build.js` | Complete |
 | Test runner | `tools/test.js` | Complete |
@@ -163,16 +164,23 @@ fully working programs, each with a corresponding test in `toolchain/tests/patte
 
 ### Website (`website/site/`)
 - **Framework**: Vue 3 + Vite, Shiki syntax highlighting (custom TextMate grammar)
-- **Routes**: `/` (Home), `/syntax`, `/programs`, `/examples`, `/docs`, `/about`, `/vs-c`
+- **Routes**: `/` (Home), `/syntax`, `/programs`, `/examples`, `/docs`, `/about`, `/roadmap`, `/vs-c`, `/benchmark`
 - **Home**: animated hero with typing → compiling → welcome phases; converging DAG tree
   SVG showing language features; orthogonal routing with rounded corners
-- **Syntax page**: comprehensive language reference with live code examples
+- **Syntax page**: comprehensive language reference with live code examples, including
+  Contracts section (`requires`, `ensures`, `invariant`, `constrain`) with compile-mode table
+- **Docs page**: full language reference — types/operators tables, module system, memory
+  model, hardware model, contracts, inline assembly; sidebar navigation
+- **About page**: philosophy and design manifesto — Why Hopper Exists, What I Believe,
+  Direction, Determinism, On Other Languages (orbit layout), Memento Mori, Final Principle
+- **Roadmap page**: language status, design principles, language-at-a-glance, current
+  progress (done / in-progress / planned)
 - **VS Code extension**: syntax highlighting, bracket matching, installed via
   `npm run install:ext`
 
 ### Tests
-110+ test files across all modules. Every module has a `tests/` subdirectory. CI-ready
-via `npm run test` or `npm run test -- <module>`.
+594 assertions across all modules and toolchain groups, all passing. Every module has a
+`tests/` subdirectory. CI-ready via `npm run test` or `npm run test -- <module>`.
 
 ---
 
@@ -227,10 +235,6 @@ Items are grouped by theme, not strict priority — pick what fits the current s
   canonical naming convention and update all `import` statements and `hopper.json` files
   accordingly.
 
-- [ ] **`string` as a first-class type** — currently a pointer to null-terminated bytes.
-  Decide: keep C-compatible, or wrap in a length-prefixed type? Affects FFI, `extern`
-  declarations, and the `string` module.
-
 - [ ] **Error propagation operator** — a `?`-style or `try` keyword that auto-unwraps
   `Result<T>` or returns the error to the caller. Reduces boilerplate in deeply nested
   call chains.
@@ -243,8 +247,9 @@ Items are grouped by theme, not strict priority — pick what fits the current s
 - [ ] **`fs` module** — high-level filesystem (`modules/fs/` stub exists; `io/src/fs.hop`
   has low-level ops — promote and expand)
 - [ ] **`ascii` module** — standalone ASCII utilities (currently inside `string`)
-- [ ] **`concurrent` module** — channels and futures are stubbed; implement with
-  `pthread_create` backend, test with producer/consumer programs
+- [x] **`concurrent` module** — `Channel<T>`, `Mutex`, `Future<T>` implemented in
+  `modules/concurrent/src/concurrent.hop` with `pthread_create` backend; 18 assertions
+  passing across channel, mutex, and future tests
 - [ ] **`json` module** — parser exists but is partial; add writer, prettifier, path
   queries (`.key[0].field`)
 - [ ] **`io` module** — FileReader/FileWriter are partial; add buffered I/O, line
@@ -278,22 +283,28 @@ program below should compile, run correctly, and serve as a reference for that p
 
 ### Website
 
-- [ ] **Programs page content** — `/programs` currently shows the LED blink stub only.
-  Add all design pattern programs above; group by category (embedded, systems, patterns,
-  algorithms).
+- [x] **Programs page content** — `/programs` shows all design pattern programs grouped
+  by category (embedded, systems, patterns, algorithms) with descriptions and code snippets.
+- [x] **Benchmark page** — `/benchmark` shows Hopper vs C head-to-head numbers (100k games,
+  debug/production/C -O0/-O2) and contract system overhead (debug vs `--release`), with SVG
+  bar charts and a disclaimer that results are illustrative, not language comparisons.
 - [ ] **Examples page** — `/examples` is sparse. Add the STM32 UART example, Battleship
   game, and JSON reader with explanatory prose.
-- [ ] **Docs page** — currently shows "coming soon". Write at minimum:
-  - Language reference (types, operators, control flow)
-  - Module system guide
-  - Hardware model guide (`bind`, `strict`, `bitfield`)
-  - Memory model (`allocate`/`deallocate`, smart pointers, `defer`)
+- [x] **Docs page** — full reference written: types/operators, module system, memory model,
+  hardware model (`bind`, `strict`, `bitfield`), contracts, inline assembly
 - [ ] **SVG tree on home page** — continue refining the converging DAG; consider adding
   labels or tooltips on hover to explain each node.
 - [ ] **`/vs-c` page** — flesh out comparison table with concrete code side-by-sides.
 
 ### Toolchain
 
+- [ ] **Split `codegenLLVM.js`** — 2,390 lines is too large to bootstrap. Natural boundaries:
+  - `codegenTypes.js` — type helpers, llvmType, sizeOf, bitfield layout, field lookup
+  - `codegenTemplates.js` — monomorphization, template instantiation, type substitution
+  - `codegenExpr.js` — genExpr (lines 618–1300, ~680 lines)
+  - `codegenStmt.js` — genStmt, genBlock, hoistAllocas (lines 1303–1921)
+  - `codegenDecl.js` — genFunction, genMethod, genOperator, genEntry, genBind, genModule
+  - `codegenLLVM.js` — thin orchestrator that imports and wires the above
 - [ ] **`hopper debug` command** — stub exists; wire up DWARF generation and `lldb` launch
 - [ ] **`hopper fmt` command** — formatter (`kindling/src/formatter.js`) exists; expose it
   as a CLI subcommand

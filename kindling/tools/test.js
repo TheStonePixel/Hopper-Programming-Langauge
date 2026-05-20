@@ -101,8 +101,12 @@ function parseMeta(source) {
         else if (t.startsWith("// TEST:")) {
             cur = { name: t.slice("// TEST:".length).trim(), expected: [] };
             sections.push(cur);
-        } else if (t.startsWith("// EXPECT:"))
-            cur.expected.push(t.slice("// EXPECT:".length).trim());
+        } else if (t.startsWith("// EXPECT:")) {
+            // Strip exactly one space (the directive delimiter), preserving any
+            // additional leading spaces that are part of the expected value itself.
+            const raw = t.slice("// EXPECT:".length);
+            cur.expected.push(raw.startsWith(" ") ? raw.slice(1) : raw.trimStart());
+        }
     }
 
     return { sections, compileOnly, expectedError, xfail };
@@ -156,7 +160,7 @@ function runTest(testFile, group) {
             sections: [{ name: null, assertions: [{ label: "compiles ok", status: "PASS" }] }]
         };
 
-    const run         = spawnSync(exePath, [], { encoding: "utf8" });
+    const run         = spawnSync(exePath, [], { encoding: "utf8", cwd: ROOT });
     const actualLines = (run.stdout || "").trimEnd().split("\n");
     if (actualLines.length === 1 && actualLines[0] === "") actualLines.length = 0;
 
