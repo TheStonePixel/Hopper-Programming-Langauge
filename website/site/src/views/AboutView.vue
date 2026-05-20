@@ -229,6 +229,173 @@
       </div>
     </section>
 
+    <!-- ── Philosophy ── -->
+
+    <!-- Why Hopper Exists -->
+    <section class="section phil-first">
+      <div class="inner">
+        <span class="phil-label">Philosophy</span>
+        <h2>Why Hopper Exists</h2>
+        <p>
+          I am building Hopper because the tools I want to build require a language that does not currently exist.
+        </p>
+        <div class="pull-quote">
+          <p>The compiler is the means.<br>The tools are the end.</p>
+        </div>
+        <p>
+          Most existing systems languages solve part of the problem. Few solve the whole thing
+          coherently. Some prioritize abstraction over visibility. Some prioritize safety over
+          control. Some accumulated so much complexity over time that the language itself became
+          harder to reason about than the software written in it.
+        </p>
+        <p>
+          Hopper exists because I believe most of the important problems in systems programming
+          were already solved decades ago — just not in the same place.
+        </p>
+        <div class="pull-quote">
+          <p>The goal is not reinvention.<br>The goal is assembly.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- What I Believe -->
+    <section class="section alt">
+      <div class="inner">
+        <h2>What I Believe</h2>
+        <div class="beliefs">
+          <div class="belief">I believe systems programming should expose the machine instead of hiding it.</div>
+          <div class="belief">I believe the runtime cost of code should be obvious from the source.</div>
+          <div class="belief">I believe abstraction is useful only when it preserves clarity and control.</div>
+          <div class="belief">I believe languages become fragile when they grow faster than their users can fully understand them.</div>
+          <div class="belief">I believe stability matters more than novelty.</div>
+          <div class="belief">I believe "finished" is one of the highest compliments a language can earn.</div>
+        </div>
+        <p>
+          A language that changes constantly forces its users to continuously relearn the
+          foundation beneath them. A language that stabilizes becomes infrastructure.
+          Infrastructure lasts.
+        </p>
+        <p>
+          Hopper is designed with the intention of eventually becoming stable enough to stop
+          evolving in fundamental ways. Not abandoned. Finished.
+        </p>
+      </div>
+    </section>
+
+    <!-- Direction -->
+    <section class="section">
+      <div class="inner">
+        <h2>Direction</h2>
+        <p>
+          Hopper has a single direction-setter. That is intentional.
+        </p>
+        <p>
+          I am not building Hopper by committee, consensus process, or market research. I am
+          building it according to a coherent philosophy and a long-term design direction.
+          Contributions are welcome. Disagreement is expected. Forking is permitted.
+        </p>
+        <p>Apache 2.0 guarantees that nobody is trapped.</p>
+        <div class="pull-quote">
+          <p>The direction remains centralized.<br>The exit remains open.</p>
+        </div>
+        <p>Both are necessary.</p>
+      </div>
+    </section>
+
+    <!-- Building Things That Last -->
+    <section class="section alt">
+      <div class="inner">
+        <h2>Building Things That Last</h2>
+        <p>
+          I believe long projects are completed by persistence more than brilliance.
+        </p>
+        <p>
+          Most ambitious software projects fail slowly. Not because the ideas were impossible,
+          but because the people building them eventually stopped showing up. The people who
+          finish things are usually the people still in the chair years after the excitement
+          wears off.
+        </p>
+        <p>
+          I plan to still be in the chair. I also plan to leave it cleanly when the work is
+          done. I want to build tools, operating systems, compilers, runtimes, and
+          hardware-oriented software. Hopper exists to make those possible. The language
+          itself is not the final product.
+        </p>
+      </div>
+    </section>
+
+    <!-- On Other Languages -->
+    <section class="section">
+      <div class="inner">
+        <h2>On Other Languages</h2>
+        <p>
+          Hopper is not built from rejection of the past. It is built from respect for it.
+        </p>
+        <div class="lang-grid">
+          <div class="lang-card">
+            <div class="lang-name">C</div>
+            <p>Proved how much could be accomplished with a small language close to the machine.</p>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name">C++</div>
+            <p>Proved deterministic resource management and zero-overhead abstractions could scale.</p>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name">Ada</div>
+            <p>Proved contracts and correctness systems mattered in real-world safety-critical software.</p>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name">Forth</div>
+            <p>Proved hardware description could live in user space instead of compiler internals.</p>
+          </div>
+          <div class="lang-card">
+            <div class="lang-name">Lisp</div>
+            <p>Proved small languages can survive for generations.</p>
+          </div>
+        </div>
+        <p>
+          Hopper borrows from all of them because all of them discovered something important.
+        </p>
+        <p>
+          The problem is not that previous languages failed to teach us anything.
+          The problem is that the industry keeps forgetting the lessons.
+        </p>
+      </div>
+    </section>
+
+    <!-- Impermanence -->
+    <section class="section alt">
+      <div class="inner">
+        <h2>Impermanence</h2>
+        <p>
+          I do not expect Hopper to last forever. Nothing does.
+        </p>
+        <p>
+          If Hopper succeeds, eventually something better should replace it. That is healthy.
+          Languages should earn their survival through usefulness, not institutional inertia.
+        </p>
+        <p>
+          Too many ecosystems survive indefinitely through accumulated compatibility obligations,
+          governance structures, and endless revision cycles. Languages become permanent
+          construction projects instead of stable foundations.
+        </p>
+        <p>
+          I would rather Hopper become stable, useful, and eventually obsolete than endlessly
+          "modernized." All things are impermanent.
+        </p>
+        <p class="memento">Memento mori.</p>
+      </div>
+    </section>
+
+    <!-- Final Principle -->
+    <section class="final-principle">
+      <div class="inner">
+        <p class="fp-line">The compiler is the kernel.</p>
+        <p class="fp-line">Everything else is userland.</p>
+        <p class="fp-sub">That is Hopper.</p>
+      </div>
+    </section>
+
     <footer class="page-footer">
       <div class="inner">
         <p>Hopper — open source systems language &nbsp;·&nbsp; prototype</p>
@@ -553,11 +720,121 @@
   color: #9ca3af;
 }
 
+/* ── Philosophy ── */
+.phil-first {
+  border-top: 2px solid #e5e7eb;
+}
+
+.phil-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #2563eb;
+  margin-bottom: 1.25rem;
+}
+
+.pull-quote {
+  border-left: 3px solid #2563eb;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  margin: 2rem 0;
+}
+
+.pull-quote p {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: #1e293b;
+  line-height: 1.75;
+  margin: 0;
+  max-width: none;
+  font-weight: 500;
+}
+
+/* ── Beliefs ── */
+.beliefs {
+  margin: 1.75rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.belief {
+  font-size: 0.975rem;
+  color: #374151;
+  line-height: 1.75;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* ── Language cards ── */
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  margin: 1.75rem 0;
+}
+
+.lang-card {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.25rem 1rem;
+}
+
+.lang-name {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #2563eb;
+  margin-bottom: 0.6rem;
+}
+
+.lang-card p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.65;
+  margin: 0;
+  max-width: none;
+}
+
+/* ── Memento ── */
+.memento {
+  font-style: italic;
+  color: #9ca3af !important;
+  margin-top: 1.5rem;
+}
+
+/* ── Final Principle ── */
+.final-principle {
+  background: #111827;
+  padding: 6rem 0;
+  text-align: center;
+}
+
+.fp-line {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #f9fafb;
+  line-height: 1.6;
+  letter-spacing: -0.5px;
+  margin: 0;
+  max-width: none;
+}
+
+.fp-sub {
+  font-size: 1rem;
+  color: #6b7280;
+  margin-top: 1.5rem !important;
+  max-width: none;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .principles  { grid-template-columns: 1fr; }
   .glance-grid { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
+  .lang-grid   { grid-template-columns: 1fr 1fr; }
   .page-header h1 { font-size: 2.75rem; }
+  .fp-line { font-size: 1.25rem; }
 }
 </style>
