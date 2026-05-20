@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watchEffect, onBeforeUnmount } from 'vue'
 import { highlight } from '@/lib/highlight.js'
+import { useTheme } from '@/lib/useTheme.js'
 
 const props = defineProps({
   label: { type: String, default: '' },
@@ -11,9 +12,12 @@ const highlighted = ref('')
 const copied = ref(false)
 let copyTimer = null
 
+const { theme } = useTheme()
+
 watchEffect(async () => {
   if (props.code) {
-    highlighted.value = await highlight(props.code)
+    // theme.value is read so the effect re-runs on theme change
+    highlighted.value = await highlight(props.code, theme.value)
   }
 })
 
@@ -88,7 +92,7 @@ onBeforeUnmount(() => clearTimeout(copyTimer))
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #cbd5e1;
+  color: var(--color-text-fainter);
   pointer-events: none;
   user-select: none;
   z-index: 1;

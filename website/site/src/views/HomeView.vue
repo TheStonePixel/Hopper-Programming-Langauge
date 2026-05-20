@@ -1,6 +1,15 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import CodeBlock from '@/components/CodeBlock.vue'
+import { useTheme } from '@/lib/useTheme.js'
+
+const { theme } = useTheme()
+
+function readCssVar(name, fallback) {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
 
 // ── Hero typing animation ────────────────────────────────────────────────────
 
@@ -219,7 +228,7 @@ function orthoPath(pts, r = 12) {
     return d
 }
 
-function dot(svg, cx, cy, r = 4, fill = '#2563eb', opacity = 0.75) {
+function dot(svg, cx, cy, r, fill, opacity = 0.75) {
     const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
     c.setAttribute('cx', cx); c.setAttribute('cy', cy)
     c.setAttribute('r',  r);  c.setAttribute('fill', fill)
@@ -308,13 +317,19 @@ function drawTreeLines() {
         document.head.appendChild(st)
     }
 
+    // Resolve theme-aware colors from CSS tokens (re-read each draw so a
+    // theme switch + redraw picks up the new palette).
+    const cBrand   = readCssVar('--color-brand',        '#2563eb')
+    const cPurple  = readCssVar('--color-purple',       '#7c3aed')
+    const cSuccess = readCssVar('--color-success-deep', '#059669')
+
     segments.forEach(({ pts, delay }) => {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
         path.setAttribute('d', orthoPath(pts, R))
         path.setAttribute('fill', 'none')
-        path.setAttribute('stroke', '#2563eb')
+        path.setAttribute('stroke', cBrand)
         path.setAttribute('stroke-width', '1.75')
-        path.setAttribute('stroke-opacity', '0.45')
+        path.setAttribute('stroke-opacity', '0.5')
         path.setAttribute('stroke-linecap', 'round')
         path.setAttribute('stroke-linejoin', 'round')
         const len = path.getTotalLength()
@@ -325,10 +340,10 @@ function drawTreeLines() {
     })
 
     // Junction / merge dots (drawn after paths so they sit on top)
-    dot(svg, tx,    busY,   5, '#2563eb')          // bus midpoint — trunk origin
-    dot(svg, tx,    memBrY, 4, '#7c3aed')          // T-junction to memory
-    dot(svg, tx,    clBrY,  4, '#2563eb')          // trunk turns into class
-    dot(svg, e.cx,  entY,   5, '#059669')          // class + syscall converge before entry
+    dot(svg, tx,    busY,   5, cBrand)
+    dot(svg, tx,    memBrY, 4, cPurple)
+    dot(svg, tx,    clBrY,  4, cBrand)
+    dot(svg, e.cx,  entY,   5, cSuccess)
 }
 
 // ── Hero + tree mount ─────────────────────────────────────────────────────────
@@ -374,6 +389,9 @@ onMounted(() => {
     ro = new ResizeObserver(() => drawTreeLines())
     nextTick(() => { if (treeWrapper.value) ro.observe(treeWrapper.value) })
 })
+
+// Redraw the connector tree when the theme flips so colors match.
+watch(theme, () => { drawTreeLines() })
 
 onUnmounted(() => { if (ro) ro.disconnect() })
 

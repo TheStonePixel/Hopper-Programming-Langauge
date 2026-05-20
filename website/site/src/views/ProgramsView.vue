@@ -1290,7 +1290,7 @@ function byGroup(g) {
 
 .toc-bar a {
   padding: 0.2rem 0.75rem;
-  color: #475569;
+  color: var(--color-text-muted);
   text-decoration: none;
   border-radius: var(--radius-pill);
   font-size: 0.85rem;
@@ -1358,7 +1358,7 @@ function byGroup(g) {
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius-pill);
   background: var(--color-surface-code);
-  color: #64748b;
+  color: var(--color-text-soft);
   border: 1px solid var(--color-border-strong);
 }
 

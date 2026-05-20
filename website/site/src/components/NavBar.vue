@@ -1,6 +1,9 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router'
+import { useTheme } from '@/lib/useTheme.js'
+
 const route = useRoute()
+const { theme, toggleTheme } = useTheme()
 
 const links = [
   { to: '/docs',      label: 'Documentation' },
@@ -24,6 +27,25 @@ const links = [
           </RouterLink>
         </li>
       </ul>
+      <button
+        type="button"
+        class="theme-toggle"
+        :aria-label="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+        :title="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+        @click="toggleTheme"
+      >
+        <!-- Sun (shown in dark mode → click to go light) -->
+        <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <!-- Moon (shown in light mode → click to go dark) -->
+        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"
+            stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   </nav>
 </template>
@@ -102,4 +124,40 @@ const links = [
 }
 
 .nav-links a.active::after { width: 60%; }
+
+/* ── Theme toggle ─────────────────────────────────────────────────── */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 0.5rem;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast),
+              color var(--transition-fast),
+              border-color var(--transition-fast),
+              transform var(--transition-fast);
+}
+
+.theme-toggle:hover {
+  color: var(--color-brand);
+  border-color: var(--color-brand-tint-border);
+  background: var(--color-brand-tint);
+}
+
+.theme-toggle:active { transform: scale(0.92); }
+
+.theme-toggle svg {
+  transition: transform var(--transition-med);
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(15deg);
+}
 </style>

@@ -112,6 +112,81 @@
   /* --bp-mobile: 768px */
 }
 
+/* ── Dark theme overrides ─────────────────────────────────────────────────
+   Applied when [data-theme="dark"] is set on <html> by the bootstrap
+   script in index.html or the in-app toggle.
+   --------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  /* Brand — slightly brighter so it pops on dark surfaces */
+  --color-brand:              #3b82f6;
+  --color-brand-hover:        #60a5fa;
+  --color-brand-tint:         rgba(59, 130, 246, 0.16);
+  --color-brand-tint-border:  rgba(59, 130, 246, 0.42);
+
+  /* Text */
+  --color-text:               #e6e8ee;
+  --color-text-strong:        #cbd5e1;
+  --color-text-muted:         #a3aab8;
+  --color-text-soft:          #8b93a3;
+  --color-text-faint:         #6b7280;
+  --color-text-fainter:       #4b5563;
+  --color-text-deep:          #f1f5f9;
+  /* on-dark tokens — these were already designed for dark contexts;
+     they remain identical so the terminal / footer feel unchanged. */
+
+  /* Surfaces */
+  --color-bg:                 #0f1116;
+  --color-surface:            #161a23;
+  --color-surface-alt:        #1a1e29;
+  --color-surface-soft:       #1c2030;
+  --color-surface-code:       #1e2330;
+  --color-surface-muted:      #181c26;
+  --color-surface-dark:       #08090d;
+  --color-surface-dark-alt:   #161a23;
+  --color-surface-dark-deeper:#05060a;
+
+  /* Borders */
+  --color-border:             #2a2f3d;
+  --color-border-strong:      #353b4a;
+  --color-border-soft:        #1f2330;
+
+  /* Accent tints — semi-transparent so they layer over dark surfaces */
+  --color-success-tint:       rgba(34, 197, 94, 0.13);
+  --color-success-tint-border:rgba(34, 197, 94, 0.36);
+
+  --color-warning-tint:       rgba(245, 158, 11, 0.13);
+  --color-warning-pale:       rgba(245, 158, 11, 0.10);
+  --color-warning-pale-border:rgba(245, 158, 11, 0.32);
+  --color-warning-text:       #fbbf24;
+
+  --color-danger-tint:        rgba(220, 38, 38, 0.14);
+  --color-danger-tint-border: rgba(220, 38, 38, 0.36);
+
+  --color-purple-tint:        rgba(124, 58, 237, 0.16);
+  --color-purple-tint-border: rgba(124, 58, 237, 0.42);
+
+  --color-orange-tint:        rgba(194, 65, 12, 0.16);
+  --color-orange-tint-border: rgba(194, 65, 12, 0.42);
+
+  --color-info-tint:          rgba(8, 145, 178, 0.16);
+
+  /* Card hover for dark mode */
+  --card-hover-border:        #3b82f6;
+  --card-hover-shadow:        0 8px 28px rgba(59, 130, 246, 0.22);
+
+  /* Shadows — slightly stronger over dark surfaces */
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm:    0 1px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md:    0 4px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg:    0 20px 60px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

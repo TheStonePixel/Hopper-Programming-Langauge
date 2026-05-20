@@ -1,45 +1,33 @@
 <script setup>
+import { computed } from 'vue'
 import PageShell from '@/components/PageShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SidebarLayout from '@/components/SidebarLayout.vue'
+import { useTheme } from '@/lib/useTheme.js'
 
 // All numbers are from live runs on x86-64 Linux.
 // Same algorithm (100,000 bot-vs-bot Battleship games), same RNG seed (42).
 
+const { theme } = useTheme()
+
+// Variant → token-resolved {color, bg} pair. Re-computes on theme change.
+const variantPalette = computed(() => {
+  theme.value  // dependency so we recompute when the theme flips
+  if (typeof window === 'undefined') return {}
+  const cs = getComputedStyle(document.documentElement)
+  const v = (n) => cs.getPropertyValue(n).trim()
+  return {
+    brand:   { color: v('--color-brand'),      bg: v('--color-brand-tint') },
+    neutral: { color: v('--color-text-soft'),  bg: v('--color-surface-alt') },
+  }
+})
+
 // ── Hopper vs C ──────────────────────────────────────────────────────────────
 const vsC = [
-  {
-    name: 'Hopper dev',
-    desc: 'hopperc → clang -O0',
-    time: 7400,
-    throughput: 13514,
-    color: '#2563eb',
-    bg: '#eff6ff',
-  },
-  {
-    name: 'C -O0',
-    desc: 'gcc -O0',
-    time: 6091,
-    throughput: 16419,
-    color: '#6b7280',
-    bg: '#f9fafb',
-  },
-  {
-    name: 'Hopper production',
-    desc: 'hopperc → clang -O2',
-    time: 880,
-    throughput: 113636,
-    color: '#2563eb',
-    bg: '#eff6ff',
-  },
-  {
-    name: 'C -O2',
-    desc: 'gcc -O2',
-    time: 907,
-    throughput: 110254,
-    color: '#6b7280',
-    bg: '#f9fafb',
-  },
+  { name: 'Hopper dev',        desc: 'hopperc → clang -O0', time: 7400, throughput: 13514, variant: 'brand'   },
+  { name: 'C -O0',             desc: 'gcc -O0',             time: 6091, throughput: 16419, variant: 'neutral' },
+  { name: 'Hopper production', desc: 'hopperc → clang -O2', time: 880,  throughput: 113636,variant: 'brand'   },
+  { name: 'C -O2',             desc: 'gcc -O2',             time: 907,  throughput: 110254,variant: 'neutral' },
 ]
 
 const vsCUnopt = vsC.slice(0, 2)
@@ -47,22 +35,8 @@ const vsCOpt   = vsC.slice(2, 4)
 
 // ── Contract system (Battleship 4) ───────────────────────────────────────────
 const contracts = [
-  {
-    name: 'Debug',
-    desc: 'runtime contract checks (13 sites)',
-    time: 9234,
-    throughput: 10829,
-    color: '#2563eb',
-    bg: '#eff6ff',
-  },
-  {
-    name: 'Release',
-    desc: '--release, all contracts stripped',
-    time: 7590,
-    throughput: 13175,
-    color: '#6b7280',
-    bg: '#f9fafb',
-  },
+  { name: 'Debug',   desc: 'runtime contract checks (13 sites)', time: 9234, throughput: 10829, variant: 'brand'   },
+  { name: 'Release', desc: '--release, all contracts stripped',  time: 7590, throughput: 13175, variant: 'neutral' },
 ]
 
 // ── Chart helpers ─────────────────────────────────────────────────────────────
@@ -135,7 +109,7 @@ function maxOf(rows, key) {
             <tbody>
               <tr v-for="r in vsCUnopt" :key="r.name">
                 <td>
-                  <span class="badge" :style="{ background: r.bg, color: r.color }">{{ r.name }}</span>
+                  <span class="badge" :style="{ background: variantPalette[r.variant]?.bg, color: variantPalette[r.variant]?.color }">{{ r.name }}</span>
                   <span class="sub-label">{{ r.desc }}</span>
                 </td>
                 <td class="num">{{ r.time.toLocaleString() }} ms</td>
@@ -147,7 +121,7 @@ function maxOf(rows, key) {
             <svg width="520" height="110" class="chart">
               <g v-for="(r, i) in vsCUnopt" :key="r.name" :transform="`translate(0, ${i * 50})`">
                 <text x="110" y="20" class="bar-label" text-anchor="end">{{ r.name }}</text>
-                <rect x="118" y="6" :width="barWidth(r.time, maxOf(vsCUnopt, 'time'))" height="22" :fill="r.color" rx="3" />
+                <rect x="118" y="6" :width="barWidth(r.time, maxOf(vsCUnopt, 'time'))" height="22" :fill="variantPalette[r.variant]?.color" rx="3" />
                 <text :x="118 + Number(barWidth(r.time, maxOf(vsCUnopt, 'time'))) + 7" y="21" class="bar-value">
                   {{ r.time.toLocaleString() }} ms
                 </text>
@@ -163,7 +137,7 @@ function maxOf(rows, key) {
             <tbody>
               <tr v-for="r in vsCOpt" :key="r.name">
                 <td>
-                  <span class="badge" :style="{ background: r.bg, color: r.color }">{{ r.name }}</span>
+                  <span class="badge" :style="{ background: variantPalette[r.variant]?.bg, color: variantPalette[r.variant]?.color }">{{ r.name }}</span>
                   <span class="sub-label">{{ r.desc }}</span>
                 </td>
                 <td class="num">{{ r.time.toLocaleString() }} ms</td>
@@ -175,7 +149,7 @@ function maxOf(rows, key) {
             <svg width="520" height="110" class="chart">
               <g v-for="(r, i) in vsCOpt" :key="r.name" :transform="`translate(0, ${i * 50})`">
                 <text x="110" y="20" class="bar-label" text-anchor="end">{{ r.name }}</text>
-                <rect x="118" y="6" :width="barWidth(r.time, maxOf(vsCOpt, 'time'))" height="22" :fill="r.color" rx="3" />
+                <rect x="118" y="6" :width="barWidth(r.time, maxOf(vsCOpt, 'time'))" height="22" :fill="variantPalette[r.variant]?.color" rx="3" />
                 <text :x="118 + Number(barWidth(r.time, maxOf(vsCOpt, 'time'))) + 7" y="21" class="bar-value">
                   {{ r.time.toLocaleString() }} ms
                 </text>
@@ -207,7 +181,7 @@ function maxOf(rows, key) {
             <tbody>
               <tr v-for="r in contracts" :key="r.name">
                 <td>
-                  <span class="badge" :style="{ background: r.bg, color: r.color }">{{ r.name }}</span>
+                  <span class="badge" :style="{ background: variantPalette[r.variant]?.bg, color: variantPalette[r.variant]?.color }">{{ r.name }}</span>
                   <span class="sub-label">{{ r.desc }}</span>
                 </td>
                 <td class="num">{{ r.time.toLocaleString() }} ms</td>
@@ -220,7 +194,7 @@ function maxOf(rows, key) {
             <svg width="520" height="110" class="chart">
               <g v-for="(r, i) in contracts" :key="r.name" :transform="`translate(0, ${i * 50})`">
                 <text x="70" y="20" class="bar-label" text-anchor="end">{{ r.name }}</text>
-                <rect x="78" y="6" :width="barWidth(r.time, maxOf(contracts, 'time'))" height="22" :fill="r.color" rx="3" />
+                <rect x="78" y="6" :width="barWidth(r.time, maxOf(contracts, 'time'))" height="22" :fill="variantPalette[r.variant]?.color" rx="3" />
                 <text :x="78 + Number(barWidth(r.time, maxOf(contracts, 'time'))) + 7" y="21" class="bar-value">
                   {{ r.time.toLocaleString() }} ms
                 </text>
@@ -297,7 +271,7 @@ function maxOf(rows, key) {
   background: var(--color-surface-muted);
   padding: 0.1em 0.35em;
   border-radius: var(--radius-sm);
-  color: #1f2937;
+  color: var(--color-text);
 }
 
 .disclaimer {

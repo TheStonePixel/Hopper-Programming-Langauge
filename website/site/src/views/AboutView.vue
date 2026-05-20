@@ -343,7 +343,7 @@ import LinkButton from '@/components/LinkButton.vue'
 
 /* ── Final Principle ── */
 .final-principle {
-  background: var(--color-text);
+  background: var(--color-surface-dark);
   padding: 6rem 0;
   text-align: center;
 }
