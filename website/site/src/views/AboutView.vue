@@ -416,8 +416,18 @@
 
 .orbit-node {
   position: absolute;
-  width: 125px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: #faf9f6;
+  border: 1.5px solid #e5e7eb;
   transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem;
+  box-sizing: border-box;
   text-align: center;
 }
 
@@ -519,8 +529,11 @@
     position: static;
     transform: none;
     width: 100%;
+    height: auto;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
     text-align: left;
-    display: flex;
+    flex-direction: row;
     align-items: baseline;
     gap: 0.75rem;
   }
