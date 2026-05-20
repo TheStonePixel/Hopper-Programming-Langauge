@@ -92,9 +92,9 @@
   --shadow-lg:    0 20px 60px rgba(0, 0, 0, 0.22);
 
   /* ── Layout ────────────────────────────────────────────────────────── */
-  --container-sm:   700px;
-  --container-md:   860px;
-  --container-lg:   1100px;
+  --container-sm:   820px;
+  --container-md:   1040px;
+  --container-lg:   1320px;
   --page-gutter:    5vw;
   --nav-height:     56px;
 
