@@ -196,12 +196,15 @@ import ContentSection from '@/components/ContentSection.vue'
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: 1.75rem;
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast),
+              box-shadow var(--transition-fast),
+              transform var(--transition-fast);
 }
 
 .principle:hover {
-  border-color: var(--color-brand-tint-border);
-  transform: translateY(-2px);
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-hover-shadow);
+  transform: var(--card-lift);
 }
 
 :deep(.section--alt) .principle { background: var(--color-surface); }

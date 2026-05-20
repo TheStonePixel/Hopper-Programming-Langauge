@@ -103,6 +103,11 @@
   --transition-med:  0.3s ease;
   --transition-slow: 0.6s ease;
 
+  /* ── Interactive card hover (shared across views) ──────────────────── */
+  --card-lift:           translateY(-2px);
+  --card-hover-border:   #93c5fd;
+  --card-hover-shadow:   0 6px 24px rgba(37, 99, 235, 0.10);
+
   /* ── Breakpoints (reference only; media queries can't use vars) ────── */
   /* --bp-mobile: 768px */
 }

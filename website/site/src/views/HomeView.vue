@@ -880,9 +880,9 @@ const tools = [
 }
 
 .tool-card:hover {
-  border-color: #93c5fd;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-hover-shadow);
+  transform: var(--card-lift);
 }
 
 .tool-name {
