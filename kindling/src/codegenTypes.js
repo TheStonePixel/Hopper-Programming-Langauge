@@ -23,6 +23,7 @@ export function mangleTemplate(t) {
 }
 
 export function normalizeType(t) {
+    if (typeAliases.has(t)) return normalizeType(typeAliases.get(t));
     if (t && t.includes('<')) return mangleTemplate(t);
     return t;
 }
