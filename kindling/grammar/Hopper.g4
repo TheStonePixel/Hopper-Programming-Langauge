@@ -264,13 +264,13 @@ statement
     | AsmBlock                                                     # AsmStmt
     ;
 
-// Compile-time constraint clause — reserved, not yet implemented
-// e.g.  int x = 10 constrain [u8]
+// Compile-time constraint clause — type range narrowing on variable declaration
+// e.g.  int x = 10 constrain [byte]  →  runtime (or strict: compile-time) range check
 constrainClause
     : 'constrain' '[' type ']'
     ;
 
-// Compile-time loop invariant — reserved, not yet implemented
+// Loop invariant — checked at every loop-head evaluation
 // e.g.  while (i < n) invariant i >= 0 { ... }
 invariantClause
     : 'invariant' expression
