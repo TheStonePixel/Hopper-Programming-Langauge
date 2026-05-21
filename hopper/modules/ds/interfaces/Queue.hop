@@ -1,0 +1,7 @@
+interface Queue {
+    function len() int
+    function empty() bool
+    function push(address val)
+    function pop() address
+    function peek() address
+}

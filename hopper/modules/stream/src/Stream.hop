@@ -1,0 +1,58 @@
+class ByteStream implements Stream {
+    address data
+    int position
+    int length
+
+    constructor(address buf, int len) {
+        self.data     = buf
+        self.position = 0
+        self.length   = len
+    }
+
+    function pos() int {
+        return self.position
+    }
+
+    function remaining() int {
+        return self.length - self.position
+    }
+
+    function atEnd() bool {
+        return self.position >= self.length
+    }
+
+    function peek() byte {
+        if (self.position >= self.length) {
+            byte z = 0
+            return z
+        }
+        address p = self.data + self.position
+        byte b = p::value
+        return b
+    }
+
+    function peekAt(int offset) byte {
+        int idx = self.position + offset
+        if (idx >= self.length) {
+            byte z = 0
+            return z
+        }
+        if (idx < 0) {
+            byte z = 0
+            return z
+        }
+        address p = self.data + idx
+        byte b = p::value
+        return b
+    }
+
+    function advance() {
+        if (self.position < self.length) {
+            self.position = self.position + 1
+        }
+    }
+
+    function reset() {
+        self.position = 0
+    }
+}

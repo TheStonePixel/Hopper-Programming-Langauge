@@ -1,0 +1,8 @@
+interface Buffer {
+    function ptr() address
+    function len() int
+    function get(int i) byte
+    function set(int i, byte val)
+    function zero()
+    function resize(int newLen)
+}

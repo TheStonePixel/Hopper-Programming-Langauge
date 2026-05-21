@@ -1,0 +1,16 @@
+{
+  "name": "tui",
+  "version": "0.1.0",
+  "description": "Terminal UI: raw mode, ANSI colors, box drawing, key input",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {
+    "arch": "0.1.0"
+  },
+  "exports": {
+    "TUI": {
+      "interface":      "interfaces/TUI.hop",
+      "implementation": "src/TUI.hop"
+    }
+  }
+}

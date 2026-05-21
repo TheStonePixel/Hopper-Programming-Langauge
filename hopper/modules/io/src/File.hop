@@ -1,0 +1,100 @@
+import io from arch
+import fs from arch
+
+function _ioStrLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { break }
+        n = n + 1
+    }
+    return n
+}
+
+class StandardFileReader implements FileReader {
+    int  fd
+    bool eof
+
+    constructor(address path) {
+        self.fd  = open(path, 0, 0)
+        self.eof = false
+    }
+
+    destructor() {
+        if (self.fd >= 0) {
+            close(self.fd)
+        }
+    }
+
+    function valid() bool { return self.fd >= 0 }
+    function done()  bool { return self.eof     }
+
+    function readBytes(address buf, int max) int {
+        if (self.eof) { return 0 }
+        int n = read(self.fd, buf, max)
+        if (n <= 0) {
+            self.eof = true
+            return 0
+        }
+        return n
+    }
+
+    function readByte(address out) bool {
+        if (self.eof) { return false }
+        int n = read(self.fd, out, 1)
+        if (n <= 0) {
+            self.eof = true
+            return false
+        }
+        return true
+    }
+}
+
+class StandardFileWriter implements FileWriter {
+    int fd
+
+    constructor(address path) {
+        self.fd = open(path, 577, 420)
+    }
+
+    destructor() {
+        if (self.fd >= 0) {
+            close(self.fd)
+        }
+    }
+
+    function valid() bool { return self.fd >= 0 }
+
+    function writeBytes(address buf, int n) int {
+        return write(self.fd, buf, n)
+    }
+
+    function writeStr(address s) int {
+        int len = _ioStrLen(s)
+        return write(self.fd, s, len)
+    }
+}
+
+// Read up to maxLen bytes from path into buf; null-terminates. Returns bytes read or -1.
+function fileRead(address path, address buf, int maxLen) int {
+    int fd = open(path, 0, 0)
+    if (fd < 0) { return -1 }
+    int n = read(fd, buf, maxLen - 1)
+    close(fd)
+    if (n < 0) { n = 0 }
+    address term = buf + n
+    byte z = 0
+    term::value = z
+    return n
+}
+
+// Write len bytes from buf to path (create/truncate). Returns true on success.
+function fileWrite(address path, address buf, int len) bool {
+    int fd = open(path, 577, 420)
+    if (fd < 0) { return false }
+    int written = write(fd, buf, len)
+    close(fd)
+    return written == len
+}

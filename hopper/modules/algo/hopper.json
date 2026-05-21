@@ -1,0 +1,14 @@
+{
+  "name": "algo",
+  "version": "0.1.0",
+  "description": "Sorting algorithms: insertionSort, quickSort, mergeSort with callback comparators",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Algo": {
+      "interface":      "interfaces/Algo.hop",
+      "implementation": "src/Algo.hop"
+    }
+  }
+}

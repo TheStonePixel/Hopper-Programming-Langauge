@@ -1,0 +1,106 @@
+extern function pthread_mutex_init(address m, address attr) int
+extern function pthread_mutex_lock(address m) int
+extern function pthread_mutex_trylock(address m) int
+extern function pthread_mutex_unlock(address m) int
+extern function pthread_mutex_destroy(address m) int
+
+extern function pthread_cond_init(address c, address attr) int
+extern function pthread_cond_wait(address c, address m) int
+extern function pthread_cond_signal(address c) int
+extern function pthread_cond_broadcast(address c) int
+extern function pthread_cond_destroy(address c) int
+
+extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
+extern function pthread_detach(int tid) int
+extern function pthread_join(int tid, address retval) int
+
+extern function memset(address dst, int c, int n) address
+
+// pthread_mutex_t on Linux x86-64 is 40 bytes; 64 for alignment safety
+const MUTEX_SIZE = 64
+// pthread_cond_t on Linux x86-64 is 48 bytes; 64 for alignment safety
+const COND_SIZE  = 64
+
+class StandardMutex implements Mutex {
+    address handle
+
+    constructor() {
+        self.handle = allocate MUTEX_SIZE
+        memset(self.handle, 0, MUTEX_SIZE)
+        pthread_mutex_init(self.handle, null)
+    }
+
+    destructor() {
+        pthread_mutex_destroy(self.handle)
+        deallocate self.handle
+    }
+
+    function lock()             { pthread_mutex_lock(self.handle) }
+    function tryLock() bool     { return pthread_mutex_trylock(self.handle) == 0 }
+    function unlock()           { pthread_mutex_unlock(self.handle) }
+    function rawHandle() address { return self.handle }
+}
+
+class StandardCondvar implements Condvar {
+    address handle
+
+    constructor() {
+        self.handle = allocate COND_SIZE
+        memset(self.handle, 0, COND_SIZE)
+        pthread_cond_init(self.handle, null)
+    }
+
+    destructor() {
+        pthread_cond_destroy(self.handle)
+        deallocate self.handle
+    }
+
+    function wait(address mutHandle) { pthread_cond_wait(self.handle, mutHandle) }
+    function signal()               { pthread_cond_signal(self.handle) }
+    function broadcast()            { pthread_cond_broadcast(self.handle) }
+    function rawHandle() address    { return self.handle }
+}
+
+// Internal thunk for spawn: rawArgs layout = [fn(8) | arg(8) | statePtr(8)]
+function _spawnThunk(address rawArgs) address {
+    address fn      = rawArgs::value
+    address argSlot = rawArgs + 8
+    address userArg = argSlot::value
+    address stSlot  = rawArgs + 16
+    address statePtr = stSlot::value
+    deallocate rawArgs
+
+    callback(address) address cb = cast fn
+    address result = cb(userArg)
+
+    address valSlot = statePtr + 8
+    valSlot::value  = result
+    statePtr::value = 1
+    return null
+}
+
+// Spawn fn(arg) on a new thread; returns a statePtr (16 bytes: [done(8) | result(8)]).
+// Poll statePtr::value != 0 to check completion; read result from statePtr+8.
+// Caller is responsible for deallocating statePtr after reading the result.
+function spawn(address fn, address arg) address {
+    address statePtr = allocate 16
+    statePtr::value  = 0
+    address valSlot  = statePtr + 8
+    valSlot::value   = null
+
+    address thunkArgs = allocate 24
+    thunkArgs::value  = fn
+    address argSlot   = thunkArgs + 8
+    argSlot::value    = arg
+    address stSlot    = thunkArgs + 16
+    stSlot::value     = statePtr
+
+    address thunkAddr = _spawnThunk::address
+    address tidPtr    = allocate 8
+    pthread_create(tidPtr, null, thunkAddr, thunkArgs)
+    int tid = tidPtr::value
+    pthread_detach(tid)
+    deallocate tidPtr
+
+    return statePtr
+}

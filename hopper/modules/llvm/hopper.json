@@ -1,0 +1,14 @@
+{
+  "name": "llvm",
+  "version": "0.1.0",
+  "description": "LLVM C API bindings for IR generation and optimization",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "LLVM": {
+      "interface":      "interfaces/LLVM.hop",
+      "implementation": "src/LLVM.hop"
+    }
+  }
+}

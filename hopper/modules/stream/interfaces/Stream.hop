@@ -1,0 +1,9 @@
+interface Stream {
+    function peek() byte
+    function advance()
+    function remaining() int
+    function atEnd() bool
+    function reset()
+    function peekAt(int offset) byte
+    function pos() int
+}

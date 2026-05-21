@@ -1,0 +1,18 @@
+{
+  "name": "concurrent",
+  "version": "0.1.0",
+  "description": "Concurrency primitives: Mutex, Condvar, spawn via pthreads",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Mutex": {
+      "interface":      "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    },
+    "Condvar": {
+      "interface":      "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    }
+  }
+}

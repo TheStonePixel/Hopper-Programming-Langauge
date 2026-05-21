@@ -1,0 +1,14 @@
+{
+  "name": "pointer",
+  "version": "0.1.0",
+  "description": "OwnedBuffer: heap byte buffer with get/set/zero/resize lifecycle",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Buffer": {
+      "interface":      "interfaces/Buffer.hop",
+      "implementation": "src/Buffer.hop"
+    }
+  }
+}

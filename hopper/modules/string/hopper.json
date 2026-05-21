@@ -1,0 +1,14 @@
+{
+  "name": "string",
+  "version": "0.1.0",
+  "description": "AsciiString: growable null-terminated UTF-8/ASCII string with full mutation API",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "IString": {
+      "interface":      "interfaces/IString.hop",
+      "implementation": "src/AsciiString.hop"
+    }
+  }
+}

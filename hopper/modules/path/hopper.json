@@ -1,0 +1,14 @@
+{
+  "name": "path",
+  "version": "0.1.0",
+  "description": "Path manipulation: join, basename, dirname, ext",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Path": {
+      "interface":      "interfaces/Path.hop",
+      "implementation": "src/Path.hop"
+    }
+  }
+}

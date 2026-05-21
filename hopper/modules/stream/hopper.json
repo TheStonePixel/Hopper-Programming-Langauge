@@ -1,0 +1,14 @@
+{
+  "name": "stream",
+  "version": "0.1.0",
+  "description": "Byte stream: peek, advance, seek, remaining over a raw buffer",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Stream": {
+      "interface":      "interfaces/Stream.hop",
+      "implementation": "src/Stream.hop"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "ds",
+  "version": "0.1.0",
+  "description": "Data structures: Array, Stack, Queue, Map, StringBuilder — address-based generics",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Array": {
+      "interface":      "interfaces/Array.hop",
+      "implementation": "src/Array.hop"
+    },
+    "Stack": {
+      "interface":      "interfaces/Stack.hop",
+      "implementation": "src/Stack.hop"
+    },
+    "Queue": {
+      "interface":      "interfaces/Queue.hop",
+      "implementation": "src/Queue.hop"
+    },
+    "Map": {
+      "interface":      "interfaces/Map.hop",
+      "implementation": "src/Map.hop"
+    },
+    "StringBuilder": {
+      "interface":      "interfaces/StringBuilder.hop",
+      "implementation": "src/StringBuilder.hop"
+    }
+  }
+}

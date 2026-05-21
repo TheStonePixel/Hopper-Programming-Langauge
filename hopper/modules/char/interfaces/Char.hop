@@ -1,0 +1,15 @@
+interface Char {
+    function isAlpha(byte c) bool
+    function isDigit(byte c) bool
+    function isAlphaNum(byte c) bool
+    function isSpace(byte c) bool
+    function isUpper(byte c) bool
+    function isLower(byte c) bool
+    function isHex(byte c) bool
+    function isPrint(byte c) bool
+    function isPunct(byte c) bool
+    function toUpper(byte c) byte
+    function toLower(byte c) byte
+    function digitValue(byte c) int
+    function hexValue(byte c) int
+}

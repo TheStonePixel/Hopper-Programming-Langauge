@@ -1,0 +1,54 @@
+class StandardStack implements Stack {
+    address data
+    int length
+    int capacity
+
+    constructor(int initialCap) {
+        self.capacity = initialCap
+        self.length   = 0
+        self.data     = allocate initialCap * 8
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow() {
+        int newCap  = self.capacity * 2
+        address buf = allocate newCap * 8
+        int i = 0
+        while (i < self.length) {
+            address src = self.data + i * 8
+            address dst = buf + i * 8
+            address v = src::value
+            dst::value = v
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = buf
+        self.capacity = newCap
+    }
+
+    function len() int   { return self.length }
+    function empty() bool { return self.length == 0 }
+
+    function push(address val) {
+        if (self.length == self.capacity) { self._grow() }
+        address p = self.data + self.length * 8
+        p::value = val
+        self.length = self.length + 1
+    }
+
+    function pop() address {
+        self.length = self.length - 1
+        address p = self.data + self.length * 8
+        address v = p::value
+        return v
+    }
+
+    function peek() address {
+        address p = self.data + (self.length - 1) * 8
+        address v = p::value
+        return v
+    }
+}

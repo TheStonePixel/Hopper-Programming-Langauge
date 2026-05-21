@@ -1,0 +1,331 @@
+import Array  from ds
+import Stream from stream
+
+// JsonNode layout (stored in heap, accessed via address):
+//   [0..7]   int kind
+//   [8..15]  int numVal
+//   [16..23] address strVal (null-terminated heap string or null)
+//   [24..31] address children (heap StandardArray of address, or null)
+//   [32..39] address keys (heap StandardArray of address strings, or null)
+const JSON_NODE_SIZE   = 40
+const JSON_KIND_OFF    = 0
+const JSON_NUM_OFF     = 8
+const JSON_STR_OFF     = 16
+const JSON_CHILD_OFF   = 24
+const JSON_KEYS_OFF    = 32
+
+function _jsonReadInt(address p) int {
+    address pi = p
+    int v = pi::value
+    return v
+}
+
+function _jsonWriteInt(address p, int v) {
+    address pi = p
+    pi::value = v
+}
+
+function _jsonReadAddr(address p) address {
+    address pa = p
+    address v = pa::value
+    return v
+}
+
+function _jsonWriteAddr(address p, address v) {
+    address pa = p
+    pa::value = v
+}
+
+function _jsonMakeNode(int kind, int numVal, address strVal, address children, address keys) address {
+    address node = allocate JSON_NODE_SIZE
+    _jsonWriteInt(node + JSON_KIND_OFF, kind)
+    _jsonWriteInt(node + JSON_NUM_OFF, numVal)
+    _jsonWriteAddr(node + JSON_STR_OFF, strVal)
+    _jsonWriteAddr(node + JSON_CHILD_OFF, children)
+    _jsonWriteAddr(node + JSON_KEYS_OFF, keys)
+    return node
+}
+
+class JsonReader implements JSON {
+    address stream
+    address data
+    int     dataLen
+    int     pos
+
+    constructor(address src, int len) {
+        self.data    = src
+        self.dataLen = len
+        self.pos     = 0
+    }
+
+    destructor() { }
+
+    function _peek() int {
+        if (self.pos >= self.dataLen) { return -1 }
+        address p = self.data + self.pos
+        byte b = p::value
+        int bi = cast b
+        return bi
+    }
+
+    function _advance() int {
+        if (self.pos >= self.dataLen) { return -1 }
+        address p = self.data + self.pos
+        byte b = p::value
+        int bi = cast b
+        self.pos = self.pos + 1
+        return bi
+    }
+
+    function _skipWS() {
+        while (self.pos < self.dataLen) {
+            int c = self._peek()
+            if (c == 32) { self.pos = self.pos + 1 }
+            else if (c == 9) { self.pos = self.pos + 1 }
+            else if (c == 10) { self.pos = self.pos + 1 }
+            else if (c == 13) { self.pos = self.pos + 1 }
+            else { break }
+        }
+    }
+
+    function _parseStr() address {
+        self._advance()
+        address buf = allocate 256
+        int bufLen = 0
+        int bufCap = 256
+        while (self.pos < self.dataLen) {
+            int c = self._advance()
+            if (c == 34) { break }
+            if (c == 92) {
+                int esc = self._advance()
+                if (esc == 110) { c = 10 }
+                else if (esc == 116) { c = 9 }
+                else if (esc == 114) { c = 13 }
+                else if (esc == 92) { c = 92 }
+                else if (esc == 34) { c = 34 }
+                else { c = esc }
+            }
+            if (bufLen + 2 > bufCap) {
+                int newCap = bufCap * 2
+                address nb = allocate newCap
+                int i = 0
+                while (i < bufLen) {
+                    address s = buf + i
+                    address d = nb + i
+                    byte bv = s::value
+                    d::value = bv
+                    i = i + 1
+                }
+                deallocate buf
+                buf    = nb
+                bufCap = newCap
+            }
+            byte cb = cast c
+            address wp = buf + bufLen
+            wp::value = cb
+            bufLen = bufLen + 1
+        }
+        byte z = 0
+        address term = buf + bufLen
+        term::value = z
+        return buf
+    }
+
+    function _parseIntVal() int {
+        int sign = 1
+        if (self._peek() == 45) {
+            sign = -1
+            self._advance()
+        }
+        int val = 0
+        while (self.pos < self.dataLen) {
+            int c = self._peek()
+            if (c < 48) { break }
+            if (c > 57) { break }
+            self._advance()
+            val = val * 10 + (c - 48)
+        }
+        return sign * val
+    }
+
+    function _parseValue() address {
+        self._skipWS()
+        int c = self._peek()
+        if (c == 123) { return self._parseObject() }
+        if (c == 91)  { return self._parseArray() }
+        if (c == 34)  { return self._parseStringNode() }
+        if (c == 116) { return self._parseTrue() }
+        if (c == 102) { return self._parseFalse() }
+        if (c == 110) { return self._parseNull() }
+        return self._parseIntNode()
+    }
+
+    function _parseObject() address {
+        self._advance()
+        address children = allocate 128
+        address keys     = allocate 128
+        int childCap = 128
+        int keyCap   = 128
+        int childLen = 0
+        int keyLen   = 0
+        self._skipWS()
+        if (self._peek() != 125) {
+            while (true) {
+                self._skipWS()
+                address key = self._parseStr()
+                if (keyLen + 8 > keyCap) {
+                    int nc = keyCap * 2
+                    address nb = allocate nc
+                    int i = 0
+                    while (i < keyLen) {
+                        address s = keys + i
+                        address d = nb + i
+                        byte bv = s::value
+                        d::value = bv
+                        i = i + 1
+                    }
+                    deallocate keys
+                    keys   = nb
+                    keyCap = nc
+                }
+                address ks = keys + keyLen
+                ks::value = key
+                keyLen = keyLen + 8
+                self._skipWS()
+                self._advance()
+                self._skipWS()
+                address child = self._parseValue()
+                if (childLen + 8 > childCap) {
+                    int nc = childCap * 2
+                    address nb = allocate nc
+                    int i = 0
+                    while (i < childLen) {
+                        address s = children + i
+                        address d = nb + i
+                        byte bv = s::value
+                        d::value = bv
+                        i = i + 1
+                    }
+                    deallocate children
+                    children = nb
+                    childCap = nc
+                }
+                address cs = children + childLen
+                cs::value = child
+                childLen = childLen + 8
+                self._skipWS()
+                int next = self._peek()
+                if (next == 44) {
+                    self._advance()
+                } else {
+                    break
+                }
+            }
+        }
+        self._skipWS()
+        self._advance()
+        int cnt = childLen / 8
+        address node = _jsonMakeNode(5, cnt, null, children, keys)
+        return node
+    }
+
+    function _parseArray() address {
+        self._advance()
+        address children = allocate 128
+        int childCap = 128
+        int childLen = 0
+        self._skipWS()
+        if (self._peek() != 93) {
+            while (true) {
+                self._skipWS()
+                address child = self._parseValue()
+                if (childLen + 8 > childCap) {
+                    int nc = childCap * 2
+                    address nb = allocate nc
+                    int i = 0
+                    while (i < childLen) {
+                        address s = children + i
+                        address d = nb + i
+                        byte bv = s::value
+                        d::value = bv
+                        i = i + 1
+                    }
+                    deallocate children
+                    children = nb
+                    childCap = nc
+                }
+                address cs = children + childLen
+                cs::value = child
+                childLen = childLen + 8
+                self._skipWS()
+                int next = self._peek()
+                if (next == 44) {
+                    self._advance()
+                } else {
+                    break
+                }
+            }
+        }
+        self._skipWS()
+        self._advance()
+        int cnt = childLen / 8
+        address node = _jsonMakeNode(4, cnt, null, children, null)
+        return node
+    }
+
+    function _parseStringNode() address {
+        address s = self._parseStr()
+        return _jsonMakeNode(3, 0, s, null, null)
+    }
+
+    function _parseIntNode() address {
+        int n = self._parseIntVal()
+        return _jsonMakeNode(2, n, null, null, null)
+    }
+
+    function _parseTrue() address {
+        self._advance()  // t
+        self._advance()  // r
+        self._advance()  // u
+        self._advance()  // e
+        return _jsonMakeNode(1, 1, null, null, null)
+    }
+
+    function _parseFalse() address {
+        self._advance()  // f
+        self._advance()  // a
+        self._advance()  // l
+        self._advance()  // s
+        self._advance()  // e
+        return _jsonMakeNode(1, 0, null, null, null)
+    }
+
+    function _parseNull() address {
+        self._advance()  // n
+        self._advance()  // u
+        self._advance()  // l
+        self._advance()  // l
+        return _jsonMakeNode(0, 0, null, null, null)
+    }
+
+    function parse(address src, int len) address {
+        self.data    = src
+        self.dataLen = len
+        self.pos     = 0
+        return self._parseValue()
+    }
+
+    function nodeKind(address node) int     { return _jsonReadInt(node + JSON_KIND_OFF) }
+    function nodeInt(address node) int      { return _jsonReadInt(node + JSON_NUM_OFF)  }
+    function nodeBool(address node) bool    { return _jsonReadInt(node + JSON_NUM_OFF) != 0 }
+    function nodeStr(address node) address  { return _jsonReadAddr(node + JSON_STR_OFF) }
+    function nodeChildren(address node) address { return _jsonReadAddr(node + JSON_CHILD_OFF) }
+    function nodeKeys(address node) address { return _jsonReadAddr(node + JSON_KEYS_OFF) }
+
+    function nodeLen(address node) int {
+        int kind = _jsonReadInt(node + JSON_KIND_OFF)
+        if (kind == 4) { return _jsonReadInt(node + JSON_NUM_OFF) }
+        if (kind == 5) { return _jsonReadInt(node + JSON_NUM_OFF) }
+        return 0
+    }
+}
