@@ -764,7 +764,8 @@ export function genExpr(ir, expr) {
             const selfArg   = `${fieldLL}* ${fieldPtr}`;
             const otherArgs = coercedArgs.map(a => {
                 if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
-                return `${llvmType(a.type)} ${a.value}`;
+                const llArgType = a.type.startsWith("address:") ? "i8*" : llvmType(a.type);
+                return `${llArgType} ${a.value}`;
             }).join(", ");
             const argStr   = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             const normRetT = retType ? normalizeType(retType) : null;
@@ -839,7 +840,8 @@ export function genExpr(ir, expr) {
             const selfArg   = `${llTypeName}* ${v.ptr}`;
             const otherArgs = coercedArgs.map(a => {
                 if (a.isClassPtr) return `%class.${a.type}* ${a.value}`;
-                return `${llvmType(a.type)} ${a.value}`;
+                const llArgType = a.type.startsWith("address:") ? "i8*" : llvmType(a.type);
+                return `${llArgType} ${a.value}`;
             }).join(", ");
             const argStr  = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
             const normRetT = retType ? normalizeType(retType) : null;
