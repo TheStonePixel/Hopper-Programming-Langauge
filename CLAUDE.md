@@ -268,8 +268,23 @@ int n = cast someAddress        // address → int
 
 ## Module Architecture
 
-### linux module (`hopper/modules/linux/`)
-Exports 7 interfaces via new-style bindings:
+### Three-Tier Module System
+
+Modules fall into three tiers. Only the user-facing library tier uses the interface/class system.
+
+#### Tier 1 — Platform (`x86_64/`)
+Raw inline-ASM syscall wrappers. No imports. Direct kernel calls via `asm { ... syscall }`.
+This is the hardware layer. Never import from this directly in application code.
+Files: `x86_64/src/io.hop`, `x86_64/src/fs.hop`, `x86_64/src/mem.hop`, etc.
+
+#### Tier 2 — Architecture abstraction (`sys/`)
+Each file is a single line: `import <name> from x86_64`.
+This is a portability shim — to retarget to ARM64, change `x86_64` to `arm64` here only.
+Never import from `sys` in application code. Only tier-3 library implementations may do so.
+Files: `sys/src/io.hop`, `sys/src/fs.hop`, `sys/src/mem.hop`, etc.
+
+#### Tier 3 — User-facing library (`linux/`)
+The conforming, new-standard module. Exports 7 interfaces via the interface/class system:
 - `IO` — read, write, pread64, pwrite64, readv, writev, sendfile, splice, tee, ioctl
 - `FileSystem` — open, close, stat, mkdir, unlink, rename, getcwd, dup, pipe, inotify, ...
 - `System` — uname, sysinfo, clocks, scheduling, resource limits
@@ -278,15 +293,30 @@ Exports 7 interfaces via new-style bindings:
 - `Network` — select, poll, epoll
 - `Memory` — mmap, munmap, mprotect, mremap, madvise, mlock, memfd_create
 
-Implementation files (`src/IO.hop`, `src/FileSystem.hop`, etc.) delegate to `import X from sys` (old-style internal). The sys module delegates to `x86_64/src/` which contains inline-ASM syscall wrappers.
+Implementation files (`src/IO.hop`, `src/FileSystem.hop`, etc.) delegate to `import X from sys`.
+The `import X from sys` declarations in linux implementations ARE the dependency tracking —
+they tell the build system that linux depends on sys which depends on x86_64.
 
-Old free-function files (`src/io.hop`, `src/fs.hop`, etc.) remain for backward compat with tui and other modules that use old-style imports.
+### Non-conforming legacy modules (do NOT import from these)
+These modules were built before the new interface/class standard and must not be used as
+dependencies until they are updated:
+- `io/` — file I/O helpers (old-style, no interfaces)
+- `tui/` — terminal UI (old-style, no interfaces)
+- `ds/` — data structures (old-style, no interfaces)
+- `ascii/` — ASCII utilities (old-style, no interfaces)
+- `buffer/` — buffer helpers (old-style, no interfaces)
+- `editor/` — text editor (old-style, no interfaces)
+- `he/`, `battleship/` — programs, not libraries
+
+Do NOT add `import <anything> from io` (or tui, ds, ascii, etc.) to any file in the linux
+module or any conforming module. If file I/O is needed, use `import fs from sys` and call
+`open`/`read`/`close` directly (see `linux/src/shell.hop` for the pattern).
 
 ### Dependency chain
 ```
 program → import IO from linux
              ↓ hopper.json binding resolves to:
-          linux/interfaces/IO.hop    (interface contract)
+          linux/interfaces/IO.hop    (interface contract + enums)
           linux/src/IO.hop           (class LinuxIO implements IO)
              ↓ import io from sys
           sys/src/io.hop             (architecture-neutral delegation)
