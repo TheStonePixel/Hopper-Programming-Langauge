@@ -1,0 +1,15 @@
+import Terminal
+import IO
+import Buffer from buffer
+import Editor from editor
+
+entry main(int argc, string[] argv) {
+    Editor ed = Editor()
+    if (argc >= 2) {
+        string path = argv[1]
+        ed.open_file(path)
+    } else {
+        ed.ensure_nonempty()
+    }
+    ed.run()
+}

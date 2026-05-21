@@ -1,0 +1,16 @@
+{
+  "name": "he",
+  "type": "program",
+  "targets": {
+    "host": {
+      "Terminal": {
+        "interface": "./interfaces/Terminal.hop",
+        "implementation": "./modules/posix/PosixTerminal.hop"
+      },
+      "IO": {
+        "interface": "./interfaces/IO.hop",
+        "implementation": "./modules/posix/PosixIO.hop"
+      }
+    }
+  }
+}
