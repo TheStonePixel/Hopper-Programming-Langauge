@@ -1,27 +1,125 @@
 // htop.hop — live process monitor
 //
 // Reads /proc every second, computes per-process and system CPU%,
-// and renders a full-terminal dashboard with emoji decorations.
-//
-// Uses only Hopper's own modules — no libc printf, no extern helpers.
+// and renders a full-terminal dashboard.
 //
 // Layout:
-//   🖥  hopper-top ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//   🧠 CPU  [████████████░░░░░░░░]  42.3%
-//   💾 MEM  [████░░░░░░░░░░░░░░░░]   3.2 GB / 16.0 GB
+//   hopper-top ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//   CPU  [████████████░░░░░░░░]  42.3%
+//   MEM  [████░░░░░░░░░░░░░░░░]   3.2 GB / 16.0 GB
 //
 //     PID     CPU%      MEM  ST  COMMAND
 //    1234    42.3%   142 MB   R  firefox
-//     456     4.1%    28 MB   S  sshd
 
-import io      from linux
-import fs      from linux
-import sys     from linux
-import String  from ascii
-import array   from ds
-import hashmap from ds
+import IO         from linux
+import FileSystem from linux
+import System     from linux
+import Array      from ds
+import Map        from ds
 
-// ── dirent64 helpers (identical to tree.hop) ─────────────────────────────────
+// ── OutputBuf — growable byte buffer for terminal rendering ───────────────────
+
+class OutputBuf {
+    address data
+    int length
+    int capacity
+
+    constructor(int cap) {
+        self.capacity = cap
+        self.length   = 0
+        self.data     = allocate cap
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow(int needed) {
+        int newCap = self.capacity * 2
+        if (newCap < needed) { newCap = needed }
+        address nb = allocate newCap
+        int i = 0
+        while (i < self.length) {
+            address s = self.data + i
+            address d = nb + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = nb
+        self.capacity = newCap
+    }
+
+    function clear() {
+        self.length = 0
+    }
+
+    function pointer() address {
+        return self.data
+    }
+
+    function length() int {
+        return self.length
+    }
+
+    // Append a single byte value (as int for convenience).
+    function appendByte(int bi) {
+        if (self.length + 1 > self.capacity) { self._grow(self.length + 2) }
+        byte b = cast bi
+        address p = self.data + self.length
+        p::value = b
+        self.length = self.length + 1
+    }
+
+    // Append a null-terminated string literal / address.
+    function appendLiteral(address src) {
+        int i = 0
+        while (true) {
+            address p = src + i
+            byte b = p::value
+            int bv = cast b
+            if (bv == 0) { break }
+            self.appendByte(bv)
+            i = i + 1
+        }
+    }
+
+    // Append a decimal integer.
+    function appendNumber(int n) {
+        if (n < 0) {
+            self.appendByte(45)
+            n = 0 - n
+        }
+        if (n == 0) {
+            self.appendByte(48)
+            return
+        }
+        address tmp = allocate 24
+        int count = 0
+        int v = n
+        while (v > 0) {
+            int d = v - (v / 10) * 10
+            int dch = d + 48
+            byte db = cast dch
+            address tp = tmp + count
+            tp::value = db
+            count = count + 1
+            v = v / 10
+        }
+        int i = count - 1
+        while (i >= 0) {
+            address tp = tmp + i
+            byte b = tp::value
+            int bv = cast b
+            self.appendByte(bv)
+            i = i - 1
+        }
+        deallocate tmp
+    }
+}
+
+// ── dirent64 helpers ──────────────────────────────────────────────────────────
 
 function direntReclen(address e) int {
     address rp = e + 16
@@ -221,9 +319,6 @@ function matchesAt(address buf, int pos, string pat) bool {
 }
 
 // ── /proc/pid/stat parser ─────────────────────────────────────────────────────
-//
-// Fields (after closing paren):
-//   3=state  4-13=skip(10)  14=utime  15=stime  16-22=skip(7)  23=vsize  24=rss
 
 function parseProcStat(address buf, int n, address utimeOut, address stimeOut, address vsizeKBOut, address rssKBOut, address stateOut, address nameDst) {
     // Find closing ')' — scan backwards to handle parens in comm
@@ -300,7 +395,6 @@ function parseProcStat(address buf, int n, address utimeOut, address stimeOut, a
 }
 
 // ── /proc/stat parser ─────────────────────────────────────────────────────────
-// Line 1: "cpu  user nice system idle iowait irq softirq steal ..."
 
 function parseCPUStat(address buf, int n, address totalOut, address idleOut) {
     // Skip "cpu" token
@@ -351,65 +445,68 @@ function parseMemInfo(address buf, int n, address totalKBOut, address availKBOut
 }
 
 // ── Monitor ───────────────────────────────────────────────────────────────────
+// Arrays store ints as addresses (cast). Map stores pid->ticks (both cast).
 
 class Monitor {
-    Array<int>         pids
-    Array<int>         ut
-    Array<int>         st
-    Array<int>         vmKB
-    Array<int>         rssKB
-    Array<int>         cpu10
-    Array<int>         states
-    Array<address>     names
-    Array<int>         order
-    HashMap<int, int>  prevTicks
+    StandardArray pids
+    StandardArray ut
+    StandardArray st
+    StandardArray vmKB
+    StandardArray rssKB
+    StandardArray cpu10
+    StandardArray states
+    StandardArray names
+    StandardArray order
+    StandardMap   prevTicks
     int prevTotal
     int prevIdle
     int memTotalKB
     int memAvailKB
     int sysCpu10
-    String out
+    OutputBuf out
 
     constructor() {
-        self.pids      = Array(512)
-        self.ut        = Array(512)
-        self.st        = Array(512)
-        self.vmKB      = Array(512)
-        self.rssKB     = Array(512)
-        self.cpu10     = Array(512)
-        self.states    = Array(512)
-        self.names     = Array(512)
-        self.order     = Array(512)
-        self.prevTicks = HashMap(512)
+        self.pids      = StandardArray(512)
+        self.ut        = StandardArray(512)
+        self.st        = StandardArray(512)
+        self.vmKB      = StandardArray(512)
+        self.rssKB     = StandardArray(512)
+        self.cpu10     = StandardArray(512)
+        self.states    = StandardArray(512)
+        self.names     = StandardArray(512)
+        self.order     = StandardArray(512)
+        self.prevTicks = StandardMap(512)
         self.prevTotal = 0
         self.prevIdle  = 0
         self.memTotalKB = 0
         self.memAvailKB = 0
         self.sysCpu10  = 0
-        self.out       = String(131072)
+        self.out       = OutputBuf(131072)
     }
 
     // Free name buffers and reset all per-frame arrays.
     function clearProcs() {
         int i = 0
-        while (i < self.names.len()) {
+        int cnt = self.names.len()
+        while (i < cnt) {
             address n = self.names.get(i)
             deallocate n
             i = i + 1
         }
-        self.pids.length   = 0
-        self.ut.length     = 0
-        self.st.length     = 0
-        self.vmKB.length   = 0
-        self.rssKB.length  = 0
-        self.cpu10.length  = 0
-        self.states.length = 0
-        self.names.length  = 0
-        self.order.length  = 0
+        self.pids.reset()
+        self.ut.reset()
+        self.st.reset()
+        self.vmKB.reset()
+        self.rssKB.reset()
+        self.cpu10.reset()
+        self.states.reset()
+        self.names.reset()
+        self.order.reset()
     }
 
     function collectProcs(address readBuf, address pathBuf, address dirBuf) {
-        int procFd = open("/proc", 0, 0)
+        string procPath = cast "/proc"
+        int procFd = open(procPath, 0, 0)
         if (procFd < 0) { return }
         int dirN = getdents64(procFd, dirBuf, 65536)
         close(procFd)
@@ -442,14 +539,21 @@ class Monitor {
 
             parseProcStat(readBuf, n, utime::address, stime::address, vsizeKB::address, rssKB::address, state::address, nameBuf)
 
-            self.pids.push(pid)
-            self.ut.push(utime)
-            self.st.push(stime)
-            self.vmKB.push(vsizeKB)
-            self.rssKB.push(rssKB)
-            self.states.push(state)
+            address pidA    = cast pid
+            address utimeA  = cast utime
+            address stimeA  = cast stime
+            address vsizeA  = cast vsizeKB
+            address rssKBA  = cast rssKB
+            address stateA  = cast state
+            self.pids.push(pidA)
+            self.ut.push(utimeA)
+            self.st.push(stimeA)
+            self.vmKB.push(vsizeA)
+            self.rssKB.push(rssKBA)
+            self.states.push(stateA)
             self.names.push(nameBuf)
-            self.cpu10.push(0)
+            address zero = cast 0
+            self.cpu10.push(zero)
         }
     }
 
@@ -475,22 +579,31 @@ class Monitor {
         int count = self.pids.len()
         int i = 0
         while (i < count) {
-            int pid      = self.pids.get(i)
-            int curr     = self.ut.get(i) + self.st.get(i)
-            int prev     = 0
-            if (self.prevTicks.contains(pid)) {
-                prev = self.prevTicks.get(pid)
+            address pidA = self.pids.get(i)
+            int pid = cast pidA
+            address utA = self.ut.get(i)
+            int utv = cast utA
+            address stA = self.st.get(i)
+            int stv = cast stA
+            int curr = utv + stv
+            int prev = 0
+            address pidKey = cast pid
+            if (self.prevTicks.contains(pidKey)) {
+                address prevA = self.prevTicks.get(pidKey)
+                prev = cast prevA
             }
             int delta = curr - prev
             if (delta < 0) { delta = 0 }
             int c10 = 0
-            int dTot = self.prevTotal   // already updated above
+            int dTot = self.prevTotal
             if (dTot > 0) {
                 c10 = delta * 1000 / (dTot / 100)
                 if (c10 > 9999) { c10 = 9999 }
             }
-            self.cpu10.set(i, c10)
-            self.prevTicks.set(pid, curr)
+            address c10A = cast c10
+            self.cpu10.set(i, c10A)
+            address currA = cast curr
+            self.prevTicks.set(pidKey, currA)
             i = i + 1
         }
     }
@@ -509,11 +622,12 @@ class Monitor {
 
     // Bubble sort order[] descending by cpu10.
     function sortProcs() {
-        self.order.length = 0
+        self.order.reset()
         int n = self.pids.len()
         int i = 0
         while (i < n) {
-            self.order.push(i)
+            address ia = cast i
+            self.order.push(ia)
             i = i + 1
         }
         bool swapped = true
@@ -521,11 +635,17 @@ class Monitor {
             swapped = false
             int j = 0
             while (j < n - 1) {
-                int a = self.order.get(j)
-                int b = self.order.get(j + 1)
-                if (self.cpu10.get(a) < self.cpu10.get(b)) {
-                    self.order.set(j, b)
-                    self.order.set(j + 1, a)
+                address aA = self.order.get(j)
+                address bA = self.order.get(j + 1)
+                int a = cast aA
+                int b = cast bA
+                address acpuA = self.cpu10.get(a)
+                address bcpuA = self.cpu10.get(b)
+                int acpu = cast acpuA
+                int bcpu = cast bcpuA
+                if (acpu < bcpu) {
+                    self.order.set(j, bA)
+                    self.order.set(j + 1, aA)
                     swapped = true
                 }
                 j = j + 1
@@ -587,51 +707,52 @@ class Monitor {
         }
     }
 
-    // Colored state character with emoji prefix.
+    // Colored state character.
     function appendState(int st) {
         if (st == 82) {
-            // R — Running 🟢
-            self.out.appendLiteral("\xF0\x9F\x9F\xA2\x1b[1m\x1b[32m R\x1b[0m")
+            // R — Running
+            self.out.appendLiteral("\x1b[1m\x1b[32m R\x1b[0m")
         }
         if (st == 83) {
-            // S — Sleeping 💤
-            self.out.appendLiteral("\xF0\x9F\x92\xA4\x1b[36m S\x1b[0m")
+            // S — Sleeping
+            self.out.appendLiteral("\x1b[36m S\x1b[0m")
         }
         if (st == 68) {
-            // D — Disk wait 💾
-            self.out.appendLiteral("\xF0\x9F\x92\xBE\x1b[33m D\x1b[0m")
+            // D — Disk wait
+            self.out.appendLiteral("\x1b[33m D\x1b[0m")
         }
         if (st == 90) {
-            // Z — Zombie 💀
-            self.out.appendLiteral("\xF0\x9F\x92\x80\x1b[1m\x1b[31m Z\x1b[0m")
+            // Z — Zombie
+            self.out.appendLiteral("\x1b[1m\x1b[31m Z\x1b[0m")
         }
         if (st == 84) {
-            // T — Stopped ⏸
-            self.out.appendLiteral("\xE2\x8F\xB8\x1b[2m T\x1b[0m")
+            // T — Stopped
+            self.out.appendLiteral("\x1b[2m T\x1b[0m")
         }
         if (st == 73) {
-            // I — Idle kernel thread ·
-            self.out.appendLiteral("  \x1b[2m I\x1b[0m")
+            // I — Idle kernel thread
+            self.out.appendLiteral("\x1b[2m I\x1b[0m")
         }
         if (st != 82 && st != 83 && st != 68 && st != 90 && st != 84 && st != 73) {
-            self.out.appendLiteral("  \x1b[2m ?\x1b[0m")
+            self.out.appendLiteral("\x1b[2m ?\x1b[0m")
         }
     }
 
-    // Draw a 20-cell bar: filled cells bold-colored, empty cells dim.
+    // Draw a 20-cell bar: filled cells colored, empty cells dim.
     function appendBar(int filled, string fillColor) {
         if (filled > 20) { filled = 20 }
         if (filled < 0)  { filled = 0 }
         self.out.appendLiteral("\x1b[0m")
-        self.out.appendLiteral(fillColor)
+        address fc = cast fillColor
+        self.out.appendLiteral(fc)
         int i = 0
         while (i < filled) {
-            self.out.appendLiteral("\xE2\x96\x88")   // █
+            self.out.appendLiteral("\xE2\x96\x88")   // full block
             i = i + 1
         }
         self.out.appendLiteral("\x1b[2m")
         while (i < 20) {
-            self.out.appendLiteral("\xE2\x96\x91")   // ░
+            self.out.appendLiteral("\xE2\x96\x91")   // light shade
             i = i + 1
         }
         self.out.appendLiteral("\x1b[0m")
@@ -642,23 +763,22 @@ class Monitor {
     function render() {
         self.out.clear()
 
-        // Move cursor home without full clear (less flicker)
+        // Move cursor home + clear
         self.out.appendLiteral("\x1b[H\x1b[J")
 
         // ── title ──
-        self.out.appendLiteral("\x1b[1m\xF0\x9F\x96\xA5  hopper-top")
-        self.out.appendLiteral("\x1b[0m\x1b[2m  \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\x1b[0m\n")
+        self.out.appendLiteral("\x1b[1m hopper-top\x1b[0m\x1b[2m  \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\x1b[0m\n")
 
         // ── CPU bar ──
-        self.out.appendLiteral("\xF0\x9F\xA7\xA0 CPU  [")
+        self.out.appendLiteral(" CPU  [")
         int cpuFilled = self.sysCpu10 / 50
         self.appendBar(cpuFilled, "\x1b[32m")
         self.out.appendLiteral("]  ")
         self.appendCPU(self.sysCpu10)
-        self.out.appendLiteral("\n")
+        self.out.appendByte(10)
 
         // ── memory bar ──
-        self.out.appendLiteral("\xF0\x9F\x92\xBE MEM  [")
+        self.out.appendLiteral(" MEM  [")
         int memUsed = self.memTotalKB - self.memAvailKB
         int memFilled = 0
         if (self.memTotalKB > 0) {
@@ -678,18 +798,23 @@ class Monitor {
         self.out.appendLiteral(" GB\n\n")
 
         // ── column headers ──
-        self.out.appendLiteral("\x1b[1m\x1b[2m   PID    CPU%       MEM       STATE  COMMAND\x1b[0m\n")
+        self.out.appendLiteral("\x1b[1m\x1b[2m   PID    CPU%       MEM  ST  COMMAND\x1b[0m\n")
 
         // ── process rows ──
         int count = self.pids.len()
         int shown = 0
         int i = 0
         while (i < count && shown < 35) {
-            int idx  = self.order.get(i)
-            int pid  = self.pids.get(idx)
-            int c10  = self.cpu10.get(idx)
-            int rss  = self.rssKB.get(idx)
-            int st   = self.states.get(idx)
+            address idxA = self.order.get(i)
+            int idx = cast idxA
+            address pidA = self.pids.get(idx)
+            int pid = cast pidA
+            address c10A = self.cpu10.get(idx)
+            int c10 = cast c10A
+            address rssA = self.rssKB.get(idx)
+            int rss = cast rssA
+            address stA = self.states.get(idx)
+            int st = cast stA
             address nm = self.names.get(idx)
 
             self.appendPadded(pid, 6)
@@ -721,7 +846,7 @@ class Monitor {
         // ── footer ──
         self.out.appendLiteral("\x1b[2m  ")
         self.out.appendNumber(count)
-        self.out.appendLiteral(" processes   \xF0\x9F\x9F\xA2=running  \xF0\x9F\x92\xA4=sleeping  \xF0\x9F\x92\xBE=disk  \xF0\x9F\x92\x80=zombie\x1b[0m\n")
+        self.out.appendLiteral(" processes\x1b[0m\n")
 
         write(1, self.out.pointer(), self.out.length())
     }

@@ -1,30 +1,23 @@
-// pgrep — parallel grep using regex + concurrent modules.
+// pgrep — grep using regex module.
 //
 // Usage:
 //   pgrep <pattern> [file|dir ...]
 //
 // Searches every file (recursively under directories) for lines matching the
-// regex pattern.  One thread is spawned per file.  Output is serialized via a
-// mutex so lines from different files never interleave.
+// regex pattern.  Processes files sequentially.  Output is serialized via a
+// mutex so it is safe to extend to concurrent use later.
 //
 // Output format:  filename:linenum:line
 
-import regex      from regex
-import concurrent from concurrent
-import io         from linux
-import fs         from linux
+import Regex      from regex
+import Concurrent from concurrent
+import IO         from linux
+import FileSystem from linux
 
 extern function printf(string fmt, ...) int
 
-// These are declared in concurrent.hop (via the import); re-declaring them
-// here is safe — codegenLLVM deduplicates extern declarations.
-extern function pthread_mutex_lock(address m) int
-extern function pthread_mutex_unlock(address m) int
-extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
-extern function pthread_detach(int tid) int
-
 enum PgrepLimits {
-    PgrepLimits.MAX_FILES = 8192
+    MAX_FILES = 8192
 }
 
 // ── string helpers ────────────────────────────────────────────────────────────
@@ -115,11 +108,10 @@ function pgIsDot(address e) bool {
 
 function collectFiles(address pathStr, address filePtrs, address countPtr) {
     // Try to open as a directory (O_RDONLY | O_DIRECTORY = 65536).
-    string sp = cast pathStr
-    int fd = open(sp, 65536, 0)
+    int fd = open(pathStr, 65536, 0)
     if (fd < 0) {
         // Not a directory or unreadable — treat as a regular file.
-        int fd2 = open(sp, 0, 0)
+        int fd2 = open(pathStr, 0, 0)
         if (fd2 >= 0) {
             close(fd2)
             int cur = countPtr::value
@@ -197,62 +189,11 @@ function collectFiles(address pathStr, address filePtrs, address countPtr) {
     deallocate buf
 }
 
-// ── async spawn helpers ───────────────────────────────────────────────────────
-// asyncThunk from concurrent.hop is used as the thread start routine.
-// We only need pSpawn (which returns the raw statePtr) and pWait.
-
-// Spawn fn(arg) on a new OS thread.
-// Returns the statePtr (heap address, 16 bytes) for use with pWait / pFree.
-function pSpawn(address fn, address arg) address {
-    address statePtr = allocate 16
-    statePtr::value = 0
-    address valSlot = statePtr + 8
-    valSlot::value = null
-
-    address thunkArgs = allocate 24
-    thunkArgs::value = fn
-    address argSlot = thunkArgs + 8
-    argSlot::value = arg
-    address stSlot = thunkArgs + 16
-    stSlot::value = statePtr
-
-    address thunkAddr = asyncThunk::address
-    address tidPtr = allocate 8
-    pthread_create(tidPtr, null, thunkAddr, thunkArgs)
-    int tid = tidPtr::value
-    pthread_detach(tid)
-    deallocate tidPtr
-
-    return statePtr
-}
-
-// Block until the statePtr (returned by pSpawn) signals completion.
-function pWait(address sp) {
-    bool done = false
-    while (!done) {
-        int st = sp::value
-        if (st != 0) { done = true }
-        if (!done) { futex_wait(sp, 0) }
-    }
-}
-
 // ── grep worker ───────────────────────────────────────────────────────────────
-// Worker arg layout (24 bytes, heap-allocated by main, freed here):
-//   [0]  address pattern    — null-terminated regex pattern (shared, not freed)
-//   [8]  address filename   — null-terminated file path (shared, not freed)
-//   [16] address mutHandle  — raw pthread_mutex_t for stdout serialization
 
-function grepWorker(address rawArgs) address {
-    address pattern   = rawArgs::value
-    address fnSlot    = rawArgs + 8
-    address filename  = fnSlot::value
-    address mhSlot    = rawArgs + 16
-    address mutHandle = mhSlot::value
-    deallocate rawArgs
-
-    string sfn = cast filename
-    int fd = open(sfn, 0, 0)
-    if (fd < 0) { return null }
+function grepFile(StandardRegex r, address pattern, address filename, StandardMutex mtx) {
+    int fd = open(filename, 0, 0)
+    if (fd < 0) { return }
 
     address lineBuf  = allocate 4096
     address byteBuf  = allocate 1
@@ -273,11 +214,11 @@ function grepWorker(address rawArgs) address {
                 address termPtr = lineBuf + lineLen
                 byte nulB = cast 0
                 termPtr::value = nulB
-                bool m = reMatch(pattern, lineBuf)
+                bool m = r.matchAt(pattern, lineBuf)
                 if (m) {
-                    pthread_mutex_lock(mutHandle)
+                    mtx.lock()
                     printf("%s:%lld:%s\n", filename, lineNum, lineBuf)
-                    pthread_mutex_unlock(mutHandle)
+                    mtx.unlock()
                 }
                 lineLen = 0
                 lineNum = lineNum + 1
@@ -296,18 +237,17 @@ function grepWorker(address rawArgs) address {
         address termPtr = lineBuf + lineLen
         byte nulB = cast 0
         termPtr::value = nulB
-        bool m = reMatch(pattern, lineBuf)
+        bool m = r.matchAt(pattern, lineBuf)
         if (m) {
-            pthread_mutex_lock(mutHandle)
+            mtx.lock()
             printf("%s:%lld:%s\n", filename, lineNum, lineBuf)
-            pthread_mutex_unlock(mutHandle)
+            mtx.unlock()
         }
     }
 
     close(fd)
     deallocate byteBuf
     deallocate lineBuf
-    return null
 }
 
 // ── entry ─────────────────────────────────────────────────────────────────────
@@ -322,9 +262,11 @@ entry main(int argc, address argv) {
     address arg1ptr = argv + 8
     address patternArg = arg1ptr::value
 
-    // Output mutex — serializes writes from all worker threads.
-    Mutex outMtx = Mutex()
-    address mutHandle = outMtx.rawHandle()
+    // Output mutex — serializes writes across files.
+    StandardMutex outMtx = StandardMutex()
+
+    // Regex engine
+    StandardRegex re = StandardRegex()
 
     // Collect file paths from argv[2..argc-1].
     address filePtrs = allocate PgrepLimits.MAX_FILES * 8
@@ -344,39 +286,13 @@ entry main(int argc, address argv) {
         return
     }
 
-    // Allocate statePtr array for tracking completion.
-    address statePtrs = allocate fileCount * 8
-
-    // Spawn one worker per file.
-    address wfn = grepWorker::address
+    // Process each file sequentially.
     int fi = 0
     while (fi < fileCount) {
         address fpSlot = filePtrs + fi * 8
         address filename = fpSlot::value
-
-        // Build worker args (24 bytes, freed by grepWorker).
-        address wargs = allocate 24
-        wargs::value = patternArg
-        address fnSlot = wargs + 8
-        fnSlot::value = filename
-        address mhSlot = wargs + 16
-        mhSlot::value = mutHandle
-
-        address sp = pSpawn(wfn, wargs)
-        address spSlot = statePtrs + fi * 8
-        spSlot::value = sp
-
+        grepFile(re, patternArg, filename, outMtx)
         fi = fi + 1
-    }
-
-    // Wait for every worker to finish.
-    int wi = 0
-    while (wi < fileCount) {
-        address spSlot = statePtrs + wi * 8
-        address sp = spSlot::value
-        pWait(sp)
-        deallocate sp
-        wi = wi + 1
     }
 
     // Free the per-file path copies.
@@ -388,6 +304,5 @@ entry main(int argc, address argv) {
         ffi = ffi + 1
     }
 
-    deallocate statePtrs
     deallocate filePtrs
 }
