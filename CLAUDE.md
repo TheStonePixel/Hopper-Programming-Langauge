@@ -16,7 +16,8 @@
 Hopper-Programming-Langauge/
   hopper/
     programs/          # executable projects
-    modules/           # library projects (linux, tui, ds, x86_64, sys, ...)
+    modules/           # conforming modules only: linux, sys, x86_64
+    nonconform/        # legacy modules not yet updated to new standard
     build/             # compiler output (gitignored)
     tests/             # toolchain-level tests
   seed/
@@ -297,20 +298,14 @@ Implementation files (`src/IO.hop`, `src/FileSystem.hop`, etc.) delegate to `imp
 The `import X from sys` declarations in linux implementations ARE the dependency tracking —
 they tell the build system that linux depends on sys which depends on x86_64.
 
-### Non-conforming legacy modules (do NOT import from these)
-These modules were built before the new interface/class standard and must not be used as
-dependencies until they are updated:
-- `io/` — file I/O helpers (old-style, no interfaces)
-- `tui/` — terminal UI (old-style, no interfaces)
-- `ds/` — data structures (old-style, no interfaces)
-- `ascii/` — ASCII utilities (old-style, no interfaces)
-- `buffer/` — buffer helpers (old-style, no interfaces)
-- `editor/` — text editor (old-style, no interfaces)
-- `he/`, `battleship/` — programs, not libraries
+### Non-conforming legacy modules (`hopper/nonconform/`)
+Everything in `hopper/nonconform/` was written before the new interface/class standard.
+Do NOT import from any of these until they have been updated and moved to `hopper/modules/`:
+`Pointer`, `algo`, `ascii`, `char`, `cli`, `concurrent`, `core`, `ds`, `fs`, `io`, `json`,
+`llvm`, `math`, `path`, `regex`, `stream`, `string`, `tui`, `uart`, `utf8`
 
-Do NOT add `import <anything> from io` (or tui, ds, ascii, etc.) to any file in the linux
-module or any conforming module. If file I/O is needed, use `import fs from sys` and call
-`open`/`read`/`close` directly (see `linux/src/shell.hop` for the pattern).
+If you need file I/O inside a conforming module, use `import fs from sys` and call
+`open`/`read`/`close` directly — see `linux/src/shell.hop` for the pattern.
 
 ### Dependency chain
 ```
