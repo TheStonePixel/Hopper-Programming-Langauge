@@ -252,7 +252,6 @@ statement
     | expression                                                # ExprStmt
     | 'if' '(' expression ')' block elseClause?                 # IfStmt
     | 'while' '(' expression ')' (NEWLINE+ invariantClause)* block  # WhileStmt
-    | 'for' '(' type Identifier ':' expression ')' block        # ForEachStmt
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
     | 'break'                                                   # BreakStmt
     | 'continue'                                                # ContinueStmt

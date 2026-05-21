@@ -608,15 +608,6 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#ForEachStmt.
-	enterForEachStmt(ctx) {
-	}
-
-	// Exit a parse tree produced by HopperParser#ForEachStmt.
-	exitForEachStmt(ctx) {
-	}
-
-
 	// Enter a parse tree produced by HopperParser#ForStmt.
 	enterForStmt(ctx) {
 	}
