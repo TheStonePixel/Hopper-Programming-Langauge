@@ -10,5 +10,14 @@
       "interface":      "interfaces/IString.hop",
       "implementation": "src/AsciiString.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "IString": {
+        "from":           "string",
+        "interface":      "interfaces/IString.hop",
+        "implementation": "src/AsciiString.hop"
+      }
+    }
   }
 }

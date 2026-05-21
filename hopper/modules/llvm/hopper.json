@@ -10,5 +10,14 @@
       "interface":      "interfaces/LLVM.hop",
       "implementation": "src/LLVM.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "LLVM": {
+        "from":           "llvm",
+        "interface":      "interfaces/LLVM.hop",
+        "implementation": "src/LLVM.hop"
+      }
+    }
   }
 }

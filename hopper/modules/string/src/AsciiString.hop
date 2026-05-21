@@ -76,7 +76,10 @@ class AsciiString implements IString {
                 address dp = self.data + i + j
                 byte db = dp::value
                 int dv = cast db
-                if (sv != dv) { match = false  break }
+                if (sv != dv) {
+                    match = false
+                    break
+                }
                 j = j + 1
             }
             if (match) { return i }

@@ -10,5 +10,14 @@
       "interface":      "interfaces/Regex.hop",
       "implementation": "src/Regex.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Regex": {
+        "from":           "regex",
+        "interface":      "interfaces/Regex.hop",
+        "implementation": "src/Regex.hop"
+      }
+    }
   }
 }

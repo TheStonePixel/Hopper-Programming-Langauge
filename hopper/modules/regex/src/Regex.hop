@@ -30,7 +30,10 @@ function _matchClass(address pat, byte c) bool {
     int c0 = cast b0
     bool negate = false
     int i = 0
-    if (c0 == 94) { negate = true  i = 1 }
+    if (c0 == 94) {
+        negate = true
+        i = 1
+    }
     while (true) {
         address pi = pat + i
         byte bi = pi::value
@@ -125,7 +128,8 @@ function _matchOne(address pat, byte c) bool {
     return cv == c0
 }
 
-function _matchHere(address pat, address text) bool
+extern function _matchHere(address pat, address text) bool
+
 function _matchStar(address pat, address text, bool plus) bool {
     int i = 0
     while (true) {
@@ -140,7 +144,10 @@ function _matchStar(address pat, address text, bool plus) bool {
     address next = pat + alen + 1
     while (i >= 0) {
         if (plus) {
-            if (i == 0) { i = i - 1  continue }
+            if (i == 0) {
+                i = i - 1
+                continue
+            }
         }
         address tp = text + i
         if (_matchHere(next, tp)) { return true }

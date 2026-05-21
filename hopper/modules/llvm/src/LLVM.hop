@@ -197,7 +197,7 @@ class StandardLLVM implements LLVM {
 
     function contextCreate() address               { return LLVMContextCreate() }
     function contextDispose(address ctx)           { LLVMContextDispose(ctx) }
-    function moduleCreate(address ctx, address n)  { return LLVMModuleCreateWithNameInContext(n, ctx) }
+    function moduleCreate(address ctx, address n) address { return LLVMModuleCreateWithNameInContext(n, ctx) }
     function moduleDispose(address m)              { LLVMDisposeModule(m) }
     function moduleDump(address m)                 { LLVMDumpModule(m) }
     function moduleVerify(address m) int           { return LLVMVerifyModule(m, 2, null) }

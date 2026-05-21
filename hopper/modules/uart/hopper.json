@@ -10,5 +10,14 @@
       "interface":      "interfaces/Uart.hop",
       "implementation": "src/Uart.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Uart": {
+        "from":           "uart",
+        "interface":      "interfaces/Uart.hop",
+        "implementation": "src/Uart.hop"
+      }
+    }
   }
 }

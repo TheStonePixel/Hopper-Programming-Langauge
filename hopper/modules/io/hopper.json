@@ -16,5 +16,19 @@
       "interface":      "interfaces/FileWriter.hop",
       "implementation": "src/File.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "FileReader": {
+        "from":           "io",
+        "interface":      "interfaces/FileReader.hop",
+        "implementation": "src/File.hop"
+      },
+      "FileWriter": {
+        "from":           "io",
+        "interface":      "interfaces/FileWriter.hop",
+        "implementation": "src/File.hop"
+      }
+    }
   }
 }

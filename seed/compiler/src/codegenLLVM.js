@@ -177,10 +177,19 @@ export function genModule(ast, opts = {}) {
     const bindGlobals = (ast.binds || []).map(b => genBind(b));
     if (bindGlobals.length > 0) out += bindGlobals.join("\n") + "\n\n";
 
+    // Build a set of names that have a concrete (non-extern) body — used to suppress
+    // forward-declaration `declare` stubs when the real definition also exists in this TU.
+    const definedFnNames = new Set(
+        (ast.functions || []).filter(fn => !fn.isExtern && !fn._skip).map(fn => fn.name)
+    );
+
     const emittedExterns = new Set();
     for (const fn of ast.functions) {
         if (fn.isExtern) {
             if (emittedExterns.has(fn.name)) continue;
+            // If a concrete definition exists in this TU, skip the declare — the define
+            // acts as its own forward reference in LLVM IR.
+            if (definedFnNames.has(fn.name)) continue;
             emittedExterns.add(fn.name);
             const ret    = fn.returnType === null ? "void" : llvmType(fn.returnType);
             const params = fn.params.map(p => llvmType(p.type)).join(", ");
