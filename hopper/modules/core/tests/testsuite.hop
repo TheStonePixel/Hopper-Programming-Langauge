@@ -1,0 +1,14 @@
+// Tests TestSuite: check, checkEq, checkStrEq, done
+// EXPECT: PASS  two plus two
+// EXPECT: PASS  string match
+// EXPECT: PASS  negative abs
+// EXPECT: suite: 3 passed, 0 failed
+import Core from core
+
+entry main {
+    TestSuite t = TestSuite("suite")
+    t.checkEq(2 + 2, 4, "two plus two")
+    t.checkStrEq("hello", "hello", "string match")
+    t.checkEq(0 - 5, -5, "negative abs")
+    t.done()
+}

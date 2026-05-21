@@ -1245,6 +1245,186 @@ function cmdFlash(args) {
     console.log(`\nhopper: done — remove SD card safely, insert in Pi Zero, power on\n`);
 }
 
+// ── fix: validate and auto-repair a project ───────────────────────────────
+
+function cmdFix(args) {
+    const G = "\x1b[32m", R = "\x1b[31m", Y = "\x1b[33m";
+    const DIM = "\x1b[2m", BOLD = "\x1b[1m", RST = "\x1b[0m";
+    const TICK = "✓", CROSS = "✗";
+
+    const dryRun    = args.includes("--dry-run") || args.includes("-n");
+    const pathArg   = args.find(a => !a.startsWith("-"));
+    const projectRoot = pathArg
+        ? path.resolve(pathArg)
+        : findProjectRoot(process.cwd());
+
+    const manifestPath = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(manifestPath)) {
+        console.error(`hopper fix: no hopper.json found in ${projectRoot}`);
+        process.exit(1);
+    }
+
+    let manifest;
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch (e) {
+        console.error(`hopper fix: malformed hopper.json — ${e.message}`);
+        console.error(`  ${CROSS}  manual fix required: repair JSON syntax`);
+        process.exit(1);
+    }
+
+    const fixes  = [];
+    const manual = [];
+    let   manifestDirty = false;
+
+    const isLib  = manifest.type === "library";
+
+    // ── 1. Standard directories ──────────────────────────────────────────
+    const standardDirs = ["src", "tests"];
+    if (isLib) standardDirs.push("interfaces");
+
+    for (const d of standardDirs) {
+        const dirPath = path.join(projectRoot, d);
+        if (!fs.existsSync(dirPath)) {
+            if (!dryRun) fs.mkdirSync(dirPath, { recursive: true });
+            fixes.push(`created ${d}/`);
+        }
+    }
+
+    // ── 2. Entry file for executables ────────────────────────────────────
+    if (!isLib && manifest.entry) {
+        const entryAbs = path.join(projectRoot, manifest.entry);
+        if (!fs.existsSync(entryAbs)) {
+            if (!dryRun) {
+                fs.mkdirSync(path.dirname(entryAbs), { recursive: true });
+                fs.writeFileSync(entryAbs, `entry main {\n}\n`, "utf8");
+            }
+            fixes.push(`created ${manifest.entry}  (stub entry point)`);
+        }
+    }
+
+    // ── 3. Export files for libraries ────────────────────────────────────
+    for (const [exportName, exp] of Object.entries(manifest.exports || {})) {
+        const pairs = [
+            ["interface",      exp.interface],
+            ["implementation", exp.implementation],
+        ];
+        for (const [field, relPath] of pairs) {
+            if (!relPath) continue;
+            const absPath = path.join(projectRoot, relPath);
+            if (!fs.existsSync(absPath)) {
+                if (!dryRun) {
+                    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+                    const stub = field === "interface"
+                        ? `interface ${exportName} {\n}\n`
+                        : `class Standard${exportName} implements ${exportName} {\n    constructor() { }\n    destructor() { }\n}\n`;
+                    fs.writeFileSync(absPath, stub, "utf8");
+                }
+                fixes.push(`created ${relPath}  (stub ${field})`);
+            }
+        }
+    }
+
+    // ── 4. Scan source files for undeclared imports ───────────────────────
+    const declaredDeps = new Set(Object.keys(manifest.dependencies || {}));
+
+    // Collect binding-declared module names (from targets) — these don't
+    // need a separate entry in dependencies.
+    const targetBound = new Set();
+    for (const bindings of Object.values(manifest.targets || {})) {
+        for (const b of Object.values(bindings || {})) {
+            if (b.from) targetBound.add(b.from);
+        }
+    }
+
+    // All project source files to scan (skip modules/ subdirectory)
+    const toScan = new Set();
+    for (const subdir of ["src", "interfaces"]) {
+        const d = path.join(projectRoot, subdir);
+        if (fs.existsSync(d)) {
+            for (const f of fs.readdirSync(d).filter(x => x.endsWith(".hop")))
+                toScan.add(path.join(d, f));
+        }
+    }
+    // Also scan files referenced explicitly in exports and entry
+    for (const exp of Object.values(manifest.exports || {})) {
+        for (const relPath of [exp.interface, exp.implementation]) {
+            if (!relPath) continue;
+            const abs = path.join(projectRoot, relPath);
+            if (fs.existsSync(abs)) toScan.add(abs);
+        }
+    }
+    if (manifest.entry) {
+        const abs = path.join(projectRoot, manifest.entry);
+        if (fs.existsSync(abs)) toScan.add(abs);
+    }
+
+    const missingDeps = new Map();  // moduleName → Set of importing files
+    const importRe = /^[ \t]*import\s+\S+\s+from\s+([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*$/gm;
+
+    for (const filePath of toScan) {
+        let content;
+        try { content = fs.readFileSync(filePath, "utf8"); } catch { continue; }
+        importRe.lastIndex = 0;
+        let m;
+        while ((m = importRe.exec(content)) !== null) {
+            const mod = m[1];
+            if (mod === manifest.name)    continue;   // self-import
+            if (declaredDeps.has(mod))    continue;   // already declared
+            if (targetBound.has(mod))     continue;   // covered by targets
+            if (!missingDeps.has(mod)) missingDeps.set(mod, new Set());
+            missingDeps.get(mod).add(path.relative(projectRoot, filePath));
+        }
+    }
+
+    for (const [dep, files] of missingDeps) {
+        const modPath = path.join(MODULES_DIR, dep);
+        const fileList = [...files].join(", ");
+        if (fs.existsSync(modPath)) {
+            let version = "0.1.0";
+            try {
+                const dm = JSON.parse(fs.readFileSync(path.join(modPath, "hopper.json"), "utf8"));
+                if (dm.version) version = dm.version;
+            } catch {}
+            if (!dryRun) {
+                if (!manifest.dependencies) manifest.dependencies = {};
+                manifest.dependencies[dep] = version;
+                declaredDeps.add(dep);
+                manifestDirty = true;
+            }
+            fixes.push(`added dependency "${dep}": "${version}"  (imported in ${fileList})`);
+        } else {
+            manual.push(`import '${dep}' in ${fileList} — not in module store  →  hopper install ${dep}`);
+        }
+    }
+
+    if (manifestDirty) {
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+    }
+
+    // ── Report ─────────────────────────────────────────────────────────────
+    const rel = path.relative(process.cwd(), projectRoot) || ".";
+    console.log();
+    if (fixes.length === 0 && manual.length === 0) {
+        console.log(`${G}${TICK}${RST}  ${BOLD}nothing to fix${RST}  ${DIM}${rel}${RST}`);
+    } else {
+        console.log(`${BOLD}hopper fix${RST}  ${DIM}${rel}${RST}${dryRun ? `  ${Y}[dry run]${RST}` : ""}`);
+        if (fixes.length > 0) {
+            console.log();
+            console.log(`  ${G}Fixed (${fixes.length})${RST}`);
+            for (const f of fixes) console.log(`  ${G}${TICK}${RST}  ${f}`);
+        }
+        if (manual.length > 0) {
+            console.log();
+            console.log(`  ${Y}Needs manual resolution (${manual.length})${RST}`);
+            for (const m of manual) console.log(`  ${R}${CROSS}${RST}  ${m}`);
+        }
+    }
+    console.log();
+
+    if (manual.length > 0) process.exit(1);
+}
+
 // ── usage ──────────────────────────────────────────────────────────────────
 
 function usage() {
@@ -1263,6 +1443,7 @@ function usage() {
         "  hopper uninstall <module...>        remove installed packages",
         "  hopper publish [name]               publish this package to the registry",
         "  hopper revoke [name]                permanently delete a package from the registry",
+        "  hopper fix [path] [--dry-run]       auto-repair missing files and undeclared deps",
         "  hopper check [file.hop] [--asan|--tsan|--ubsan|--msan]",
         "                                      compile with sanitizers (default: --asan)",
         "  hopper debug [file.hop]             debug support (coming soon)",
@@ -1305,6 +1486,7 @@ if (asyncCmds[sub]) {
         case "run":       cmdRun(rest);      break;
         case "dev":       cmdDev(rest);      break;
         case "uninstall": cmdUninstall(rest); break;
+        case "fix":       cmdFix(rest);      break;
         case "check":     cmdCheck(rest);    break;
         case "debug":     cmdDebug(rest);    break;
         case "profile":   cmdProfile(rest);  break;

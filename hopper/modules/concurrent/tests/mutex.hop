@@ -1,0 +1,25 @@
+// Tests StandardMutex: create, lock, tryLock while locked, unlock, tryLock after unlock
+// EXPECT: PASS  created
+// EXPECT: PASS  locked blocks tryLock
+// EXPECT: PASS  unlock allows tryLock
+// EXPECT: mutex: 3 passed, 0 failed
+import Core from core
+import Concurrent from concurrent
+
+entry main {
+    TestSuite t = TestSuite("mutex")
+
+    StandardMutex m = StandardMutex()
+    t.check(true, "created")
+
+    m.lock()
+    bool tl1 = m.tryLock()
+    t.check(!tl1, "locked blocks tryLock")
+
+    m.unlock()
+    bool tl2 = m.tryLock()
+    t.check(tl2, "unlock allows tryLock")
+    m.unlock()
+
+    t.done()
+}

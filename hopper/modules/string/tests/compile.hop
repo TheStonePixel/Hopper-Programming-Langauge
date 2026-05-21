@@ -1,0 +1,3 @@
+// COMPILE_ONLY
+// Verifies AsciiString class and String interface compile
+import AsciiString from string
