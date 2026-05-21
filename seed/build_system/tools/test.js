@@ -25,8 +25,8 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, "..", "..");
-const BUILD_DIR  = path.join(ROOT, "build", "tests");
+const ROOT       = path.resolve(__dirname, "..", "..", "..");
+const BUILD_DIR  = path.join(ROOT, "hopper", "build", "tests");
 
 // ── ANSI ───────────────────────────────────────────────────────────────────────
 const G    = "\x1b[32m";
@@ -51,7 +51,7 @@ const LINE   = "─".repeat(52);
 function discoverGroups(filter) {
     const groups = [];
 
-    const modulesDir = path.join(ROOT, "modules");
+    const modulesDir = path.join(ROOT, "hopper", "modules");
     if (existsSync(modulesDir)) {
         for (const mod of readdirSync(modulesDir).sort()) {
             if (filter && mod !== filter) continue;
@@ -65,7 +65,7 @@ function discoverGroups(filter) {
         }
     }
 
-    const toolchainDir = path.join(ROOT, "toolchain", "tests");
+    const toolchainDir = path.join(ROOT, "hopper", "tests");
     if (existsSync(toolchainDir)) {
         for (const group of readdirSync(toolchainDir).sort()) {
             if (filter && group !== filter) continue;
@@ -122,7 +122,7 @@ function runTest(testFile, group) {
 
     const build = spawnSync(
         "node",
-        ["kindling/hopper", "-c", testFile, "-o", exePath],
+        [path.join(__dirname, "..", "hopper"), "-c", testFile, "-o", exePath],
         { cwd: ROOT, encoding: "utf8" }
     );
 

@@ -5,10 +5,10 @@ import https from "node:https";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { execSync, spawn } from "node:child_process";
-import { buildAstFromSource } from "./src/astBuilder.js";
-import { genModule } from "./src/codegenLLVM.js";
-import { parseSource } from "./src/parse.js";
-import { formatAst } from "./src/formatter.js";
+import { buildAstFromSource } from "../compiler/src/astBuilder.js";
+import { genModule } from "../compiler/src/codegenLLVM.js";
+import { parseSource } from "../compiler/src/parse.js";
+import { formatAst } from "../compiler/src/formatter.js";
 
 const __filename  = fileURLToPath(import.meta.url);
 const __dirname   = path.dirname(__filename);

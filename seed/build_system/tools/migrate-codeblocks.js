@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const ROOT = path.resolve(__dirname, '..', '..')
+const ROOT = path.resolve(__dirname, '..', '..', '..')
 
 const FILES = [
     'website/site/src/views/SyntaxView.vue',

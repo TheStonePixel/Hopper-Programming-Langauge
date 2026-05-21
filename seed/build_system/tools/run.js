@@ -14,7 +14,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, "..", "..");
+const ROOT       = path.resolve(__dirname, "..", "..", "..");
 
 const file = process.argv[2];
 if (!file) {
@@ -23,7 +23,7 @@ if (!file) {
 }
 
 const absFile = path.resolve(ROOT, file);
-const result  = spawnSync("node", ["kindling/hopper", "-r", absFile], {
+const result  = spawnSync("node", [path.join(__dirname, "..", "hopper"), "-r", absFile], {
     cwd:   ROOT,
     stdio: "inherit",
 });

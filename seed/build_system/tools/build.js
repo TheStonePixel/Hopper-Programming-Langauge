@@ -21,9 +21,9 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, "..", "..");
-const PROGS_DIR  = path.join(ROOT, "programs");
-const BUILD_DIR  = path.join(ROOT, "build", "programs");
+const ROOT       = path.resolve(__dirname, "..", "..", "..");
+const PROGS_DIR  = path.join(ROOT, "hopper", "programs");
+const BUILD_DIR  = path.join(ROOT, "hopper", "build", "programs");
 
 // ── ANSI colours ─────────────────────────────────────────────────────────────
 const G    = "\x1b[32m";
@@ -60,7 +60,7 @@ for (const file of files) {
 
     const result = spawnSync(
         "node",
-        ["kindling/hopper", "-c", file, "-o", outPath],
+        [path.join(__dirname, "..", "hopper"), "-c", file, "-o", outPath],
         { cwd: ROOT, encoding: "utf8" }
     );
 
