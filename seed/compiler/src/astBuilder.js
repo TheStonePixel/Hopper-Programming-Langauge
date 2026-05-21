@@ -898,12 +898,12 @@ export class AstBuilder extends HopperVisitor {
 const STDLIB_DIR = path.resolve(__dirname, "..", "..", "..", "hopper", "modules");
 
 // Find modules/ directory by walking up from baseDir, then fall back to stdlib.
-function resolveModuleFiles(moduleName, names, baseDir) {
+function resolveModuleFiles(moduleName, names, baseDir, importingFile) {
     let dir = baseDir || process.cwd();
     while (true) {
         const candidate = path.join(dir, "modules", moduleName);
         if (fs.existsSync(candidate)) {
-            return filesToLoad(candidate, names);
+            return filesToLoad(candidate, names, moduleName, importingFile);
         }
         const parent = path.dirname(dir);
         if (parent === dir) break;
@@ -912,18 +912,26 @@ function resolveModuleFiles(moduleName, names, baseDir) {
     // Fall back to the Hopper standard library
     const stdlibCandidate = path.join(STDLIB_DIR, moduleName);
     if (fs.existsSync(stdlibCandidate)) {
-        return filesToLoad(stdlibCandidate, names);
+        return filesToLoad(stdlibCandidate, names, moduleName, importingFile);
     }
-    throw new Error(`Module '${moduleName}' not found`);
+    const from = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
+    throw new Error(`Module '${moduleName}' not found${from}\n  Looked in: modules/${moduleName}/ and stdlib`);
 }
 
-function filesToLoad(moduleDir, names) {
+function filesToLoad(moduleDir, names, moduleName, importingFile) {
     // Prefer src/ subdirectory if present (standard module layout)
     const srcDir  = path.join(moduleDir, "src");
     const loadDir = fs.existsSync(srcDir) ? srcDir : moduleDir;
 
     if (names) {
-        return names.map(n => path.join(loadDir, n + ".hop"));
+        return names.map(n => {
+            const file = path.join(loadDir, n + ".hop");
+            if (!fs.existsSync(file)) {
+                const from = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
+                throw new Error(`No file '${n}.hop' in module '${moduleName}'${from}\n  Looked in: ${loadDir}`);
+            }
+            return file;
+        });
     } else {
         return fs.readdirSync(loadDir)
             .filter(f => f.endsWith(".hop"))
@@ -931,7 +939,7 @@ function filesToLoad(moduleDir, names) {
     }
 }
 
-export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false, bindings = null } = {}) {
+export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false, bindings = null, sourceFile = null } = {}) {
     // Strip import lines before ANTLR sees them, collect import requests
     const imports = [];
     const strippedSource = source.replace(
@@ -965,14 +973,25 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
 
             // Validate the project name if the binding declares one.
             if (names && binding.from && binding.from !== moduleName) {
-                throw new Error(`import ${bindingName} from ${moduleName}: expected 'from ${binding.from}'`);
+                const sf = sourceFile ? ` in ${path.basename(sourceFile)}` : "";
+                throw new Error(`import ${bindingName} from ${moduleName}: binding specifies 'from ${binding.from}'${sf}`);
+            }
+
+            // Validate binding files exist before trying to load them.
+            if (!fs.existsSync(binding.interface)) {
+                const sf = sourceFile ? ` (declared in hopper.json, imported from ${path.basename(sourceFile)})` : "";
+                throw new Error(`Interface file not found for '${bindingName}'${sf}\n  Expected: ${binding.interface}`);
+            }
+            if (!fs.existsSync(binding.implementation)) {
+                const sf = sourceFile ? ` (declared in hopper.json, imported from ${path.basename(sourceFile)})` : "";
+                throw new Error(`Implementation file not found for '${bindingName}'${sf}\n  Expected: ${binding.implementation}`);
             }
 
             // Load interface file
             if (!visited.has(binding.interface)) {
                 visited.add(binding.interface);
                 const ifaceAst = buildAstFromSource(fs.readFileSync(binding.interface, "utf8"), {
-                    baseDir: path.dirname(binding.interface), visited, bindings,
+                    baseDir: path.dirname(binding.interface), visited, bindings, sourceFile: binding.interface,
                 });
                 ast.interfaces.unshift(...ifaceAst.interfaces);
                 ast.functions.unshift(...ifaceAst.functions);
@@ -984,7 +1003,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             if (!visited.has(binding.implementation)) {
                 visited.add(binding.implementation);
                 const implAst = buildAstFromSource(fs.readFileSync(binding.implementation, "utf8"), {
-                    baseDir: path.dirname(binding.implementation), visited, bindings,
+                    baseDir: path.dirname(binding.implementation), visited, bindings, sourceFile: binding.implementation,
                 });
 
                 // Find the class that matches the binding name; fall back to the first class.
@@ -1017,15 +1036,16 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         }
 
         // Regular module import
-        const files = resolveModuleFiles(moduleName, names, baseDir);
+        const files = resolveModuleFiles(moduleName, names, baseDir, sourceFile);
         for (const resolved of files) {
             if (visited.has(resolved)) continue;
             visited.add(resolved);
 
             const importedAst = buildAstFromSource(fs.readFileSync(resolved, "utf8"), {
-                baseDir: path.dirname(resolved),
+                baseDir:    path.dirname(resolved),
                 visited,
                 bindings,
+                sourceFile: resolved,
             });
 
             ast.functions.unshift(...importedAst.functions);

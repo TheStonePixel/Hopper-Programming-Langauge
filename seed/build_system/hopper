@@ -53,9 +53,10 @@ function loadBindings(sourceFile, target = "host") {
 }
 
 function toIR(file, target = "host") {
-    const src      = fs.readFileSync(file, "utf8");
-    const bindings = loadBindings(file, target);
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), bindings });
+    const abs      = path.resolve(file);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, target);
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
     return genModule(ast, { target });
 }
 
@@ -175,9 +176,10 @@ function dedupeDeclarations(ir) {
 }
 
 function toObjectBare(file, llDir, oDir, cfg) {
-    const src      = fs.readFileSync(file, "utf8");
-    const bindings = loadBindings(file, cfg.llvmTarget);
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), bindings });
+    const abs      = path.resolve(file);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, cfg.llvmTarget);
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
     const ir       = dedupeDeclarations(genModule(ast, { target: cfg.llvmTarget }));
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
@@ -223,9 +225,10 @@ function projectBinaryName(entryFile, projectRoot) {
 }
 
 function toObject(file, llDir, oDir, flags) {
-    const src      = fs.readFileSync(file, "utf8");
-    const bindings = loadBindings(file, "host");
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), bindings });
+    const abs      = path.resolve(file);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, "host");
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
     const ir       = dedupeDeclarations(genModule(ast));
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
@@ -1064,9 +1067,10 @@ function cmdIR(args) {
 
 function cmdAST(args) {
     if (!args[0]) { console.error("hopper: ast requires a file"); process.exit(1); }
-    const src      = fs.readFileSync(args[0], "utf8");
-    const bindings = loadBindings(args[0], "host");
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(args[0])), bindings });
+    const abs      = path.resolve(args[0]);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, "host");
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
     console.log(JSON.stringify(ast, null, 2));
 }
 
