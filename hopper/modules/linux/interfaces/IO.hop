@@ -1,6 +1,8 @@
-const STDIN  = 0
-const STDOUT = 1
-const STDERR = 2
+enum StdFd {
+    STDIN  = 0
+    STDOUT = 1
+    STDERR = 2
+}
 
 interface IO {
     function read(int fd, address buf, int count) int

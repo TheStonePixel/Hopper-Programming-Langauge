@@ -1,34 +1,46 @@
-const AF_UNIX  =  1
-const AF_INET  =  2
-const AF_INET6 = 10
+enum AddrFamily {
+    AF_UNIX  =  1
+    AF_INET  =  2
+    AF_INET6 = 10
+}
 
-const SOCK_STREAM   =       1
-const SOCK_DGRAM    =       2
-const SOCK_RAW      =       3
-const SOCK_NONBLOCK =    2048
-const SOCK_CLOEXEC  =  524288
+enum SockType {
+    SOCK_STREAM   =      1
+    SOCK_DGRAM    =      2
+    SOCK_RAW      =      3
+    SOCK_NONBLOCK =   2048
+    SOCK_CLOEXEC  = 524288
+}
 
-const SOL_SOCKET  =  1
-const IPPROTO_TCP =  6
-const IPPROTO_UDP = 17
+enum SockLevel {
+    SOL_SOCKET  =  1
+    IPPROTO_TCP =  6
+    IPPROTO_UDP = 17
+}
 
-const SO_REUSEADDR =  2
-const SO_KEEPALIVE =  9
-const SO_SNDBUF    =  7
-const SO_RCVBUF    =  8
-const TCP_NODELAY  =  1
-const TCP_KEEPIDLE =  4
-const TCP_KEEPINTVL = 5
+enum SockOpt {
+    SO_REUSEADDR =  2
+    SO_KEEPALIVE =  9
+    SO_SNDBUF    =  7
+    SO_RCVBUF    =  8
+    TCP_NODELAY  =  1
+    TCP_KEEPIDLE =  4
+    TCP_KEEPINTVL = 5
+}
 
-const SHUT_RD   = 0
-const SHUT_WR   = 1
-const SHUT_RDWR = 2
+enum ShutHow {
+    SHUT_RD   = 0
+    SHUT_WR   = 1
+    SHUT_RDWR = 2
+}
 
-const MSG_OOB      =     1
-const MSG_PEEK     =     2
-const MSG_DONTWAIT =    64
-const MSG_WAITALL  =   256
-const MSG_NOSIGNAL = 16384
+enum MsgFlag {
+    MSG_OOB      =     1
+    MSG_PEEK     =     2
+    MSG_DONTWAIT =    64
+    MSG_WAITALL  =   256
+    MSG_NOSIGNAL = 16384
+}
 
 interface Socket {
     function socket(int domain, int type, int protocol) int

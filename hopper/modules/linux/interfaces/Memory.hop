@@ -1,28 +1,40 @@
-const PROT_NONE  = 0
-const PROT_READ  = 1
-const PROT_WRITE = 2
-const PROT_EXEC  = 4
+enum Prot {
+    PROT_NONE  = 0
+    PROT_READ  = 1
+    PROT_WRITE = 2
+    PROT_EXEC  = 4
+}
 
-const MAP_SHARED  =  1
-const MAP_PRIVATE =  2
-const MAP_FIXED   = 16
-const MAP_ANON    = 32
+enum MapFlag {
+    MAP_SHARED  =  1
+    MAP_PRIVATE =  2
+    MAP_FIXED   = 16
+    MAP_ANON    = 32
+}
 
-const MS_ASYNC      = 1
-const MS_INVALIDATE = 2
-const MS_SYNC       = 4
+enum MsyncFlag {
+    MS_ASYNC      = 1
+    MS_INVALIDATE = 2
+    MS_SYNC       = 4
+}
 
-const MADV_NORMAL     = 0
-const MADV_RANDOM     = 1
-const MADV_SEQUENTIAL = 2
-const MADV_DONTNEED   = 4
-const MADV_FREE       = 8
+enum MadviseAdvice {
+    MADV_NORMAL     = 0
+    MADV_RANDOM     = 1
+    MADV_SEQUENTIAL = 2
+    MADV_DONTNEED   = 4
+    MADV_FREE       = 8
+}
 
-const MCL_CURRENT = 1
-const MCL_FUTURE  = 2
+enum MlockFlag {
+    MCL_CURRENT = 1
+    MCL_FUTURE  = 2
+}
 
-const MFD_CLOEXEC       = 1
-const MFD_ALLOW_SEALING = 2
+enum MemfdFlag {
+    MFD_CLOEXEC       = 1
+    MFD_ALLOW_SEALING = 2
+}
 
 interface Memory {
     function mmap(address addr, int len, int prot, int flags, int fd, int offset) address

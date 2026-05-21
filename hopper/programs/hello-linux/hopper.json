@@ -1,9 +1,9 @@
 {
   "name": "hello-linux",
   "version": "0.1.0",
-  "description": "Smoke test for the linux module interface system",
+  "description": "Smoke test for linux module interface system",
   "license": "Apache-2.0",
-  "type": "program",
+  "type": "executable",
   "entry": "src/main.hop",
   "targets": {
     "host": {

@@ -1,27 +1,39 @@
-const CLOCK_REALTIME        = 0
-const CLOCK_MONOTONIC       = 1
-const CLOCK_PROCESS_CPUTIME = 2
-const CLOCK_BOOTTIME        = 7
+enum ClockId {
+    CLOCK_REALTIME        = 0
+    CLOCK_MONOTONIC       = 1
+    CLOCK_PROCESS_CPUTIME = 2
+    CLOCK_BOOTTIME        = 7
+}
 
-const ITIMER_REAL    = 0
-const ITIMER_VIRTUAL = 1
-const ITIMER_PROF    = 2
+enum ItimerWhich {
+    ITIMER_REAL    = 0
+    ITIMER_VIRTUAL = 1
+    ITIMER_PROF    = 2
+}
 
-const RUSAGE_SELF     =  0
-const RUSAGE_CHILDREN = -1
+enum RusageWho {
+    RUSAGE_SELF     =  0
+    RUSAGE_CHILDREN = -1
+}
 
-const RLIMIT_CORE   = 4
-const RLIMIT_STACK  = 3
-const RLIMIT_NOFILE = 7
-const RLIMIT_AS     = 9
+enum Rlimit {
+    RLIMIT_CORE   = 4
+    RLIMIT_STACK  = 3
+    RLIMIT_NOFILE = 7
+    RLIMIT_AS     = 9
+}
 
-const SCHED_OTHER = 0
-const SCHED_FIFO  = 1
-const SCHED_RR    = 2
+enum SchedPolicy {
+    SCHED_OTHER = 0
+    SCHED_FIFO  = 1
+    SCHED_RR    = 2
+}
 
-const PRIO_PROCESS = 0
-const PRIO_PGRP    = 1
-const PRIO_USER    = 2
+enum PrioWhich {
+    PRIO_PROCESS = 0
+    PRIO_PGRP    = 1
+    PRIO_USER    = 2
+}
 
 interface System {
     function uname(address buf) int

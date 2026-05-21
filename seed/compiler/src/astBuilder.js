@@ -977,6 +977,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                 ast.interfaces.unshift(...ifaceAst.interfaces);
                 ast.functions.unshift(...ifaceAst.functions);
                 ast.consts.unshift(...ifaceAst.consts);
+                ast.enums.unshift(...(ifaceAst.enums || []));
             }
 
             // Load implementation file

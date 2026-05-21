@@ -25,10 +25,38 @@ function baseName(file) {
     return path.basename(file, path.extname(file));
 }
 
-function toIR(file) {
-    const src = fs.readFileSync(file, "utf8");
-    const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    return genModule(ast);
+// Walk up from the source file to find hopper.json; return a Map of target bindings.
+function loadBindings(sourceFile, target = "host") {
+    let dir = path.dirname(path.resolve(sourceFile));
+    while (true) {
+        const candidate = path.join(dir, "hopper.json");
+        if (fs.existsSync(candidate)) {
+            try {
+                const config = JSON.parse(fs.readFileSync(candidate, "utf8"));
+                const targetBindings = (config.targets || {})[target] || {};
+                const bindings = new Map();
+                for (const [name, b] of Object.entries(targetBindings)) {
+                    bindings.set(name, {
+                        from:           b.from || null,
+                        interface:      path.resolve(dir, b.interface),
+                        implementation: path.resolve(dir, b.implementation),
+                    });
+                }
+                return bindings;
+            } catch { /* malformed hopper.json — skip */ }
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return new Map();
+}
+
+function toIR(file, target = "host") {
+    const src      = fs.readFileSync(file, "utf8");
+    const bindings = loadBindings(file, target);
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), bindings });
+    return genModule(ast, { target });
 }
 
 // Walk up from startDir to find the nearest directory containing hopper.json.
@@ -147,9 +175,10 @@ function dedupeDeclarations(ir) {
 }
 
 function toObjectBare(file, llDir, oDir, cfg) {
-    const src     = fs.readFileSync(file, "utf8");
-    const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    const ir      = dedupeDeclarations(genModule(ast, { target: cfg.llvmTarget }));
+    const src      = fs.readFileSync(file, "utf8");
+    const bindings = loadBindings(file, cfg.llvmTarget);
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), bindings });
+    const ir       = dedupeDeclarations(genModule(ast, { target: cfg.llvmTarget }));
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
@@ -194,9 +223,10 @@ function projectBinaryName(entryFile, projectRoot) {
 }
 
 function toObject(file, llDir, oDir, flags) {
-    const src     = fs.readFileSync(file, "utf8");
-    const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    const ir      = dedupeDeclarations(genModule(ast));
+    const src      = fs.readFileSync(file, "utf8");
+    const bindings = loadBindings(file, "host");
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), bindings });
+    const ir       = dedupeDeclarations(genModule(ast));
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
@@ -480,12 +510,20 @@ function writeManifest(obj) {
 }
 
 async function cmdInit(args) {
-    if (!args[0]) {
+    // Parse flags: --yes/-y skips prompts, --type=library|executable, --description=..., --license=...
+    const yesFlag   = args.includes("--yes") || args.includes("-y");
+    const typeFlag  = (args.find(a => a.startsWith("--type="))        || "").slice("--type=".length)        || null;
+    const descFlag  = (args.find(a => a.startsWith("--description=")) || "").slice("--description=".length) || null;
+    const licFlag   = (args.find(a => a.startsWith("--license="))     || "").slice("--license=".length)     || null;
+    const versionFlag = (args.find(a => a.startsWith("--version="))   || "").slice("--version=".length)     || null;
+    const nameArg   = args.find(a => !a.startsWith("-"));
+
+    if (!nameArg) {
         console.error("hopper: init requires a project name  —  hopper init <name>");
         process.exit(1);
     }
 
-    const rawName  = args[0];
+    const rawName  = nameArg;
     const safeName = rawName.replace(/[^a-zA-Z0-9_-]/g, "_");
     const projectDir = path.resolve(process.cwd(), safeName);
 
@@ -494,19 +532,50 @@ async function cmdInit(args) {
         process.exit(1);
     }
 
-    const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const ask = (q, def) => new Promise(resolve =>
-        rl.question(`${q}: ${def ? `(${def}) ` : ""}`, ans => resolve(ans.trim() || def || ""))
-    );
+    let name, version, description, license, typeChoice;
 
-    console.log("\nThis utility will walk you through creating a hopper.json file.\n");
+    if (yesFlag) {
+        name        = safeName;
+        version     = versionFlag  || "0.1.0";
+        description = descFlag     || "";
+        license     = licFlag      || "MIT";
+        typeChoice  = typeFlag     || "executable";
+    } else {
+        const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const ask = (q, def) => new Promise(resolve =>
+            rl.question(`${q}: ${def ? `(${def}) ` : ""}`, ans => resolve(ans.trim() || def || ""))
+        );
 
-    const name        = await ask("name",        safeName);
-    const version     = await ask("version",     "0.1.0");
-    const description = await ask("description", "");
-    const license     = await ask("license",     "MIT");
-    const typeChoice  = await ask("type (executable/library)", "executable");
-    const isLib       = typeChoice.startsWith("l");
+        console.log("\nThis utility will walk you through creating a hopper.json file.\n");
+
+        name        = await ask("name",        safeName);
+        version     = await ask("version",     versionFlag  || "0.1.0");
+        description = await ask("description", descFlag     || "");
+        license     = await ask("license",     licFlag      || "MIT");
+        typeChoice  = await ask("type (executable/library)", typeFlag || "executable");
+
+        const isLibPreview = typeChoice.startsWith("l");
+        const previewManifest = isLibPreview ? {
+            name, version, description, license,
+            type: "library",
+            main: `src/${name}.hop`,
+        } : {
+            name, version, description, license,
+            type: "executable",
+            entry: "src/main.hop",
+            targets: { host: {} },
+        };
+        console.log(`\n${JSON.stringify(previewManifest, null, 2)}\n`);
+
+        const confirm = await ask("Is this ok?", "yes");
+        rl.close();
+        if (confirm !== "yes" && confirm !== "y") {
+            console.log("aborted.");
+            process.exit(0);
+        }
+    }
+
+    const isLib = typeChoice.startsWith("l");
 
     const manifest = isLib ? {
         name, version, description, license,
@@ -521,14 +590,8 @@ async function cmdInit(args) {
         },
     };
 
-    console.log(`\n${JSON.stringify(manifest, null, 2)}\n`);
-
-    const confirm = await ask("Is this ok?", "yes");
-    rl.close();
-
-    if (confirm !== "yes" && confirm !== "y") {
-        console.log("aborted.");
-        process.exit(0);
+    if (yesFlag) {
+        console.log(`\ncreating ${safeName} (${manifest.type})...`);
     }
 
     fs.mkdirSync(path.join(projectDir, "src"),        { recursive: true });
@@ -1001,8 +1064,9 @@ function cmdIR(args) {
 
 function cmdAST(args) {
     if (!args[0]) { console.error("hopper: ast requires a file"); process.exit(1); }
-    const src = fs.readFileSync(args[0], "utf8");
-    const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(args[0])) });
+    const src      = fs.readFileSync(args[0], "utf8");
+    const bindings = loadBindings(args[0], "host");
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(args[0])), bindings });
     console.log(JSON.stringify(ast, null, 2));
 }
 

@@ -1,37 +1,47 @@
-const SIGHUP  =  1
-const SIGINT  =  2
-const SIGQUIT =  3
-const SIGILL  =  4
-const SIGABRT =  6
-const SIGFPE  =  8
-const SIGKILL =  9
-const SIGSEGV = 11
-const SIGPIPE = 13
-const SIGALRM = 14
-const SIGTERM = 15
-const SIGCHLD = 17
-const SIGCONT = 18
-const SIGSTOP = 19
-const SIGTSTP = 20
-const SIGUSR1 = 10
-const SIGUSR2 = 12
+enum Signal {
+    SIGHUP  =  1
+    SIGINT  =  2
+    SIGQUIT =  3
+    SIGILL  =  4
+    SIGABRT =  6
+    SIGFPE  =  8
+    SIGKILL =  9
+    SIGSEGV = 11
+    SIGPIPE = 13
+    SIGALRM = 14
+    SIGTERM = 15
+    SIGUSR1 = 10
+    SIGUSR2 = 12
+    SIGCHLD = 17
+    SIGCONT = 18
+    SIGSTOP = 19
+    SIGTSTP = 20
+}
 
-const SIG_BLOCK   = 0
-const SIG_UNBLOCK = 1
-const SIG_SETMASK = 2
+enum SigHow {
+    SIG_BLOCK   = 0
+    SIG_UNBLOCK = 1
+    SIG_SETMASK = 2
+}
 
-const WNOHANG   = 1
-const WUNTRACED = 2
+enum WaitFlag {
+    WNOHANG   = 1
+    WUNTRACED = 2
+}
 
-const P_ALL  = 0
-const P_PID  = 1
-const P_PGID = 2
+enum IdType {
+    P_ALL  = 0
+    P_PID  = 1
+    P_PGID = 2
+}
 
-const CLONE_VM      =    256
-const CLONE_FS      =    512
-const CLONE_FILES   =   1024
-const CLONE_SIGHAND =   2048
-const CLONE_THREAD  =  65536
+enum CloneFlag {
+    CLONE_VM      =    256
+    CLONE_FS      =    512
+    CLONE_FILES   =   1024
+    CLONE_SIGHAND =   2048
+    CLONE_THREAD  =  65536
+}
 
 interface Process {
     function exit(int code)
