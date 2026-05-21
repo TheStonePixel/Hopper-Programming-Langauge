@@ -136,10 +136,20 @@ SECTIONS
 }
 
 // Compile one .hop file for a bare-metal target.
+function dedupeDeclarations(ir) {
+    const seen = new Set();
+    return ir.split("\n").filter(line => {
+        if (!line.startsWith("declare ")) return true;
+        if (seen.has(line)) return false;
+        seen.add(line);
+        return true;
+    }).join("\n");
+}
+
 function toObjectBare(file, llDir, oDir, cfg) {
     const src     = fs.readFileSync(file, "utf8");
     const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    const ir      = genModule(ast, { target: cfg.llvmTarget });
+    const ir      = dedupeDeclarations(genModule(ast, { target: cfg.llvmTarget }));
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
@@ -186,7 +196,7 @@ function projectBinaryName(entryFile, projectRoot) {
 function toObject(file, llDir, oDir, flags) {
     const src     = fs.readFileSync(file, "utf8");
     const ast     = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)) });
-    const ir      = genModule(ast);
+    const ir      = dedupeDeclarations(genModule(ast));
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
