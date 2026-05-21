@@ -10,5 +10,19 @@
       "interface":      "interfaces/Buffer.hop",
       "implementation": "src/Buffer.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Buffer": {
+        "from":           "pointer",
+        "interface":      "interfaces/Buffer.hop",
+        "implementation": "src/Buffer.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

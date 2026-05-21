@@ -10,5 +10,19 @@
       "interface":      "interfaces/Stream.hop",
       "implementation": "src/Stream.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Stream": {
+        "from":           "stream",
+        "interface":      "interfaces/Stream.hop",
+        "implementation": "src/Stream.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

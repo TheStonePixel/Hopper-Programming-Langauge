@@ -10,5 +10,19 @@
       "interface":      "interfaces/Char.hop",
       "implementation": "src/Char.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Char": {
+        "from":           "char",
+        "interface":      "interfaces/Char.hop",
+        "implementation": "src/Char.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

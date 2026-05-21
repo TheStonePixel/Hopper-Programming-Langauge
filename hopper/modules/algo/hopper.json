@@ -10,5 +10,19 @@
       "interface":      "interfaces/Algo.hop",
       "implementation": "src/Algo.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Algo": {
+        "from":           "algo",
+        "interface":      "interfaces/Algo.hop",
+        "implementation": "src/Algo.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

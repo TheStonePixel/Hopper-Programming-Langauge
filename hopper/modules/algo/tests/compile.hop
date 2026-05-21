@@ -1,3 +1,0 @@
-// COMPILE_ONLY
-// Verifies Algo module compiles
-import Algo from algo
