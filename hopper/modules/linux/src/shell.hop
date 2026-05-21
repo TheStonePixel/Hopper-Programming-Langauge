@@ -1,9 +1,9 @@
 // shell.hop — capture shell command output into a buffer.
 //
 // shellCapture(cmd, outBuf, maxLen) int
-//   Run cmd via sh, redirect both stdout and stderr to a temp file,
+//   Run cmd via sh, redirect stdout+stderr to a temp file,
 //   read back up to maxLen-1 bytes into outBuf, null-terminate.
-//   Returns byte count; -1 if the temp file could not be opened or read.
+//   Returns byte count; -1 on I/O error.
 //
 // shellCaptureEx(cmd, outBuf, maxLen, codeBuf) int
 //   Same but also writes the exit code into *codeBuf.
@@ -13,13 +13,27 @@
 //
 //   address buf = allocate 4096
 //   int n = shellCapture("echo hello", buf, 4096)
-//   // buf now contains "hello\n"
 
-import file from io
+import fs from sys
+import io from sys
 
 extern function system(string cmd) int
 
-// Run cmd, capture stdout+stderr into outBuf (max maxLen bytes).
+// Open path read-only, read up to maxLen-1 bytes into buf, null-terminate.
+// Returns bytes read, or -1 on open failure.
+function _readTmpFile(address path, address buf, int maxLen) int {
+    int fd = open(path, 0, 0)
+    if (fd < 0) { return -1 }
+    int n = read(fd, buf, maxLen - 1)
+    close(fd)
+    if (n < 0) { return -1 }
+    address term = buf + n
+    byte z = 0
+    term::value = z
+    return n
+}
+
+// Run cmd via sh, capture stdout+stderr into outBuf (max maxLen bytes).
 // Returns bytes captured, or -1 on I/O error.
 function shellCapture(address cmd, address outBuf, int maxLen) int {
     address tmp = "/tmp/_hopper_cap.tmp"
@@ -72,8 +86,7 @@ function shellCapture(address cmd, address outBuf, int maxLen) int {
     system(shellCmd)
     deallocate shellCmd
 
-    int n = fileRead(tmp, outBuf, maxLen)
-    return n
+    return _readTmpFile(tmp, outBuf, maxLen)
 }
 
 // Same as shellCapture but also writes the shell exit code into *codeBuf.
@@ -131,6 +144,5 @@ function shellCaptureEx(address cmd, address outBuf, int maxLen, address codeBuf
     int code = (rawStatus >> 8) & 255
     codeBuf::value = code
 
-    int n = fileRead(tmp, outBuf, maxLen)
-    return n
+    return _readTmpFile(tmp, outBuf, maxLen)
 }
