@@ -1,3 +1,6 @@
 // COMPILE_ONLY
 // Verifies bare-metal UART driver (strict int MMIO registers, StandardUart class) compiles
 import Uart from uart
+
+extern function printf(string fmt, ...) int
+entry main { }

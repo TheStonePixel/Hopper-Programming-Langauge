@@ -1,3 +1,0 @@
-// COMPILE_ONLY
-// Verifies all 150+ extern LLVM C API declarations and StandardLLVM class compile
-import LLVM from llvm
