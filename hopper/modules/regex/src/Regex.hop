@@ -201,8 +201,61 @@ function _matchHere(address pat, address text) bool {
     return _matchHere(nextPat, nextText)
 }
 
+extern function strstr(address haystack, address needle) address
+
+// --- Fast path for literal patterns (no special regex chars: . * + ? [ ^ $ \) ---
+// Uses libc strstr which is SSE2/AVX vectorised in glibc.
+
+function _isLitPat(address pat) bool {
+    int i = 0
+    while (true) {
+        address p = pat + i
+        byte b = p::value
+        int c = cast b
+        if (c == 0)  { return true }
+        if (c == 46) { return false }
+        if (c == 42) { return false }
+        if (c == 43) { return false }
+        if (c == 63) { return false }
+        if (c == 91) { return false }
+        if (c == 94) { return false }
+        if (c == 36) { return false }
+        if (c == 92) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function _litLen(address pat) int {
+    int n = 0
+    while (true) {
+        address p = pat + n
+        byte b = p::value
+        int c = cast b
+        if (c == 0) { return n }
+        n = n + 1
+    }
+    return n
+}
+
+// Returns start offset of first match, or -1.
+// Delegates to libc strstr (SSE2/AVX vectorised in glibc).
+function _litSearch(address pat, int plen, address text) int {
+    address hit = strstr(text, pat)
+    if (hit == null) { return -1 }
+    int hitI  = cast hit
+    int textI = cast text
+    return hitI - textI
+}
+
 class StandardRegex implements Regex {
     function matchAt(address pattern, address text) bool {
+        if (_isLitPat(pattern)) {
+            int plen = _litLen(pattern)
+            if (plen == 0) { return true }
+            int pos = _litSearch(pattern, plen, text)
+            return pos >= 0
+        }
         address p0 = pattern + 0
         byte b0 = p0::value
         int c0 = cast b0
@@ -214,6 +267,11 @@ class StandardRegex implements Regex {
     }
 
     function match(address pattern, address text) int {
+        if (_isLitPat(pattern)) {
+            int plen = _litLen(pattern)
+            if (plen == 0) { return 0 }
+            return _litSearch(pattern, plen, text)
+        }
         address p0 = pattern + 0
         byte b0 = p0::value
         int c0 = cast b0

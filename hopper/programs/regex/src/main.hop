@@ -15,6 +15,9 @@ import IO         from linux
 import FileSystem from linux
 
 extern function printf(string fmt, ...) int
+extern function memchr(address s, int c, int n) address
+extern function memcpy(address dst, address src, int n) address
+extern function strstr(address haystack, address needle) address
 
 enum Flag {
     N = 1
@@ -113,6 +116,21 @@ function direntIsDot(address e) bool {
     return i2 == 0
 }
 
+// Lowercase a region of a buffer in-place.
+function lowerRegion(address buf, int start, int len) {
+    int k = 0
+    while (k < len) {
+        address p = buf + start + k
+        byte b = p::value
+        int bi = cast b
+        if (bi >= 65 && bi <= 90) {
+            byte lo = cast (bi + 32)
+            p::value = lo
+        }
+        k = k + 1
+    }
+}
+
 function grepFd(StandardRegex re, address pat, int fd, address name, int flags, int showName) int {
     int flagN = flags & Flag.N
     int flagI = flags & Flag.I
@@ -129,6 +147,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
     int lineNum    = 0
     int matchCount = 0
     int printed    = 0
+    int chunkI     = cast chunk
 
     bool eof = false
     while (!eof) {
@@ -138,23 +157,49 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
         } else {
             int ci = 0
             while (ci < nr) {
-                address cp = chunk + ci
-                byte b = cp::value
-                int bi = cast b
+                int remaining = nr - ci
+                address segStart = chunk + ci
+                address nlp = memchr(segStart, 10, remaining)
 
-                if (bi == 10) {
+                int segLen
+                bool hasNl
+                int nlAbsOff
+                if (nlp == null) {
+                    segLen   = remaining
+                    hasNl    = false
+                    nlAbsOff = 0
+                } else {
+                    int nlpI     = cast nlp
+                    int segStI   = cast segStart
+                    segLen       = nlpI - segStI
+                    hasNl        = true
+                    nlAbsOff     = nlpI - chunkI
+                }
+
+                int copyLen = segLen
+                int room = Limits.LINE_MAX - 1 - lineLen
+                if (copyLen > room) { copyLen = room }
+                if (copyLen > 0) {
+                    memcpy(lineBuf + lineLen, segStart, copyLen)
+                    if (flagI != 0) {
+                        memcpy(lowBuf + lineLen, segStart, copyLen)
+                        lowerRegion(lowBuf, lineLen, copyLen)
+                    }
+                    lineLen = lineLen + copyLen
+                }
+
+                if (hasNl) {
                     lineNum = lineNum + 1
                     address term = lineBuf + lineLen
                     byte nul = cast 0
                     term::value = nul
-
-                    address matchBuf = lineBuf
                     if (flagI != 0) {
                         address lt = lowBuf + lineLen
                         lt::value = nul
-                        matchBuf = lowBuf
                     }
 
+                    address matchBuf = lineBuf
+                    if (flagI != 0) { matchBuf = lowBuf }
                     bool m = re.matchAt(pat, matchBuf)
                     if (flagV != 0) { m = !m }
                     if (m) {
@@ -171,19 +216,10 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                         }
                     }
                     lineLen = 0
-                } else if (lineLen < Limits.LINE_MAX - 1) {
-                    address lp = lineBuf + lineLen
-                    lp::value = b
-                    lineLen = lineLen + 1
-                    if (flagI != 0) {
-                        int blo = bi
-                        if (blo >= 65 && blo <= 90) { blo = blo + 32 }
-                        byte bloB = cast blo
-                        address dp = lowBuf + lineLen - 1
-                        dp::value = bloB
-                    }
+                    ci = nlAbsOff + 1
+                } else {
+                    ci = nr
                 }
-                ci = ci + 1
             }
         }
     }
@@ -193,14 +229,13 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
         address term = lineBuf + lineLen
         byte nul = cast 0
         term::value = nul
-
-        address matchBuf = lineBuf
         if (flagI != 0) {
             address lt = lowBuf + lineLen
             lt::value = nul
-            matchBuf = lowBuf
         }
 
+        address matchBuf = lineBuf
+        if (flagI != 0) { matchBuf = lowBuf }
         bool m = re.matchAt(pat, matchBuf)
         if (flagV != 0) { m = !m }
         if (m) {
