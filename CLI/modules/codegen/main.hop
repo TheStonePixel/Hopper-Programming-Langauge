@@ -1,6 +1,0 @@
-import io from core
-
-entry main {
-    print("Hello from codegen!")
-    newline()
-}

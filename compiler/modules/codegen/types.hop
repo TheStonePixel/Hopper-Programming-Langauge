@@ -1,7 +1,0 @@
-// types.hop — Hopper type → LLVM type resolution
-
-function llvmType(string hopperType) string
-function llvmSize(string hopperType) int
-function isPointer(string hopperType) int
-function isInteger(string hopperType) int
-function isFloat(string hopperType) int
