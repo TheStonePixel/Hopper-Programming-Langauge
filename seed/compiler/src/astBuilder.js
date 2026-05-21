@@ -38,6 +38,7 @@ import {
     IfStmt,
     WhileStmt,
     ForStmt,
+    ForEachStmt,
     BreakStmt,
     ContinueStmt,
     ReturnStmt,
@@ -620,9 +621,56 @@ export class AstBuilder extends HopperVisitor {
 
     visitIfStmt(ctx) {
         const cond      = this.visit(ctx.expression());
-        const thenBlock = this.visit(ctx.block(0));
-        const elseBlock = ctx.block(1) ? this.visit(ctx.block(1)) : null;
+        const thenBlock = this.visit(ctx.block());
+        const elseBlock = ctx.elseClause() ? this.visit(ctx.elseClause()) : null;
         return IfStmt(cond, thenBlock, elseBlock);
+    }
+
+    // 'else' block  → return the block as-is
+    visitElseBlock(ctx) {
+        return this.visit(ctx.block());
+    }
+
+    // 'else' 'if' '(' expr ')' block elseClause?  → wrap inner IfStmt in a Block
+    visitElseIf(ctx) {
+        const cond      = this.visit(ctx.expression());
+        const thenBlock = this.visit(ctx.block());
+        const elseBlock = ctx.elseClause() ? this.visit(ctx.elseClause()) : null;
+        return Block([IfStmt(cond, thenBlock, elseBlock)]);
+    }
+
+    visitForEachStmt(ctx) {
+        const elemType   = ctx.type().getText();
+        const elemVar    = ctx.Identifier().getText();
+        const collExpr   = this.visit(ctx.expression());
+        const body       = this.visit(ctx.block());
+
+        // Collection must be a simple variable; extract its name for MethodCall
+        if (!collExpr || collExpr.kind !== "Var")
+            throw new Error(`for-each collection must be a simple variable (got ${collExpr && collExpr.kind})`);
+        const collName = collExpr.name;
+
+        const counterVar = `__fe_${elemVar}`;
+
+        // Desugar: for (elemType elemVar : collName) { body }
+        //       →  for (int __fe_X = 0; __fe_X < collName.len(); __fe_X = __fe_X + 1) {
+        //              elemType elemVar = [cast] collName.get(__fe_X)
+        //              body
+        //          }
+        const getCall = MethodCall(collName, "get", [Var(counterVar)]);
+        const elemInit = elemType === "address"
+            ? getCall
+            : CastExpr(null, getCall);
+        const elemDecl = VarDecl(elemVar, elemType, elemInit);
+
+        const fullBody = Block([elemDecl, ...body.statements]);
+
+        return ForStmt(
+            VarDecl(counterVar, "int", IntLiteral(0)),
+            Binary("<", Var(counterVar), MethodCall(collName, "len", [])),
+            Assign(counterVar, Binary("+", Var(counterVar), IntLiteral(1))),
+            fullBody
+        );
     }
 
     visitWhileStmt(ctx) {

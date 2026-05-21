@@ -608,6 +608,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#ForEachStmt.
+	enterForEachStmt(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ForEachStmt.
+	exitForEachStmt(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#ForStmt.
 	enterForStmt(ctx) {
 	}
@@ -686,6 +695,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 
 	// Exit a parse tree produced by HopperParser#invariantClause.
 	exitInvariantClause(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ElseBlock.
+	enterElseBlock(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ElseBlock.
+	exitElseBlock(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ElseIf.
+	enterElseIf(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ElseIf.
+	exitElseIf(ctx) {
 	}
 
 

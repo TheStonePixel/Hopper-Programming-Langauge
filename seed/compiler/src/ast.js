@@ -148,6 +148,11 @@ export function ForStmt(init, cond, update, body) {
     return { kind: "ForStmt", init, cond, update, body };
 }
 
+// for (type var : collection) — desugared to ForStmt at AST-build time
+export function ForEachStmt(elemType, elemVar, collection, body) {
+    return { kind: "ForEachStmt", elemType, elemVar, collection, body };
+}
+
 export function BreakStmt() {
     return { kind: "BreakStmt" };
 }

@@ -250,8 +250,9 @@ statement
     | Identifier '.' fieldName '=' expression                   # FieldAssign
     | Identifier '::' 'value' '=' expression                    # DerefAssign
     | expression                                                # ExprStmt
-    | 'if' '(' expression ')' block ('else' block)?             # IfStmt
+    | 'if' '(' expression ')' block elseClause?                 # IfStmt
     | 'while' '(' expression ')' (NEWLINE+ invariantClause)* block  # WhileStmt
+    | 'for' '(' type Identifier ':' expression ')' block        # ForEachStmt
     | 'for' '(' forInit? ';' expression? ';' forUpdate? ')' block  # ForStmt
     | 'break'                                                   # BreakStmt
     | 'continue'                                                # ContinueStmt
@@ -271,6 +272,11 @@ constrainClause
 // e.g.  while (i < n) invariant i >= 0 { ... }
 invariantClause
     : 'invariant' expression
+    ;
+
+elseClause
+    : 'else' block                                              # ElseBlock
+    | 'else' 'if' '(' expression ')' block elseClause?         # ElseIf
     ;
 
 forInit
