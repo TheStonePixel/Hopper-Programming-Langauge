@@ -1,0 +1,109 @@
+import sys from sys
+
+class LinuxProcess implements Process {
+    function exit(int code) {
+        exit(code)
+    }
+    function exit_group(int code) {
+        exit_group(code)
+    }
+    function fork() int {
+        return fork()
+    }
+    function vfork() int {
+        return vfork()
+    }
+    function clone(int flags, address stack, address ptid, address ctid, int regs) int {
+        return clone(flags, stack, ptid, ctid, regs)
+    }
+    function clone3(address args, int argsz) int {
+        return clone3(args, argsz)
+    }
+    function execve(string filename, string[] argv, string[] envp) int {
+        return execve(filename, argv, envp)
+    }
+    function execveat(int dirfd, string path, string[] argv, string[] envp, int flags) int {
+        return execveat(dirfd, path, argv, envp, flags)
+    }
+    function waitpid(int pid, address wstatus, int options) int {
+        return waitpid(pid, wstatus, options)
+    }
+    function waitid(int idtype, int id, address infop, int options) int {
+        return waitid(idtype, id, infop, options)
+    }
+    function getpid() int {
+        return getpid()
+    }
+    function getppid() int {
+        return getppid()
+    }
+    function gettid() int {
+        return gettid()
+    }
+    function getuid() int {
+        return getuid()
+    }
+    function getgid() int {
+        return getgid()
+    }
+    function geteuid() int {
+        return geteuid()
+    }
+    function getegid() int {
+        return getegid()
+    }
+    function setuid(int uid) int {
+        return setuid(uid)
+    }
+    function setgid(int gid) int {
+        return setgid(gid)
+    }
+    function setreuid(int ruid, int euid) int {
+        return setreuid(ruid, euid)
+    }
+    function setregid(int rgid, int egid) int {
+        return setregid(rgid, egid)
+    }
+    function setsid() int {
+        return setsid()
+    }
+    function setpgid(int pid, int pgid) int {
+        return setpgid(pid, pgid)
+    }
+    function getpgid(int pid) int {
+        return getpgid(pid)
+    }
+    function kill(int pid, int sig) int {
+        return kill(pid, sig)
+    }
+    function tkill(int tid, int sig) int {
+        return tkill(tid, sig)
+    }
+    function tgkill(int tgid, int tid, int sig) int {
+        return tgkill(tgid, tid, sig)
+    }
+    function pause() int {
+        return pause()
+    }
+    function alarm(int seconds) int {
+        return alarm(seconds)
+    }
+    function rt_sigaction(int sig, address act, address oldact, int sigsetsize) int {
+        return rt_sigaction(sig, act, oldact, sigsetsize)
+    }
+    function rt_sigprocmask(int how, address set, address oldset, int sigsetsize) int {
+        return rt_sigprocmask(how, set, oldset, sigsetsize)
+    }
+    function rt_sigpending(address set, int sigsetsize) int {
+        return rt_sigpending(set, sigsetsize)
+    }
+    function rt_sigsuspend(address mask, int sigsetsize) int {
+        return rt_sigsuspend(mask, sigsetsize)
+    }
+    function sigaltstack(address ss, address oss) int {
+        return sigaltstack(ss, oss)
+    }
+    function ptrace(int request, int pid, address addr, address data) int {
+        return ptrace(request, pid, addr, data)
+    }
+}

@@ -1,0 +1,54 @@
+const AF_UNIX  =  1
+const AF_INET  =  2
+const AF_INET6 = 10
+
+const SOCK_STREAM   =       1
+const SOCK_DGRAM    =       2
+const SOCK_RAW      =       3
+const SOCK_NONBLOCK =    2048
+const SOCK_CLOEXEC  =  524288
+
+const SOL_SOCKET  =  1
+const IPPROTO_TCP =  6
+const IPPROTO_UDP = 17
+
+const SO_REUSEADDR =  2
+const SO_KEEPALIVE =  9
+const SO_SNDBUF    =  7
+const SO_RCVBUF    =  8
+const TCP_NODELAY  =  1
+const TCP_KEEPIDLE =  4
+const TCP_KEEPINTVL = 5
+
+const SHUT_RD   = 0
+const SHUT_WR   = 1
+const SHUT_RDWR = 2
+
+const MSG_OOB      =     1
+const MSG_PEEK     =     2
+const MSG_DONTWAIT =    64
+const MSG_WAITALL  =   256
+const MSG_NOSIGNAL = 16384
+
+interface Socket {
+    function socket(int domain, int type, int protocol) int
+    function bind(int fd, address addr, int addrlen) int
+    function listen(int fd, int backlog) int
+    function accept(int fd, address addr, address addrlen) int
+    function accept4(int fd, address addr, address addrlen, int flags) int
+    function connect(int fd, address addr, int addrlen) int
+    function shutdown(int fd, int how) int
+    function getsockname(int fd, address addr, address addrlen) int
+    function getpeername(int fd, address addr, address addrlen) int
+    function socketpair(int domain, int type, int protocol, address fds) int
+    function send(int fd, address buf, int len, int flags) int
+    function recv(int fd, address buf, int len, int flags) int
+    function sendto(int fd, address buf, int len, int flags, address addr, int addrlen) int
+    function recvfrom(int fd, address buf, int len, int flags, address addr, address addrlen) int
+    function sendmsg(int fd, address msg, int flags) int
+    function recvmsg(int fd, address msg, int flags) int
+    function sendmmsg(int fd, address msgs, int vlen, int flags) int
+    function recvmmsg(int fd, address msgs, int vlen, int flags, address timeout) int
+    function setsockopt(int fd, int level, int optname, address optval, int optlen) int
+    function getsockopt(int fd, int level, int optname, address optval, address optlen) int
+}

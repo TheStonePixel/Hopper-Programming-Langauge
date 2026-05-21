@@ -1,0 +1,88 @@
+import sys from sys
+
+class LinuxSystem implements System {
+    function uname(address buf) int {
+        return uname(buf)
+    }
+    function sysinfo(address buf) int {
+        return sysinfo(buf)
+    }
+    function getrusage(int who, address rusage) int {
+        return getrusage(who, rusage)
+    }
+    function getrlimit(int resource, address rlim) int {
+        return getrlimit(resource, rlim)
+    }
+    function setrlimit(int resource, address rlim) int {
+        return setrlimit(resource, rlim)
+    }
+    function prctl(int option, int arg2, int arg3, int arg4, int arg5) int {
+        return prctl(option, arg2, arg3, arg4, arg5)
+    }
+    function arch_prctl(int code, address addr) int {
+        return arch_prctl(code, addr)
+    }
+    function nanosleep(address req, address rem) int {
+        return nanosleep(req, rem)
+    }
+    function clock_gettime(int clockid, address ts) int {
+        return clock_gettime(clockid, ts)
+    }
+    function clock_settime(int clockid, address ts) int {
+        return clock_settime(clockid, ts)
+    }
+    function clock_getres(int clockid, address res) int {
+        return clock_getres(clockid, res)
+    }
+    function clock_nanosleep(int clockid, int flags, address req, address rem) int {
+        return clock_nanosleep(clockid, flags, req, rem)
+    }
+    function gettimeofday(address tv, address tz) int {
+        return gettimeofday(tv, tz)
+    }
+    function settimeofday(address tv, address tz) int {
+        return settimeofday(tv, tz)
+    }
+    function times(address buf) int {
+        return times(buf)
+    }
+    function getitimer(int which, address val) int {
+        return getitimer(which, val)
+    }
+    function setitimer(int which, address val, address oval) int {
+        return setitimer(which, val, oval)
+    }
+    function sched_yield() int {
+        return sched_yield()
+    }
+    function sched_getscheduler(int pid) int {
+        return sched_getscheduler(pid)
+    }
+    function sched_setscheduler(int pid, int policy, address param) int {
+        return sched_setscheduler(pid, policy, param)
+    }
+    function sched_getparam(int pid, address param) int {
+        return sched_getparam(pid, param)
+    }
+    function sched_setparam(int pid, address param) int {
+        return sched_setparam(pid, param)
+    }
+    function sched_getaffinity(int pid, int cpusetsize, address mask) int {
+        return sched_getaffinity(pid, cpusetsize, mask)
+    }
+    function sched_setaffinity(int pid, int cpusetsize, address mask) int {
+        return sched_setaffinity(pid, cpusetsize, mask)
+    }
+    function getpriority(int which, int who) int {
+        return getpriority(which, who)
+    }
+    function setpriority(int which, int who, int prio) int {
+        return setpriority(which, who, prio)
+    }
+    function chroot(string path) int {
+        return chroot(path)
+    }
+    function brk(address addr) int {
+        return brk(addr)
+    }
+}

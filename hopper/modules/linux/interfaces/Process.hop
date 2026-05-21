@@ -1,0 +1,72 @@
+const SIGHUP  =  1
+const SIGINT  =  2
+const SIGQUIT =  3
+const SIGILL  =  4
+const SIGABRT =  6
+const SIGFPE  =  8
+const SIGKILL =  9
+const SIGSEGV = 11
+const SIGPIPE = 13
+const SIGALRM = 14
+const SIGTERM = 15
+const SIGCHLD = 17
+const SIGCONT = 18
+const SIGSTOP = 19
+const SIGTSTP = 20
+const SIGUSR1 = 10
+const SIGUSR2 = 12
+
+const SIG_BLOCK   = 0
+const SIG_UNBLOCK = 1
+const SIG_SETMASK = 2
+
+const WNOHANG   = 1
+const WUNTRACED = 2
+
+const P_ALL  = 0
+const P_PID  = 1
+const P_PGID = 2
+
+const CLONE_VM      =    256
+const CLONE_FS      =    512
+const CLONE_FILES   =   1024
+const CLONE_SIGHAND =   2048
+const CLONE_THREAD  =  65536
+
+interface Process {
+    function exit(int code)
+    function exit_group(int code)
+    function fork() int
+    function vfork() int
+    function clone(int flags, address stack, address ptid, address ctid, int regs) int
+    function clone3(address args, int argsz) int
+    function execve(string filename, string[] argv, string[] envp) int
+    function execveat(int dirfd, string path, string[] argv, string[] envp, int flags) int
+    function waitpid(int pid, address wstatus, int options) int
+    function waitid(int idtype, int id, address infop, int options) int
+    function getpid() int
+    function getppid() int
+    function gettid() int
+    function getuid() int
+    function getgid() int
+    function geteuid() int
+    function getegid() int
+    function setuid(int uid) int
+    function setgid(int gid) int
+    function setreuid(int ruid, int euid) int
+    function setregid(int rgid, int egid) int
+    function setsid() int
+    function setpgid(int pid, int pgid) int
+    function getpgid(int pid) int
+    function kill(int pid, int sig) int
+    function tkill(int tid, int sig) int
+    function tgkill(int tgid, int tid, int sig) int
+    function pause() int
+    function alarm(int seconds) int
+    function rt_sigaction(int sig, address act, address oldact, int sigsetsize) int
+    function rt_sigprocmask(int how, address set, address oldset, int sigsetsize) int
+    function rt_sigpending(address set, int sigsetsize) int
+    function rt_sigsuspend(address mask, int sigsetsize) int
+    function sigaltstack(address ss, address oss) int
+    function ptrace(int request, int pid, address addr, address data) int
+}
