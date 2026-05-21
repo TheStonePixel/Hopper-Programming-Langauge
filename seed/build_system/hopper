@@ -670,66 +670,88 @@ function fetchTarball(url, destDir) {
     });
 }
 
-async function cmdInstall(args) {
-    const LOCAL_MODULES = path.join(process.cwd(), "modules");
-    const STDLIB_DIR    = path.join(__dirname, "..", "..", "hopper", "modules");
-    let names = args.filter(a => !a.startsWith("-"));
+const INSTALL_STDLIB = path.join(__dirname, "..", "..", "hopper", "modules");
 
-    // No args — reinstall everything from hopper.json
-    if (names.length === 0) {
-        const manifest = readManifest();
-        if (!manifest) {
-            console.error("hopper: no hopper.json and no package names given");
+// Copy src/, interfaces/, and hopper.json from a module — not its modules/ dir.
+// Dependencies are installed flat at the project level.
+function installModule(name, projectModulesDir, installed = new Set()) {
+    if (installed.has(name)) return;
+    installed.add(name);
+
+    const dest = path.join(projectModulesDir, name);
+    if (fs.existsSync(dest)) {
+        console.log(`  already installed: ${name}`);
+    } else {
+        const src = path.join(INSTALL_STDLIB, name);
+        if (!fs.existsSync(src)) {
+            console.error(`hopper: module '${name}' not found in stdlib`);
             process.exit(1);
         }
+        fs.mkdirSync(dest, { recursive: true });
+        fs.copyFileSync(path.join(src, "hopper.json"), path.join(dest, "hopper.json"));
+        for (const entry of ["src", "interfaces"]) {
+            const s = path.join(src, entry);
+            if (fs.existsSync(s)) copyDir(s, path.join(dest, entry));
+        }
+        console.log(`  installed: ${name}`);
+    }
+
+    // Recurse into the installed module's declared dependencies
+    const manifestPath = path.join(dest, "hopper.json");
+    if (fs.existsSync(manifestPath)) {
+        let m;
+        try { m = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch { return; }
+        for (const dep of Object.keys(m.dependencies || {})) {
+            installModule(dep, projectModulesDir, installed);
+        }
+    }
+}
+
+// Rewrite hopper.json binding paths to point at locally installed modules.
+function localizeBindings(projectRoot, installedNames) {
+    const manifestPath = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(manifestPath)) return;
+    let manifest;
+    try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch { return; }
+
+    const targets = manifest.targets || {};
+    let changed = false;
+    for (const bindings of Object.values(targets)) {
+        for (const b of Object.values(bindings)) {
+            if (!b.from || !installedNames.has(b.from)) continue;
+            const mod = b.from;
+            for (const key of ["interface", "implementation"]) {
+                if (!b[key]) continue;
+                const idx = b[key].indexOf(`/${mod}/`);
+                if (idx !== -1) {
+                    b[key] = `modules/${mod}` + b[key].slice(idx + mod.length + 1);
+                    changed = true;
+                }
+            }
+        }
+    }
+    if (changed) fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+}
+
+async function cmdInstall(args) {
+    const projectRoot   = process.cwd();
+    const localModules  = path.join(projectRoot, "modules");
+    let names = args.filter(a => !a.startsWith("-"));
+
+    if (names.length === 0) {
+        const manifest = readManifest();
+        if (!manifest) { console.error("hopper: no hopper.json and no package names given"); process.exit(1); }
         const deps = manifest.dependencies || {};
         if (Object.keys(deps).length === 0) { console.log("hopper: nothing to install"); return; }
         names = Object.keys(deps);
     }
 
-    fs.mkdirSync(LOCAL_MODULES, { recursive: true });
-
-    for (const name of names) {
-        const dest = path.join(LOCAL_MODULES, name);
-        if (fs.existsSync(dest)) { console.log(`already installed: ${name}`); continue; }
-
-        // Try stdlib first
-        const stdlibSrc = path.join(STDLIB_DIR, name);
-        if (fs.existsSync(stdlibSrc)) {
-            copyDir(stdlibSrc, dest);
-            console.log(`installed: ${name}  (stdlib)`);
-            updateDep(name, "stdlib");
-            continue;
-        }
-
-        // Fetch from registry (GitHub org)
-        const tarUrl = `https://codeload.github.com/${REGISTRY_ORG}/${name}/tar.gz/refs/heads/main`;
-        console.log(`installing: ${name}  from ${REGISTRY_URL}/${name}`);
-        try {
-            const tmp = path.join(LOCAL_MODULES, `_${name}_tmp`);
-            await fetchTarball(tarUrl, tmp);
-            // Package must have a modules/<name>/ folder — move it into place
-            const inner = path.join(tmp, "modules", name);
-            if (fs.existsSync(inner)) {
-                fs.renameSync(inner, dest);
-                fs.rmSync(tmp, { recursive: true, force: true });
-            } else {
-                // Repo root IS the module
-                fs.renameSync(tmp, dest);
-            }
-            console.log(`installed: ${name}  ✓`);
-            updateDep(name, `${REGISTRY_ORG}/${name}`);
-        } catch (e) {
-            console.error(`failed: ${name}  — ${e.message}`);
-            process.exit(1);
-        }
-    }
-}
-
-function updateDep(name, source) {
-    const manifest = readManifest() || { name: path.basename(process.cwd()), version: "0.1.0", entry: "main.hop", dependencies: {} };
-    manifest.dependencies[name] = source;
-    writeManifest(manifest);
+    fs.mkdirSync(localModules, { recursive: true });
+    const installed = new Set();
+    console.log("installing:");
+    for (const name of names) installModule(name, localModules, installed);
+    localizeBindings(projectRoot, installed);
+    console.log(`done  (${installed.size} module${installed.size === 1 ? "" : "s"})`);
 }
 
 function cmdUninstall(args) {

@@ -894,10 +894,8 @@ export class AstBuilder extends HopperVisitor {
 
 // ── import resolution ──────────────────────────────────────────────────────
 
-// Hopper stdlib location — the modules/ dir next to kindling/src/
-const STDLIB_DIR = path.resolve(__dirname, "..", "..", "..", "hopper", "modules");
-
-// Find modules/ directory by walking up from baseDir, then fall back to stdlib.
+// Walk up from baseDir looking for modules/<name>/ — no stdlib fallback.
+// All dependencies must be declared in hopper.json and installed via hopper install.
 function resolveModuleFiles(moduleName, names, baseDir, importingFile) {
     let dir = baseDir || process.cwd();
     while (true) {
@@ -909,13 +907,8 @@ function resolveModuleFiles(moduleName, names, baseDir, importingFile) {
         if (parent === dir) break;
         dir = parent;
     }
-    // Fall back to the Hopper standard library
-    const stdlibCandidate = path.join(STDLIB_DIR, moduleName);
-    if (fs.existsSync(stdlibCandidate)) {
-        return filesToLoad(stdlibCandidate, names, moduleName, importingFile);
-    }
     const from = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
-    throw new Error(`Module '${moduleName}' not found${from}\n  Looked in: modules/${moduleName}/ and stdlib`);
+    throw new Error(`Module '${moduleName}' not found${from}\n  Run: hopper install ${moduleName}`);
 }
 
 function filesToLoad(moduleDir, names, moduleName, importingFile) {

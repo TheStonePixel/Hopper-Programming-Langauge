@@ -1,0 +1,72 @@
+// x86-64 System V message queue syscalls
+//
+// Message queues allow typed messages to be exchanged between processes.
+// Each message has a long integer type field used for selective receive.
+// For new code prefer sockets or pipes — SysV IPC is here for compatibility.
+//
+// Calling convention: nr → rax | args → rdi rsi rdx r10 r8 r9 | return ← rax
+
+// Syscall nr 68 — get or create a message queue. Returns msqid or negative errno.
+// key: IPC_PRIVATE=0 for a private queue.
+// msgflg: IPC_CREAT=512 | IPC_EXCL=1024 | permission bits.
+function msgget(int key, int msgflg) int {
+    int result
+    asm {
+        rax = 68
+        rdi = key
+        rsi = msgflg
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 69 — send a message. msgp points to struct msgbuf {int mtype, byte mtext[]}.
+// msgsz is the size of mtext only (not including mtype).
+// msgflg: IPC_NOWAIT=0x800 to return EAGAIN instead of blocking.
+function msgsnd(int msqid, address msgp, int msgsz, int msgflg) int {
+    int result
+    asm {
+        rax = 69
+        rdi = msqid
+        rsi = msgp
+        rdx = msgsz
+        r10 = msgflg
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 70 — receive a message of type msgtyp.
+// msgtyp=0 receives the first message; >0 receives first of that type; <0 receives lowest type ≤ |msgtyp|.
+// msgflg: IPC_NOWAIT=0x800 MSG_NOERROR=0x1000.
+function msgrcv(int msqid, address msgp, int msgsz, int msgtyp, int msgflg) int {
+    int result
+    asm {
+        rax = 70
+        rdi = msqid
+        rsi = msgp
+        rdx = msgsz
+        r10 = msgtyp
+        r8 = msgflg
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 71 — control or query a message queue.
+// cmd: IPC_RMID=0 (remove) IPC_STAT=2 (query) IPC_SET=1 (update).
+function msgctl(int msqid, int cmd, address buf) int {
+    int result
+    asm {
+        rax = 71
+        rdi = msqid
+        rsi = cmd
+        rdx = buf
+        syscall
+        result = rax
+    }
+    return result
+}
