@@ -1,0 +1,461 @@
+// sort — sort lines of text
+//
+// Usage: sort [-r] [-u] [file ...]
+//   -r  reverse order
+//   -u  unique (deduplicate consecutive equal lines)
+//   default: lexicographic ascending
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    INPUT_SIZE = 67108864
+    MAX_LINES  = 4194304
+    CHUNK      = 65536
+}
+
+function getLine(address lineArr, int i) address {
+    address slot = lineArr + (i * 8)
+    int val = slot::value
+    address ptr = cast val
+    return ptr
+}
+
+function setLine(address lineArr, int i, address ptr) {
+    address slot = lineArr + (i * 8)
+    int val = cast ptr
+    slot::value = val
+}
+
+function swapLines(address lineArr, int i, int j) {
+    address a = getLine(lineArr, i)
+    address b = getLine(lineArr, j)
+    setLine(lineArr, i, b)
+    setLine(lineArr, j, a)
+}
+
+// Unsigned lexicographic compare. Returns negative/zero/positive.
+function strCmp(address a, address b) int {
+    int i = 0
+    bool done = false
+    while (!done) {
+        address ap = a + i
+        address bp = b + i
+        byte ab = ap::value
+        byte bb = bp::value
+        int ac = cast ab
+        int bc = cast bb
+        ac = ac & 0xFF
+        bc = bc & 0xFF
+        if (ac != bc) {
+            return ac - bc
+        }
+        if (ac == 0) {
+            done = true
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+// Return index of median element among lo/mid/hi.
+function med3(address lineArr, int lo, int mid, int hi) int {
+    address a = getLine(lineArr, lo)
+    address b = getLine(lineArr, mid)
+    address c = getLine(lineArr, hi)
+    int ab = strCmp(a, b)
+    int bc = strCmp(b, c)
+    int ac = strCmp(a, c)
+    if (ab <= 0 && bc <= 0) { return mid }
+    if (ab >= 0 && bc >= 0) { return mid }
+    if (ac <= 0 && ab >= 0) { return lo }
+    if (ac >= 0 && ab <= 0) { return lo }
+    return hi
+}
+
+// Insertion sort for small ranges.
+function insertSort(address lineArr, int lo, int hi, bool reverse) {
+    int i = lo + 1
+    while (i <= hi) {
+        int j = i
+        bool cont = true
+        while (j > lo && cont) {
+            address a = getLine(lineArr, j - 1)
+            address b = getLine(lineArr, j)
+            int cmp = strCmp(a, b)
+            if (reverse) { cmp = 0 - cmp }
+            if (cmp > 0) {
+                swapLines(lineArr, j - 1, j)
+                j = j - 1
+            } else {
+                cont = false
+            }
+        }
+        i = i + 1
+    }
+}
+
+// 3-way quicksort with tail-recursion elimination.
+function qsort(address lineArr, int lo, int hi, bool reverse) {
+    while (lo < hi) {
+        if (hi - lo <= 16) {
+            insertSort(lineArr, lo, hi, reverse)
+            return
+        }
+
+        int mid = lo + (hi - lo) / 2
+        int pivotIdx = med3(lineArr, lo, mid, hi)
+        swapLines(lineArr, pivotIdx, lo)
+        address pivot = getLine(lineArr, lo)
+
+        int lt = lo
+        int gt = hi
+        int i = lo + 1
+        while (i <= gt) {
+            address elem = getLine(lineArr, i)
+            int cmp = strCmp(elem, pivot)
+            if (reverse) { cmp = 0 - cmp }
+            if (cmp < 0) {
+                swapLines(lineArr, lt, i)
+                lt = lt + 1
+                i = i + 1
+            } else if (cmp > 0) {
+                swapLines(lineArr, i, gt)
+                gt = gt - 1
+            } else {
+                i = i + 1
+            }
+        }
+
+        if (lt - 1 - lo < hi - (gt + 1)) {
+            qsort(lineArr, lo, lt - 1, reverse)
+            lo = gt + 1
+        } else {
+            qsort(lineArr, gt + 1, hi, reverse)
+            hi = lt - 1
+        }
+    }
+}
+
+// SSE2: scan 16 bytes for '\n' (0x0A). Returns 16-bit match mask.
+function _nlMask16(address ptr) int {
+    int mask = 0
+    asm {
+        rdi = ptr
+        rsi = 0x0A0A0A0A
+        movd xmm1, esi
+        pshufd xmm1, xmm1, 0
+        movdqu xmm0, [rdi]
+        pcmpeqb xmm0, xmm1
+        pmovmskb rax, xmm0
+        mask = rax
+    }
+    return mask
+}
+
+// Find index of lowest set bit.
+function _bsf(int mask) int {
+    int n = 0
+    asm {
+        rdi = mask
+        bsf rax, rdi
+        n = rax
+    }
+    return n
+}
+
+// Scan buf[scanStart..endPos) for newlines using SSE2. Null-terminate each
+// line and record start pointers. Carries state across multiple file reads.
+function indexLines(address inputBuf, int scanStart, int endPos, address lineArr, address lineCountAddr, address lineStartAddr) {
+    int lineCount = lineCountAddr::value
+    int lineStart = lineStartAddr::value
+    int i = scanStart
+
+    while (i + 16 <= endPos) {
+        int nlm = _nlMask16(inputBuf + i)
+        if (nlm != 0) {
+            int m = nlm
+            while (m != 0) {
+                int pos = _bsf(m)
+                address p = inputBuf + i + pos
+                byte z = 0
+                p::value = z
+                setLine(lineArr, lineCount, inputBuf + lineStart)
+                lineCount = lineCount + 1
+                lineStart = i + pos + 1
+                m = m & (m - 1)
+            }
+        }
+        i = i + 16
+    }
+
+    while (i < endPos) {
+        address p = inputBuf + i
+        byte b = p::value
+        int c = cast b
+        if (c == 10) {
+            byte z = 0
+            p::value = z
+            setLine(lineArr, lineCount, inputBuf + lineStart)
+            lineCount = lineCount + 1
+            lineStart = i + 1
+        }
+        i = i + 1
+    }
+
+    lineCountAddr::value = lineCount
+    lineStartAddr::value = lineStart
+}
+
+// First-byte radix sort: partition into 256 buckets by first character,
+// then quicksort each bucket independently. Cache-friendly: each bucket's
+// ~N/26 lines fit in L2 cache, so quicksort comparisons rarely miss L3.
+function sortTop(address lineArr, address tempArr, int lo, int hi, bool reverse) {
+    int n = hi - lo + 1
+    if (n <= 1) {
+        return
+    }
+    if (n <= 32) {
+        insertSort(lineArr, lo, hi, reverse)
+        return
+    }
+
+    address cnt = allocate 2048
+    int ci = 0
+    while (ci < 256) {
+        address p = cnt + (ci * 8)
+        int z = 0
+        p::value = z
+        ci = ci + 1
+    }
+
+    int i = lo
+    while (i <= hi) {
+        address line = getLine(lineArr, i)
+        byte fb = line::value
+        int fbi = cast fb
+        fbi = fbi & 0xFF
+        int key = fbi
+        if (reverse) { key = 255 - fbi }
+        address p = cnt + (key * 8)
+        int c = p::value
+        c = c + 1
+        p::value = c
+        i = i + 1
+    }
+
+    address scatter = allocate 2048
+    int acc = 0
+    ci = 0
+    while (ci < 256) {
+        address sp = scatter + (ci * 8)
+        sp::value = acc
+        address cp = cnt + (ci * 8)
+        int c = cp::value
+        acc = acc + c
+        ci = ci + 1
+    }
+
+    address scatterCur = allocate 2048
+    ci = 0
+    while (ci < 256) {
+        address scp = scatterCur + (ci * 8)
+        address sp = scatter + (ci * 8)
+        int sv = sp::value
+        scp::value = sv
+        ci = ci + 1
+    }
+
+    i = lo
+    while (i <= hi) {
+        address line = getLine(lineArr, i)
+        byte fb = line::value
+        int fbi = cast fb
+        fbi = fbi & 0xFF
+        int key = fbi
+        if (reverse) { key = 255 - fbi }
+        address scp = scatterCur + (key * 8)
+        int pos = scp::value
+        setLine(tempArr, pos, line)
+        pos = pos + 1
+        scp::value = pos
+        i = i + 1
+    }
+
+    i = 0
+    while (i < n) {
+        address line = getLine(tempArr, i)
+        setLine(lineArr, lo + i, line)
+        i = i + 1
+    }
+
+    int bucketStart = lo
+    ci = 0
+    while (ci < 256) {
+        address cp = cnt + (ci * 8)
+        int bucketSize = cp::value
+        if (bucketSize > 1) {
+            qsort(lineArr, bucketStart, bucketStart + bucketSize - 1, reverse)
+        }
+        bucketStart = bucketStart + bucketSize
+        ci = ci + 1
+    }
+
+    deallocate cnt
+    deallocate scatter
+    deallocate scatterCur
+}
+
+// Read fd into inputBuf at startPos. Returns new total bytes in buf.
+function readAllFd(int fd, address inputBuf, int startPos) int {
+    int pos = startPos
+    int limit = Limits.INPUT_SIZE - Limits.CHUNK
+    bool eof = false
+    while (!eof && pos < limit) {
+        int nr = read(fd, inputBuf + pos, Limits.CHUNK)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            pos = pos + nr
+        }
+    }
+    return pos
+}
+
+// Write sorted lines to stdout, optionally deduplicating.
+function writeLines(address lineArr, int lineCount, bool unique) {
+    address outBuf = allocate Limits.CHUNK
+    int outPos = 0
+    address prevLine = null
+
+    int i = 0
+    while (i < lineCount) {
+        address line = getLine(lineArr, i)
+
+        bool skip = false
+        if (unique && prevLine != null) {
+            if (strCmp(line, prevLine) == 0) { skip = true }
+        }
+
+        if (!skip) {
+            int j = 0
+            bool lineEnd = false
+            while (!lineEnd) {
+                address sp = line + j
+                byte b = sp::value
+                int c = cast b
+                if (c == 0) {
+                    lineEnd = true
+                } else {
+                    if (outPos >= Limits.CHUNK - 2) {
+                        write(1, outBuf, outPos)
+                        outPos = 0
+                    }
+                    address dp = outBuf + outPos
+                    dp::value = b
+                    outPos = outPos + 1
+                    j = j + 1
+                }
+            }
+            if (outPos >= Limits.CHUNK - 1) {
+                write(1, outBuf, outPos)
+                outPos = 0
+            }
+            address dp = outBuf + outPos
+            byte nl = 10
+            dp::value = nl
+            outPos = outPos + 1
+            prevLine = line
+        }
+
+        i = i + 1
+    }
+
+    if (outPos > 0) {
+        write(1, outBuf, outPos)
+    }
+    deallocate outBuf
+}
+
+entry main(int argc, string[] argv) {
+    bool reverse  = false
+    bool unique   = false
+    int firstFile = 0
+
+    int ai = 1
+    while (ai < argc && firstFile == 0) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = cast a0
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = cast fc
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 114) {
+                    reverse = true
+                    fi = fi + 1
+                } else if (fci == 117) {
+                    unique = true
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            firstFile = ai
+        }
+        ai = ai + 1
+    }
+
+    address inputBuf = allocate Limits.INPUT_SIZE
+    address lineArr  = allocate Limits.MAX_LINES * 8
+    address tempArr  = allocate Limits.MAX_LINES * 8
+    int lineCount = 0
+    int bufUsed   = 0
+    int lineStart = 0
+
+    if (firstFile == 0) {
+        bufUsed = readAllFd(0, inputBuf, 0)
+        indexLines(inputBuf, 0, bufUsed, lineArr, lineCount::address, lineStart::address)
+    } else {
+        int fi2 = firstFile
+        while (fi2 < argc) {
+            address fname = argv[fi2]
+            int fd = open(fname, OpenFlag.O_RDONLY, 0)
+            if (fd < 0) {
+                printf("sort: %s: cannot open\n", fname)
+            } else {
+                int prevBufUsed = bufUsed
+                bufUsed = readAllFd(fd, inputBuf, bufUsed)
+                indexLines(inputBuf, prevBufUsed, bufUsed, lineArr, lineCount::address, lineStart::address)
+                close(fd)
+            }
+            fi2 = fi2 + 1
+        }
+    }
+
+    if (lineStart < bufUsed) {
+        address tp = inputBuf + bufUsed
+        byte z = 0
+        tp::value = z
+        setLine(lineArr, lineCount, inputBuf + lineStart)
+        lineCount = lineCount + 1
+    }
+
+    if (lineCount > 1) {
+        sortTop(lineArr, tempArr, 0, lineCount - 1, reverse)
+    }
+
+    writeLines(lineArr, lineCount, unique)
+
+    deallocate inputBuf
+    deallocate lineArr
+    deallocate tempArr
+}

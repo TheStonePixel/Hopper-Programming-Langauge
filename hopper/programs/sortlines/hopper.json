@@ -1,0 +1,25 @@
+{
+  "name": "sortlines",
+  "version": "0.1.0",
+  "description": "sort lines of text",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "linux": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "IO": {
+        "from": "linux",
+        "interface": "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/linux/src/IO.hop"
+      },
+      "FileSystem": {
+        "from": "linux",
+        "interface": "modules/linux/interfaces/FileSystem.hop",
+        "implementation": "modules/linux/src/FileSystem.hop"
+      }
+    }
+  }
+}

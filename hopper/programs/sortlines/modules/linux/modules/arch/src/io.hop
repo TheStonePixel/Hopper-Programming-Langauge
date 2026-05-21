@@ -1,0 +1,3 @@
+// Target selector — change 'x86_64' to 'arm64' (etc.) to retarget.
+// linux/io.hop imports from here; it never needs to know the arch.
+import io from x86_64
