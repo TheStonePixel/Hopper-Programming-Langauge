@@ -6,8 +6,8 @@ extern function free(address p)
 extern function memcpy(address dst, address src, int n) address
 
 enum BufferLimits {
-    BufferLimits.MAX_LINES = 4096
-    BufferLimits.INIT_CAP  = 64
+    MAX_LINES = 4096
+    INIT_CAP  = 64
 }
 
 class Buffer {

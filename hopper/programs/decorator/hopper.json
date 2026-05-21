@@ -2,5 +2,5 @@
   "name": "decorator",
   "version": "0.1.0",
   "type": "program",
-  "main": "decorator.hop"
+  "entry": "decorator.hop"
 }

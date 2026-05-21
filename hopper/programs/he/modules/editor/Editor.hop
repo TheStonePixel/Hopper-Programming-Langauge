@@ -1,6 +1,6 @@
 // Editor — modal text editor state machine using tui/linux modules
 
-import Terminal
+import TUI
 import fs     from linux
 import io     from linux
 import Buffer from buffer
@@ -111,7 +111,7 @@ class Editor {
         if (self.cx < 0)    { self.cx = 0 }
     }
 
-    function scroll(Terminal t) {
+    function scroll(TUI t) {
         int rows = t.height() - 2
         int cols = t.width()
         if (self.cy < self.rowoff) { self.rowoff = self.cy }
@@ -120,7 +120,7 @@ class Editor {
         if (self.cx >= self.coloff + cols) { self.coloff = self.cx - cols + 1 }
     }
 
-    function draw_rows(Terminal t) {
+    function draw_rows(TUI t) {
         int rows = t.height() - 2
         int cols = t.width()
         int i = 0
@@ -156,7 +156,7 @@ class Editor {
         }
     }
 
-    function draw_status(Terminal t) {
+    function draw_status(TUI t) {
         int srow = t.height() - 1
         t.moveTo(srow, 1)
         t.reverse()
@@ -180,7 +180,7 @@ class Editor {
         t.reset()
     }
 
-    function draw_cmdbar(Terminal t) {
+    function draw_cmdbar(TUI t) {
         int crow = t.height()
         t.moveTo(crow, 1)
         t.writeStr("\x1b[K")
@@ -197,7 +197,7 @@ class Editor {
         }
     }
 
-    function refresh(Terminal t) {
+    function refresh(TUI t) {
         t.hideCursor()
         self.scroll(t)
         self.draw_rows(t)
@@ -247,90 +247,90 @@ class Editor {
     }
 
     function handle_normal(int code, int val) {
-        if (code == KEY_CHAR && val == 104) {
+        if (code == KeyCode.CHAR && val == 104) {
             if (self.cx > 0) { self.cx = self.cx - 1 }
         }
-        if (code == KEY_LEFT) {
+        if (code == KeyCode.LEFT) {
             if (self.cx > 0) { self.cx = self.cx - 1 }
         }
-        if (code == KEY_CHAR && val == 108) {
+        if (code == KeyCode.CHAR && val == 108) {
             int llen = self.buf.line_len(self.cy)
             if (self.cx < llen) { self.cx = self.cx + 1 }
         }
-        if (code == KEY_RIGHT) {
+        if (code == KeyCode.RIGHT) {
             int llen = self.buf.line_len(self.cy)
             if (self.cx < llen) { self.cx = self.cx + 1 }
         }
-        if (code == KEY_CHAR && val == 107) {
+        if (code == KeyCode.CHAR && val == 107) {
             if (self.cy > 0) {
                 self.cy = self.cy - 1
                 self.clamp_cx()
             }
         }
-        if (code == KEY_UP) {
+        if (code == KeyCode.UP) {
             if (self.cy > 0) {
                 self.cy = self.cy - 1
                 self.clamp_cx()
             }
         }
-        if (code == KEY_CHAR && val == 106) {
+        if (code == KeyCode.CHAR && val == 106) {
             if (self.cy < self.buf.get_count() - 1) {
                 self.cy = self.cy + 1
                 self.clamp_cx()
             }
         }
-        if (code == KEY_DOWN) {
+        if (code == KeyCode.DOWN) {
             if (self.cy < self.buf.get_count() - 1) {
                 self.cy = self.cy + 1
                 self.clamp_cx()
             }
         }
-        if (code == KEY_CHAR && val == 48) {
+        if (code == KeyCode.CHAR && val == 48) {
             self.cx = 0
         }
-        if (code == KEY_CHAR && val == 36) {
+        if (code == KeyCode.CHAR && val == 36) {
             int llen = self.buf.line_len(self.cy)
             if (llen > 0) { self.cx = llen - 1 }
         }
-        if (code == KEY_CHAR && val == 105) {
+        if (code == KeyCode.CHAR && val == 105) {
             self.mode = Mode.INSERT
         }
-        if (code == KEY_CHAR && val == 65) {
+        if (code == KeyCode.CHAR && val == 65) {
             self.cx = self.buf.line_len(self.cy)
             self.mode = Mode.INSERT
         }
-        if (code == KEY_CHAR && val == 111) {
+        if (code == KeyCode.CHAR && val == 111) {
             int llen = self.buf.line_len(self.cy)
             self.buf.split_line(self.cy, llen)
             self.cy = self.cy + 1
             self.cx = 0
             self.mode = Mode.INSERT
         }
-        if (code == KEY_CHAR && val == 120) {
+        if (code == KeyCode.CHAR && val == 120) {
             self.buf.delete_char(self.cy, self.cx)
             self.clamp_cx()
         }
-        if (code == KEY_CHAR && val == 58) {
+        if (code == KeyCode.CHAR && val == 58) {
             self.mode = Mode.COMMAND
             self.cmdlen = 0
         }
-        if (code == KEY_CHAR && val == CtrlKey.CTRL_S) { self.save_file() }
-        if (code == KEY_CHAR && val == CtrlKey.CTRL_Q) { self.running = 0 }
+        if (code == KeyCode.CHAR && val == CtrlKey.CTRL_S) { self.save_file() }
+        if (code == KeyCode.CHAR && val == CtrlKey.CTRL_Q) { self.running = 0 }
     }
 
     function handle_insert(int code, int val) {
-        if (code == KEY_ESCAPE) {
+        if (code == KeyCode.ESCAPE) {
             self.mode = Mode.NORMAL
             if (self.cx > 0) { self.cx = self.cx - 1 }
             return
         }
-        if (code == KEY_ENTER) {
+        if (code == KeyCode.ENTER) {
             self.buf.split_line(self.cy, self.cx)
             self.cy = self.cy + 1
             self.cx = 0
             return
         }
-        if (code == KEY_BACKSPACE) {
+        if (code == KeyCode.BACKSPACE) {
             if (self.cx > 0) {
                 self.cx = self.cx - 1
                 self.buf.delete_char(self.cy, self.cx)
@@ -344,24 +344,24 @@ class Editor {
             }
             return
         }
-        if (code == KEY_UP) {
+        if (code == KeyCode.UP) {
             if (self.cy > 0) { self.cy = self.cy - 1 }
             return
         }
-        if (code == KEY_DOWN) {
+        if (code == KeyCode.DOWN) {
             if (self.cy < self.buf.get_count() - 1) { self.cy = self.cy + 1 }
             return
         }
-        if (code == KEY_LEFT) {
+        if (code == KeyCode.LEFT) {
             if (self.cx > 0) { self.cx = self.cx - 1 }
             return
         }
-        if (code == KEY_RIGHT) {
+        if (code == KeyCode.RIGHT) {
             int llen = self.buf.line_len(self.cy)
             if (self.cx < llen) { self.cx = self.cx + 1 }
             return
         }
-        if (code == KEY_CHAR && val >= 32 && val < 127) {
+        if (code == KeyCode.CHAR && val >= 32 && val < 127) {
             byte bval = cast val
             self.buf.insert_char(self.cy, self.cx, bval)
             self.cx = self.cx + 1
@@ -369,16 +369,16 @@ class Editor {
     }
 
     function handle_command(int code, int val) {
-        if (code == KEY_ESCAPE) {
+        if (code == KeyCode.ESCAPE) {
             self.mode = Mode.NORMAL
             self.cmdlen = 0
             return
         }
-        if (code == KEY_ENTER) {
+        if (code == KeyCode.ENTER) {
             self.exec_command()
             return
         }
-        if (code == KEY_BACKSPACE) {
+        if (code == KeyCode.BACKSPACE) {
             if (self.cmdlen > 0) {
                 self.cmdlen = self.cmdlen - 1
             } else {
@@ -386,7 +386,7 @@ class Editor {
             }
             return
         }
-        if (code == KEY_CHAR && val >= 32 && val < 127 && self.cmdlen < 126) {
+        if (code == KeyCode.CHAR && val >= 32 && val < 127 && self.cmdlen < 126) {
             address cp = self.cmdbuf + self.cmdlen
             byte bval = cast val
             cp::value = bval
@@ -395,7 +395,7 @@ class Editor {
     }
 
     function run() {
-        Terminal t = Terminal()
+        TUI t = TUI()
         while (self.running == 1) {
             self.refresh(t)
             Key k = t.readKey()

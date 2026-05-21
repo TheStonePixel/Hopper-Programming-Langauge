@@ -7,10 +7,10 @@
   "entry": "src/main.hop",
   "targets": {
     "host": {
-      "Terminal": {
+      "TUI": {
         "from":           "tui",
-        "interface":      "./interfaces/Terminal.hop",
-        "implementation": "../../modules/tui/src/tui.hop"
+        "interface":      "../../modules/tui/interfaces/TUI.hop",
+        "implementation": "../../modules/tui/src/TUI.hop"
       }
     }
   }

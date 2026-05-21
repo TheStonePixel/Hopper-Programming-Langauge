@@ -362,71 +362,135 @@ class StandardTUI implements TUI {
         }
     }
 
-    // readKey reads one key event; codeOut receives KeyCode, valOut receives the byte value for CHAR keys.
-    function readKey(address codeOut, address valOut) {
-        address codePtr = codeOut
-        address valPtr  = valOut
-        int none = -1
-        codePtr::value = none
-        int zero = 0
-        valPtr::value  = zero
-
+    // readKey reads one key event and returns a Key object with code and val fields.
+    function readKey() Key {
         address buf = allocate 4
         _tuiZero(buf, 4)
         int n = read(0, buf, 1)
         if (n <= 0) {
             deallocate buf
-            return
+            return Key(-1, 0)
         }
 
         byte b = buf::value
         int bi = cast b
 
-        if (bi == 3)  { int v = 24  codePtr::value = v  deallocate buf  return }
-        if (bi == 4)  { int v = 25  codePtr::value = v  deallocate buf  return }
-        if (bi == 12) { int v = 26  codePtr::value = v  deallocate buf  return }
-        if (bi == 26) { int v = 27  codePtr::value = v  deallocate buf  return }
-        if (bi == 13) { int v = 1   codePtr::value = v  deallocate buf  return }
-        if (bi == 127){ int v = 2   codePtr::value = v  deallocate buf  return }
-        if (bi == 9)  { int v = 3   codePtr::value = v  deallocate buf  return }
+        if (bi == 3) {
+            deallocate buf
+            return Key(24, 0)
+        }
+        if (bi == 4) {
+            deallocate buf
+            return Key(25, 0)
+        }
+        if (bi == 12) {
+            deallocate buf
+            return Key(26, 0)
+        }
+        if (bi == 26) {
+            deallocate buf
+            return Key(27, 0)
+        }
+        if (bi == 13) {
+            deallocate buf
+            return Key(1, 0)
+        }
+        if (bi == 127) {
+            deallocate buf
+            return Key(2, 0)
+        }
+        if (bi == 9) {
+            deallocate buf
+            return Key(3, 0)
+        }
 
         if (bi != 27) {
-            int v = 0
-            codePtr::value = v
-            valPtr::value  = bi
             deallocate buf
-            return
+            return Key(0, bi)
         }
 
         n = read(0, buf, 1)
-        if (n <= 0) { int v = 4  codePtr::value = v  deallocate buf  return }
+        if (n <= 0) {
+            deallocate buf
+            return Key(4, 0)
+        }
         byte b2 = buf::value
         int b2i = cast b2
-        if (b2i != 91) { int v = 4  codePtr::value = v  deallocate buf  return }
+        if (b2i != 91) {
+            deallocate buf
+            return Key(4, 0)
+        }
 
         n = read(0, buf, 1)
-        if (n <= 0) { int v = 4  codePtr::value = v  deallocate buf  return }
+        if (n <= 0) {
+            deallocate buf
+            return Key(4, 0)
+        }
         byte b3 = buf::value
         int b3i = cast b3
 
-        if (b3i == 65) { int v = 5   codePtr::value = v  deallocate buf  return }
-        if (b3i == 66) { int v = 6   codePtr::value = v  deallocate buf  return }
-        if (b3i == 67) { int v = 8   codePtr::value = v  deallocate buf  return }
-        if (b3i == 68) { int v = 7   codePtr::value = v  deallocate buf  return }
-        if (b3i == 72) { int v = 9   codePtr::value = v  deallocate buf  return }
-        if (b3i == 70) { int v = 10  codePtr::value = v  deallocate buf  return }
-        if (b3i == 80) { int v = 14  codePtr::value = v  deallocate buf  return }
-        if (b3i == 81) { int v = 15  codePtr::value = v  deallocate buf  return }
-        if (b3i == 82) { int v = 16  codePtr::value = v  deallocate buf  return }
-        if (b3i == 83) { int v = 17  codePtr::value = v  deallocate buf  return }
+        if (b3i == 65) {
+            deallocate buf
+            return Key(5, 0)
+        }
+        if (b3i == 66) {
+            deallocate buf
+            return Key(6, 0)
+        }
+        if (b3i == 67) {
+            deallocate buf
+            return Key(8, 0)
+        }
+        if (b3i == 68) {
+            deallocate buf
+            return Key(7, 0)
+        }
+        if (b3i == 72) {
+            deallocate buf
+            return Key(9, 0)
+        }
+        if (b3i == 70) {
+            deallocate buf
+            return Key(10, 0)
+        }
+        if (b3i == 80) {
+            deallocate buf
+            return Key(14, 0)
+        }
+        if (b3i == 81) {
+            deallocate buf
+            return Key(15, 0)
+        }
+        if (b3i == 82) {
+            deallocate buf
+            return Key(16, 0)
+        }
+        if (b3i == 83) {
+            deallocate buf
+            return Key(17, 0)
+        }
+        if (b3i == 51) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(11, 0)
+        }
+        if (b3i == 53) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(12, 0)
+        }
+        if (b3i == 54) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(13, 0)
+        }
+        if (b3i == 52) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(10, 0)
+        }
 
-        if (b3i == 51) { read(0, buf, 1)  int v = 11  codePtr::value = v  deallocate buf  return }
-        if (b3i == 53) { read(0, buf, 1)  int v = 12  codePtr::value = v  deallocate buf  return }
-        if (b3i == 54) { read(0, buf, 1)  int v = 13  codePtr::value = v  deallocate buf  return }
-        if (b3i == 52) { read(0, buf, 1)  int v = 10  codePtr::value = v  deallocate buf  return }
-
-        int unk = 255
-        codePtr::value = unk
         deallocate buf
+        return Key(255, 0)
     }
 }

@@ -682,6 +682,37 @@ export function genExpr(ir, expr) {
                 }
             }
 
+            // Constructor call in expression context: ClassName(args...)
+            // e.g. `return Key(24, 0)` or `Key k = someFunc()` where someFunc returns Key.
+            // Allocate a slot, call ClassName_constructor, return isClassPtr.
+            const normCallee = normalizeType(expr.callee);
+            if (classTypes.has(normCallee)) {
+                const ctorName = `${normCallee}_constructor`;
+                const llType   = llvmType(normCallee);
+                const ptr      = ir.newTmp();
+                ir.emit(`${ptr} = alloca ${llType}`);
+                if (functionReturnTypes.has(ctorName)) {
+                    const ctorInfo = functionReturnTypes.get(ctorName);
+                    const args = (expr.args || []).map((a, i) => {
+                        const paramNormT = ctorInfo.params && ctorInfo.params[i]
+                            ? normalizeType(ctorInfo.params[i].type) : null;
+                        if (paramNormT && classTypes.has(paramNormT) && a.kind === "Var") {
+                            const argVar = ir.vars.get(a.name);
+                            if (argVar) return { value: argVar.ptr, type: paramNormT, isClassPtr: true };
+                        }
+                        return genExpr(ir, a);
+                    });
+                    const selfArg   = `${llType}* ${ptr}`;
+                    const otherArgs = args.map(a =>
+                        a.isClassPtr ? `${llvmType(a.type)}* ${a.value}`
+                                     : `${a.type.startsWith("address:") ? "i8*" : llvmType(a.type)} ${a.value}`
+                    ).join(", ");
+                    const argStr = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+                    ir.emit(`call void @${ctorName}(${argStr})`);
+                }
+                return { value: ptr, type: normCallee, isClassPtr: true };
+            }
+
             const fnInfo   = functionReturnTypes.get(expr.callee);
             if (!fnInfo && !ir.vars.has(expr.callee)) {
                 throw new Error(`Call to undefined function '${expr.callee}' — declare it or import the module that provides it`);

@@ -1,0 +1,17 @@
+{
+  "name": "jsonreader",
+  "version": "0.1.0",
+  "description": "Parse any JSON string and print its structure",
+  "license": "Apache-2.0",
+  "type": "program",
+  "entry": "jsonReader.hop",
+  "targets": {
+    "host": {
+      "JSON": {
+        "from": "json",
+        "interface": "../../modules/json/interfaces/JSON.hop",
+        "implementation": "../../modules/json/src/JSON.hop"
+      }
+    }
+  }
+}

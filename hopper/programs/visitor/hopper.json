@@ -2,5 +2,5 @@
   "name": "visitor",
   "version": "0.1.0",
   "type": "program",
-  "main": "visitor.hop"
+  "entry": "visitor.hop"
 }

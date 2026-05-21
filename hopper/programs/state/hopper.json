@@ -2,5 +2,5 @@
   "name": "state",
   "version": "0.1.0",
   "type": "program",
-  "main": "state.hop"
+  "entry": "state.hop"
 }

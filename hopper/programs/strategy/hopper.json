@@ -3,5 +3,15 @@
   "version": "0.1.0",
   "description": "Strategy pattern — swappable validation algorithm via stored callback",
   "type": "program",
-  "main": "strategy.hop"
+  "main": "strategy.hop",
+  "entry": "strategy.hop",
+  "targets": {
+    "host": {
+      "Array": {
+        "from": "ds",
+        "interface": "../../modules/ds/interfaces/Array.hop",
+        "implementation": "../../modules/ds/src/Array.hop"
+      }
+    }
+  }
 }

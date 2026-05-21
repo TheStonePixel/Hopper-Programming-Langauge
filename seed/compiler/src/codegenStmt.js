@@ -553,7 +553,13 @@ export function genStmt(ir, stmt, retType) {
                     ir.emit(`${structVal} = load ${llRetT}, ${llRetT}* ${varEntry.ptr}`);
                 } else {
                     const res = genExpr(ir, stmt.expr);
-                    structVal = res.value;
+                    if (res.isClassPtr) {
+                        // genExpr returned an alloca pointer — load the struct value from it.
+                        structVal = ir.newTmp();
+                        ir.emit(`${structVal} = load ${llRetT}, ${llRetT}* ${res.value}`);
+                    } else {
+                        structVal = res.value;
+                    }
                 }
                 ir.emit(`ret ${llRetT} ${structVal}`);
             } else if (stmt.expr) {

@@ -7,41 +7,36 @@
 //   3 4 + 2 *        →  (3 + 4) * 2  =  14
 //   5 1 2 + 4 * + 3 - →  5 + (1+2)*4 - 3  =  14
 
-import io    from linux
-import array from ds
-import math  from math
+import Array from ds
+import Math  from math
 
-extern function printf(String fmt, ...) int
+extern function printf(string fmt, ...) int
 
 // ── binary operations ─────────────────────────────────────────────────────────
 
 function add(int a, int b) int { return a + b }
 function sub(int a, int b) int { return a - b }
 function mul(int a, int b) int { return a * b }
-function div(int a, int b) int { return a / b }
+function divide(int a, int b) int { return a / b }
 function mod(int a, int b) int { return a % b }
 
 // ── stack helpers ─────────────────────────────────────────────────────────────
 
-// Pop two values, apply binary op, push result.
-function applyBin(Array<int> stack, callback(int, int) int op) {
-    int b = stack.pop()
-    int a = stack.pop()
-    stack.push(op(a, b))
-}
-
-// Pop one value, apply unary op, push result.
-function applyUn(Array<int> stack, callback(int) int op) {
-    int a = stack.pop()
-    stack.push(op(a))
+function applyBin(StandardArray stack, callback(int, int) int op) {
+    int b = cast stack.pop()
+    int a = cast stack.pop()
+    int r = op(a, b)
+    address _r = cast r
+    stack.push(_r)
 }
 
 // ── fold ──────────────────────────────────────────────────────────────────────
 
-function fold(Array<int> arr, int acc, callback(int, int) int fn) int {
+function fold(StandardArray arr, int acc, callback(int, int) int fn) int {
     int i = 0
     while (i < arr.len()) {
-        acc = fn(acc, arr.get(i))
+        int v = cast arr.get(i)
+        acc = fn(acc, v)
         i = i + 1
     }
     return acc
@@ -49,107 +44,100 @@ function fold(Array<int> arr, int acc, callback(int, int) int fn) int {
 
 // ── entry ─────────────────────────────────────────────────────────────────────
 
-entry main(int argc, address argv) {
-    Array<int> stack = Array(32)
+entry main {
+    StandardArray stack = StandardArray(32)
+    Math m = Math()
 
     // ── basic RPN expressions ─────────────────────────────────────────────────
 
     // 3 4 + 2 * = 14
-    stack.push(3)
-    stack.push(4)
+    address _3 = cast 3
+    stack.push(_3)
+    address _4 = cast 4
+    stack.push(_4)
     applyBin(stack, add)
-    stack.push(2)
+    address _2 = cast 2
+    stack.push(_2)
     applyBin(stack, mul)
-    printf("3 4 + 2 *        = %d\n", stack.pop())
+    int r1 = cast stack.pop()
+    printf("3 4 + 2 *        = %lld\n", r1)
 
     // 5 1 2 + 4 * + 3 - = 14
-    stack.push(5)
-    stack.push(1)
-    stack.push(2)
+    address _5 = cast 5
+    stack.push(_5)
+    address _1a = cast 1
+    stack.push(_1a)
+    address _2b = cast 2
+    stack.push(_2b)
     applyBin(stack, add)
-    stack.push(4)
+    address _4b = cast 4
+    stack.push(_4b)
     applyBin(stack, mul)
     applyBin(stack, add)
-    stack.push(3)
+    address _3b = cast 3
+    stack.push(_3b)
     applyBin(stack, sub)
-    printf("5 1 2 + 4 * + 3 -= %d\n", stack.pop())
+    int r2 = cast stack.pop()
+    printf("5 1 2 + 4 * + 3 -= %lld\n", r2)
 
     // 100 7 mod = 2
-    stack.push(100)
-    stack.push(7)
+    address _100 = cast 100
+    stack.push(_100)
+    address _7 = cast 7
+    stack.push(_7)
     applyBin(stack, mod)
-    printf("100 7 mod        = %d\n", stack.pop())
+    int r3 = cast stack.pop()
+    printf("100 7 mod        = %lld\n", r3)
 
     // ── math module ───────────────────────────────────────────────────────────
 
-    // 5! = 120
-    stack.push(5)
-    applyUn(stack, factorial)
-    printf("5!               = %d\n", stack.pop())
-
-    // fib(10) = 55
-    stack.push(10)
-    applyUn(stack, fib)
-    printf("fib(10)          = %d\n", stack.pop())
-
-    // isqrt(144) = 12
-    stack.push(144)
-    applyUn(stack, isqrt)
-    printf("isqrt(144)       = %d\n", stack.pop())
-
-    // gcd(48, 18) = 6
-    stack.push(48)
-    stack.push(18)
-    applyBin(stack, gcd)
-    printf("gcd(48,18)       = %d\n", stack.pop())
-
-    // lcm(4, 6) = 12
-    stack.push(4)
-    stack.push(6)
-    applyBin(stack, lcm)
-    printf("lcm(4,6)         = %d\n", stack.pop())
-
-    // pow(2, 10) = 1024
-    stack.push(2)
-    stack.push(10)
-    applyBin(stack, pow)
-    printf("2^10             = %d\n", stack.pop())
+    printf("5!               = %lld\n", m.factorial(5))
+    printf("fib(10)          = %lld\n", m.fib(10))
+    printf("isqrt(144)       = %lld\n", m.isqrt(144))
+    printf("gcd(48,18)       = %lld\n", m.gcd(48, 18))
+    printf("lcm(4,6)         = %lld\n", m.lcm(4, 6))
+    printf("2^10             = %lld\n", m.pow(2, 10))
 
     // ── dispatch table ────────────────────────────────────────────────────────
-    // Store operation addresses, select by index at runtime.
 
     printf("\ndispatch table: 10 op 3 for each op\n")
-    Array<address> ops = Array(5)
+    StandardArray ops = StandardArray(5)
     ops.push(add::address)
     ops.push(sub::address)
     ops.push(mul::address)
-    ops.push(div::address)
+    ops.push(divide::address)
     ops.push(mod::address)
 
-    int m = 0
-    while (m < ops.len()) {
-        address fnAddr = ops.get(m)
+    int i = 0
+    while (i < ops.len()) {
+        address fnAddr = ops.get(i)
         callback(int, int) int op = cast fnAddr
-        stack.push(10)
-        stack.push(3)
+        address _10 = cast 10
+        stack.push(_10)
+        address _3c = cast 3
+        stack.push(_3c)
         applyBin(stack, op)
-        printf("  op[%d]: %d\n", m, stack.pop())
-        m = m + 1
+        int rv = cast stack.pop()
+        printf("  op[%lld]: %lld\n", i, rv)
+        i = i + 1
     }
 
     // ── fold ──────────────────────────────────────────────────────────────────
 
-    Array<int> nums = Array(5)
-    nums.push(1)
-    nums.push(2)
-    nums.push(3)
-    nums.push(4)
-    nums.push(5)
+    StandardArray nums = StandardArray(5)
+    address _n1 = cast 1
+    nums.push(_n1)
+    address _n2 = cast 2
+    nums.push(_n2)
+    address _n3 = cast 3
+    nums.push(_n3)
+    address _n4 = cast 4
+    nums.push(_n4)
+    address _n5 = cast 5
+    nums.push(_n5)
 
-    int sum     = fold(nums, 0, add)
+    int sum = fold(nums, 0, add)
     int product = fold(nums, 1, mul)
-    int largest = fold(nums, 0, max)
-    printf("\nfold sum(1..5)     = %d\n", sum)
-    printf("fold product(1..5) = %d\n", product)
-    printf("fold max(1..5)     = %d\n", largest)
+    printf("\nfold sum(1..5)     = %lld\n", sum)
+    printf("fold product(1..5) = %lld\n", product)
 }

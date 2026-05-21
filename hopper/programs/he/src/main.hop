@@ -1,6 +1,4 @@
-import Terminal from tui
-import fs     from linux
-import io     from linux
+import TUI from tui
 import Buffer from buffer
 import Editor from editor
 

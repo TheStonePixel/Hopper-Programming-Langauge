@@ -6,10 +6,9 @@
 //   - higher-order functions: filter, map, reduce, forEach
 //   - swapping sort algorithms at runtime
 
-import io from linux
-import array from ds
+import Array from ds
 
-extern function printf(String fmt, ...) int
+extern function printf(string fmt, ...) int
 
 // ── comparators ───────────────────────────────────────────────────────────────
 
@@ -43,47 +42,50 @@ function sumAcc(int acc, int n) int {
 
 // ── algorithms ────────────────────────────────────────────────────────────────
 
-// In-place insertion sort — O(n²), stable.
-function insertionSort(Array<int> arr, callback(int, int) bool less) {
+function insertionSort(StandardArray arr, callback(int, int) bool less) {
     int n = arr.len()
     int i = 1
     while (i < n) {
-        int key = arr.get(i)
+        int key = cast arr.get(i)
         int j   = i
         while (j > 0) {
-            int prev = arr.get(j - 1)
+            int prev = cast arr.get(j - 1)
             if (less(prev, key)) { break }
-            arr.set(j, prev)
+            address _prev = cast prev
+            arr.set(j, _prev)
             j = j - 1
         }
-        arr.set(j, key)
+        address _key = cast key
+        arr.set(j, _key)
         i = i + 1
     }
 }
 
-// Partition step for quicksort (Lomuto scheme).
-function partition(Array<int> arr, int lo, int hi, callback(int, int) bool less) int {
-    int pivot = arr.get(hi)
+function partition(StandardArray arr, int lo, int hi, callback(int, int) bool less) int {
+    int pivot = cast arr.get(hi)
     int i     = lo - 1
     int j     = lo
     while (j < hi) {
-        int elem = arr.get(j)
+        int elem = cast arr.get(j)
         if (less(elem, pivot)) {
             i = i + 1
-            int tmp = arr.get(i)
-            arr.set(i, elem)
-            arr.set(j, tmp)
+            int tmp = cast arr.get(i)
+            address _elem = cast elem
+            arr.set(i, _elem)
+            address _tmp = cast tmp
+            arr.set(j, _tmp)
         }
         j = j + 1
     }
-    int tmp = arr.get(i + 1)
-    arr.set(i + 1, arr.get(hi))
-    arr.set(hi, tmp)
+    int tmp2 = cast arr.get(i + 1)
+    address _hi = cast arr.get(hi)
+    arr.set(i + 1, _hi)
+    address _tmp2 = cast tmp2
+    arr.set(hi, _tmp2)
     return i + 1
 }
 
-// Recursive quicksort.
-function quickSort(Array<int> arr, int lo, int hi, callback(int, int) bool less) {
+function quickSort(StandardArray arr, int lo, int hi, callback(int, int) bool less) {
     if (lo < hi) {
         int p = partition(arr, lo, hi, less)
         quickSort(arr, lo, p - 1, less)
@@ -93,40 +95,46 @@ function quickSort(Array<int> arr, int lo, int hi, callback(int, int) bool less)
 
 // ── higher-order helpers ──────────────────────────────────────────────────────
 
-function forEach(Array<int> arr, callback(int) int fn) {
+function forEach(StandardArray arr, callback(int) int fn) {
     int i = 0
     while (i < arr.len()) {
-        int v = arr.get(i)
+        int v = cast arr.get(i)
         fn(v)
         i = i + 1
     }
 }
 
-function filter(Array<int> src, Array<int> dst, callback(int) bool pred) {
+function filter(StandardArray src, StandardArray dst, callback(int) bool pred) {
     dst.reset()
     int i = 0
     while (i < src.len()) {
-        int v = src.get(i)
-        if (pred(v)) { dst.push(v) }
+        int v = cast src.get(i)
+        if (pred(v)) {
+            address _v = cast v
+            dst.push(_v)
+        }
         i = i + 1
     }
 }
 
-function map(Array<int> src, Array<int> dst, callback(int) int fn) {
+function map(StandardArray src, StandardArray dst, callback(int) int fn) {
     dst.reset()
     int i = 0
     while (i < src.len()) {
-        int v = src.get(i)
-        dst.push(fn(v))
+        int v = cast src.get(i)
+        int r = fn(v)
+        address _r = cast r
+        dst.push(_r)
         i = i + 1
     }
 }
 
-function reduce(Array<int> arr, int initial, callback(int, int) int fn) int {
+function reduce(StandardArray arr, int initial, callback(int, int) int fn) int {
     int acc = initial
     int i   = 0
     while (i < arr.len()) {
-        acc = fn(acc, arr.get(i))
+        int v = cast arr.get(i)
+        acc = fn(acc, v)
         i = i + 1
     }
     return acc
@@ -134,12 +142,13 @@ function reduce(Array<int> arr, int initial, callback(int, int) int fn) int {
 
 // ── print helpers ─────────────────────────────────────────────────────────────
 
-function printArr(Array<int> arr) {
+function printArr(StandardArray arr) {
     printf("[")
     int i = 0
     while (i < arr.len()) {
         if (i > 0) { printf(", ") }
-        printf("%d", arr.get(i))
+        int v = cast arr.get(i)
+        printf("%lld", v)
         i = i + 1
     }
     printf("]\n")
@@ -147,80 +156,88 @@ function printArr(Array<int> arr) {
 
 // ── entry ─────────────────────────────────────────────────────────────────────
 
-entry main(int argc, address argv) {
-    Array<int> nums = Array(16)
-    nums.push(5)
-    nums.push(-3)
-    nums.push(8)
-    nums.push(1)
-    nums.push(-7)
-    nums.push(4)
-    nums.push(2)
-    nums.push(-6)
+entry main {
+    StandardArray nums = StandardArray(16)
+    address _5 = cast 5
+    nums.push(_5)
+    address _n3 = cast -3
+    nums.push(_n3)
+    address _8 = cast 8
+    nums.push(_8)
+    address _1 = cast 1
+    nums.push(_1)
+    address _n7 = cast -7
+    nums.push(_n7)
+    address _4 = cast 4
+    nums.push(_4)
+    address _2 = cast 2
+    nums.push(_2)
+    address _n6 = cast -6
+    nums.push(_n6)
 
-    printf("original: ")
+    printf("original:  ")
     printArr(nums)
-
-    // ── quicksort with swappable comparator ───────────────────────────────────
 
     callback cmp = intAscending(int, int) bool
     quickSort(nums, 0, nums.len() - 1, cmp)
     printf("ascending:  ")
     printArr(nums)
 
-    cmp = intDescending
-    quickSort(nums, 0, nums.len() - 1, cmp)
+    callback cmp2 = intDescending(int, int) bool
+    quickSort(nums, 0, nums.len() - 1, cmp2)
     printf("descending: ")
     printArr(nums)
 
-    cmp = absAscending
-    quickSort(nums, 0, nums.len() - 1, cmp)
+    callback cmp3 = absAscending(int, int) bool
+    quickSort(nums, 0, nums.len() - 1, cmp3)
     printf("abs order:  ")
     printArr(nums)
 
-    // ── insertion sort (stable, different algorithm, same comparator API) ──────
-
-    Array<int> small = Array(8)
-    small.push(9)
-    small.push(3)
-    small.push(6)
-    small.push(1)
-    small.push(4)
+    StandardArray small = StandardArray(8)
+    address _9 = cast 9
+    small.push(_9)
+    address _3 = cast 3
+    small.push(_3)
+    address _6 = cast 6
+    small.push(_6)
+    address _1b = cast 1
+    small.push(_1b)
+    address _4b = cast 4
+    small.push(_4b)
 
     insertionSort(small, intAscending)
     printf("insertionSort: ")
     printArr(small)
 
-    // ── higher-order: filter, map, reduce ─────────────────────────────────────
+    StandardArray src = StandardArray(8)
+    address _s1 = cast 1
+    src.push(_s1)
+    address _s2 = cast 2
+    src.push(_s2)
+    address _s3 = cast 3
+    src.push(_s3)
+    address _s4 = cast 4
+    src.push(_s4)
+    address _s5 = cast 5
+    src.push(_s5)
+    address _s6 = cast 6
+    src.push(_s6)
 
-    Array<int> src = Array(8)
-    src.push(1)
-    src.push(2)
-    src.push(3)
-    src.push(4)
-    src.push(5)
-    src.push(6)
-
-    Array<int> evens = Array(8)
+    StandardArray evens = StandardArray(8)
     filter(src, evens, isEven)
     printf("evens: ")
     printArr(evens)
 
-    Array<int> squares = Array(8)
+    StandardArray squares = StandardArray(8)
     map(src, squares, squared)
     printf("squares: ")
     printArr(squares)
 
     int total = reduce(src, 0, sumAcc)
-    printf("sum(1..6) = %d\n", total)
-
-    // ── dispatch table: array of comparators ──────────────────────────────────
-    //
-    // Hopper stores callbacks as address, so we use Array<address> as a dispatch
-    // table and alias each slot to the right callback type at the call site.
+    printf("sum(1..6) = %lld\n", total)
 
     printf("\ndispatch table demo:\n")
-    Array<address> sortModes = Array(4)
+    StandardArray sortModes = StandardArray(4)
     address ascAddr  = intAscending::address
     address descAddr = intDescending::address
     address absAddr  = absAscending::address
@@ -228,27 +245,36 @@ entry main(int argc, address argv) {
     sortModes.push(descAddr)
     sortModes.push(absAddr)
 
-    Array<int> demo = Array(8)
-    demo.push(7)
-    demo.push(-2)
-    demo.push(5)
-    demo.push(-9)
-    demo.push(3)
+    StandardArray demo = StandardArray(8)
+    address _d7 = cast 7
+    demo.push(_d7)
+    address _dn2 = cast -2
+    demo.push(_dn2)
+    address _d5 = cast 5
+    demo.push(_d5)
+    address _dn9 = cast -9
+    demo.push(_dn9)
+    address _d3 = cast 3
+    demo.push(_d3)
 
     int m = 0
     while (m < sortModes.len()) {
-        // Restore demo order
         demo.reset()
-        demo.push(7)
-        demo.push(-2)
-        demo.push(5)
-        demo.push(-9)
-        demo.push(3)
+        address _r7 = cast 7
+        demo.push(_r7)
+        address _rn2 = cast -2
+        demo.push(_rn2)
+        address _r5 = cast 5
+        demo.push(_r5)
+        address _rn9 = cast -9
+        demo.push(_rn9)
+        address _r3 = cast 3
+        demo.push(_r3)
 
         address fnAddr = sortModes.get(m)
         callback(int, int) bool sorter = cast fnAddr
         quickSort(demo, 0, demo.len() - 1, sorter)
-        printf("mode %d: ", m)
+        printf("mode %lld: ", m)
         printArr(demo)
         m = m + 1
     }

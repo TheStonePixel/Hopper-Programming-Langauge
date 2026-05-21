@@ -3,10 +3,10 @@
 // Usage: jsonreader '<json>'
 //   jsonreader '{"name": "Hopper", "version": 1, "tags": ["fast", "safe"]}'
 
-import io   from core
-import json from json
+import JSON from json
 
-extern function printf(String fmt, ...) int
+extern function printf(string fmt, ...) int
+extern function strlen(string s) int
 
 function indent(int depth) {
     int i = 0
@@ -16,18 +16,19 @@ function indent(int depth) {
     }
 }
 
-function printNode(address nodePtr, int depth) {
-    JsonNode node = nodePtr::value
+function printNode(JSON r, address nodePtr, int depth) {
+    int kind = r.nodeKind(nodePtr)
 
-    if (node.kind == JsonKind.NONE) {
+    if (kind == JsonKind.NONE) {
         indent(depth)
         printf("null\n")
         return
     }
 
-    if (node.kind == JsonKind.BOOL) {
+    if (kind == JsonKind.BOOL) {
         indent(depth)
-        if (node.numVal == 1) {
+        bool bv = r.nodeBool(nodePtr)
+        if (bv) {
             printf("bool: true\n")
         } else {
             printf("bool: false\n")
@@ -35,48 +36,52 @@ function printNode(address nodePtr, int depth) {
         return
     }
 
-    if (node.kind == JsonKind.INT) {
+    if (kind == JsonKind.INT) {
         indent(depth)
-        printf("int: %lld\n", node.numVal)
+        int n = r.nodeInt(nodePtr)
+        printf("int: %lld\n", n)
         return
     }
 
-    if (node.kind == JsonKind.STRING) {
+    if (kind == JsonKind.STRING) {
         indent(depth)
-        printf("string: \"%s\"\n", node.strVal)
+        address sv = r.nodeStr(nodePtr)
+        string ss = cast sv
+        printf("string: \"%s\"\n", ss)
         return
     }
 
-    if (node.kind == JsonKind.ARRAY) {
+    if (kind == JsonKind.ARRAY) {
         indent(depth)
-        address childrenPtr = node.children
-        Array<address> children = childrenPtr::value
-        int count = children.len()
+        int count = r.nodeLen(nodePtr)
         printf("array (%lld items):\n", count)
+        address childBuf = r.nodeChildren(nodePtr)
         int i = 0
         while (i < count) {
-            address child = children.get(i)
-            printNode(child, depth + 1)
+            address slot = childBuf + i * 8
+            address child = slot::value
+            printNode(r, child, depth + 1)
             i = i + 1
         }
         return
     }
 
-    if (node.kind == JsonKind.OBJECT) {
+    if (kind == JsonKind.OBJECT) {
         indent(depth)
-        address childrenPtr = node.children
-        address keysPtr     = node.keys
-        Array<address> children = childrenPtr::value
-        Array<string>  keys     = keysPtr::value
-        int count = children.len()
+        int count = r.nodeLen(nodePtr)
         printf("object (%lld keys):\n", count)
+        address childBuf = r.nodeChildren(nodePtr)
+        address keyBuf   = r.nodeKeys(nodePtr)
         int i = 0
         while (i < count) {
+            address kslot = keyBuf + i * 8
+            address kptr = kslot::value
+            string kstr = cast kptr
             indent(depth + 1)
-            string key = keys.get(i)
-            printf("\"%s\":\n", key)
-            address child = children.get(i)
-            printNode(child, depth + 2)
+            printf("\"%s\":\n", kstr)
+            address cslot = childBuf + i * 8
+            address child = cslot::value
+            printNode(r, child, depth + 2)
             i = i + 1
         }
         return
@@ -89,10 +94,10 @@ entry main(int argc, string[] argv) {
         return
     }
 
+    JSON r = JSON("", 0)
     string src = argv[1]
-    int    len = strLen(src)
-
-    JsonReader r = JsonReader(src, len)
-    address root = r.parseValue()
-    printNode(root, 0)
+    int len = strlen(src)
+    address src_addr = cast src
+    address root = r.parse(src_addr, len)
+    printNode(r, root, 0)
 }

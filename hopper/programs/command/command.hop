@@ -9,7 +9,7 @@
 //
 // Build: hopper build command.hop
 
-import array from ds
+import Array from ds
 
 extern function printf(string fmt, ...) int
 
@@ -46,10 +46,10 @@ function doHalve(address p) int {
 // ── CommandQueue — records and replays commands ───────────────────────────────
 
 class CommandQueue {
-    Array<address> log
+    StandardArray log
 
     constructor() {
-        self.log = Array(16)
+        self.log = StandardArray(16)
     }
 
     function run(address state, address cmd) {

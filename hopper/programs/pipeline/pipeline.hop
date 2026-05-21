@@ -10,17 +10,17 @@
 //
 // Build: hopper build pipeline.hop
 
-import array from ds
+import Array from ds
 
 extern function printf(string fmt, ...) int
 
 // ── Pipeline — ordered transform chain ───────────────────────────────────────
 
 class Pipeline {
-    Array<address> stages
+    StandardArray stages
 
     constructor() {
-        self.stages = Array(8)
+        self.stages = StandardArray(8)
     }
 
     function pipe(address stage) {

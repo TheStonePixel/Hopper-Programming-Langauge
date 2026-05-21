@@ -10,7 +10,7 @@
 //
 // Build: hopper build iterator.hop
 
-import array from ds
+import Array from ds
 
 extern function printf(string fmt, ...) int
 
@@ -25,16 +25,17 @@ interface Iterator {
 // ── ArrayIter ─────────────────────────────────────────────────────────────────
 
 class ArrayIter implements Iterator {
-    Array<int> data
+    StandardArray data
     int cursor
 
     constructor() {
-        self.data   = Array(16)
+        self.data   = StandardArray(16)
         self.cursor = 0
     }
 
     function push(int val) {
-        self.data.push(val)
+        address _val = cast val
+        self.data.push(_val)
     }
 
     function hasNext() bool {
@@ -42,7 +43,8 @@ class ArrayIter implements Iterator {
     }
 
     function next() int {
-        int val = self.data.get(self.cursor)
+        address _a = self.data.get(self.cursor)
+        int val = cast _a
         self.cursor = self.cursor + 1
         return val
     }

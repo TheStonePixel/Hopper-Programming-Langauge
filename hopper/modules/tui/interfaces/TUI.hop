@@ -50,6 +50,21 @@ enum KeyCode {
     UNKNOWN   = 255
 }
 
+class Key {
+    int code
+    int val
+
+    constructor(int c, int v) {
+        self.code = c
+        self.val  = v
+    }
+
+    destructor() { }
+
+    function getCode() int { return self.code }
+    function getVal()  int { return self.val  }
+}
+
 interface TUI {
     function width() int
     function height() int
@@ -76,6 +91,6 @@ interface TUI {
     function writeInt(int n)
     function drawBox(int row, int col, int w, int h)
     function fillRect(int row, int col, int w, int h)
-    function readKey(address codeOut, address valOut)
+    function readKey() Key
     function close()
 }

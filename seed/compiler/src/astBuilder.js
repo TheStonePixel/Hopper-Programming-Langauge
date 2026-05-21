@@ -996,6 +996,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                 ast.interfaces.unshift(...ifaceAst.interfaces);
                 ast.functions.unshift(...ifaceAst.functions);
                 ast.enums.unshift(...(ifaceAst.enums || []));
+                ast.classes.unshift(...(ifaceAst.classes || []));
             }
 
             // Load implementation file
@@ -1005,9 +1006,11 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                     baseDir: path.dirname(binding.implementation), visited, bindings, sourceFile: binding.implementation,
                 });
 
-                // Find the class that matches the binding name; fall back to the first class.
-                // This handles impl files that export multiple classes (e.g. tui.hop has Key + Terminal).
+                // Find the class that matches the binding name; also accept a class that
+                // already declares `implements <bindingName>` in source; fall back to first class.
+                // This handles impl files that export multiple classes (e.g. tui.hop has Key + StandardTUI).
                 const implClass = (implAst.classes || []).find(c => c.name === bindingName)
+                               || (implAst.classes || []).find(c => (c.interfaces || []).includes(bindingName))
                                || (implAst.classes || [])[0];
                 if (implClass) {
                     implClass.interfaces = [...(implClass.interfaces || []), bindingName];

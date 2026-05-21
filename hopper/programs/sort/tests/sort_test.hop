@@ -1,0 +1,169 @@
+// Tests: quickSort ascending/descending, insertionSort, filter, map, reduce
+// EXPECT: ascending:  [-7, -6, -3, 1, 2, 4, 5, 8]
+// EXPECT: descending: [8, 5, 4, 2, 1, -3, -6, -7]
+// EXPECT: insertionSort: [1, 3, 4, 6, 9]
+// EXPECT: evens: [2, 4, 6]
+// EXPECT: sum(1..6) = 21
+
+import Array from ds
+
+extern function printf(string fmt, ...) int
+
+function intAscending(int a, int b) bool { return a < b }
+function intDescending(int a, int b) bool { return a > b }
+function isEven(int n) bool { return (n % 2) == 0 }
+function sumAcc(int acc, int n) int { return acc + n }
+
+function partition(StandardArray arr, int lo, int hi, callback(int, int) bool less) int {
+    int pivot = cast arr.get(hi)
+    int i = lo - 1
+    int j = lo
+    while (j < hi) {
+        int elem = cast arr.get(j)
+        if (less(elem, pivot)) {
+            i = i + 1
+            int tmp = cast arr.get(i)
+            address _elem = cast elem
+            arr.set(i, _elem)
+            address _tmp = cast tmp
+            arr.set(j, _tmp)
+        }
+        j = j + 1
+    }
+    int tmp2 = cast arr.get(i + 1)
+    address _hi = cast arr.get(hi)
+    arr.set(i + 1, _hi)
+    address _tmp2 = cast tmp2
+    arr.set(hi, _tmp2)
+    return i + 1
+}
+
+function quickSort(StandardArray arr, int lo, int hi, callback(int, int) bool less) {
+    if (lo < hi) {
+        int p = partition(arr, lo, hi, less)
+        quickSort(arr, lo, p - 1, less)
+        quickSort(arr, p + 1, hi, less)
+    }
+}
+
+function insertionSort(StandardArray arr, callback(int, int) bool less) {
+    int n = arr.len()
+    int i = 1
+    while (i < n) {
+        int key = cast arr.get(i)
+        int j   = i
+        while (j > 0) {
+            int prev = cast arr.get(j - 1)
+            if (less(prev, key)) { break }
+            address _prev = cast prev
+            arr.set(j, _prev)
+            j = j - 1
+        }
+        address _key = cast key
+        arr.set(j, _key)
+        i = i + 1
+    }
+}
+
+function filter(StandardArray src, StandardArray dst, callback(int) bool pred) {
+    dst.reset()
+    int i = 0
+    while (i < src.len()) {
+        int v = cast src.get(i)
+        if (pred(v)) {
+            address _v = cast v
+            dst.push(_v)
+        }
+        i = i + 1
+    }
+}
+
+function reduce(StandardArray arr, int initial, callback(int, int) int fn) int {
+    int acc = initial
+    int i   = 0
+    while (i < arr.len()) {
+        int v = cast arr.get(i)
+        acc = fn(acc, v)
+        i = i + 1
+    }
+    return acc
+}
+
+function printArr(StandardArray arr) {
+    printf("[")
+    int i = 0
+    while (i < arr.len()) {
+        if (i > 0) { printf(", ") }
+        int v = cast arr.get(i)
+        printf("%lld", v)
+        i = i + 1
+    }
+    printf("]\n")
+}
+
+entry main {
+    StandardArray nums = StandardArray(16)
+    address _5 = cast 5
+    nums.push(_5)
+    address _n3 = cast -3
+    nums.push(_n3)
+    address _8 = cast 8
+    nums.push(_8)
+    address _1 = cast 1
+    nums.push(_1)
+    address _n7 = cast -7
+    nums.push(_n7)
+    address _4 = cast 4
+    nums.push(_4)
+    address _2 = cast 2
+    nums.push(_2)
+    address _n6 = cast -6
+    nums.push(_n6)
+
+    callback cmp = intAscending(int, int) bool
+    quickSort(nums, 0, nums.len() - 1, cmp)
+    printf("ascending:  ")
+    printArr(nums)
+
+    callback cmp2 = intDescending(int, int) bool
+    quickSort(nums, 0, nums.len() - 1, cmp2)
+    printf("descending: ")
+    printArr(nums)
+
+    StandardArray small = StandardArray(8)
+    address _9 = cast 9
+    small.push(_9)
+    address _3a = cast 3
+    small.push(_3a)
+    address _6 = cast 6
+    small.push(_6)
+    address _1b = cast 1
+    small.push(_1b)
+    address _4b = cast 4
+    small.push(_4b)
+    insertionSort(small, intAscending)
+    printf("insertionSort: ")
+    printArr(small)
+
+    StandardArray src = StandardArray(8)
+    address _s1 = cast 1
+    src.push(_s1)
+    address _s2 = cast 2
+    src.push(_s2)
+    address _s3 = cast 3
+    src.push(_s3)
+    address _s4 = cast 4
+    src.push(_s4)
+    address _s5 = cast 5
+    src.push(_s5)
+    address _s6 = cast 6
+    src.push(_s6)
+
+    StandardArray evens = StandardArray(8)
+    filter(src, evens, isEven)
+    printf("evens: ")
+    printArr(evens)
+
+    int total = reduce(src, 0, sumAcc)
+    printf("sum(1..6) = %lld\n", total)
+}

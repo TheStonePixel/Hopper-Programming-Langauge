@@ -1,8 +1,17 @@
 {
   "name": "tuidemo",
   "version": "0.1.0",
-  "description": "Interactive TUI showcase — colors, gradients, box drawing, key input",
+  "description": "Interactive TUI showcase",
   "license": "Apache-2.0",
   "type": "program",
-  "main": "tuidemo.hop"
+  "entry": "tuidemo.hop",
+  "targets": {
+    "host": {
+      "TUI": {
+        "from":           "tui",
+        "interface":      "../../modules/tui/interfaces/TUI.hop",
+        "implementation": "../../modules/tui/src/TUI.hop"
+      }
+    }
+  }
 }
