@@ -4,9 +4,11 @@
 
 1. **Always use `hopper init` to create new projects** — never hand-craft directories.
 2. **Always use `hopper build` to compile** — never invoke `hopperc.js` or `clang` directly unless debugging the compiler itself.
-3. **No global mutable variables** — the grammar has no top-level `var`/`let`/`int x = 5`. State lives in classes or is passed as parameters.
-4. **Top-level `const` is being removed** — the grammar supports it and tui.hop uses 48 of them, but the design intent is to eliminate module-level constants. Use `enum` for named integer sets, or scope constants inside classes/interfaces once the grammar supports it.
-5. **Write syntax that the compiler actually accepts** — check the grammar and codegen before inventing syntax.
+3. **Always use `hopper install <name>` to add dependencies** — never copy module files manually. This is how the build tool is tested — use it constantly.
+4. **After `hopper install`, always run `hopper build` and verify the output** — the build tool and compiler are tested together. Every change to either must be proven with a real build.
+5. **No global mutable variables** — the grammar has no top-level `var`/`let`/`int x = 5`. State lives in classes or is passed as parameters.
+6. **Top-level `const` is being removed** — the grammar supports it and tui.hop uses 48 of them, but the design intent is to eliminate module-level constants. Use `enum` for named integer sets, or scope constants inside classes/interfaces once the grammar supports it.
+7. **Write syntax that the compiler actually accepts** — check the grammar and codegen before inventing syntax.
 
 ---
 
@@ -16,7 +18,7 @@
 Hopper-Programming-Langauge/
   hopper/
     programs/          # executable projects
-    modules/           # conforming modules only: linux, sys, x86_64
+    modules/           # conforming modules only: linux, arch, x86_64
     nonconform/        # legacy modules not yet updated to new standard
     build/             # compiler output (gitignored)
     tests/             # toolchain-level tests
@@ -46,15 +48,32 @@ hopper init <name>                   # scaffold a new project (interactive)
 hopper init <name> --yes             # scaffold non-interactively (all defaults)
 hopper init <name> --yes --type=library --description="..." --license=MIT
 
-hopper build                         # compile src/main.hop → build/dev/<name>
-hopper run                           # run build/dev/<name>
+hopper install                       # install all dependencies from hopper.json
+hopper install <name>                # install a specific module + its transitive deps
+
+hopper build                         # compile entry → build/<name>
+hopper run                           # run build/<name>
 hopper ir <file.hop>                 # print LLVM IR (debug)
 hopper ast <file.hop>                # print AST as JSON (debug)
 ```
 
-`hopper init` creates: `hopper.json`, `src/`, `modules/`, `tests/`, `interfaces/` (for executables), `.gitignore`.
+`hopper init` creates: `hopper.json`, `src/`, `modules/`, `tests/`, `interfaces/` (for executables).
 
-The CLI lives at `seed/build_system/hopper`. It is NOT globally installed right now — run it as `node seed/build_system/hopper` or reinstall with `cd seed/build_system && npm install -g --force .`.
+`hopper install` copies modules from the global store (`hopper/modules/`) into the project's
+`modules/` directory with full nesting — each module's dependencies go into its own `modules/`
+subdirectory, so the folder tree mirrors the dependency graph exactly.
+
+Dependencies must be declared in `hopper.json` before installing:
+```json
+{
+  "dependencies": {
+    "linux": "0.1.0"
+  }
+}
+```
+
+The CLI lives at `seed/build_system/hopper`. It is NOT globally installed right now — run it as
+`node seed/build_system/hopper` or reinstall with `cd seed/build_system && npm install -g --force .`.
 
 ---
 
@@ -86,12 +105,12 @@ Resolves via the consuming project's `hopper.json` targets section:
 
 ### Module import (old, internal use only)
 ```hopper
-import io from sys
+import io from arch
 import tty from linux
 ```
 - Lowercase module name, no binding in hopper.json — falls through to file resolution.
 - Resolves to `modules/<name>/src/<module>.hop` or stdlib.
-- Used internally inside library implementations (e.g. linux/src/IO.hop imports `io from sys`).
+- Used internally inside library implementations (e.g. linux/src/IO.hop imports `io from arch`).
 - Do NOT use this form in application code — use the interface import form.
 
 ---
@@ -278,11 +297,11 @@ Raw inline-ASM syscall wrappers. No imports. Direct kernel calls via `asm { ... 
 This is the hardware layer. Never import from this directly in application code.
 Files: `x86_64/src/io.hop`, `x86_64/src/fs.hop`, `x86_64/src/mem.hop`, etc.
 
-#### Tier 2 — Architecture abstraction (`sys/`)
+#### Tier 2 — Architecture abstraction (`arch/`)
 Each file is a single line: `import <name> from x86_64`.
 This is a portability shim — to retarget to ARM64, change `x86_64` to `arm64` here only.
-Never import from `sys` in application code. Only tier-3 library implementations may do so.
-Files: `sys/src/io.hop`, `sys/src/fs.hop`, `sys/src/mem.hop`, etc.
+Never import from `arch` in application code. Only tier-3 library implementations may do so.
+Files: `arch/src/io.hop`, `arch/src/fs.hop`, `arch/src/mem.hop`, etc.
 
 #### Tier 3 — User-facing library (`linux/`)
 The conforming, new-standard module. Exports 7 interfaces via the interface/class system:
@@ -294,9 +313,9 @@ The conforming, new-standard module. Exports 7 interfaces via the interface/clas
 - `Network` — select, poll, epoll
 - `Memory` — mmap, munmap, mprotect, mremap, madvise, mlock, memfd_create
 
-Implementation files (`src/IO.hop`, `src/FileSystem.hop`, etc.) delegate to `import X from sys`.
-The `import X from sys` declarations in linux implementations ARE the dependency tracking —
-they tell the build system that linux depends on sys which depends on x86_64.
+Implementation files (`src/IO.hop`, `src/FileSystem.hop`, etc.) delegate to `import X from arch`.
+The `import X from arch` declarations in linux implementations ARE the dependency tracking —
+they tell the build system that linux depends on arch which depends on x86_64.
 
 ### Non-conforming legacy modules (`hopper/nonconform/`)
 Everything in `hopper/nonconform/` was written before the new interface/class standard.
@@ -304,7 +323,7 @@ Do NOT import from any of these until they have been updated and moved to `hoppe
 `Pointer`, `algo`, `ascii`, `char`, `cli`, `concurrent`, `core`, `ds`, `fs`, `io`, `json`,
 `llvm`, `math`, `path`, `regex`, `stream`, `string`, `tui`, `uart`, `utf8`
 
-If you need file I/O inside a conforming module, use `import fs from sys` and call
+If you need file I/O inside a conforming module, use `import fs from arch` and call
 `open`/`read`/`close` directly — see `linux/src/shell.hop` for the pattern.
 
 ### Dependency chain
@@ -313,8 +332,8 @@ program → import IO from linux
              ↓ hopper.json binding resolves to:
           linux/interfaces/IO.hop    (interface contract + enums)
           linux/src/IO.hop           (class LinuxIO implements IO)
-             ↓ import io from sys
-          sys/src/io.hop             (architecture-neutral delegation)
+             ↓ import io from arch
+          arch/src/io.hop            (architecture multiplexer)
              ↓ import io from x86_64
           x86_64/src/io.hop          (inline-ASM syscalls)
 ```
