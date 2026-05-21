@@ -1,0 +1,10 @@
+// COMPILE_ONLY
+// Verifies the regex program entry point and all imports compile cleanly.
+
+import Regex      from regex
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+entry main(int argc, string[] argv) { }
