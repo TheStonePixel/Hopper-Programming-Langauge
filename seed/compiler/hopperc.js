@@ -43,6 +43,7 @@ function loadBindings(sourceFile, target) {
                 const bindings = new Map();
                 for (const [name, b] of Object.entries(targetBindings)) {
                     bindings.set(name, {
+                        from:           b.from || null,
                         interface:      resolve(dir, b.interface),
                         implementation: resolve(dir, b.implementation),
                     });

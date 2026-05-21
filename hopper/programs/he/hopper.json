@@ -8,6 +8,7 @@
   "targets": {
     "host": {
       "Terminal": {
+        "from":           "tui",
         "interface":      "./interfaces/Terminal.hop",
         "implementation": "../../modules/tui/src/tui.hop"
       }

@@ -1,4 +1,4 @@
-import Text
+import Text from ascii
 
 function announce(Text t) {
     t.greet()

@@ -957,9 +957,16 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     if (noImports) return ast;
 
     for (const { module: moduleName, names } of imports) {
-        // Binding import: `import Name` where Name is declared in hopper.json targets
-        if (!names && bindings && bindings.has(moduleName)) {
-            const binding = bindings.get(moduleName);
+        // Binding import: `import Interface from Project` or legacy `import Interface`
+        // The interface name is either the bare module name (no from) or the single name before `from`.
+        const bindingName = names ? (names.length === 1 ? names[0] : null) : moduleName;
+        if (bindingName && bindings && bindings.has(bindingName)) {
+            const binding = bindings.get(bindingName);
+
+            // Validate the project name if the binding declares one.
+            if (names && binding.from && binding.from !== moduleName) {
+                throw new Error(`import ${bindingName} from ${moduleName}: expected 'from ${binding.from}'`);
+            }
 
             // Load interface file
             if (!visited.has(binding.interface)) {
@@ -981,16 +988,16 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
 
                 // Find the class that matches the binding name; fall back to the first class.
                 // This handles impl files that export multiple classes (e.g. tui.hop has Key + Terminal).
-                const implClass = (implAst.classes || []).find(c => c.name === moduleName)
+                const implClass = (implAst.classes || []).find(c => c.name === bindingName)
                                || (implAst.classes || [])[0];
                 if (implClass) {
-                    implClass.interfaces = [...(implClass.interfaces || []), moduleName];
+                    implClass.interfaces = [...(implClass.interfaces || []), bindingName];
                 }
 
                 // Register a type alias: binding name → concrete class name.
                 // Skip when names match — a self-alias causes infinite recursion in normalizeType.
-                if (implClass && implClass.name !== moduleName) {
-                    ast.aliases.push({ name: moduleName, targetType: implClass.name });
+                if (implClass && implClass.name !== bindingName) {
+                    ast.aliases.push({ name: bindingName, targetType: implClass.name });
                 }
 
                 ast.functions.unshift(...implAst.functions);

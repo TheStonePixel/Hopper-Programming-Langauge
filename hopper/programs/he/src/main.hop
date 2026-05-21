@@ -1,4 +1,4 @@
-import Terminal
+import Terminal from tui
 import fs     from linux
 import io     from linux
 import Buffer from buffer
