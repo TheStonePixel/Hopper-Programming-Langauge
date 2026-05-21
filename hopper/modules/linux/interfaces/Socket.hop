@@ -44,7 +44,7 @@ enum MsgFlag {
 
 interface Socket {
     function socket(int domain, int type, int protocol) int
-    function bind(int fd, address addr, int addrlen) int
+    function socketBind(int fd, address addr, int addrlen) int
     function listen(int fd, int backlog) int
     function accept(int fd, address addr, address addrlen) int
     function accept4(int fd, address addr, address addrlen, int flags) int

@@ -5,15 +5,37 @@
   "license": "Apache-2.0",
   "type": "library",
   "dependencies": {
-    "arch": "0.1.0"
+    "arch": "0.1.0",
+    "x86_64": "0.1.0"
   },
   "exports": {
-    "IO":         { "interface": "interfaces/IO.hop",         "implementation": "src/IO.hop"         },
-    "FileSystem": { "interface": "interfaces/FileSystem.hop", "implementation": "src/FileSystem.hop" },
-    "System":     { "interface": "interfaces/System.hop",     "implementation": "src/System.hop"     },
-    "Process":    { "interface": "interfaces/Process.hop",    "implementation": "src/Process.hop"    },
-    "Socket":     { "interface": "interfaces/Socket.hop",     "implementation": "src/Socket.hop"     },
-    "Network":    { "interface": "interfaces/Network.hop",    "implementation": "src/Network.hop"    },
-    "Memory":     { "interface": "interfaces/Memory.hop",     "implementation": "src/Memory.hop"     }
+    "IO": {
+      "interface": "interfaces/IO.hop",
+      "implementation": "src/IO.hop"
+    },
+    "FileSystem": {
+      "interface": "interfaces/FileSystem.hop",
+      "implementation": "src/FileSystem.hop"
+    },
+    "System": {
+      "interface": "interfaces/System.hop",
+      "implementation": "src/System.hop"
+    },
+    "Process": {
+      "interface": "interfaces/Process.hop",
+      "implementation": "src/Process.hop"
+    },
+    "Socket": {
+      "interface": "interfaces/Socket.hop",
+      "implementation": "src/Socket.hop"
+    },
+    "Network": {
+      "interface": "interfaces/Network.hop",
+      "implementation": "src/Network.hop"
+    },
+    "Memory": {
+      "interface": "interfaces/Memory.hop",
+      "implementation": "src/Memory.hop"
+    }
   }
 }

@@ -582,10 +582,10 @@ export class AstBuilder extends HopperVisitor {
     }
 
     visitAsmStmt(ctx) {
-        // AsmBlock token text: `asm { ... }` — parse line by line
+        // AsmBlock token text: `asm { ... }` — parse line by line or by 3-space separation (compact form)
         const raw     = ctx.AsmBlock().getText();
         const content = raw.replace(/^asm\s*\{/, '').replace(/\}$/, '');
-        const lines   = content.split('\n').flatMap(line => {
+        const lines   = content.split(/\n|   +/).flatMap(line => {
             // strip trailing inline comment, then trim
             const ci   = line.indexOf('//');
             let   text = (ci >= 0 ? line.slice(0, ci) : line).trim();

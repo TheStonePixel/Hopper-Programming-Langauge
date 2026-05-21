@@ -293,16 +293,26 @@ int n = cast someAddress        // address → int
 
 Modules fall into three tiers. Only the user-facing library tier uses the interface/class system.
 
-#### Tier 1 — Platform (`x86_64/`)
-Raw inline-ASM syscall wrappers. No imports. Direct kernel calls via `asm { ... syscall }`.
-This is the hardware layer. Never import from this directly in application code.
-Files: `x86_64/src/io.hop`, `x86_64/src/fs.hop`, `x86_64/src/mem.hop`, etc.
+#### Tier 1 — Hardware (`x86_64/`)
+The x86_64 module contains two kinds of implementations:
+
+**LinuxSyscalls** — the joint Linux OS ABI + x86-64 ISA interface. Syscall numbers here are
+specific to Linux on x86-64 (different on ARM64 Linux, different on macOS x86-64). The class
+`X86LinuxSyscalls implements LinuxSyscalls` provides ~150 syscalls as inline-asm methods.
+File: `x86_64/src/LinuxSyscalls.hop` (self-contained: interface declaration + class together).
+
+**SIMD** — SSE2 vector operations: `scanByte16`, `scanByte2x16`, `scanByteOR4x16`, `popcnt16`,
+`bsf16`. The class `X86SIMD implements SIMD` wraps SSE2 instructions.
+Files: `x86_64/interfaces/SIMD.hop` + `x86_64/src/SIMD.hop`.
+
+Never import `LinuxSyscalls` directly in application code — it is for linux module internals only.
+Programs may import `SIMD from x86_64` directly.
 
 #### Tier 2 — Architecture abstraction (`arch/`)
 Each file is a single line: `import <name> from x86_64`.
 This is a portability shim — to retarget to ARM64, change `x86_64` to `arm64` here only.
-Never import from `arch` in application code. Only tier-3 library implementations may do so.
-Files: `arch/src/io.hop`, `arch/src/fs.hop`, `arch/src/mem.hop`, etc.
+Used only by legacy lowercase linux files (`linux/src/io.hop`, etc.). New conforming
+implementations use LinuxSyscalls directly, bypassing arch.
 
 #### Tier 3 — User-facing library (`linux/`)
 The conforming, new-standard module. Exports 7 interfaces via the interface/class system:
@@ -310,13 +320,23 @@ The conforming, new-standard module. Exports 7 interfaces via the interface/clas
 - `FileSystem` — open, close, stat, mkdir, unlink, rename, getcwd, dup, pipe, inotify, ...
 - `System` — uname, sysinfo, clocks, scheduling, resource limits
 - `Process` — fork, exec, wait, getpid/uid/gid, signals, ptrace
-- `Socket` — socket, bind, listen, accept, connect, send, recv, setsockopt, ...
+- `Socket` — socket, socketBind, listen, accept, connect, send, recv, setsockopt, ...
 - `Network` — select, poll, epoll
 - `Memory` — mmap, munmap, mprotect, mremap, madvise, mlock, memfd_create
 
-Implementation files (`src/IO.hop`, `src/FileSystem.hop`, etc.) delegate to `import X from arch`.
-The `import X from arch` declarations in linux implementations ARE the dependency tracking —
-they tell the build system that linux depends on arch which depends on x86_64.
+Each uppercase implementation file (`src/IO.hop`, `src/FileSystem.hop`, etc.) follows the pattern:
+```hopper
+import LinuxSyscalls from x86_64
+
+function read(int fd, address buf, int count) int {
+    X86LinuxSyscalls sys = X86LinuxSyscalls()
+    return sys.read(fd, buf, count)
+}
+
+class LinuxIO implements IO {
+    function read(int fd, address buf, int count) int { return read(fd, buf, count) }
+}
+```
 
 ### Non-conforming legacy modules (`hopper/nonconform/`)
 Everything in `hopper/nonconform/` was written before the new interface/class standard.
@@ -324,8 +344,8 @@ Do NOT import from any of these until they have been updated and moved to `hoppe
 `Pointer`, `algo`, `ascii`, `char`, `cli`, `concurrent`, `core`, `ds`, `fs`, `io`, `json`,
 `llvm`, `math`, `path`, `regex`, `stream`, `string`, `tui`, `uart`, `utf8`
 
-If you need file I/O inside a conforming module, use `import fs from arch` and call
-`open`/`read`/`close` directly — see `linux/src/shell.hop` for the pattern.
+If you need file I/O inside a conforming module, use `import LinuxSyscalls from x86_64` and
+instantiate `X86LinuxSyscalls` directly.
 
 ### Dependency chain
 ```
@@ -333,11 +353,21 @@ program → import IO from linux
              ↓ hopper.json binding resolves to:
           linux/interfaces/IO.hop    (interface contract + enums)
           linux/src/IO.hop           (class LinuxIO implements IO)
-             ↓ import io from arch
-          arch/src/io.hop            (architecture multiplexer)
-             ↓ import io from x86_64
-          x86_64/src/io.hop          (inline-ASM syscalls)
+             ↓ import LinuxSyscalls from x86_64  (regular module import)
+          x86_64/src/LinuxSyscalls.hop  (interface LinuxSyscalls + class X86LinuxSyscalls)
+                                         → inline-ASM syscalls, no further dependencies
 ```
+
+**Important — keyword collision**: `bind` is a grammar keyword (hardware address linker directive).
+The socket `bind` syscall is exposed as `socketBind` in both the `LinuxSyscalls` interface and
+the `linux/interfaces/Socket.hop` interface.
+
+**Important — `LinuxSyscalls.hop` is self-contained**: the interface declaration and class
+implementation live in the same `src/` file. This is required because the build system passes
+root project bindings to all sub-compilations; when programs compile linux implementation files,
+`LinuxSyscalls` is not in the program's bindings, so the file is loaded via regular module
+resolution (which only loads the src file, not the interfaces/ file). The self-contained design
+ensures the interface is always in scope when the class is compiled.
 
 ---
 
