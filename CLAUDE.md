@@ -9,6 +9,7 @@
 5. **No global mutable variables** — the grammar has no top-level `var`/`let`/`int x = 5`. State lives in classes or is passed as parameters.
 6. **Top-level `const` is being removed** — the grammar supports it and tui.hop uses 48 of them, but the design intent is to eliminate module-level constants. Use `enum` for named integer sets, or scope constants inside classes/interfaces once the grammar supports it.
 7. **Write syntax that the compiler actually accepts** — check the grammar and codegen before inventing syntax.
+8. **libc is for diagnostics only** — `extern` declarations to C library functions (`memchr`, `strstr`, `memcpy`, etc.) are acceptable temporarily to confirm a performance bottleneck exists and to measure the ceiling. Once the bottleneck is confirmed, implement the equivalent mechanism in Hopper and remove the extern. Never ship a module that delegates its core work to libc.
 
 ---
 

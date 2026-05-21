@@ -15,9 +15,25 @@ import IO         from linux
 import FileSystem from linux
 
 extern function printf(string fmt, ...) int
-extern function memchr(address s, int c, int n) address
-extern function memcpy(address dst, address src, int n) address
-extern function strstr(address haystack, address needle) address
+
+// SWAR on one 32-bit half: does any byte of w equal target?
+// target must be a 4-byte broadcast of the sought byte (e.g. 0x0A0A0A0A).
+// Returns non-zero (bit 7+8*i set for each hit) on match.
+// Uses only 32-bit constants so JavaScript double precision is never an issue.
+function _swar32(int w, int target) int {
+    int xr = w ^ target
+    int sub = xr - 0x01010101
+    int inv = ~xr
+    return (sub & inv) & 0x80808080
+}
+
+// Position of the first hit byte (0–3) within a _swar32 result.
+function _pos32(int r) int {
+    if ((r & 0x80) != 0) { return 0 }
+    if ((r & 0x8000) != 0) { return 1 }
+    if ((r & 0x800000) != 0) { return 2 }
+    return 3
+}
 
 enum Flag {
     N = 1
@@ -147,7 +163,6 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
     int lineNum    = 0
     int matchCount = 0
     int printed    = 0
-    int chunkI     = cast chunk
 
     bool eof = false
     while (!eof) {
@@ -156,39 +171,66 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
             eof = true
         } else {
             int ci = 0
-            while (ci < nr) {
-                int remaining = nr - ci
-                address segStart = chunk + ci
-                address nlp = memchr(segStart, 10, remaining)
 
-                int segLen
-                bool hasNl
-                int nlAbsOff
-                if (nlp == null) {
-                    segLen   = remaining
-                    hasNl    = false
-                    nlAbsOff = 0
-                } else {
-                    int nlpI     = cast nlp
-                    int segStI   = cast segStart
-                    segLen       = nlpI - segStI
-                    hasNl        = true
-                    nlAbsOff     = nlpI - chunkI
-                }
+            // --- 8-bytes-at-a-time SWAR scan ---
+            while (ci + 8 <= nr) {
+                address wp = chunk + ci
+                int word = wp::value
+                int wLo = word & 0xFFFFFFFF
+                int wHi = (word >> 32) & 0xFFFFFFFF
+                int rLo = _swar32(wLo, 0x0A0A0A0A)
+                int rHi = _swar32(wHi, 0x0A0A0A0A)
 
-                int copyLen = segLen
-                int room = Limits.LINE_MAX - 1 - lineLen
-                if (copyLen > room) { copyLen = room }
-                if (copyLen > 0) {
-                    memcpy(lineBuf + lineLen, segStart, copyLen)
-                    if (flagI != 0) {
-                        memcpy(lowBuf + lineLen, segStart, copyLen)
-                        lowerRegion(lowBuf, lineLen, copyLen)
+                if (rLo == 0 && rHi == 0) {
+                    // No newline in this 8-byte block.
+                    // Fast-write 8 bytes to lineBuf (int store = 8 bytes at once).
+                    if (lineLen + 8 <= Limits.LINE_MAX - 1) {
+                        if (flagI == 0) {
+                            address dp = lineBuf + lineLen
+                            dp::value = word
+                        } else {
+                            int k = 0
+                            while (k < 8) {
+                                address sp = chunk + ci + k
+                                byte sb = sp::value
+                                int sbi = cast sb
+                                address dlp = lineBuf + lineLen + k
+                                dlp::value = sb
+                                int blo = sbi
+                                if (blo >= 65 && blo <= 90) { blo = blo + 32 }
+                                byte bloB = cast blo
+                                address dlw = lowBuf + lineLen + k
+                                dlw::value = bloB
+                                k = k + 1
+                            }
+                        }
+                        lineLen = lineLen + 8
                     }
-                    lineLen = lineLen + copyLen
-                }
+                    ci = ci + 8
+                } else {
+                    // Newline found — pos is its offset within this 8-byte word.
+                    int pos = 0
+                    if (rLo != 0) { pos = _pos32(rLo) } else { pos = _pos32(rHi) + 4 }
+                    int k = 0
+                    while (k < pos) {
+                        if (lineLen < Limits.LINE_MAX - 1) {
+                            address sp = chunk + ci + k
+                            byte sb = sp::value
+                            int sbi = cast sb
+                            address dlp = lineBuf + lineLen
+                            dlp::value = sb
+                            if (flagI != 0) {
+                                int blo = sbi
+                                if (blo >= 65 && blo <= 90) { blo = blo + 32 }
+                                byte bloB = cast blo
+                                address dlw = lowBuf + lineLen
+                                dlw::value = bloB
+                            }
+                            lineLen = lineLen + 1
+                        }
+                        k = k + 1
+                    }
 
-                if (hasNl) {
                     lineNum = lineNum + 1
                     address term = lineBuf + lineLen
                     byte nul = cast 0
@@ -216,10 +258,55 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                         }
                     }
                     lineLen = 0
-                    ci = nlAbsOff + 1
-                } else {
-                    ci = nr
+                    ci = ci + pos + 1
                 }
+            }
+
+            // --- tail: remaining < 8 bytes, byte-at-a-time ---
+            while (ci < nr) {
+                address cp = chunk + ci
+                byte b = cp::value
+                int bi = cast b
+                if (bi == 10) {
+                    lineNum = lineNum + 1
+                    address term = lineBuf + lineLen
+                    byte nul = cast 0
+                    term::value = nul
+                    if (flagI != 0) {
+                        address lt = lowBuf + lineLen
+                        lt::value = nul
+                    }
+                    address matchBuf = lineBuf
+                    if (flagI != 0) { matchBuf = lowBuf }
+                    bool m = re.matchAt(pat, matchBuf)
+                    if (flagV != 0) { m = !m }
+                    if (m) {
+                        matchCount = matchCount + 1
+                        if (flagL != 0) {
+                            if (printed == 0) {
+                                printf("%s\n", name)
+                                printed = 1
+                            }
+                        } else if (flagC == 0) {
+                            if (showName != 0) { printf("%s:", name) }
+                            if (flagN != 0) { printf("%lld:", lineNum) }
+                            printf("%s\n", lineBuf)
+                        }
+                    }
+                    lineLen = 0
+                } else if (lineLen < Limits.LINE_MAX - 1) {
+                    address lp = lineBuf + lineLen
+                    lp::value = b
+                    if (flagI != 0) {
+                        int blo = bi
+                        if (blo >= 65 && blo <= 90) { blo = blo + 32 }
+                        byte bloB = cast blo
+                        address dp = lowBuf + lineLen
+                        dp::value = bloB
+                    }
+                    lineLen = lineLen + 1
+                }
+                ci = ci + 1
             }
         }
     }
@@ -233,7 +320,6 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
             address lt = lowBuf + lineLen
             lt::value = nul
         }
-
         address matchBuf = lineBuf
         if (flagI != 0) { matchBuf = lowBuf }
         bool m = re.matchAt(pat, matchBuf)

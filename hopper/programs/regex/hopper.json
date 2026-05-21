@@ -8,18 +8,18 @@
   "targets": {
     "host": {
       "Regex": {
-        "from":           "regex",
-        "interface":      "../../modules/regex/interfaces/Regex.hop",
-        "implementation": "../../modules/regex/src/Regex.hop"
+        "from": "regex",
+        "interface": "modules/regex/interfaces/Regex.hop",
+        "implementation": "modules/regex/src/Regex.hop"
       },
       "IO": {
-        "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/IO.hop",
+        "from": "linux",
+        "interface": "../../modules/linux/interfaces/IO.hop",
         "implementation": "../../modules/linux/src/IO.hop"
       },
       "FileSystem": {
-        "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/FileSystem.hop",
+        "from": "linux",
+        "interface": "../../modules/linux/interfaces/FileSystem.hop",
         "implementation": "../../modules/linux/src/FileSystem.hop"
       }
     }
