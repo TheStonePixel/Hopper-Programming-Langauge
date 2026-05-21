@@ -4,5 +4,5 @@
   "description": "BCM2835 UART0 (PL011) driver for Pi Zero bare-metal",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "uart.hop"
+  "main": "src/uart.hop"
 }

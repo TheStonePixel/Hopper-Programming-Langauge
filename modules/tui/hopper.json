@@ -4,5 +4,5 @@
   "description": "Terminal UI — raw mode, ANSI colors, box drawing, key input",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "tui.hop"
+  "main": "src/tui.hop"
 }

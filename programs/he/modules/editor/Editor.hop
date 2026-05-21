@@ -1,6 +1,6 @@
 // Editor — modal text editor state machine using tui/linux modules
 
-import tui    from tui
+import Terminal
 import fs     from linux
 import io     from linux
 import Buffer from buffer

@@ -4,5 +4,5 @@
   "description": "Async/await concurrency — Future<T>, Mutex, Condvar, Channel<T>",
   "license": "Apache-2.0",
   "type": "library",
-  "main": "concurrent.hop"
+  "main": "src/concurrent.hop"
 }

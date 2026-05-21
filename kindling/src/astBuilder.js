@@ -979,14 +979,17 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                     baseDir: path.dirname(binding.implementation), visited, bindings,
                 });
 
-                // Inject compliance: tell the compiler this class must satisfy the binding interface
-                const implClass = (implAst.classes || [])[0];
+                // Find the class that matches the binding name; fall back to the first class.
+                // This handles impl files that export multiple classes (e.g. tui.hop has Key + Terminal).
+                const implClass = (implAst.classes || []).find(c => c.name === moduleName)
+                               || (implAst.classes || [])[0];
                 if (implClass) {
                     implClass.interfaces = [...(implClass.interfaces || []), moduleName];
                 }
 
-                // Register a type alias: binding name → concrete class name
-                if (implClass) {
+                // Register a type alias: binding name → concrete class name.
+                // Skip when names match — a self-alias causes infinite recursion in normalizeType.
+                if (implClass && implClass.name !== moduleName) {
                     ast.aliases.push({ name: moduleName, targetType: implClass.name });
                 }
 
