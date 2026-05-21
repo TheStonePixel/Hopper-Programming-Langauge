@@ -1,0 +1,17 @@
+// EXPECT: 0
+// EXPECT: 1
+// EXPECT: 42
+// EXPECT: -7
+// EXPECT: 100
+// EXPECT: -999
+
+import io from core
+
+entry main(int argc, address argv) {
+    println(0)
+    println(1)
+    println(42)
+    println(-7)
+    println(100)
+    println(-999)
+}

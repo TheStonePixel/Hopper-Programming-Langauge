@@ -1,0 +1,19 @@
+import utf8 from string
+
+template Declaration<T> {
+ String kind = "Declaration"
+  T type 
+
+}
+
+template Expression<T> {
+ String kind = "Experession"
+  T type 
+
+}
+
+template Statement<T> {
+ String kind = "Statement"
+  T type 
+    
+}

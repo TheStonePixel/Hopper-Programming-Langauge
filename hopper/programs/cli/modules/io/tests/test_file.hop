@@ -1,0 +1,37 @@
+// EXPECT: write ok
+// EXPECT: hello from hopper
+// EXPECT: read ok
+
+import io from core
+import file from io
+
+entry main(int argc, address argv) {
+    // Write a file
+    FileWriter w = FileWriter("/tmp/hopper_test_file.txt")
+    if (w.valid()) {
+        w.writeStr("hello from hopper\n")
+        print("write ok")
+        newline()
+    }
+
+    // Read it back
+    FileReader r = FileReader("/tmp/hopper_test_file.txt")
+    if (r.valid()) {
+        address buf = allocate 256
+        int n = r.readBytes(buf, 255)
+        // strip trailing newline for clean output
+        if (n > 0) {
+            address last = buf + (n - 1)
+            byte lb = last::value
+            int li = cast lb
+            if (li == '\n') {
+                n = n - 1
+            }
+        }
+        print(buf, n)
+        newline()
+        print("read ok")
+        newline()
+        deallocate buf
+    }
+}

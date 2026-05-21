@@ -1,0 +1,13 @@
+// EXPECT: true
+// EXPECT: false
+// EXPECT: hello
+// EXPECT: world
+
+import io from core
+
+entry main(int argc, address argv) {
+    println(true)
+    println(false)
+    println("hello")
+    println("world")
+}
