@@ -229,6 +229,15 @@ class Terminal {
         deallocate self.savedTermios
     }
 
+    // close() — explicit teardown for call sites where destructor keyword is unparseable.
+    // Restores the terminal and frees resources; equivalent to calling the destructor.
+    function close() {
+        self.out.appendStr("\x1b[0m\x1b[?25h\x1b[?1049l")
+        self.flush()
+        tcsetattr(0, 0, self.savedTermios)
+        deallocate self.savedTermios
+    }
+
     function width()  int { return self.cols }
     function height() int { return self.rows }
 

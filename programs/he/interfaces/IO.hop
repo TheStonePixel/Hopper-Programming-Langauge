@@ -1,4 +1,0 @@
-interface IO {
-    function read_file(string path, address out_len) address
-    function write_file(string path, address data, int len) int
-}

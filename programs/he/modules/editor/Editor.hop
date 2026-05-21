@@ -1,10 +1,10 @@
-// Editor — modal text editor state machine
+// Editor — modal text editor state machine using tui/linux modules
 
+import tui    from tui
+import fs     from linux
+import io     from linux
 import Buffer from buffer
-import Terminal
-import IO
 
-extern function strlen(string s) int
 extern function memcpy(address dst, address src, int n) address
 
 enum Mode {
@@ -13,20 +13,11 @@ enum Mode {
     COMMAND = 2
 }
 
-const KEY_UP     = 1000
-const KEY_DOWN   = 1001
-const KEY_RIGHT  = 1002
-const KEY_LEFT   = 1003
-const KEY_ESC    = 27
-const KEY_ENTER  = 13
-const KEY_BS     = 127
-const KEY_CTRL_S = 19
-const KEY_CTRL_Q = 17
+const CTRL_S = 19
+const CTRL_Q = 17
 
 class Editor {
     Buffer buf
-    Terminal term
-    IO io
     int cx
     int cy
     int rowoff
@@ -39,9 +30,7 @@ class Editor {
     int cmdlen
 
     constructor() {
-        self.buf  = Buffer()
-        self.term = Terminal()
-        self.io   = IO()
+        self.buf      = Buffer()
         self.cx       = 0
         self.cy       = 0
         self.rowoff   = 0
@@ -60,21 +49,37 @@ class Editor {
     }
 
     function open_file(string path) {
-        int plen = strlen(path)
+        address pathp = cast path
+        int plen = 0
+        while (true) {
+            address cp = pathp + plen
+            byte b = cp::value
+            int bi = int b
+            if (bi == 0) { break }
+            plen = plen + 1
+        }
         self.filename = allocate plen + 1
-        memcpy(self.filename, path::address, plen)
+        int pi = 0
+        while (pi < plen) {
+            address sp = pathp + pi
+            address dp = self.filename + pi
+            byte b = sp::value
+            dp::value = b
+            pi = pi + 1
+        }
         self.fnlen = plen
-        int flen = 0
-        address flenp = flen::address
-        address data = self.io.read_file(path, flenp)
-        flen = flenp::value
-        if (int data != 0) {
-            self.buf.load(data, flen)
-            deallocate data
+        int fd = open(path, 0, 0)
+        if (fd < 0) { return }
+        int filesize = lseek(fd, 0, 2)
+        lseek(fd, 0, 0)
+        address data = allocate filesize + 1
+        int n = read(fd, data, filesize)
+        close(fd)
+        if (n > 0) {
+            self.buf.load(data, n)
         }
-        if (self.buf.get_count() == 0) {
-            self.buf.append_line(null, 0)
-        }
+        deallocate data
+        self.ensure_nonempty()
     }
 
     function save_file() {
@@ -83,9 +88,19 @@ class Editor {
         address flenp = flen::address
         address flat = self.buf.flatten(flenp)
         flen = flenp::value
-        self.io.write_file(self.filename, flat, flen)
+        int fd = open(self.filename, 577, 420)
+        if (fd >= 0) {
+            write(fd, flat, flen)
+            close(fd)
+        }
         deallocate flat
         self.buf.dirty = 0
+    }
+
+    function ensure_nonempty() {
+        if (self.buf.get_count() == 0) {
+            self.buf.append_line(null, 0)
+        }
     }
 
     function clamp_cx() {
@@ -94,24 +109,24 @@ class Editor {
         if (self.cx < 0)    { self.cx = 0 }
     }
 
-    function scroll() {
-        int rows = self.term.height() - 2
-        int cols = self.term.width()
+    function scroll(Terminal t) {
+        int rows = t.height() - 2
+        int cols = t.width()
         if (self.cy < self.rowoff) { self.rowoff = self.cy }
         if (self.cy >= self.rowoff + rows) { self.rowoff = self.cy - rows + 1 }
         if (self.cx < self.coloff) { self.coloff = self.cx }
         if (self.cx >= self.coloff + cols) { self.coloff = self.cx - cols + 1 }
     }
 
-    function draw_rows() {
-        int rows = self.term.height() - 2
-        int cols = self.term.width()
+    function draw_rows(Terminal t) {
+        int rows = t.height() - 2
+        int cols = t.width()
         int i = 0
         while (i < rows) {
             int filerow = i + self.rowoff
-            self.term.move(i, 0)
+            t.moveTo(i + 1, 1)
             if (filerow >= self.buf.get_count()) {
-                self.term.write_str("~")
+                t.writeStr("~")
             } else {
                 address data = self.buf.line_data(filerow)
                 int len = self.buf.line_len(filerow) - self.coloff
@@ -123,101 +138,104 @@ class Editor {
                     while (j < len) {
                         address cp = start + j
                         byte ch = cp::value
-                        if (int ch >= 32) {
-                            self.term.write_byte(ch)
+                        int chi = int ch
+                        if (chi >= 32) {
+                            t.writeChar(ch)
                         } else {
-                            self.term.write_byte(46)
+                            byte dot = 46
+                            t.writeChar(dot)
                         }
                         j = j + 1
                     }
                 }
             }
-            self.term.write_str("\x1b[K")
+            t.writeStr("\x1b[K")
             i = i + 1
         }
     }
 
-    function draw_status() {
-        int srow = self.term.height() - 2
-        self.term.move(srow, 0)
-        self.term.set_reverse()
-        if (self.mode == Mode.NORMAL)  { self.term.write_str(" NOR ") }
-        if (self.mode == Mode.INSERT)  { self.term.write_str(" INS ") }
-        if (self.mode == Mode.COMMAND) { self.term.write_str(" CMD ") }
-        self.term.write_str(" ")
+    function draw_status(Terminal t) {
+        int srow = t.height() - 1
+        t.moveTo(srow, 1)
+        t.reverse()
+        if (self.mode == Mode.NORMAL)  { t.writeStr(" NOR ") }
+        if (self.mode == Mode.INSERT)  { t.writeStr(" INS ") }
+        if (self.mode == Mode.COMMAND) { t.writeStr(" CMD ") }
+        t.writeStr(" ")
         if (int self.filename != 0) {
             int j = 0
             while (j < self.fnlen) {
                 address cp = self.filename + j
                 byte ch = cp::value
-                self.term.write_byte(ch)
+                t.writeChar(ch)
                 j = j + 1
             }
         } else {
-            self.term.write_str("[no name]")
+            t.writeStr("[no name]")
         }
-        if (self.buf.get_dirty() == 1) { self.term.write_str(" [+]") }
-        self.term.write_str("\x1b[K")
-        self.term.set_normal()
+        if (self.buf.get_dirty() == 1) { t.writeStr(" [+]") }
+        t.writeStr("\x1b[K")
+        t.reset()
     }
 
-    function draw_cmdbar() {
-        int crow = self.term.height() - 1
-        self.term.move(crow, 0)
-        self.term.write_str("\x1b[K")
+    function draw_cmdbar(Terminal t) {
+        int crow = t.height()
+        t.moveTo(crow, 1)
+        t.writeStr("\x1b[K")
         if (self.mode == Mode.COMMAND) {
-            self.term.write_byte(58)
+            byte colon = 58
+            t.writeChar(colon)
             int j = 0
             while (j < self.cmdlen) {
                 address cp = self.cmdbuf + j
                 byte ch = cp::value
-                self.term.write_byte(ch)
+                t.writeChar(ch)
                 j = j + 1
             }
         }
     }
 
-    function refresh() {
-        self.term.hide_cursor()
-        self.scroll()
-        self.draw_rows()
-        self.draw_status()
-        self.draw_cmdbar()
+    function refresh(Terminal t) {
+        t.hideCursor()
+        self.scroll(t)
+        self.draw_rows(t)
+        self.draw_status(t)
+        self.draw_cmdbar(t)
         if (self.mode == Mode.COMMAND) {
-            int crow = self.term.height() - 1
-            self.term.move(crow, self.cmdlen + 1)
+            int crow = t.height()
+            t.moveTo(crow, self.cmdlen + 2)
         } else {
-            int sr = self.cy - self.rowoff
-            int sc = self.cx - self.coloff
-            self.term.move(sr, sc)
+            int sr = self.cy - self.rowoff + 1
+            int sc = self.cx - self.coloff + 1
+            t.moveTo(sr, sc)
         }
-        self.term.show_cursor()
+        t.showCursor()
+        t.flush()
     }
 
     function exec_command() {
         address cp0 = self.cmdbuf
         byte c0 = cp0::value
-        // :q
-        if (self.cmdlen == 1 && int c0 == 113) {
+        int c0i = int c0
+        if (self.cmdlen == 1 && c0i == 113) {
             if (self.buf.get_dirty() == 0) {
                 self.running = 0
             }
         }
-        // :q! (force quit)
-        if (self.cmdlen == 2 && int c0 == 113) {
+        if (self.cmdlen == 2 && c0i == 113) {
             address cp1 = self.cmdbuf + 1
             byte c1 = cp1::value
-            if (int c1 == 33) { self.running = 0 }
+            int c1i = int c1
+            if (c1i == 33) { self.running = 0 }
         }
-        // :w
-        if (self.cmdlen == 1 && int c0 == 119) {
+        if (self.cmdlen == 1 && c0i == 119) {
             self.save_file()
         }
-        // :wq
-        if (self.cmdlen == 2 && int c0 == 119) {
+        if (self.cmdlen == 2 && c0i == 119) {
             address cp1 = self.cmdbuf + 1
             byte c1 = cp1::value
-            if (int c1 == 113) {
+            int c1i = int c1
+            if (c1i == 113) {
                 self.save_file()
                 self.running = 0
             }
@@ -226,68 +244,91 @@ class Editor {
         self.cmdlen = 0
     }
 
-    function handle_normal(int key) {
-        if (key == 104 || key == KEY_LEFT) {
+    function handle_normal(int code, int val) {
+        if (code == KEY_CHAR && val == 104) {
             if (self.cx > 0) { self.cx = self.cx - 1 }
         }
-        if (key == 108 || key == KEY_RIGHT) {
+        if (code == KEY_LEFT) {
+            if (self.cx > 0) { self.cx = self.cx - 1 }
+        }
+        if (code == KEY_CHAR && val == 108) {
             int llen = self.buf.line_len(self.cy)
             if (self.cx < llen) { self.cx = self.cx + 1 }
         }
-        if (key == 107 || key == KEY_UP) {
+        if (code == KEY_RIGHT) {
+            int llen = self.buf.line_len(self.cy)
+            if (self.cx < llen) { self.cx = self.cx + 1 }
+        }
+        if (code == KEY_CHAR && val == 107) {
             if (self.cy > 0) {
                 self.cy = self.cy - 1
                 self.clamp_cx()
             }
         }
-        if (key == 106 || key == KEY_DOWN) {
+        if (code == KEY_UP) {
+            if (self.cy > 0) {
+                self.cy = self.cy - 1
+                self.clamp_cx()
+            }
+        }
+        if (code == KEY_CHAR && val == 106) {
             if (self.cy < self.buf.get_count() - 1) {
                 self.cy = self.cy + 1
                 self.clamp_cx()
             }
         }
-        if (key == 48)  { self.cx = 0 }
-        if (key == 36) {
+        if (code == KEY_DOWN) {
+            if (self.cy < self.buf.get_count() - 1) {
+                self.cy = self.cy + 1
+                self.clamp_cx()
+            }
+        }
+        if (code == KEY_CHAR && val == 48) {
+            self.cx = 0
+        }
+        if (code == KEY_CHAR && val == 36) {
             int llen = self.buf.line_len(self.cy)
             if (llen > 0) { self.cx = llen - 1 }
         }
-        if (key == 105) { self.mode = Mode.INSERT }
-        if (key == 65) {
+        if (code == KEY_CHAR && val == 105) {
+            self.mode = Mode.INSERT
+        }
+        if (code == KEY_CHAR && val == 65) {
             self.cx = self.buf.line_len(self.cy)
             self.mode = Mode.INSERT
         }
-        if (key == 111) {
+        if (code == KEY_CHAR && val == 111) {
             int llen = self.buf.line_len(self.cy)
             self.buf.split_line(self.cy, llen)
             self.cy = self.cy + 1
             self.cx = 0
             self.mode = Mode.INSERT
         }
-        if (key == 120) {
+        if (code == KEY_CHAR && val == 120) {
             self.buf.delete_char(self.cy, self.cx)
             self.clamp_cx()
         }
-        if (key == 58) {
+        if (code == KEY_CHAR && val == 58) {
             self.mode = Mode.COMMAND
             self.cmdlen = 0
         }
-        if (key == KEY_CTRL_S) { self.save_file() }
-        if (key == KEY_CTRL_Q) { self.running = 0 }
+        if (code == KEY_CHAR && val == CTRL_S) { self.save_file() }
+        if (code == KEY_CHAR && val == CTRL_Q) { self.running = 0 }
     }
 
-    function handle_insert(int key) {
-        if (key == KEY_ESC) {
+    function handle_insert(int code, int val) {
+        if (code == KEY_ESCAPE) {
             self.mode = Mode.NORMAL
             if (self.cx > 0) { self.cx = self.cx - 1 }
             return
         }
-        if (key == KEY_ENTER) {
+        if (code == KEY_ENTER) {
             self.buf.split_line(self.cy, self.cx)
             self.cy = self.cy + 1
             self.cx = 0
             return
         }
-        if (key == KEY_BS) {
+        if (code == KEY_BACKSPACE) {
             if (self.cx > 0) {
                 self.cx = self.cx - 1
                 self.buf.delete_char(self.cy, self.cx)
@@ -301,40 +342,41 @@ class Editor {
             }
             return
         }
-        if (key == KEY_UP) {
+        if (code == KEY_UP) {
             if (self.cy > 0) { self.cy = self.cy - 1 }
             return
         }
-        if (key == KEY_DOWN) {
+        if (code == KEY_DOWN) {
             if (self.cy < self.buf.get_count() - 1) { self.cy = self.cy + 1 }
             return
         }
-        if (key == KEY_LEFT) {
+        if (code == KEY_LEFT) {
             if (self.cx > 0) { self.cx = self.cx - 1 }
             return
         }
-        if (key == KEY_RIGHT) {
+        if (code == KEY_RIGHT) {
             int llen = self.buf.line_len(self.cy)
             if (self.cx < llen) { self.cx = self.cx + 1 }
             return
         }
-        if (key >= 32 && key < 127) {
-            self.buf.insert_char(self.cy, self.cx, byte key)
+        if (code == KEY_CHAR && val >= 32 && val < 127) {
+            byte bval = cast val
+            self.buf.insert_char(self.cy, self.cx, bval)
             self.cx = self.cx + 1
         }
     }
 
-    function handle_command(int key) {
-        if (key == KEY_ESC) {
+    function handle_command(int code, int val) {
+        if (code == KEY_ESCAPE) {
             self.mode = Mode.NORMAL
             self.cmdlen = 0
             return
         }
-        if (key == KEY_ENTER) {
+        if (code == KEY_ENTER) {
             self.exec_command()
             return
         }
-        if (key == KEY_BS) {
+        if (code == KEY_BACKSPACE) {
             if (self.cmdlen > 0) {
                 self.cmdlen = self.cmdlen - 1
             } else {
@@ -342,29 +384,27 @@ class Editor {
             }
             return
         }
-        if (key >= 32 && key < 127 && self.cmdlen < 126) {
+        if (code == KEY_CHAR && val >= 32 && val < 127 && self.cmdlen < 126) {
             address cp = self.cmdbuf + self.cmdlen
-            cp::value = byte key
+            byte bval = cast val
+            cp::value = bval
             self.cmdlen = self.cmdlen + 1
         }
     }
 
-    function ensure_nonempty() {
-        if (self.buf.get_count() == 0) {
-            self.buf.append_line(null, 0)
-        }
-    }
-
     function run() {
-        self.term.init()
-        defer self.term.shutdown()
+        Terminal t = Terminal()
         while (self.running == 1) {
-            self.refresh()
-            int key = self.term.read_key()
-            if (self.mode == Mode.NORMAL)  { self.handle_normal(key) }
-            if (self.mode == Mode.INSERT)  { self.handle_insert(key) }
-            if (self.mode == Mode.COMMAND) { self.handle_command(key) }
+            self.refresh(t)
+            Key k = t.readKey()
+            int code = k.getCode()
+            int val  = k.getVal()
+            if (self.mode == Mode.NORMAL)  { self.handle_normal(code, val) }
+            if (self.mode == Mode.INSERT)  { self.handle_insert(code, val) }
+            if (self.mode == Mode.COMMAND) { self.handle_command(code, val) }
         }
-        self.term.clear()
+        t.clear()
+        t.flush()
+        t.close()
     }
 }
