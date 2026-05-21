@@ -397,131 +397,59 @@ The `exports` field on libraries is documentation/tooling only for now — consu
 
 ---
 
-## Planned Architecture: Hardware Capability Modules
+## Hardware Capability Modules (x86_64 SIMD)
 
-**Status: designed, not yet implemented. Do not implement until the test harness can validate it end-to-end.**
+`x86_64` is a full capability module — not just syscall stubs. It exports a `SIMD` interface that programs import the same way they import OS interfaces.
 
-### The Problem with the Current Design
+**Convention: no `asm {}` blocks in program source files.** Hardware specifics live exclusively in `x86_64/src/SIMD.hop`. Programs call methods on an `X86SIMD` instance.
 
-The current three-tier system (`x86_64 → arch → linux`) only covers syscalls. Hardware capabilities like SIMD (SSE2, AVX2) are currently written as inline `asm {}` blocks directly inside program source files (`wc/src/main.hop`, `sortlines/src/main.hop`, `regex/src/main.hop`). This is duplicated across programs and breaks portability.
+### The SIMD Interface
 
-### The Target Architecture
-
-`x86_64` becomes a full capability module with multiple interfaces — not just syscall stubs. Programs import hardware interfaces the same way they import OS interfaces.
-
-```
-x86_64/
-  interfaces/
-    Syscalls.hop    — read, write, open, close, mmap, etc. (wraps existing src/io.hop etc.)
-    SIMD.hop        — SSE2: scanByte16, scanByte2x16, popcnt16, bsf16
-    AVX.hop         — AVX2/AVX-512: wider ops (scaffold now, fill when needed)
-    Crypto.hop      — AES-NI, SHA extensions (future)
-  src/
-    Syscalls.hop    — class X86Syscalls implements Syscalls { asm { syscall } }
-    SIMD.hop        — class X86SIMD implements SIMD { asm { pcmpeqb ... } }
-    AVX.hop         — class X86AVX implements AVX { asm { vpgatherdd ... } }
-
-generic/            — scalar fallback implementations (no ASM, pure Hopper logic)
-  interfaces/
-    SIMD.hop        — same interface shape as x86_64/interfaces/SIMD.hop
-  src/
-    SIMD.hop        — class ScalarSIMD implements SIMD { byte-by-byte loops }
-```
-
-### The Core Convention
-
-**No `asm {}` blocks in `src/main.hop` of any program, ever.**
-Hardware specifics live exclusively in bound modules. Programs express intent via interfaces; the build system selects the implementation.
+`x86_64/interfaces/SIMD.hop` — `x86_64/src/SIMD.hop` (class `X86SIMD implements SIMD`):
 
 ```hopper
-// sort/src/main.hop — after refactor
-import IO   from linux
-import SIMD from arch    // "arch" resolves to x86_64, arm64, or generic via hopper.json
+interface SIMD {
+    // Scan 16 bytes at ptr for byte value b. Returns 16-bit mask (bit i set if byte[i] == b).
+    function scanByte16(address ptr, int b) int
+
+    // One load; scan for b1 and b2. Bits 0-15: b1 matches. Bits 16-31: b2 matches.
+    function scanByte2x16(address ptr, int b1, int b2) int
+
+    // One load; OR four byte comparisons. Returns 16-bit mask.
+    function scanByteOR4x16(address ptr, int b1, int b2, int b3, int b4) int
+
+    // Count set bits in a 16-bit mask (popcnt).
+    function popcnt16(int mask) int
+
+    // Index of lowest set bit (mask must be non-zero).
+    function bsf16(int mask) int
+}
+```
+
+### Usage Pattern
+
+```hopper
+import SIMD from x86_64
 
 function indexLines(...) {
+    X86SIMD simd = X86SIMD()
     while (i + 16 <= endPos) {
-        int nlm = simd.scanByte16(inputBuf + i, 10)   // no asm, no x86 knowledge
+        int nlm = simd.scanByte16(inputBuf + i, 10)
         ...
     }
 }
 ```
 
-### Multi-Target hopper.json
-
-The `targets` section selects the implementation per build target. One source file, multiple hardware paths:
-
+Add to `hopper.json` targets:
 ```json
-{
-  "targets": {
-    "host": {
-      "IO":   { "from": "linux",   "interface": "...", "implementation": "..." },
-      "SIMD": { "from": "x86_64",  "interface": "modules/x86_64/interfaces/SIMD.hop",
-                                   "implementation": "modules/x86_64/src/SIMD.hop" }
-    },
-    "arm64": {
-      "IO":   { "from": "linux",   "interface": "...", "implementation": "..." },
-      "SIMD": { "from": "arm64",   "interface": "modules/arm64/interfaces/SIMD.hop",
-                                   "implementation": "modules/arm64/src/SIMD.hop" }
-    },
-    "scalar": {
-      "IO":   { "from": "linux",   "interface": "...", "implementation": "..." },
-      "SIMD": { "from": "generic", "interface": "modules/generic/interfaces/SIMD.hop",
-                                   "implementation": "modules/generic/src/SIMD.hop" }
-    }
-  }
+"SIMD": {
+  "from": "x86_64",
+  "interface": "modules/x86_64/interfaces/SIMD.hop",
+  "implementation": "modules/x86_64/src/SIMD.hop"
 }
 ```
 
-`hopper build` → uses `host` target.
-`hopper build --target scalar` → uses scalar fallback (portable, no ASM).
-`hopper build --target arm64` → uses NEON implementation.
-
-### The SIMD Interface (canonical shape, same across all implementations)
-
-```hopper
-interface SIMD {
-    // Scan 16 bytes at ptr for byte value b. Returns 16-bit match mask (bit i set if byte[i]==b).
-    function scanByte16(address ptr, int b) int
-
-    // Scan 16 bytes for b1 or b2 simultaneously. Bits 0-15: b1 matches. Bits 16-31: b2 matches.
-    function scanByte2x16(address ptr, int b1, int b2) int
-
-    // Count set bits in a 16-bit mask (popcnt).
-    function popcnt16(int mask) int
-
-    // Index of lowest set bit (mask must be nonzero).
-    function bsf16(int mask) int
-}
-```
-
-### How linux Uses x86_64
-
-The `linux` module itself can consume x86_64 interfaces for hardware-accelerated internals (e.g., SIMD-accelerated memory operations). The dependency flows: `program → linux → x86_64`, and programs that need raw hardware can also import x86_64 directly alongside linux.
-
-### The `arch/` Tier After This Change
-
-The `arch/` passthrough tier becomes optional:
-- Programs that want **portability** write `import SIMD from arch` and the hopper.json binding resolves to the right implementation.
-- Programs that are **explicitly x86-only** write `import SIMD from x86_64` directly.
-- The thin `arch/src/simd.hop` passthrough (`import simd from x86_64`) can stay or be removed — it's just a convenience for portable programs.
-
-### Implementation Phases (when ready)
-
-1. **Phase 1 — SIMD interface (additive, no existing code touched)**
-   - Create `x86_64/interfaces/SIMD.hop` + `x86_64/src/SIMD.hop` (SSE2 implementation)
-   - Create `generic/interfaces/SIMD.hop` + `generic/src/SIMD.hop` (scalar fallback)
-   - Refactor `wc`, `sortlines`, `regex` — remove inline `asm {}` blocks, use imported SIMD
-   - Add `scalar` target to their `hopper.json` and verify both targets build and produce correct output
-
-2. **Phase 2 — Syscalls interface (refactor, existing code)**
-   - Wrap `x86_64/src/io.hop`, `fs.hop`, etc. into a `class X86Syscalls implements Syscalls`
-   - Update `linux` module to `import Syscalls from x86_64` instead of the arch passthrough
-   - Remove or thin the `arch/` tier
-
-3. **Phase 3 — AVX target (additive)**
-   - New `x86_64/src/AVX.hop` implementation
-   - Add `avx` target to programs that can benefit
-   - Zero source changes required
+Programs currently using the SIMD module: `wc`, `sortlines`, `regex`.
 
 ---
 

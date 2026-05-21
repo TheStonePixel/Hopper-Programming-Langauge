@@ -7,6 +7,7 @@
 
 import IO         from linux
 import FileSystem from linux
+import SIMD       from x86_64
 
 extern function printf(string fmt, ...) int
 
@@ -139,32 +140,6 @@ function qsort(address lineArr, int lo, int hi, bool reverse) {
     }
 }
 
-// SSE2: scan 16 bytes for '\n' (0x0A). Returns 16-bit match mask.
-function _nlMask16(address ptr) int {
-    int mask = 0
-    asm {
-        rdi = ptr
-        rsi = 0x0A0A0A0A
-        movd xmm1, esi
-        pshufd xmm1, xmm1, 0
-        movdqu xmm0, [rdi]
-        pcmpeqb xmm0, xmm1
-        pmovmskb rax, xmm0
-        mask = rax
-    }
-    return mask
-}
-
-// Find index of lowest set bit.
-function _bsf(int mask) int {
-    int n = 0
-    asm {
-        rdi = mask
-        bsf rax, rdi
-        n = rax
-    }
-    return n
-}
 
 // Scan buf[scanStart..endPos) for newlines using SSE2. Null-terminate each
 // line and record start pointers. Carries state across multiple file reads.
@@ -172,13 +147,14 @@ function indexLines(address inputBuf, int scanStart, int endPos, address lineArr
     int lineCount = lineCountAddr::value
     int lineStart = lineStartAddr::value
     int i = scanStart
+    X86SIMD simd = X86SIMD()
 
     while (i + 16 <= endPos) {
-        int nlm = _nlMask16(inputBuf + i)
+        int nlm = simd.scanByte16(inputBuf + i, 10)
         if (nlm != 0) {
             int m = nlm
             while (m != 0) {
-                int pos = _bsf(m)
+                int pos = simd.bsf16(m)
                 address p = inputBuf + i + pos
                 byte z = 0
                 p::value = z

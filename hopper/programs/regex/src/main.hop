@@ -13,62 +13,10 @@
 import Regex      from regex
 import IO         from linux
 import FileSystem from linux
+import SIMD       from x86_64
 
 extern function printf(string fmt, ...) int
 
-// SSE2: scan 16 bytes at ptr for any byte equal to the one broadcast in bc
-// (bc = 32-bit broadcast, e.g. 0x0A0A0A0A for newline).
-// Returns a 16-bit mask: bit i set if byte[i] matches.
-function _simd16(address ptr, int bc) int {
-    int mask = 0
-    asm {
-        rdi = ptr
-        rsi = bc
-        movd xmm1, esi
-        pshufd xmm1, xmm1, 0
-        movdqu xmm0, [rdi]
-        pcmpeqb xmm0, xmm1
-        pmovmskb rax, xmm0
-        mask = rax
-    }
-    return mask
-}
-
-// Position of lowest set bit in mask (0–15). mask must be non-zero.
-function _bsf16(int mask) int {
-    int pos = 0
-    asm {
-        rdi = mask
-        bsf rax, rdi
-        pos = rax
-    }
-    return pos
-}
-
-// One 16-byte load; compare against bc1 and bc2 simultaneously.
-// Returns bc1 mask in bits 0–15, bc2 mask in bits 16–31.
-function _simd16dual(address ptr, int bc1, int bc2) int {
-    int result = 0
-    asm {
-        rdi = ptr
-        rsi = bc1
-        rdx = bc2
-        movd xmm2, esi
-        pshufd xmm2, xmm2, 0
-        movd xmm3, edx
-        pshufd xmm3, xmm3, 0
-        movdqu xmm0, [rdi]
-        movdqa xmm1, xmm0
-        pcmpeqb xmm0, xmm2
-        pcmpeqb xmm1, xmm3
-        pmovmskb rax, xmm0
-        pmovmskb rcx, xmm1
-        shl rcx, 16
-        or rax, rcx
-        result = rax
-    }
-    return result
-}
 
 // Returns true if pat has no special regex metacharacters (pure literal).
 function _patIsLit(address pat) bool {
@@ -241,14 +189,13 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
     address lineBuf = allocate Limits.LINE_MAX
     address lowBuf  = null
     if (flagI != 0) { lowBuf = allocate Limits.LINE_MAX }
+    X86SIMD simd = X86SIMD()
 
-    // Literal fast-path: precompute first-char broadcast and pattern length once.
+    // Literal fast-path: precompute first-char and pattern length once.
     // Only used when flagI == 0 (casefold always buffers into lowBuf for matchAt).
     int pIsLit = 0
     int plen   = 0
     int pfc    = 0
-    int pbc    = 0
-    int nlbc   = 0x0A0A0A0A
     if (flagI == 0) {
         if (_patIsLit(pat)) {
             pIsLit = 1
@@ -258,7 +205,6 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                 byte pfb = pp0::value
                 pfc = cast pfb
                 pfc = pfc & 0xFF
-                pbc = pfc * 0x01010101
             }
         }
     }
@@ -291,7 +237,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
 
                 if (pIsLit != 0 && plen > 0) {
                     // Literal fast path: scan for first-char AND newline in one load.
-                    int pair   = _simd16dual(wp, pbc, nlbc)
+                    int pair   = simd.scanByte2x16(wp, pfc, 10)
                     int fcMask = pair & 0xFFFF
                     int nlMask = (pair >> 16) & 0xFFFF
 
@@ -301,12 +247,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                             // In-chunk: check fcMask for pattern hits.
                             int fm = fcMask
                             while (fm != 0) {
-                                int j = 0
-                                asm {
-                                    rdi = fm
-                                    bsf rax, rdi
-                                    j = rax
-                                }
+                                int j = simd.bsf16(fm)
                                 if (ci + j + plen <= nr) {
                                     if (_checkLit(chunk + ci + j, pat, plen)) {
                                         lineMatch = true
@@ -331,7 +272,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                         ci = ci + 16
                     } else {
                         // Newline found — process it.
-                        int pos = _bsf16(nlMask)
+                        int pos = simd.bsf16(nlMask)
                         lineNum = lineNum + 1
 
                         if (lineStart >= 0) {
@@ -339,12 +280,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                             int rangeMask = (1 << pos) - 1
                             int fm = fcMask & rangeMask
                             while (fm != 0) {
-                                int j = 0
-                                asm {
-                                    rdi = fm
-                                    bsf rax, rdi
-                                    j = rax
-                                }
+                                int j = simd.bsf16(fm)
                                 if (ci + j + plen <= nr) {
                                     if (_checkLit(chunk + ci + j, pat, plen)) {
                                         lineMatch = true
@@ -415,7 +351,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                     }
                 } else {
                     // General path: newline scan only, matchAt per line.
-                    int nlMask = _simd16(wp, nlbc)
+                    int nlMask = simd.scanByte16(wp, 10)
 
                     if (nlMask == 0) {
                         if (lineStart >= 0) {
@@ -452,7 +388,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                         }
                         ci = ci + 16
                     } else {
-                        int pos = _bsf16(nlMask)
+                        int pos = simd.bsf16(nlMask)
                         lineNum = lineNum + 1
 
                         if (lineStart >= 0) {

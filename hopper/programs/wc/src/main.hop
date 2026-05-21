@@ -8,6 +8,7 @@
 
 import IO         from linux
 import FileSystem from linux
+import SIMD       from x86_64
 
 extern function printf(string fmt, ...) int
 
@@ -15,74 +16,10 @@ enum Limits {
     CHUNK = 65536
 }
 
-// SSE2: 16-byte newline scan. Returns 16-bit mask — bit i set if byte[i] == '\n'.
-function _nlMask16(address ptr) int {
-    int mask = 0
-    asm {
-        rdi = ptr
-        rsi = 0x0A0A0A0A
-        movd xmm1, esi
-        pshufd xmm1, xmm1, 0
-        movdqu xmm0, [rdi]
-        pcmpeqb xmm0, xmm1
-        pmovmskb rax, xmm0
-        mask = rax
-    }
-    return mask
-}
-
-// SSE2: 16-byte whitespace scan (space=32, tab=9, \n=10, \r=13).
-// Returns 16-bit mask — bit i set if byte[i] is whitespace.
-function _wsMask16(address ptr) int {
-    int mask = 0
-    int sp = 0x20202020
-    int tb = 0x09090909
-    int nl = 0x0A0A0A0A
-    int cr = 0x0D0D0D0D
-    asm {
-        rdi = ptr
-        rsi = sp
-        rdx = tb
-        rcx = nl
-        r8  = cr
-        movd xmm1, esi
-        pshufd xmm1, xmm1, 0
-        movd xmm2, edx
-        pshufd xmm2, xmm2, 0
-        movd xmm3, ecx
-        pshufd xmm3, xmm3, 0
-        movd xmm4, r8d
-        pshufd xmm4, xmm4, 0
-        movdqu xmm0, [rdi]
-        movdqa xmm5, xmm0
-        movdqa xmm6, xmm0
-        movdqa xmm7, xmm0
-        pcmpeqb xmm0, xmm1
-        pcmpeqb xmm5, xmm2
-        pcmpeqb xmm6, xmm3
-        pcmpeqb xmm7, xmm4
-        por xmm0, xmm5
-        por xmm0, xmm6
-        por xmm0, xmm7
-        pmovmskb rax, xmm0
-        mask = rax
-    }
-    return mask
-}
-
-// Count set bits in a mask using the popcnt instruction.
-function _pop16(int mask) int {
-    int n = 0
-    asm {
-        rdi = mask
-        popcnt rax, rdi
-        n = rax
-    }
-    return n
-}
 
 function wcFd(int fd, address linesOut, address wordsOut, address bytesOut) {
     address chunk = allocate Limits.CHUNK + 16
+    X86SIMD simd = X86SIMD()
 
     int lines = 0
     int words = 0
@@ -102,14 +39,14 @@ function wcFd(int fd, address linesOut, address wordsOut, address bytesOut) {
             while (ci + 16 <= nr) {
                 address wp = chunk + ci
 
-                int nlm = _nlMask16(wp)
-                lines = lines + _pop16(nlm)
+                int nlm = simd.scanByte16(wp, 10)
+                lines = lines + simd.popcnt16(nlm)
 
-                int wsm = _wsMask16(wp)
+                int wsm = simd.scanByteOR4x16(wp, 32, 9, 10, 13)
                 // Word starts: non-whitespace byte preceded by whitespace
                 int nonWs = (~wsm) & 0xFFFF
                 int prevWs = ((wsm << 1) | prevWasSpace) & 0xFFFF
-                words = words + _pop16(nonWs & prevWs)
+                words = words + simd.popcnt16(nonWs & prevWs)
                 prevWasSpace = (wsm >> 15) & 1
 
                 ci = ci + 16
