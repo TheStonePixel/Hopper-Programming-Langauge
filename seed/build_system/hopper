@@ -511,20 +511,14 @@ async function cmdInit(args) {
     const manifest = isLib ? {
         name, version, description, license,
         type: "library",
-        main: "src/main.hop",
-        dependencies: {},
+        main: `src/${name}.hop`,
     } : {
         name, version, description, license,
         type: "executable",
-        entry: "main.hop",
-        scripts: {
-            build:  "hopper build",
-            run:    "hopper run",
-            test:   "hopper test",
-            check:  "hopper check",
-            format: "hopper format -w main.hop",
+        entry: "src/main.hop",
+        targets: {
+            host: {},
         },
-        dependencies: {},
     };
 
     console.log(`\n${JSON.stringify(manifest, null, 2)}\n`);
@@ -537,27 +531,19 @@ async function cmdInit(args) {
         process.exit(0);
     }
 
-    fs.mkdirSync(path.join(projectDir, "src"),     { recursive: true });
-    fs.mkdirSync(path.join(projectDir, "modules"), { recursive: true });
-    fs.mkdirSync(path.join(projectDir, "tests"),   { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "src"),        { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "modules"),     { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "tests"),       { recursive: true });
+    if (!isLib) {
+        fs.mkdirSync(path.join(projectDir, "interfaces"), { recursive: true });
+    }
     fs.writeFileSync(path.join(projectDir, "modules", ".gitkeep"), "", "utf8");
     fs.writeFileSync(path.join(projectDir, "tests",   ".gitkeep"), "", "utf8");
 
-    if (isLib) {
-        fs.writeFileSync(path.join(projectDir, "src", "main.hop"), [
-            `// ${name} — ${description || name}`,
-            ``,
-        ].join("\n"), "utf8");
-    } else {
-        fs.writeFileSync(path.join(projectDir, "main.hop"), [
-            `import io from core`,
-            ``,
-            `entry main {`,
-            `    println("Hello from ${name}!")`,
-            `}`,
-            ``,
-        ].join("\n"), "utf8");
-    }
+    const entryFile = isLib
+        ? path.join(projectDir, "src", `${name}.hop`)
+        : path.join(projectDir, "src", "main.hop");
+    fs.writeFileSync(entryFile, "", "utf8");
 
     fs.writeFileSync(path.join(projectDir, "hopper.json"),
         JSON.stringify(manifest, null, 2) + "\n", "utf8");
@@ -565,16 +551,11 @@ async function cmdInit(args) {
     fs.writeFileSync(path.join(projectDir, ".gitignore"), "build/\n", "utf8");
 
     console.log(`\ncreated ${safeName}/`);
-    if (!isLib) console.log(`  ${safeName}/main.hop`);
     console.log(`  ${safeName}/hopper.json`);
     console.log(`  ${safeName}/src/`);
+    if (!isLib) console.log(`  ${safeName}/interfaces/`);
     console.log(`  ${safeName}/modules/`);
     console.log(`  ${safeName}/tests/`);
-    if (isLib) {
-        console.log(`\n  import ${name} from <parent-module>`);
-    } else {
-        console.log(`\n  cd ${safeName} && hopper run`);
-    }
 }
 
 // ── package helpers ────────────────────────────────────────────────────────
