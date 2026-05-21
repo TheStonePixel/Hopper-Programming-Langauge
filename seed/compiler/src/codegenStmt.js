@@ -16,7 +16,7 @@ import {
     genExpr, ensureBool, emitCast, emitDeferred,
 } from "./codegenExpr.js";
 import {
-    isReg, isSIMDReg, regLLVMType, regConstraint, SYSCALL_CLOBBERS,
+    isReg, isSIMDReg, regLLVMType, regConstraint, simdClobbers, SYSCALL_CLOBBERS,
 } from "./x86.js";
 
 // ── statement codegen ─────────────────────────────────────────────────────
@@ -408,24 +408,25 @@ export function genStmt(ir, stmt, retType) {
             const outConstraints = outputs.map(o => regConstraint(o.reg, true));
             const inConstraints  = inputs.map(i => regConstraint(i.reg, false));
             const raxClobber     = (outputs.length === 0 && inputs.some(i => i.reg === 'rax')) ? ['~{rax}'] : [];
-            const clobbers       = [...raxClobber, ...SYSCALL_CLOBBERS];
+            const xmmClobbers    = simdClobbers(ops, outputs);
+            const clobbers       = [...raxClobber, ...xmmClobbers, ...SYSCALL_CLOBBERS];
             const constraints    = [...outConstraints, ...inConstraints, ...clobbers].join(",");
             const inputArgs      = inputs.map(i => `${i.llType} ${i.value}`).join(", ");
 
             if (outputs.length === 0) {
-                ir.emit(`call void asm sideeffect "${asmStr}", "${constraints}"(${inputArgs})`);
+                ir.emit(`call void asm sideeffect inteldialect "${asmStr}", "${constraints}"(${inputArgs})`);
             } else if (outputs.length === 1) {
                 const { llType } = outputs[0];
                 const ptrType    = isSIMDReg(outputs[0].reg) ? `${llType}*` : `i64*`;
                 const storeType  = isSIMDReg(outputs[0].reg) ? llType : 'i64';
                 const outTmp     = ir.newTmp();
-                ir.emit(`${outTmp} = call ${storeType} asm sideeffect "${asmStr}", "${constraints}"(${inputArgs})`);
+                ir.emit(`${outTmp} = call ${storeType} asm sideeffect inteldialect "${asmStr}", "${constraints}"(${inputArgs})`);
                 const outVar = ir.vars.get(outputs[0].name);
                 if (outVar) ir.emit(`store ${storeType} ${outTmp}, ${ptrType} ${outVar.ptr}`);
             } else {
                 const structT = `{ ${outputs.map(o => o.llType).join(', ')} }`;
                 const outTmp  = ir.newTmp();
-                ir.emit(`${outTmp} = call ${structT} asm sideeffect "${asmStr}", "${constraints}"(${inputArgs})`);
+                ir.emit(`${outTmp} = call ${structT} asm sideeffect inteldialect "${asmStr}", "${constraints}"(${inputArgs})`);
                 outputs.forEach((out, i) => {
                     const ex = ir.newTmp();
                     ir.emit(`${ex} = extractvalue ${structT} ${outTmp}, ${i}`);

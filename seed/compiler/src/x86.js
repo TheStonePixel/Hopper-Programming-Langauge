@@ -57,5 +57,21 @@ export function regConstraint(name, isOutput = false) {
     return isOutput ? `={${name}}` : `{${name}}`;
 }
 
-// Registers that are always clobbered by a syscall.
+// Scan raw instruction strings and return clobber constraints for any XMM/YMM
+// registers that are written but not already declared as outputs.
+export function simdClobbers(ops, outputs) {
+    const outputRegs = new Set(outputs.map(o => o.reg));
+    const found = new Set();
+    for (const op of ops) {
+        for (const reg of XMM) {
+            if (op.includes(reg) && !outputRegs.has(reg)) found.add(`~{${reg}}`);
+        }
+        for (const reg of YMM) {
+            if (op.includes(reg) && !outputRegs.has(reg)) found.add(`~{${reg}}`);
+        }
+    }
+    return [...found];
+}
+
+// Registers always clobbered by the syscall instruction.
 export const SYSCALL_CLOBBERS = ['~{rcx}', '~{r11}', '~{memory}'];

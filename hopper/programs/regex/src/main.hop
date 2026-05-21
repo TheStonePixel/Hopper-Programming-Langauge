@@ -35,6 +35,35 @@ function _pos32(int r) int {
     return 3
 }
 
+// SSE2: scan 16 bytes at ptr for any byte equal to the one broadcast in bc
+// (bc = 32-bit broadcast, e.g. 0x0A0A0A0A for newline).
+// Returns a 16-bit mask: bit i set if byte[i] matches.
+function _simd16(address ptr, int bc) int {
+    int mask = 0
+    asm {
+        rdi = ptr
+        rsi = bc
+        movd xmm1, esi
+        pshufd xmm1, xmm1, 0
+        movdqu xmm0, [rdi]
+        pcmpeqb xmm0, xmm1
+        pmovmskb rax, xmm0
+        mask = rax
+    }
+    return mask
+}
+
+// Position of lowest set bit in mask (0–15). mask must be non-zero.
+function _bsf16(int mask) int {
+    int pos = 0
+    asm {
+        rdi = mask
+        bsf rax, rdi
+        pos = rax
+    }
+    return pos
+}
+
 enum Flag {
     N = 1
     I = 2
@@ -172,25 +201,26 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
         } else {
             int ci = 0
 
-            // --- 8-bytes-at-a-time SWAR scan ---
-            while (ci + 8 <= nr) {
+            // --- 16-bytes-at-a-time SSE2 scan ---
+            while (ci + 16 <= nr) {
                 address wp = chunk + ci
-                int word = wp::value
-                int wLo = word & 0xFFFFFFFF
-                int wHi = (word >> 32) & 0xFFFFFFFF
-                int rLo = _swar32(wLo, 0x0A0A0A0A)
-                int rHi = _swar32(wHi, 0x0A0A0A0A)
+                int nlMask = _simd16(wp, 0x0A0A0A0A)
 
-                if (rLo == 0 && rHi == 0) {
-                    // No newline in this 8-byte block.
-                    // Fast-write 8 bytes to lineBuf (int store = 8 bytes at once).
-                    if (lineLen + 8 <= Limits.LINE_MAX - 1) {
+                if (nlMask == 0) {
+                    // No newline in these 16 bytes — two 8-byte int stores.
+                    if (lineLen + 16 <= Limits.LINE_MAX - 1) {
                         if (flagI == 0) {
-                            address dp = lineBuf + lineLen
-                            dp::value = word
+                            address wp1 = chunk + ci
+                            int w1 = wp1::value
+                            address dp1 = lineBuf + lineLen
+                            dp1::value = w1
+                            address wp2 = chunk + ci + 8
+                            int w2 = wp2::value
+                            address dp2 = lineBuf + lineLen + 8
+                            dp2::value = w2
                         } else {
                             int k = 0
-                            while (k < 8) {
+                            while (k < 16) {
                                 address sp = chunk + ci + k
                                 byte sb = sp::value
                                 int sbi = cast sb
@@ -204,13 +234,12 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                 k = k + 1
                             }
                         }
-                        lineLen = lineLen + 8
+                        lineLen = lineLen + 16
                     }
-                    ci = ci + 8
+                    ci = ci + 16
                 } else {
-                    // Newline found — pos is its offset within this 8-byte word.
-                    int pos = 0
-                    if (rLo != 0) { pos = _pos32(rLo) } else { pos = _pos32(rHi) + 4 }
+                    // Newline found — position is lowest set bit in the mask.
+                    int pos = _bsf16(nlMask)
                     int k = 0
                     while (k < pos) {
                         if (lineLen < Limits.LINE_MAX - 1) {
@@ -262,7 +291,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                 }
             }
 
-            // --- tail: remaining < 8 bytes, byte-at-a-time ---
+            // --- tail: remaining < 16 bytes, byte-at-a-time ---
             while (ci < nr) {
                 address cp = chunk + ci
                 byte b = cp::value
