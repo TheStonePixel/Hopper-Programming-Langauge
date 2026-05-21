@@ -10,5 +10,19 @@
       "interface":      "interfaces/Math.hop",
       "implementation": "src/Math.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Math": {
+        "from":           "math",
+        "interface":      "interfaces/Math.hop",
+        "implementation": "src/Math.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

@@ -2,20 +2,25 @@
 /**
  * Hopper Test Runner
  *
- * Discovers tests from two locations:
- *   modules/<name>/tests/*.hop       — module tests, grouped by module name
- *   toolchain/tests/<group>/*.hop    — language/compiler tests
+ * Discovers tests from the current project (or a named module) only —
+ * never the whole repo.
  *
  * Directives inside each .hop test file:
+ *   // EXPECT: <line>      — expected stdout line
+ *   // COMPILE_ONLY        — verify the file compiles; don't run it
+ *   // EXPECT_ERROR: <msg> — compilation must fail with a message containing <msg>
  *   // TEST: name          — start a named section (groups following assertions)
- *   // EXPECT: <line>      — expected stdout line (one assertion per line)
- *   // COMPILE_ONLY        — only verify the file compiles, don't run
- *   // EXPECT_ERROR: <msg> — compilation should fail with a message containing <msg>
  *   // XFAIL               — test is expected to fail (shown but not counted against total)
  *
- * Usage:
- *   node tools/test.js              — run all tests
- *   node tools/test.js ds           — run modules/ds/tests/ only
+ * Usage (via `hopper test`):
+ *   hopper test                   run tests for the current module/project
+ *   hopper test --deps            also run tests for every dependency in the chain
+ *   hopper test <name>            run tests for a named module from the global store
+ *   hopper test <name> --deps     named module + its dependency chain
+ *
+ * Direct usage:
+ *   node tools/test.js --root=/path/to/project [--deps]
+ *   node tools/test.js <moduleName> [--deps]
  */
 
 import { readFileSync, mkdirSync, existsSync, readdirSync } from "fs";
@@ -25,8 +30,9 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, "..", "..", "..");
-const BUILD_DIR  = path.join(ROOT, "hopper", "build", "tests");
+const REPO_ROOT  = path.resolve(__dirname, "..", "..", "..");
+const BUILD_DIR  = path.join(REPO_ROOT, "hopper", "build", "tests");
+const GLOBAL_MODULES = path.join(REPO_ROOT, "hopper", "modules");
 
 // ── ANSI ───────────────────────────────────────────────────────────────────────
 const G    = "\x1b[32m";
@@ -37,7 +43,6 @@ const DIM  = "\x1b[2m";
 const BOLD = "\x1b[1m";
 const RST  = "\x1b[0m";
 
-// ── Symbols ────────────────────────────────────────────────────────────────────
 const TICK   = "✓";
 const CROSS  = "✗";
 const CIRCLE = "○";
@@ -46,41 +51,94 @@ const ARROW  = "▸";
 const PIPE   = "│";
 const LINE   = "─".repeat(52);
 
+// ── Argument parsing ───────────────────────────────────────────────────────────
+
+let rootOverride = null;
+let depsFlag     = false;
+let nameFilter   = null;
+
+for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith("--root="))  { rootOverride = arg.slice("--root=".length); continue; }
+    if (arg === "--deps")           { depsFlag = true; continue; }
+    if (!arg.startsWith("-"))       { nameFilter = arg; continue; }
+}
+
 // ── Test discovery ─────────────────────────────────────────────────────────────
 
-function discoverGroups(filter) {
-    const groups = [];
+// Collect tests for one project directory. If depsFlag is set, recurse into
+// each dependency found in hopper.json, looking them up in the global store.
+function collectProjectTests(rootDir, groups, visited) {
+    const real = path.resolve(rootDir);
+    if (visited.has(real)) return;
+    visited.add(real);
 
-    const modulesDir = path.join(ROOT, "hopper", "modules");
-    if (existsSync(modulesDir)) {
-        for (const mod of readdirSync(modulesDir).sort()) {
-            if (filter && mod !== filter) continue;
-            const testsDir = path.join(modulesDir, mod, "tests");
-            if (!existsSync(testsDir)) continue;
-            const files = readdirSync(testsDir)
-                .filter(f => f.endsWith(".hop"))
-                .sort()
-                .map(f => path.join(testsDir, f));
-            if (files.length) groups.push({ name: mod, files });
-        }
+    const name     = path.basename(real);
+    const testsDir = path.join(real, "tests");
+
+    if (existsSync(testsDir)) {
+        const files = readdirSync(testsDir)
+            .filter(f => f.endsWith(".hop"))
+            .sort()
+            .map(f => path.join(testsDir, f));
+        if (files.length) groups.push({ name, files });
     }
 
-    const toolchainDir = path.join(ROOT, "hopper", "tests");
-    if (existsSync(toolchainDir)) {
-        for (const group of readdirSync(toolchainDir).sort()) {
-            if (filter && group !== filter) continue;
-            const groupDir = path.join(toolchainDir, group);
-            try {
-                const files = readdirSync(groupDir)
-                    .filter(f => f.endsWith(".hop"))
-                    .sort()
-                    .map(f => path.join(groupDir, f));
-                if (files.length) groups.push({ name: group, files });
-            } catch { /* not a directory */ }
+    if (!depsFlag) return;
+
+    const manifestPath = path.join(real, "hopper.json");
+    if (!existsSync(manifestPath)) return;
+    try {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+        for (const depName of Object.keys(manifest.dependencies || {})) {
+            const depDir = path.join(GLOBAL_MODULES, depName);
+            if (existsSync(depDir)) collectProjectTests(depDir, groups, visited);
         }
+    } catch { /* malformed hopper.json — skip deps */ }
+}
+
+function discoverGroups() {
+    const groups  = [];
+    const visited = new Set();
+
+    if (rootOverride) {
+        // Context-aware: tests for this specific project root
+        if (!existsSync(rootOverride)) {
+            console.error(`hopper test: project root not found: ${rootOverride}`);
+            process.exit(1);
+        }
+        collectProjectTests(rootOverride, groups, visited);
+        return groups;
     }
 
-    return groups;
+    if (nameFilter) {
+        // Named module: look it up in the global module store
+        const modDir = path.join(GLOBAL_MODULES, nameFilter);
+        if (!existsSync(modDir)) {
+            console.error(`hopper test: module '${nameFilter}' not found`);
+            console.error(`  Available: ${readdirSync(GLOBAL_MODULES).filter(d =>
+                existsSync(path.join(GLOBAL_MODULES, d, "hopper.json"))).join(", ")}`);
+            process.exit(1);
+        }
+        collectProjectTests(modDir, groups, visited);
+        return groups;
+    }
+
+    // No root and no name — user ran from outside any module
+    console.error("hopper test: not inside a module or project directory");
+    console.error("");
+    console.error("  Run from a module/project directory:");
+    console.error("    cd hopper/modules/linux && hopper test");
+    console.error("");
+    console.error("  Or specify a module name:");
+    console.error("    hopper test linux");
+    console.error("    hopper test linux --deps    (include dependency chain)");
+    console.error("");
+    if (existsSync(GLOBAL_MODULES)) {
+        const mods = readdirSync(GLOBAL_MODULES).filter(d =>
+            existsSync(path.join(GLOBAL_MODULES, d, "hopper.json")));
+        if (mods.length) console.error(`  Available modules: ${mods.join(", ")}`);
+    }
+    process.exit(1);
 }
 
 // ── Metadata parsing ───────────────────────────────────────────────────────────
@@ -94,16 +152,13 @@ function parseMeta(source) {
 
     for (const line of source.split("\n")) {
         const t = line.trim();
-        if      (t === "// COMPILE_ONLY")        compileOnly = true;
-        else if (t === "// XFAIL")               xfail = true;
-        else if (t.startsWith("// EXPECT_ERROR:"))
-            expectedError = t.slice("// EXPECT_ERROR:".length).trim();
+        if      (t === "// COMPILE_ONLY")          compileOnly = true;
+        else if (t === "// XFAIL")                 xfail = true;
+        else if (t.startsWith("// EXPECT_ERROR:")) expectedError = t.slice("// EXPECT_ERROR:".length).trim();
         else if (t.startsWith("// TEST:")) {
             cur = { name: t.slice("// TEST:".length).trim(), expected: [] };
             sections.push(cur);
         } else if (t.startsWith("// EXPECT:")) {
-            // Strip exactly one space (the directive delimiter), preserving any
-            // additional leading spaces that are part of the expected value itself.
             const raw = t.slice("// EXPECT:".length);
             cur.expected.push(raw.startsWith(" ") ? raw.slice(1) : raw.trimStart());
         }
@@ -123,11 +178,11 @@ function runTest(testFile, group) {
     const build = spawnSync(
         "node",
         [path.join(__dirname, "..", "hopper"), "-c", testFile, "-o", exePath],
-        { cwd: ROOT, encoding: "utf8" }
+        { cwd: REPO_ROOT, encoding: "utf8" }
     );
 
-    const compileFailed = build.status !== 0;
-    const compileOutput = (build.stderr || "") + (build.stdout || "");
+    const compileFailed  = build.status !== 0;
+    const compileOutput  = (build.stderr || "") + (build.stdout || "");
 
     if (compileFailed) {
         if (expectedError) {
@@ -136,38 +191,38 @@ function runTest(testFile, group) {
                 sections: [{ name: null, assertions: [{
                     label: `compile error: ${expectedError}`,
                     status: ok ? "PASS" : "FAIL",
-                    received: ok ? null : compileOutput.slice(0, 300)
-                }]}]
+                    received: ok ? null : compileOutput.slice(0, 300),
+                }]}],
             };
         }
         return { name, xfail, status: "FAIL",
             sections: [{ name: null, assertions: [{
                 label: "compile", status: "FAIL",
-                received: compileOutput.slice(0, 300)
-            }]}]
+                received: compileOutput.slice(0, 300),
+            }]}],
         };
     }
 
     if (expectedError)
         return { name, xfail, status: "FAIL",
             sections: [{ name: null, assertions: [{
-                label: "compile error expected", status: "FAIL", received: "compiled ok"
-            }]}]
+                label: "compile error expected", status: "FAIL", received: "compiled ok",
+            }]}],
         };
 
     if (compileOnly)
         return { name, xfail, status: "PASS", note: "compile only",
-            sections: [{ name: null, assertions: [{ label: "compiles ok", status: "PASS" }] }]
+            sections: [{ name: null, assertions: [{ label: "compiles ok", status: "PASS" }] }],
         };
 
-    const run         = spawnSync(exePath, [], { encoding: "utf8", cwd: ROOT });
+    const run         = spawnSync(exePath, [], { encoding: "utf8", cwd: REPO_ROOT });
     const actualLines = (run.stdout || "").trimEnd().split("\n");
     if (actualLines.length === 1 && actualLines[0] === "") actualLines.length = 0;
 
     const totalExpected = sections.reduce((n, s) => n + s.expected.length, 0);
     if (totalExpected === 0)
         return { name, xfail, status: "PASS", note: "ran (no output check)",
-            sections: [{ name: null, assertions: [{ label: "ran ok", status: "PASS" }] }]
+            sections: [{ name: null, assertions: [{ label: "ran ok", status: "PASS" }] }],
         };
 
     let lineIndex = 0;
@@ -206,13 +261,12 @@ function passedAssertions(result) {
 
 function renderAssertion(a, indent) {
     if (a.status === "PASS") {
-        console.log(`${indent}${DIM}${DOT}  ${a.label}${RST}`);
+        process.stdout.write(`${indent}${DIM}${DOT}  ${a.label}${RST}\n`);
     } else {
-        console.log(`${indent}${R}${CROSS}${RST}  ${BOLD}${R}${a.label}${RST}`);
+        process.stdout.write(`${indent}${R}${CROSS}${RST}  ${BOLD}${R}${a.label}${RST}\n`);
         if (a.received != null) {
-            for (const line of a.received.split("\n").filter(Boolean)) {
-                console.log(`${indent}   ${DIM}${PIPE}${RST}  ${R}${line}${RST}`);
-            }
+            for (const line of a.received.split("\n").filter(Boolean))
+                process.stdout.write(`${indent}   ${DIM}${PIPE}${RST}  ${R}${line}${RST}\n`);
         }
     }
 }
@@ -223,20 +277,16 @@ function renderResult(result, groupName, failures) {
     const allOk  = passed === total;
 
     let icon, nameStyle;
-    if (result.xfail && !allOk)      { icon = `${Y}${CIRCLE}${RST}`; nameStyle = Y; }
-    else if (result.xfail && allOk)  { icon = `${Y}?${RST}`;         nameStyle = Y; } // unexpected pass
-    else if (allOk)                  { icon = `${G}${TICK}${RST}`;   nameStyle = G; }
-    else                             { icon = `${R}${CROSS}${RST}`;  nameStyle = R; }
+    if (result.xfail && !allOk)     { icon = `${Y}${CIRCLE}${RST}`; nameStyle = Y; }
+    else if (result.xfail && allOk) { icon = `${Y}?${RST}`;         nameStyle = Y; }
+    else if (allOk)                 { icon = `${G}${TICK}${RST}`;   nameStyle = G; }
+    else                            { icon = `${R}${CROSS}${RST}`;  nameStyle = R; }
 
-    const countStr = result.note    ? `  ${DIM}${result.note}${RST}`
-                   : allOk          ? `  ${DIM}${total}${RST}`
-                   :                  `  ${R}${passed}${DIM}/${total}${RST}`;
+    const countStr = result.note ? `  ${DIM}${result.note}${RST}`
+                   : allOk       ? `  ${DIM}${total}${RST}`
+                   :               `  ${R}${passed}${DIM}/${total}${RST}`;
 
-    if (result.xfail && !allOk) {
-        console.log(`  ${icon}  ${nameStyle}${result.name}${RST}${countStr}  ${DIM}expected failure${RST}`);
-    } else {
-        console.log(`  ${icon}  ${nameStyle}${result.name}${RST}${countStr}`);
-    }
+    process.stdout.write(`  ${icon}  ${nameStyle}${result.name}${RST}${countStr}\n`);
 
     for (const section of result.sections) {
         const sPass  = section.assertions.filter(a => a.status === "PASS").length;
@@ -246,16 +296,15 @@ function renderResult(result, groupName, failures) {
         if (section.name) {
             const sCountStr = sAllOk ? `  ${DIM}${sTotal}${RST}` : `  ${R}${sPass}${DIM}/${sTotal}${RST}`;
             const sColour   = sAllOk ? `${DIM}${C}` : Y;
-            console.log(`       ${sColour}${ARROW}  ${section.name}${RST}${sCountStr}`);
+            process.stdout.write(`       ${sColour}${ARROW}  ${section.name}${RST}${sCountStr}\n`);
         }
 
         const indent = section.name ? "           " : "         ";
         for (const a of section.assertions) {
             renderAssertion(a, indent);
-
             if (a.status === "FAIL" && !result.xfail) {
-                const path = [groupName, result.name, section.name].filter(Boolean).join(" / ");
-                failures.push({ path, label: a.label, received: a.received });
+                const loc = [groupName, result.name, section.name].filter(Boolean).join(" / ");
+                failures.push({ path: loc, label: a.label, received: a.received });
             }
         }
     }
@@ -265,15 +314,16 @@ function renderResult(result, groupName, failures) {
 
 if (!existsSync(BUILD_DIR)) mkdirSync(BUILD_DIR, { recursive: true });
 
-const filter = process.argv[2] || null;
-const groups = discoverGroups(filter);
+const groups = discoverGroups();
 
 if (groups.length === 0) {
-    console.log(`no tests found${filter ? ` for "${filter}"` : ""}`);
+    const loc = rootOverride || nameFilter || "(unknown)";
+    process.stdout.write(`no tests found for ${loc}\n`);
     process.exit(0);
 }
 
-console.log(`\n${BOLD}Hopper Test Suite${RST}\n`);
+const depsNote = depsFlag ? `  ${DIM}(+ dependency chain)${RST}` : "";
+process.stdout.write(`\n${BOLD}Hopper Test Suite${RST}${depsNote}\n\n`);
 
 let totalPass  = 0;
 let totalFail  = 0;
@@ -281,8 +331,8 @@ let totalXfail = 0;
 const failures = [];
 
 for (const { name, files } of groups) {
-    console.log(`${BOLD}${name}${RST}  ${DIM}${files.length} file${files.length !== 1 ? "s" : ""}${RST}`);
-    console.log(`${DIM}${LINE}${RST}`);
+    process.stdout.write(`${BOLD}${name}${RST}  ${DIM}${files.length} file${files.length !== 1 ? "s" : ""}${RST}\n`);
+    process.stdout.write(`${DIM}${LINE}${RST}\n`);
 
     let gPass = 0, gTotal = 0;
 
@@ -303,12 +353,11 @@ for (const { name, files } of groups) {
         }
     }
 
-    const groupOk    = gPass === gTotal;
-    const countStr   = groupOk
+    const groupOk  = gPass === gTotal;
+    const countStr = groupOk
         ? `${G}${gTotal} assertion${gTotal !== 1 ? "s" : ""} passed${RST}`
         : `${R}${gPass}/${gTotal} assertions passed${RST}`;
-    console.log(`\n  ${DIM}${countStr}${RST}`);
-    console.log();
+    process.stdout.write(`\n  ${DIM}${countStr}${RST}\n\n`);
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────────
@@ -316,27 +365,27 @@ for (const { name, files } of groups) {
 const grandTotal = totalPass + totalFail;
 const allGood    = totalFail === 0;
 
-console.log(`${DIM}${LINE}${RST}`);
+process.stdout.write(`${DIM}${LINE}${RST}\n`);
 
 if (allGood) {
     const xfailNote = totalXfail > 0 ? `  ${DIM}${DOT}  ${totalXfail} expected failure${totalXfail !== 1 ? "s" : ""}${RST}` : "";
-    console.log(`${BOLD}${G}${TICK}  ${totalPass}/${grandTotal} passed${RST}${xfailNote}`);
+    process.stdout.write(`${BOLD}${G}${TICK}  ${totalPass}/${grandTotal} passed${RST}${xfailNote}\n`);
 } else {
-    console.log(`${BOLD}${R}${CROSS}  ${totalPass}/${grandTotal} passed  ${DOT}  ${totalFail} failed${RST}`);
+    process.stdout.write(`${BOLD}${R}${CROSS}  ${totalPass}/${grandTotal} passed  ${DOT}  ${totalFail} failed${RST}\n`);
 }
 
 if (failures.length > 0) {
-    console.log(`\n${BOLD}Failures:${RST}\n`);
+    process.stdout.write(`\n${BOLD}Failures:${RST}\n\n`);
     for (const f of failures) {
-        console.log(`  ${R}${CROSS}${RST}  ${DIM}${f.path}${RST}`);
-        console.log(`       ${BOLD}${R}${f.label}${RST}`);
+        process.stdout.write(`  ${R}${CROSS}${RST}  ${DIM}${f.path}${RST}\n`);
+        process.stdout.write(`       ${BOLD}${R}${f.label}${RST}\n`);
         if (f.received != null) {
             for (const line of f.received.split("\n").filter(Boolean))
-                console.log(`       ${DIM}${PIPE}${RST}  ${R}${line}${RST}`);
+                process.stdout.write(`       ${DIM}${PIPE}${RST}  ${R}${line}${RST}\n`);
         }
-        console.log();
+        process.stdout.write("\n");
     }
 }
 
-console.log();
+process.stdout.write("\n");
 process.exit(totalFail > 0 ? 1 : 0);

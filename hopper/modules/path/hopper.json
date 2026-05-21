@@ -10,5 +10,19 @@
       "interface":      "interfaces/Path.hop",
       "implementation": "src/Path.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Path": {
+        "from":           "path",
+        "interface":      "interfaces/Path.hop",
+        "implementation": "src/Path.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

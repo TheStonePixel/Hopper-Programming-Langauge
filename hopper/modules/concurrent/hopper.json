@@ -15,6 +15,24 @@
     "Condvar": {
       "interface":      "interfaces/Concurrent.hop",
       "implementation": "src/Concurrent.hop"
+    },
+    "Concurrent": {
+      "interface":      "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Concurrent": {
+        "from":           "concurrent",
+        "interface":      "interfaces/Concurrent.hop",
+        "implementation": "src/Concurrent.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
     }
   }
 }

@@ -26,5 +26,19 @@
       "interface":      "interfaces/StringBuilder.hop",
       "implementation": "src/StringBuilder.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Array": {
+        "from":           "ds",
+        "interface":      "interfaces/Array.hop",
+        "implementation": "src/Array.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
   }
 }

@@ -1110,8 +1110,24 @@ function cmdParse(args) {
 }
 
 function cmdTest(args) {
+    const depsFlag  = args.includes("--deps");
+    const rest      = args.filter(a => a !== "--deps");
+    const extraArgs = depsFlag ? ["--deps"] : [];
+
+    // If the first positional arg is a module name, pass it through directly.
+    // Otherwise auto-detect the nearest project root from CWD so tests are
+    // scoped to whatever module the user is working in.
+    const nameArg = rest.find(a => !a.startsWith("-"));
+    if (!nameArg) {
+        const projectRoot = findProjectRoot(process.cwd());
+        if (fs.existsSync(path.join(projectRoot, "hopper.json"))) {
+            extraArgs.push(`--root=${projectRoot}`);
+        }
+    }
+
     const testScript = path.join(__dirname, "tools", "test.js");
-    execSync(`node "${testScript}" ${args.join(" ")}`, { stdio: "inherit" });
+    const allArgs    = [...rest, ...extraArgs].map(a => `"${a}"`).join(" ");
+    execSync(`node "${testScript}" ${allArgs}`, { stdio: "inherit" });
 }
 
 // ── flash ──────────────────────────────────────────────────────────────────

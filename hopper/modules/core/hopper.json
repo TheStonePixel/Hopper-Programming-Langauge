@@ -12,5 +12,14 @@
       "interface":      "interfaces/Core.hop",
       "implementation": "src/Core.hop"
     }
+  },
+  "targets": {
+    "host": {
+      "Core": {
+        "from":           "core",
+        "interface":      "interfaces/Core.hop",
+        "implementation": "src/Core.hop"
+      }
+    }
   }
 }

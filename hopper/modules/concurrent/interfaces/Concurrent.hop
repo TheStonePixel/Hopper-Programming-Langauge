@@ -1,3 +1,5 @@
+interface Concurrent { }
+
 interface Mutex {
     function lock()
     function tryLock() bool

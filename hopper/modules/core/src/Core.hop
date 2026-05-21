@@ -228,7 +228,10 @@ class TestSuite {
             byte bb = pb::value
             int ai = cast ba
             int bi = cast bb
-            if (ai != bi) { ok = false  break }
+            if (ai != bi) {
+                ok = false
+                break
+            }
             if (ai == 0)  { break }
             i = i + 1
         }
