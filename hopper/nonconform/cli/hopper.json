@@ -1,7 +1,0 @@
-{
-  "name": "cli",
-  "version": "0.1.0",
-  "description": "Hopper CLI integration tests",
-  "license": "Apache-2.0",
-  "type": "tests"
-}
