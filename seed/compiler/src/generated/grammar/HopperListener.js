@@ -302,6 +302,24 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by HopperParser#InterfaceConst.
+	enterInterfaceConst(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#InterfaceConst.
+	exitInterfaceConst(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#InterfaceEnum.
+	enterInterfaceEnum(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#InterfaceEnum.
+	exitInterfaceEnum(ctx) {
+	}
+
+
 	// Enter a parse tree produced by HopperParser#classDecl.
 	enterClassDecl(ctx) {
 	}

@@ -164,13 +164,17 @@ export class AstBuilder extends HopperVisitor {
             const varName = v.Identifier().getText();
             const strLit  = v.StringLiteral ? v.StringLiteral() : null;
             const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
+            const hexLit  = v.HexLiteral ? v.HexLiteral() : null;
             if (strLit) {
                 kind = "string";
                 const raw = unescapeHopperString(strLit.getText().slice(1, -1));
                 variants.push({ name: varName, value: raw, kind: "string" });
             } else {
-                if (intLit) {
-                    const negative = v.children.some(c => c.getText && c.getText() === '-');
+                const negative = v.children.some(c => c.getText && c.getText() === '-');
+                if (hexLit) {
+                    next = parseInt(hexLit.getText(), 16);
+                    if (negative) next = -next;
+                } else if (intLit) {
                     next = parseInt(intLit.getText(), 10);
                     if (negative) next = -next;
                 }
@@ -265,8 +269,25 @@ export class AstBuilder extends HopperVisitor {
 
     visitInterfaceDecl(ctx) {
         const name = ctx.Identifier().getText();
-        const methods = ctx.interfaceMember ? ctx.interfaceMember().map(m => this.visit(m)) : [];
-        return InterfaceDecl(name, methods);
+        const methods = [];
+        const consts = [];
+        const enums = [];
+        for (const m of (ctx.interfaceMember ? ctx.interfaceMember() : [])) {
+            const node = this.visit(m);
+            if (!node) continue;
+            if (node.kind === "InterfaceMethod") methods.push(node);
+            else if (node.kind === "ConstDecl")  consts.push(node);
+            else if (node.kind === "EnumDecl")   enums.push(node);
+        }
+        return InterfaceDecl(name, methods, consts, enums);
+    }
+
+    visitInterfaceConst(ctx) {
+        return this.visitConstDecl(ctx.constDecl());
+    }
+
+    visitInterfaceEnum(ctx) {
+        return this.visitEnumDecl(ctx.enumDecl());
     }
 
     visitInterfaceFunc(ctx) {

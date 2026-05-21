@@ -696,6 +696,16 @@ export function genExpr(ir, expr) {
             }
 
             const fnInfo   = functionReturnTypes.get(expr.callee);
+            if (!fnInfo && !ir.vars.has(expr.callee)) {
+                throw new Error(`Call to undefined function '${expr.callee}' — declare it or import the module that provides it`);
+            }
+            if (fnInfo && !fnInfo.isVariadic) {
+                const expected = fnInfo.params ? fnInfo.params.length : 0;
+                const got      = expr.args ? expr.args.length : 0;
+                if (expected !== got) {
+                    throw new Error(`Function '${expr.callee}' expects ${expected} argument(s) but got ${got}`);
+                }
+            }
             const args     = (expr.args || []).map((a, i) => {
                 const paramNormT = fnInfo && fnInfo.params && fnInfo.params[i]
                     ? normalizeType(fnInfo.params[i].type) : null;
@@ -816,9 +826,20 @@ export function genExpr(ir, expr) {
             if (!v) throw new Error(`Unknown variable: ${expr.object}`);
             const typeName   = v.hType;
             const isClass    = classTypes.has(typeName);
+            if (!isClass && !structTypes.has(typeName))
+                throw new Error(`'${expr.object}' has type '${typeName}' which is not a class — cannot call method '${expr.method}' on it`);
             const llTypeName = isClass ? `%class.${typeName}` : `%struct.${typeName}`;
             const mangled    = `${typeName}_${expr.method}`;
             const mInfo      = functionReturnTypes.get(mangled);
+            if (!mInfo)
+                throw new Error(`Method '${expr.method}' not found on type '${typeName}'`);
+            if (mInfo.params) {
+                const expected = mInfo.params.length;
+                const got      = expr.args ? expr.args.length : 0;
+                if (expected !== got) {
+                    throw new Error(`Method '${typeName}.${expr.method}' expects ${expected} argument(s) but got ${got}`);
+                }
+            }
             const retType    = mInfo ? mInfo.returnType : "int";
             // Generate args — class-type params are passed by pointer (not by value)
             const rawArgs = (expr.args || []).map((a, i) => {

@@ -28,6 +28,24 @@ export function checkImplements(cls) {
                     `Class '${cls.name}' does not implement '${ifaceName}.${req.name}' — add a '${req.name}' method`
                 );
             }
+            // Check parameter count matches
+            const reqCount = req.params ? req.params.length : 0;
+            const gotCount = found.params ? found.params.length : 0;
+            if (reqCount !== gotCount) {
+                throw new Error(
+                    `Class '${cls.name}' method '${req.name}' has ${gotCount} parameter(s) but interface '${ifaceName}' requires ${reqCount}`
+                );
+            }
+            // Check return type matches (both null means procedure/void)
+            const reqRet = req.returnType || null;
+            const gotRet = found.returnType || null;
+            if (reqRet !== gotRet) {
+                const reqStr = reqRet ?? "void";
+                const gotStr = gotRet ?? "void";
+                throw new Error(
+                    `Class '${cls.name}' method '${req.name}' returns '${gotStr}' but interface '${ifaceName}' declares '${reqStr}'`
+                );
+            }
         }
     }
 }

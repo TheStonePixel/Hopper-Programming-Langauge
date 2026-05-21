@@ -35,7 +35,14 @@ export function genModule(ast, opts = {}) {
 
     // Interfaces — registered before classes so implements checking can find them
     for (const iface of ast.interfaces || []) {
-        interfaceDefs.set(iface.name, { methods: iface.methods });
+        interfaceDefs.set(iface.name, { methods: iface.methods, consts: iface.consts || [], enums: iface.enums || [] });
+        // Expose interface-level constants and enums into the module scope
+        for (const c of iface.consts || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
+        for (const en of iface.enums || []) {
+            const variants = new Map();
+            for (const v of en.variants) variants.set(v.name, { value: v.value, kind: v.kind || "int" });
+            enumTypes.set(en.name, { variants, enumKind: en.enumKind || "int" });
+        }
     }
 
     // Aliases and constants

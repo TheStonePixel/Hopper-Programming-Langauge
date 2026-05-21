@@ -57,8 +57,10 @@ export function BitfieldPad(bits) {
 }
 
 // interface = compile-time method contract
-export function InterfaceDecl(name, methods) {
-    return { kind: "InterfaceDecl", name, methods };
+// consts: ConstDecl nodes declared inside the interface body
+// enums: EnumDecl nodes declared inside the interface body
+export function InterfaceDecl(name, methods, consts = [], enums = []) {
+    return { kind: "InterfaceDecl", name, methods, consts, enums };
 }
 
 export function InterfaceMethod(name, params, returnType) {

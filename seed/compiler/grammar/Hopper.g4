@@ -60,7 +60,7 @@ enumDecl
     ;
 
 enumVariant
-    : Identifier ('=' ('-'? IntegerLiteral | StringLiteral))?
+    : Identifier ('=' ('-'? (IntegerLiteral | HexLiteral) | StringLiteral))?
     ;
 
 aliasDecl
@@ -141,6 +141,8 @@ interfaceDecl
 interfaceMember
     : 'function' fieldName '(' paramList? ')' type   # InterfaceFunc
     | 'function' fieldName '(' paramList? ')'        # InterfaceProc
+    | constDecl                                       # InterfaceConst
+    | enumDecl                                        # InterfaceEnum
     ;
 
 // class = data + behavior, compiler-optimized layout
