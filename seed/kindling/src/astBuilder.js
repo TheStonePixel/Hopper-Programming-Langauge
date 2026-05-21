@@ -895,7 +895,7 @@ export class AstBuilder extends HopperVisitor {
 // ── import resolution ──────────────────────────────────────────────────────
 
 // Hopper stdlib location — the modules/ dir next to kindling/src/
-const STDLIB_DIR = path.resolve(__dirname, "..", "..", "modules");
+const STDLIB_DIR = path.resolve(__dirname, "..", "..", "..", "hopper", "modules");
 
 // Find modules/ directory by walking up from baseDir, then fall back to stdlib.
 function resolveModuleFiles(moduleName, names, baseDir) {

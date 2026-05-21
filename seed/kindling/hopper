@@ -12,8 +12,8 @@ import { formatAst } from "./src/formatter.js";
 
 const __filename  = fileURLToPath(import.meta.url);
 const __dirname   = path.dirname(__filename);
-const ROOT        = path.resolve(__dirname, "..");
-const MODULES_DIR = path.join(ROOT, "modules");
+const ROOT        = path.resolve(__dirname, "..", "..");
+const MODULES_DIR = path.join(ROOT, "hopper", "modules");
 
 // ── registry ───────────────────────────────────────────────────────────────
 const REGISTRY_ORG = "HopperLangauge";               // github.com/HopperLangauge/<pkg>
@@ -612,7 +612,7 @@ function fetchTarball(url, destDir) {
 
 async function cmdInstall(args) {
     const LOCAL_MODULES = path.join(process.cwd(), "modules");
-    const STDLIB_DIR    = path.join(__dirname, "..", "modules");
+    const STDLIB_DIR    = path.join(__dirname, "..", "..", "hopper", "modules");
     let names = args.filter(a => !a.startsWith("-"));
 
     // No args — reinstall everything from hopper.json
