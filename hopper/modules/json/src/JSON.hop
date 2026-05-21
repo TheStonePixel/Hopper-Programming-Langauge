@@ -1,18 +1,11 @@
-import Array  from ds
-import Stream from stream
-
-// JsonNode layout (stored in heap, accessed via address):
-//   [0..7]   int kind
-//   [8..15]  int numVal
-//   [16..23] address strVal (null-terminated heap string or null)
-//   [24..31] address children (heap StandardArray of address, or null)
-//   [32..39] address keys (heap StandardArray of address strings, or null)
-const JSON_NODE_SIZE   = 40
-const JSON_KIND_OFF    = 0
-const JSON_NUM_OFF     = 8
-const JSON_STR_OFF     = 16
-const JSON_CHILD_OFF   = 24
-const JSON_KEYS_OFF    = 32
+enum JsonLayout {
+    SIZE  = 40
+    KIND  = 0
+    NUM   = 8
+    STR   = 16
+    CHILD = 24
+    KEYS  = 32
+}
 
 function _jsonReadInt(address p) int {
     address pi = p
@@ -37,12 +30,12 @@ function _jsonWriteAddr(address p, address v) {
 }
 
 function _jsonMakeNode(int kind, int numVal, address strVal, address children, address keys) address {
-    address node = allocate JSON_NODE_SIZE
-    _jsonWriteInt(node + JSON_KIND_OFF, kind)
-    _jsonWriteInt(node + JSON_NUM_OFF, numVal)
-    _jsonWriteAddr(node + JSON_STR_OFF, strVal)
-    _jsonWriteAddr(node + JSON_CHILD_OFF, children)
-    _jsonWriteAddr(node + JSON_KEYS_OFF, keys)
+    address node = allocate JsonLayout.SIZE
+    _jsonWriteInt(node + JsonLayout.KIND, kind)
+    _jsonWriteInt(node + JsonLayout.NUM, numVal)
+    _jsonWriteAddr(node + JsonLayout.STR, strVal)
+    _jsonWriteAddr(node + JsonLayout.CHILD, children)
+    _jsonWriteAddr(node + JsonLayout.KEYS, keys)
     return node
 }
 
@@ -315,17 +308,17 @@ class JsonReader implements JSON {
         return self._parseValue()
     }
 
-    function nodeKind(address node) int     { return _jsonReadInt(node + JSON_KIND_OFF) }
-    function nodeInt(address node) int      { return _jsonReadInt(node + JSON_NUM_OFF)  }
-    function nodeBool(address node) bool    { return _jsonReadInt(node + JSON_NUM_OFF) != 0 }
-    function nodeStr(address node) address  { return _jsonReadAddr(node + JSON_STR_OFF) }
-    function nodeChildren(address node) address { return _jsonReadAddr(node + JSON_CHILD_OFF) }
-    function nodeKeys(address node) address { return _jsonReadAddr(node + JSON_KEYS_OFF) }
+    function nodeKind(address node) int     { return _jsonReadInt(node + JsonLayout.KIND) }
+    function nodeInt(address node) int      { return _jsonReadInt(node + JsonLayout.NUM)  }
+    function nodeBool(address node) bool    { return _jsonReadInt(node + JsonLayout.NUM) != 0 }
+    function nodeStr(address node) address  { return _jsonReadAddr(node + JsonLayout.STR) }
+    function nodeChildren(address node) address { return _jsonReadAddr(node + JsonLayout.CHILD) }
+    function nodeKeys(address node) address { return _jsonReadAddr(node + JsonLayout.KEYS) }
 
     function nodeLen(address node) int {
-        int kind = _jsonReadInt(node + JSON_KIND_OFF)
-        if (kind == 4) { return _jsonReadInt(node + JSON_NUM_OFF) }
-        if (kind == 5) { return _jsonReadInt(node + JSON_NUM_OFF) }
+        int kind = _jsonReadInt(node + JsonLayout.KIND)
+        if (kind == 4) { return _jsonReadInt(node + JsonLayout.NUM) }
+        if (kind == 5) { return _jsonReadInt(node + JsonLayout.NUM) }
         return 0
     }
 }

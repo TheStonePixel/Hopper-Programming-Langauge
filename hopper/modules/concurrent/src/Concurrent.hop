@@ -1,106 +1,154 @@
-extern function pthread_mutex_init(address m, address attr) int
-extern function pthread_mutex_lock(address m) int
-extern function pthread_mutex_trylock(address m) int
-extern function pthread_mutex_unlock(address m) int
-extern function pthread_mutex_destroy(address m) int
+import sem from arch
 
-extern function pthread_cond_init(address c, address attr) int
-extern function pthread_cond_wait(address c, address m) int
-extern function pthread_cond_signal(address c) int
-extern function pthread_cond_broadcast(address c) int
-extern function pthread_cond_destroy(address c) int
+// Store/load int at an address (semids are ints stored as addresses)
+function _concStoreInt(address p, int v) {
+    address pi = p
+    pi::value = v
+}
 
-extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
-extern function pthread_detach(int tid) int
-extern function pthread_join(int tid, address retval) int
+function _concLoadInt(address p) int {
+    address pi = p
+    int v = pi::value
+    return v
+}
 
-extern function memset(address dst, int c, int n) address
+// Write struct sembuf {sem_num, sem_op, sem_flg} as three little-endian shorts
+function _writeSembuf(address p, int semNum, int semOp, int semFlg) {
+    int n0 = semNum & 255
+    int n1 = (semNum >> 8) & 255
+    int o0 = semOp & 255
+    int o1 = (semOp >> 8) & 255
+    int f0 = semFlg & 255
+    int f1 = (semFlg >> 8) & 255
+    byte b0 = cast n0
+    byte b1 = cast n1
+    byte b2 = cast o0
+    byte b3 = cast o1
+    byte b4 = cast f0
+    byte b5 = cast f1
+    address p0 = p
+    address p1 = p + 1
+    address p2 = p + 2
+    address p3 = p + 3
+    address p4 = p + 4
+    address p5 = p + 5
+    p0::value = b0
+    p1::value = b1
+    p2::value = b2
+    p3::value = b3
+    p4::value = b4
+    p5::value = b5
+}
 
-// pthread_mutex_t on Linux x86-64 is 40 bytes; 64 for alignment safety
-const MUTEX_SIZE = 64
-// pthread_cond_t on Linux x86-64 is 48 bytes; 64 for alignment safety
-const COND_SIZE  = 64
-
+// Binary semaphore mutex using SysV semget/semop/semctl.
+// semget(IPC_PRIVATE=0, 1, IPC_CREAT=512|0600=384) = 896
+// semctl(semid, 0, SETVAL=16, 1) initializes value to 1.
+// lock: semop -1 (blocks when 0), unlock: semop +1.
 class StandardMutex implements Mutex {
-    address handle
+    address handle   // 8-byte heap block holding the semid
 
     constructor() {
-        self.handle = allocate MUTEX_SIZE
-        memset(self.handle, 0, MUTEX_SIZE)
-        pthread_mutex_init(self.handle, null)
+        self.handle = allocate 8
+        int semid = semget(0, 1, 896)
+        _concStoreInt(self.handle, semid)
+        semctl(semid, 0, 16, 1)
     }
 
     destructor() {
-        pthread_mutex_destroy(self.handle)
+        int semid = _concLoadInt(self.handle)
+        semctl(semid, 0, 0, 0)
         deallocate self.handle
     }
 
-    function lock()             { pthread_mutex_lock(self.handle) }
-    function tryLock() bool     { return pthread_mutex_trylock(self.handle) == 0 }
-    function unlock()           { pthread_mutex_unlock(self.handle) }
+    function lock() {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, -1, 0)
+        semop(semid, sop, 1)
+        deallocate sop
+    }
+
+    function tryLock() bool {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, -1, 2048)
+        int r = semop(semid, sop, 1)
+        deallocate sop
+        return r == 0
+    }
+
+    function unlock() {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, 1, 0)
+        semop(semid, sop, 1)
+        deallocate sop
+    }
+
     function rawHandle() address { return self.handle }
 }
 
+// Counting semaphore condvar using SysV semaphores (initial value 0).
+// wait: unlocks mutex, blocks on condvar sem, relocks mutex.
+// signal: increments condvar sem by 1 (wakes one waiter).
+// broadcast: increments condvar sem by current waiter count (wakes all).
+// Note: there is a narrow race between mutex unlock and semop -1 in wait.
+// Callers should use a boolean predicate loop (while not ready: wait).
 class StandardCondvar implements Condvar {
-    address handle
+    address handle   // 8-byte heap block holding the condvar semid
 
     constructor() {
-        self.handle = allocate COND_SIZE
-        memset(self.handle, 0, COND_SIZE)
-        pthread_cond_init(self.handle, null)
+        self.handle = allocate 8
+        int semid = semget(0, 1, 896)
+        _concStoreInt(self.handle, semid)
+        semctl(semid, 0, 16, 0)
     }
 
     destructor() {
-        pthread_cond_destroy(self.handle)
+        int semid = _concLoadInt(self.handle)
+        semctl(semid, 0, 0, 0)
         deallocate self.handle
     }
 
-    function wait(address mutHandle) { pthread_cond_wait(self.handle, mutHandle) }
-    function signal()               { pthread_cond_signal(self.handle) }
-    function broadcast()            { pthread_cond_broadcast(self.handle) }
-    function rawHandle() address    { return self.handle }
-}
+    function wait(address mutHandle) {
+        int mutSemid  = _concLoadInt(mutHandle)
+        int condSemid = _concLoadInt(self.handle)
+        // Unlock mutex
+        address mop = allocate 8
+        _writeSembuf(mop, 0, 1, 0)
+        semop(mutSemid, mop, 1)
+        deallocate mop
+        // Block on condvar
+        address cop = allocate 8
+        _writeSembuf(cop, 0, -1, 0)
+        semop(condSemid, cop, 1)
+        deallocate cop
+        // Relock mutex
+        address rop = allocate 8
+        _writeSembuf(rop, 0, -1, 0)
+        semop(mutSemid, rop, 1)
+        deallocate rop
+    }
 
-// Internal thunk for spawn: rawArgs layout = [fn(8) | arg(8) | statePtr(8)]
-function _spawnThunk(address rawArgs) address {
-    address fn      = rawArgs::value
-    address argSlot = rawArgs + 8
-    address userArg = argSlot::value
-    address stSlot  = rawArgs + 16
-    address statePtr = stSlot::value
-    deallocate rawArgs
+    function signal() {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, 1, 0)
+        semop(semid, sop, 1)
+        deallocate sop
+    }
 
-    callback(address) address cb = cast fn
-    address result = cb(userArg)
+    function broadcast() {
+        int semid = _concLoadInt(self.handle)
+        // GETNCNT=14: number of threads blocked waiting for sem > 0
+        int waiters = semctl(semid, 0, 14, 0)
+        if (waiters > 0) {
+            address sop = allocate 8
+            _writeSembuf(sop, 0, waiters, 0)
+            semop(semid, sop, 1)
+            deallocate sop
+        }
+    }
 
-    address valSlot = statePtr + 8
-    valSlot::value  = result
-    statePtr::value = 1
-    return null
-}
-
-// Spawn fn(arg) on a new thread; returns a statePtr (16 bytes: [done(8) | result(8)]).
-// Poll statePtr::value != 0 to check completion; read result from statePtr+8.
-// Caller is responsible for deallocating statePtr after reading the result.
-function spawn(address fn, address arg) address {
-    address statePtr = allocate 16
-    statePtr::value  = 0
-    address valSlot  = statePtr + 8
-    valSlot::value   = null
-
-    address thunkArgs = allocate 24
-    thunkArgs::value  = fn
-    address argSlot   = thunkArgs + 8
-    argSlot::value    = arg
-    address stSlot    = thunkArgs + 16
-    stSlot::value     = statePtr
-
-    address thunkAddr = _spawnThunk::address
-    address tidPtr    = allocate 8
-    pthread_create(tidPtr, null, thunkAddr, thunkArgs)
-    int tid = tidPtr::value
-    pthread_detach(tid)
-    deallocate tidPtr
-
-    return statePtr
+    function rawHandle() address { return self.handle }
 }

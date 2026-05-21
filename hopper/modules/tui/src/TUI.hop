@@ -1,15 +1,25 @@
 import io  from arch
 import tty from arch
 
-extern function memset(address dst, int c, int n) address
-
 // Box-drawing UTF-8 sequences (3 bytes each)
-const BOX_TL = "\xe2\x94\x8c"
-const BOX_TR = "\xe2\x94\x90"
-const BOX_BL = "\xe2\x94\x94"
-const BOX_BR = "\xe2\x94\x98"
-const BOX_H  = "\xe2\x94\x80"
-const BOX_V  = "\xe2\x94\x82"
+enum Box {
+    TL = "\xe2\x94\x8c"
+    TR = "\xe2\x94\x90"
+    BL = "\xe2\x94\x94"
+    BR = "\xe2\x94\x98"
+    H  = "\xe2\x94\x80"
+    V  = "\xe2\x94\x82"
+}
+
+function _tuiZero(address dst, int n) {
+    byte z = 0
+    int i = 0
+    while (i < n) {
+        address p = dst + i
+        p::value = z
+        i = i + 1
+    }
+}
 
 function _tuiReadU32(address p) int {
     byte b0 = p::value
@@ -79,7 +89,7 @@ class StandardTUI implements TUI {
         self.outBuf = allocate 8192
 
         self.savedTermios = allocate 64
-        memset(self.savedTermios, 0, 64)
+        _tuiZero(self.savedTermios, 64)
         tcgetattr(0, self.savedTermios)
 
         address raw = allocate 64
@@ -123,7 +133,7 @@ class StandardTUI implements TUI {
         deallocate raw
 
         address ws = allocate 8
-        memset(ws, 0, 8)
+        _tuiZero(ws, 8)
         winsize(0, ws)
         int wsRows = _tuiReadU16(ws)
         int wsCols = _tuiReadU16(ws + 2)
@@ -313,29 +323,29 @@ class StandardTUI implements TUI {
 
     function drawBox(int row, int col, int w, int h) {
         self.moveTo(row, col)
-        self._out(BOX_TL)
+        self._out(Box.TL)
         int i = 1
         while (i < w - 1) {
-            self._out(BOX_H)
+            self._out(Box.H)
             i = i + 1
         }
-        self._out(BOX_TR)
+        self._out(Box.TR)
         int r = 1
         while (r < h - 1) {
             self.moveTo(row + r, col)
-            self._out(BOX_V)
+            self._out(Box.V)
             self.moveTo(row + r, col + w - 1)
-            self._out(BOX_V)
+            self._out(Box.V)
             r = r + 1
         }
         self.moveTo(row + h - 1, col)
-        self._out(BOX_BL)
+        self._out(Box.BL)
         i = 1
         while (i < w - 1) {
-            self._out(BOX_H)
+            self._out(Box.H)
             i = i + 1
         }
-        self._out(BOX_BR)
+        self._out(Box.BR)
     }
 
     function fillRect(int row, int col, int w, int h) {
@@ -362,7 +372,7 @@ class StandardTUI implements TUI {
         valPtr::value  = zero
 
         address buf = allocate 4
-        memset(buf, 0, 4)
+        _tuiZero(buf, 4)
         int n = read(0, buf, 1)
         if (n <= 0) {
             deallocate buf
