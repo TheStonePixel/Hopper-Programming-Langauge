@@ -1,5 +1,5 @@
 import {
-    typeAliases, classTypes, structTypes, bitfieldTypes, moduleConstants,
+    typeAliases, classTypes, structTypes, bitfieldTypes,
     wordBits,
 } from "./codegenState.js";
 

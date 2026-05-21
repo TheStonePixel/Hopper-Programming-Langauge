@@ -5,8 +5,10 @@ extern function malloc(int n) address
 extern function free(address p)
 extern function memcpy(address dst, address src, int n) address
 
-const MAX_LINES = 4096
-const INIT_CAP  = 64
+enum BufferLimits {
+    BufferLimits.MAX_LINES = 4096
+    BufferLimits.INIT_CAP  = 64
+}
 
 class Buffer {
     address data_arr  // int[] — line data pointers (stored as ptrtoint)
@@ -16,9 +18,9 @@ class Buffer {
     int dirty
 
     constructor() {
-        self.data_arr = allocate MAX_LINES * 8
-        self.len_arr  = allocate MAX_LINES * 8
-        self.cap_arr  = allocate MAX_LINES * 8
+        self.data_arr = allocate BufferLimits.MAX_LINES * 8
+        self.len_arr  = allocate BufferLimits.MAX_LINES * 8
+        self.cap_arr  = allocate BufferLimits.MAX_LINES * 8
         self.count    = 0
         self.dirty    = 0
     }
@@ -76,7 +78,7 @@ class Buffer {
     function get_dirty() int { return self.dirty }
 
     function append_line(address src, int srclen) {
-        int cap = INIT_CAP
+        int cap = BufferLimits.INIT_CAP
         if (srclen + 1 > cap) { cap = srclen + 1 }
         address data = allocate cap
         if (srclen > 0 && int src != 0) {

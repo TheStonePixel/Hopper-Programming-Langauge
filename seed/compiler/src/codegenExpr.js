@@ -1,5 +1,5 @@
 import {
-    classTypes, structTypes, enumTypes, mmioBindings, moduleConstants,
+    classTypes, structTypes, enumTypes, mmioBindings,
     functionReturnTypes, overloadGroups, templateInstances, bitfieldTypes,
     addStringConstant, wordBits, releaseMode,
 } from "./codegenState.js";
@@ -31,7 +31,6 @@ export class IRBuilder {
     newTmp()                { return `%t${this.tmp++}`; }
     newLabel(prefix)        { return `${prefix}${this.label++}`; }
     getVar(name) {
-        if (moduleConstants.has(name)) return null;
         const v = this.vars.get(name);
         if (!v) throw new Error(`Unknown variable: ${name}`);
         return v;
@@ -234,18 +233,6 @@ export function genExpr(ir, expr) {
         }
 
         case "Var": {
-            const c = moduleConstants.get(expr.name);
-            if (c) {
-                if (c.type === "string") {
-                    const strName = addStringConstant(c.value);
-                    const len     = stringByteLen(c.value) + 1;
-                    const tmp     = ir.newTmp();
-                    ir.emit(`${tmp} = getelementptr [${len} x i8], [${len} x i8]* ${strName}, i32 0, i32 0`);
-                    return { value: tmp, type: "string" };
-                }
-                return { value: String(c.value), type: c.type };
-            }
-
             const mmio = mmioBindings.get(expr.name);
             if (mmio) {
                 const ptr = ir.newTmp();

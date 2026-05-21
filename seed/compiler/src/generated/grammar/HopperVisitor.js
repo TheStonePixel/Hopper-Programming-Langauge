@@ -60,12 +60,6 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
-	// Visit a parse tree produced by HopperParser#constDecl.
-	visitConstDecl(ctx) {
-	  return this.visitChildren(ctx);
-	}
-
-
 	// Visit a parse tree produced by HopperParser#enumDecl.
 	visitEnumDecl(ctx) {
 	  return this.visitChildren(ctx);
@@ -204,12 +198,6 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
-	// Visit a parse tree produced by HopperParser#InterfaceConst.
-	visitInterfaceConst(ctx) {
-	  return this.visitChildren(ctx);
-	}
-
-
 	// Visit a parse tree produced by HopperParser#InterfaceEnum.
 	visitInterfaceEnum(ctx) {
 	  return this.visitChildren(ctx);
@@ -320,6 +308,12 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 
 	// Visit a parse tree produced by HopperParser#CallbackDeclTyped.
 	visitCallbackDeclTyped(ctx) {
+	  return this.visitChildren(ctx);
+	}
+
+
+	// Visit a parse tree produced by HopperParser#ConstVarDecl.
+	visitConstVarDecl(ctx) {
 	  return this.visitChildren(ctx);
 	}
 

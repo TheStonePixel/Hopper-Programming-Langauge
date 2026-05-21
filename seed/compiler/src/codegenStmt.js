@@ -37,7 +37,7 @@ export function genStmt(ir, stmt, retType) {
                 const llType   = llvmType(typeName);
                 const ptr      = ir.newTmp();
                 ir.emit(`${ptr} = alloca ${llType}`);
-                ir.vars.set(stmt.name, { ptr, type: llType, hType: typeName });
+                ir.vars.set(stmt.name, { ptr, type: llType, hType: typeName, isConst: stmt.isConst || false });
 
                 const ctorName = `${typeName}_constructor`;
                 if (functionReturnTypes.has(ctorName)) {
@@ -70,7 +70,7 @@ export function genStmt(ir, stmt, retType) {
                     || stmt.init.kind === "Binary")) {
                 const result = genExpr(ir, stmt.init);
                 if (result.isClassPtr) {
-                    ir.vars.set(stmt.name, { ptr: result.value, type: `%class.${normType}`, hType: normType });
+                    ir.vars.set(stmt.name, { ptr: result.value, type: `%class.${normType}`, hType: normType, isConst: stmt.isConst || false });
                     break;
                 }
             }
@@ -140,7 +140,7 @@ export function genStmt(ir, stmt, retType) {
                 }
             }
 
-            ir.vars.set(stmt.name, { ptr, type: llType, hType });
+            ir.vars.set(stmt.name, { ptr, type: llType, hType, isConst: stmt.isConst || false });
             break;
         }
 
@@ -156,6 +156,7 @@ export function genStmt(ir, stmt, retType) {
 
             const v   = ir.vars.get(stmt.name);
             if (!v) throw new Error(`Unknown variable: ${stmt.name}`);
+            if (v.isConst) throw new Error(`Cannot assign to '${stmt.name}' — it is declared const`);
 
             // callback var = functionName — reassign to a different function
             if (v.hType && v.hType.startsWith("callback(") && stmt.expr.kind === "Var") {

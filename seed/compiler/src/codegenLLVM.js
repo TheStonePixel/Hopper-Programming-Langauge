@@ -2,7 +2,7 @@ import { buildAstFromSource } from "./astBuilder.js";
 import { strictAnalyze } from "./codegenConstraints.js";
 import {
     stringConstants,
-    classTypes, structTypes, interfaceDefs, moduleConstants, typeAliases,
+    classTypes, structTypes, interfaceDefs, typeAliases,
     functionReturnTypes, overloadGroups, templateDefs, instantiatedClasses,
     mmioBindings, bitfieldTypes, enumTypes,
     resetAll, registerStruct, registerClass,
@@ -35,9 +35,8 @@ export function genModule(ast, opts = {}) {
 
     // Interfaces — registered before classes so implements checking can find them
     for (const iface of ast.interfaces || []) {
-        interfaceDefs.set(iface.name, { methods: iface.methods, consts: iface.consts || [], enums: iface.enums || [] });
-        // Expose interface-level constants and enums into the module scope
-        for (const c of iface.consts || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
+        interfaceDefs.set(iface.name, { methods: iface.methods, enums: iface.enums || [] });
+        // Expose interface-level enums into the module scope
         for (const en of iface.enums || []) {
             const variants = new Map();
             for (const v of en.variants) variants.set(v.name, { value: v.value, kind: v.kind || "int" });
@@ -45,9 +44,8 @@ export function genModule(ast, opts = {}) {
         }
     }
 
-    // Aliases and constants
+    // Aliases
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
-    for (const c of ast.consts  || []) moduleConstants.set(c.name, { value: c.value, type: c.type });
 
     // Register template definitions.
     // Fixed templates (all params are concrete types) are monomorphized immediately —

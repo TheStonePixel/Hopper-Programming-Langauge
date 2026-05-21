@@ -23,7 +23,6 @@ import {
     ClassDestructor,
     InterfaceDecl,
     InterfaceMethod,
-    ConstDecl,
     EnumDecl,
     AliasDecl,
     TemplateDecl,
@@ -113,7 +112,6 @@ export class AstBuilder extends HopperVisitor {
         const functions = [];
         const structs = [];
         const classes = [];
-        const consts = [];
         const enums = [];
         const aliases = [];
         const templates = [];
@@ -129,7 +127,6 @@ export class AstBuilder extends HopperVisitor {
             if (node.kind === "FunctionDecl")        functions.push(node);
             else if (node.kind === "StructDecl")     structs.push(node);
             else if (node.kind === "ClassDecl")      classes.push(node);
-            else if (node.kind === "ConstDecl")      consts.push(node);
             else if (node.kind === "EnumDecl")       enums.push(node);
             else if (node.kind === "AliasDecl")      aliases.push(node);
             else if (node.kind === "TemplateDecl")   templates.push(node);
@@ -140,7 +137,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "InterfaceDecl")  interfaces.push(node);
         }
 
-        return Program(functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums);
+        return Program(functions, structs, classes, [], aliases, templates, entry, binds, stricts, bitfields, interfaces, enums);
     }
 
     visitTopLevelDecl(ctx) {
@@ -183,18 +180,6 @@ export class AstBuilder extends HopperVisitor {
             }
         }
         return EnumDecl(name, variants, kind);
-    }
-
-    // ── const ──────────────────────────────────────────────────────────────
-
-    visitConstDecl(ctx) {
-        const name = ctx.Identifier().getText();
-        const litCtx = ctx.literal();
-        const lit = this.visitLiteral(litCtx);
-        // Check for optional leading '-' (negative constants)
-        const negative = ctx.children && ctx.children.some(c => c.getText && c.getText() === '-');
-        const value = negative ? -lit.value : lit.value;
-        return ConstDecl(name, value, lit.type);
     }
 
     visitLiteral(ctx) {
@@ -270,20 +255,14 @@ export class AstBuilder extends HopperVisitor {
     visitInterfaceDecl(ctx) {
         const name = ctx.Identifier().getText();
         const methods = [];
-        const consts = [];
         const enums = [];
         for (const m of (ctx.interfaceMember ? ctx.interfaceMember() : [])) {
             const node = this.visit(m);
             if (!node) continue;
             if (node.kind === "InterfaceMethod") methods.push(node);
-            else if (node.kind === "ConstDecl")  consts.push(node);
             else if (node.kind === "EnumDecl")   enums.push(node);
         }
-        return InterfaceDecl(name, methods, consts, enums);
-    }
-
-    visitInterfaceConst(ctx) {
-        return this.visitConstDecl(ctx.constDecl());
+        return InterfaceDecl(name, methods, enums);
     }
 
     visitInterfaceEnum(ctx) {
@@ -545,6 +524,13 @@ export class AstBuilder extends HopperVisitor {
         const type      = ctx.type().getText();
         const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
         return VarDecl(name, type, null, constrain);
+    }
+
+    visitConstVarDecl(ctx) {
+        const type     = ctx.type().getText();
+        const name     = ctx.Identifier().getText();
+        const initExpr = this.visit(ctx.expression());
+        return VarDecl(name, type, initExpr, null, true);
     }
 
     visitAssign(ctx) {
@@ -1009,7 +995,6 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                 });
                 ast.interfaces.unshift(...ifaceAst.interfaces);
                 ast.functions.unshift(...ifaceAst.functions);
-                ast.consts.unshift(...ifaceAst.consts);
                 ast.enums.unshift(...(ifaceAst.enums || []));
             }
 
@@ -1037,7 +1022,6 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                 ast.functions.unshift(...implAst.functions);
                 ast.structs.unshift(...implAst.structs);
                 ast.classes.unshift(...implAst.classes);
-                ast.consts.unshift(...implAst.consts);
                 ast.enums.unshift(...(implAst.enums || []));
                 ast.aliases.unshift(...implAst.aliases);
                 ast.templates.unshift(...implAst.templates);
@@ -1065,7 +1049,6 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             ast.functions.unshift(...importedAst.functions);
             ast.structs.unshift(...importedAst.structs);
             ast.classes.unshift(...importedAst.classes);
-            ast.consts.unshift(...importedAst.consts);
             ast.enums.unshift(...(importedAst.enums || []));
             ast.aliases.unshift(...importedAst.aliases);
             ast.templates.unshift(...importedAst.templates);

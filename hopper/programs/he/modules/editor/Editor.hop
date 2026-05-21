@@ -13,8 +13,10 @@ enum Mode {
     COMMAND = 2
 }
 
-const CTRL_S = 19
-const CTRL_Q = 17
+enum CtrlKey {
+    CTRL_S = 19
+    CTRL_Q = 17
+}
 
 class Editor {
     Buffer buf
@@ -312,8 +314,8 @@ class Editor {
             self.mode = Mode.COMMAND
             self.cmdlen = 0
         }
-        if (code == KEY_CHAR && val == CTRL_S) { self.save_file() }
-        if (code == KEY_CHAR && val == CTRL_Q) { self.running = 0 }
+        if (code == KEY_CHAR && val == CtrlKey.CTRL_S) { self.save_file() }
+        if (code == KEY_CHAR && val == CtrlKey.CTRL_Q) { self.running = 0 }
     }
 
     function handle_insert(int code, int val) {

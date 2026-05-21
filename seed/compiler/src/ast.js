@@ -57,10 +57,9 @@ export function BitfieldPad(bits) {
 }
 
 // interface = compile-time method contract
-// consts: ConstDecl nodes declared inside the interface body
 // enums: EnumDecl nodes declared inside the interface body
-export function InterfaceDecl(name, methods, consts = [], enums = []) {
-    return { kind: "InterfaceDecl", name, methods, consts, enums };
+export function InterfaceDecl(name, methods, enums = []) {
+    return { kind: "InterfaceDecl", name, methods, enums };
 }
 
 export function InterfaceMethod(name, params, returnType) {
@@ -91,11 +90,6 @@ export function ClassConstructor(params, body) {
 
 export function ClassDestructor(body) {
     return { kind: "ClassDestructor", body };
-}
-
-// top-level constant: const NAME = literal
-export function ConstDecl(name, value, type) {
-    return { kind: "ConstDecl", name, value, type };
 }
 
 // enum — named integer type with compile-time variants
@@ -130,8 +124,8 @@ export function Param(name, type) {
     return { kind: "Param", name, type };
 }
 
-export function VarDecl(name, type, init, constrain = null) {
-    return { kind: "VarDecl", name, type, init, constrain };
+export function VarDecl(name, type, init, constrain = null, isConst = false) {
+    return { kind: "VarDecl", name, type, init, constrain, isConst };
 }
 
 export function Assign(name, expr) {

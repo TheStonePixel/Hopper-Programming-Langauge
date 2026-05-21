@@ -86,15 +86,6 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#constDecl.
-	enterConstDecl(ctx) {
-	}
-
-	// Exit a parse tree produced by HopperParser#constDecl.
-	exitConstDecl(ctx) {
-	}
-
-
 	// Enter a parse tree produced by HopperParser#enumDecl.
 	enterEnumDecl(ctx) {
 	}
@@ -302,15 +293,6 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#InterfaceConst.
-	enterInterfaceConst(ctx) {
-	}
-
-	// Exit a parse tree produced by HopperParser#InterfaceConst.
-	exitInterfaceConst(ctx) {
-	}
-
-
 	// Enter a parse tree produced by HopperParser#InterfaceEnum.
 	enterInterfaceEnum(ctx) {
 	}
@@ -479,6 +461,15 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 
 	// Exit a parse tree produced by HopperParser#CallbackDeclTyped.
 	exitCallbackDeclTyped(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ConstVarDecl.
+	enterConstVarDecl(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ConstVarDecl.
+	exitConstVarDecl(ctx) {
 	}
 
 

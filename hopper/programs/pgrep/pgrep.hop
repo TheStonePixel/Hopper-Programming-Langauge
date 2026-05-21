@@ -23,8 +23,9 @@ extern function pthread_mutex_unlock(address m) int
 extern function pthread_create(address tidPtr, address attr, address startFn, address arg) int
 extern function pthread_detach(int tid) int
 
-// Maximum number of files pgrep will search in one invocation.
-const MAX_FILES = 8192
+enum PgrepLimits {
+    PgrepLimits.MAX_FILES = 8192
+}
 
 // ── string helpers ────────────────────────────────────────────────────────────
 
@@ -122,7 +123,7 @@ function collectFiles(address pathStr, address filePtrs, address countPtr) {
         if (fd2 >= 0) {
             close(fd2)
             int cur = countPtr::value
-            if (cur < MAX_FILES) {
+            if (cur < PgrepLimits.MAX_FILES) {
                 address dup = pgStrDup(pathStr)
                 address slot = filePtrs + cur * 8
                 slot::value = dup
@@ -172,7 +173,7 @@ function collectFiles(address pathStr, address filePtrs, address countPtr) {
                         if (dtype == 8) {
                             // DT_REG — regular file
                             int cur = countPtr::value
-                            if (cur < MAX_FILES) {
+                            if (cur < PgrepLimits.MAX_FILES) {
                                 address dup = pgStrDup(childBuf)
                                 address slot = filePtrs + cur * 8
                                 slot::value = dup
@@ -326,7 +327,7 @@ entry main(int argc, address argv) {
     address mutHandle = outMtx.rawHandle()
 
     // Collect file paths from argv[2..argc-1].
-    address filePtrs = allocate MAX_FILES * 8
+    address filePtrs = allocate PgrepLimits.MAX_FILES * 8
     int fileCount = 0
 
     int argi = 2

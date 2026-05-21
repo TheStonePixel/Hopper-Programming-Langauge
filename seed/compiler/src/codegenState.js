@@ -4,7 +4,6 @@ export const stringConstants    = new Map();   // raw value  → @.str.N
 export const structTypes        = new Map();   // name       → { fields: [{name,type,isPad,size}] }
 export const classTypes         = new Map();   // name       → { fields: [{name,type}], methods, operators }
 export const interfaceDefs      = new Map();   // name       → { methods: [{name, params, returnType}] }
-export const moduleConstants    = new Map();   // const name → { value, type }
 export const typeAliases        = new Map();   // alias name → target type string
 export const functionReturnTypes = new Map();  // function name → { returnType, isVariadic, params }
 export const overloadGroups     = new Map();   // baseName → [{mangledName, params, returnType}]
@@ -24,7 +23,6 @@ export function resetAll() {
     structTypes.clear();
     classTypes.clear();
     interfaceDefs.clear();
-    moduleConstants.clear();
     typeAliases.clear();
     functionReturnTypes.clear();
     overloadGroups.clear();

@@ -11,7 +11,6 @@ topLevelDecl
     | structDecl
     | classDecl
     | templateDecl
-    | constDecl
     | enumDecl
     | importDecl
     | aliasDecl
@@ -46,10 +45,6 @@ entryDecl
     : 'entry' Identifier '(' paramList ')' block  # EntryBlockParams
     | 'entry' Identifier block                     # EntryBlock
     | 'entry' Identifier '=' expression            # EntryAddr
-    ;
-
-constDecl
-    : 'const' Identifier '=' '-'? literal
     ;
 
 // enum — compile-time integer type with named variants
@@ -141,7 +136,6 @@ interfaceDecl
 interfaceMember
     : 'function' fieldName '(' paramList? ')' type   # InterfaceFunc
     | 'function' fieldName '(' paramList? ')'        # InterfaceProc
-    | constDecl                                       # InterfaceConst
     | enumDecl                                        # InterfaceEnum
     ;
 
@@ -242,6 +236,7 @@ block
 
 statement
     : 'callback' Identifier '=' Identifier '(' (type (',' type)*)? ')' type  # CallbackDeclTyped
+    | 'const' type Identifier '=' expression                     # ConstVarDecl
     | type Identifier '[' IntegerLiteral ']' '=' '[' argList ']'  # ArrayDeclInit
     | type Identifier '[' IntegerLiteral ']'                    # ArrayDecl
     | type Identifier '=' 'allocate' expression constrainClause?  # AllocateVarDecl
