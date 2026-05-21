@@ -93,8 +93,8 @@ Resolves via the consuming project's `hopper.json` targets section:
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/IO.hop",
-        "implementation": "../../modules/linux/src/IO.hop"
+        "interface":      "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
   }
@@ -102,7 +102,7 @@ Resolves via the consuming project's `hopper.json` targets section:
 ```
 - The interface name must match `from` field in the binding.
 - Both the interface file and the implementation file are compiled in.
-- Constants and function signatures from the interface file come into scope.
+- Free functions from the implementation file come into scope — programs call them directly.
 
 ### Module import (old, internal use only)
 ```hopper
@@ -111,7 +111,7 @@ import tty from linux
 ```
 - Lowercase module name, no binding in hopper.json — falls through to file resolution.
 - Resolves to `modules/<name>/src/<module>.hop` or stdlib.
-- Used internally inside library implementations (e.g. linux/src/IO.hop imports `io from arch`).
+- Used only by legacy lowercase files in `hopper/nonconform/`.
 - Do NOT use this form in application code — use the interface import form.
 
 ---
@@ -289,85 +289,74 @@ int n = cast someAddress        // address → int
 
 ## Module Architecture
 
-### Three-Tier Module System
+### Design Principle: Source code sees OS, build file sees hardware
 
-Modules fall into three tiers. Only the user-facing library tier uses the interface/class system.
+Programs import `IO from linux` and `FileSystem from linux` — hardware-independent names.
+They call free functions (`open`, `read`, `write`, `close`) and never name x86-64, ARM64, or
+any ISA. The build file (`hopper.json` targets) is the only place where hardware is named.
+Changing from x86_64 to arm64 requires editing only the `implementation` paths in hopper.json —
+zero source changes anywhere.
 
-#### Tier 1 — Hardware (`x86_64/`)
-The x86_64 module contains two kinds of implementations:
+#### Hardware layer (`x86_64/`)
+The x86_64 module contains two kinds of things:
 
 **LinuxSyscalls** — the joint Linux OS ABI + x86-64 ISA interface. Syscall numbers here are
-specific to Linux on x86-64 (different on ARM64 Linux, different on macOS x86-64). The class
-`X86LinuxSyscalls implements LinuxSyscalls` provides ~150 syscalls as inline-asm methods.
-File: `x86_64/src/LinuxSyscalls.hop` (self-contained: interface declaration + class together).
+specific to Linux on x86-64 (different on ARM64 Linux, different on macOS x86-64). The file
+`x86_64/src/LinuxSyscalls.hop` contains `interface LinuxSyscalls` (documenting ~150 syscalls)
+plus free function implementations of each one using inline asm. No class, no instantiation —
+the free functions come into scope when a build target's `implementation` resolves to this file.
 
 **SIMD** — SSE2 vector operations: `scanByte16`, `scanByte2x16`, `scanByteOR4x16`, `popcnt16`,
-`bsf16`. The class `X86SIMD implements SIMD` wraps SSE2 instructions.
+`bsf16`. The class `X86SIMD implements SIMD` wraps SSE2 instructions. SIMD is an ISA capability,
+not an OS interface, so it uses a class and programs instantiate `X86SIMD` directly.
 Files: `x86_64/interfaces/SIMD.hop` + `x86_64/src/SIMD.hop`.
 
-Never import `LinuxSyscalls` directly in application code — it is for linux module internals only.
-Programs may import `SIMD from x86_64` directly.
-
-#### Tier 2 — Architecture abstraction (`arch/`)
-Each file is a single line: `import <name> from x86_64`.
-This is a portability shim — to retarget to ARM64, change `x86_64` to `arm64` here only.
-Used only by legacy lowercase linux files (`linux/src/io.hop`, etc.). New conforming
-implementations use LinuxSyscalls directly, bypassing arch.
-
-#### Tier 3 — User-facing library (`linux/`)
-The conforming, new-standard module. Exports 7 interfaces via the interface/class system:
+#### OS interface layer (`linux/`)
+A pure interface module — no implementation files, no classes, no source to edit when porting.
+Exports 7 interfaces that declare what a Linux program needs:
 - `IO` — read, write, pread64, pwrite64, readv, writev, sendfile, splice, tee, ioctl
 - `FileSystem` — open, close, stat, mkdir, unlink, rename, getcwd, dup, pipe, inotify, ...
 - `System` — uname, sysinfo, clocks, scheduling, resource limits
-- `Process` — fork, exec, wait, getpid/uid/gid, signals, ptrace
+- `Process` — fork, execve, waitpid, getpid/uid/gid, signals, ptrace
 - `Socket` — socket, socketBind, listen, accept, connect, send, recv, setsockopt, ...
-- `Network` — select, poll, epoll
+- `Network` — select, poll, epoll_create1, epoll_ctl, epoll_wait
 - `Memory` — mmap, munmap, mprotect, mremap, madvise, mlock, memfd_create
 
-Each uppercase implementation file (`src/IO.hop`, `src/FileSystem.hop`, etc.) follows the pattern:
-```hopper
-import LinuxSyscalls from x86_64
-
-function read(int fd, address buf, int count) int {
-    X86LinuxSyscalls sys = X86LinuxSyscalls()
-    return sys.read(fd, buf, count)
-}
-
-class LinuxIO implements IO {
-    function read(int fd, address buf, int count) int { return read(fd, buf, count) }
+#### Architecture selector (hopper.json targets)
+The build file connects the OS interface to the hardware implementation:
+```json
+"IO": {
+  "from":           "linux",
+  "interface":      "modules/linux/interfaces/IO.hop",
+  "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
 }
 ```
+To retarget: change `x86_64` to `arm64` in every `implementation` path. That is the entire
+porting change for the build layer. Program source and linux interfaces are untouched.
 
 ### Non-conforming legacy modules (`hopper/nonconform/`)
-Everything in `hopper/nonconform/` was written before the new interface/class standard.
+Everything in `hopper/nonconform/` was written before the new interface standard.
 Do NOT import from any of these until they have been updated and moved to `hopper/modules/`:
 `Pointer`, `algo`, `ascii`, `char`, `cli`, `concurrent`, `core`, `ds`, `fs`, `io`, `json`,
 `llvm`, `math`, `path`, `regex`, `stream`, `string`, `tui`, `uart`, `utf8`
 
-If you need file I/O inside a conforming module, use `import LinuxSyscalls from x86_64` and
-instantiate `X86LinuxSyscalls` directly.
-
 ### Dependency chain
 ```
 program → import IO from linux
-             ↓ hopper.json binding resolves to:
-          linux/interfaces/IO.hop    (interface contract + enums)
-          linux/src/IO.hop           (class LinuxIO implements IO)
-             ↓ import LinuxSyscalls from x86_64  (regular module import)
-          x86_64/src/LinuxSyscalls.hop  (interface LinuxSyscalls + class X86LinuxSyscalls)
+             ↓ hopper.json targets binding resolves to:
+          linux/interfaces/IO.hop       (interface contract)
+          x86_64/src/LinuxSyscalls.hop  (interface LinuxSyscalls + free functions)
                                          → inline-ASM syscalls, no further dependencies
+          free functions from LinuxSyscalls.hop come into scope → program calls open(), read()...
 ```
 
 **Important — keyword collision**: `bind` is a grammar keyword (hardware address linker directive).
 The socket `bind` syscall is exposed as `socketBind` in both the `LinuxSyscalls` interface and
 the `linux/interfaces/Socket.hop` interface.
 
-**Important — `LinuxSyscalls.hop` is self-contained**: the interface declaration and class
-implementation live in the same `src/` file. This is required because the build system passes
-root project bindings to all sub-compilations; when programs compile linux implementation files,
-`LinuxSyscalls` is not in the program's bindings, so the file is loaded via regular module
-resolution (which only loads the src file, not the interfaces/ file). The self-contained design
-ensures the interface is always in scope when the class is compiled.
+**Important — `LinuxSyscalls.hop` is self-contained**: the interface declaration and free
+function implementations live in the same `src/` file. This ensures the interface is in scope
+when any file imports LinuxSyscalls, regardless of how the build system resolves the path.
 
 ---
 
@@ -386,8 +375,13 @@ ensures the interface is always in scope when the class is compiled.
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/IO.hop",
-        "implementation": "../../modules/linux/src/IO.hop"
+        "interface":      "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      },
+      "FileSystem": {
+        "from":           "linux",
+        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
   }

@@ -14,12 +14,12 @@
       "IO": {
         "from": "linux",
         "interface": "modules/linux/interfaces/IO.hop",
-        "implementation": "modules/linux/src/IO.hop"
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       },
       "FileSystem": {
         "from": "linux",
         "interface": "modules/linux/interfaces/FileSystem.hop",
-        "implementation": "modules/linux/src/FileSystem.hop"
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       },
       "SIMD": {
         "from": "x86_64",
