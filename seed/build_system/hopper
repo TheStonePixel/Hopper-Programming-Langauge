@@ -338,7 +338,21 @@ function cmdBuild(args) {
         args.splice(outputIdx, 2);
     }
 
-    const files = args.length ? args : ["main.hop"];
+    let files;
+    if (args.length) {
+        files = args;
+    } else {
+        // Read entry from hopper.json in cwd if present
+        const mf = path.join(process.cwd(), "hopper.json");
+        if (fs.existsSync(mf)) {
+            try {
+                const m = JSON.parse(fs.readFileSync(mf, "utf8"));
+                files = [m.entry || "src/main.hop"];
+            } catch { files = ["src/main.hop"]; }
+        } else {
+            files = ["src/main.hop"];
+        }
+    }
     const missing = files.filter(f => !fs.existsSync(f));
     if (missing.length) {
         console.error(`hopper: file not found: ${missing.join(", ")}`);
