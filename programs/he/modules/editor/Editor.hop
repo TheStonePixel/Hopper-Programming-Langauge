@@ -399,9 +399,17 @@ class Editor {
             Key k = t.readKey()
             int code = k.getCode()
             int val  = k.getVal()
-            if (self.mode == Mode.NORMAL)  { self.handle_normal(code, val) }
-            if (self.mode == Mode.INSERT)  { self.handle_insert(code, val) }
-            if (self.mode == Mode.COMMAND) { self.handle_command(code, val) }
+            if (self.mode == Mode.NORMAL) {
+                self.handle_normal(code, val)
+            } else {
+                if (self.mode == Mode.INSERT) {
+                    self.handle_insert(code, val)
+                } else {
+                    if (self.mode == Mode.COMMAND) {
+                        self.handle_command(code, val)
+                    }
+                }
+            }
         }
         t.clear()
         t.flush()

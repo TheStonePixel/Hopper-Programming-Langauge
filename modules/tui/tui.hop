@@ -202,7 +202,7 @@ class Terminal {
         vtimeAddr::value = bOne
         vminAddr::value  = bZero
 
-        tcsetattr(0, 0, raw)
+        tcsetattr(0, 0x5402, raw)
         deallocate raw
 
         // Query terminal dimensions via TIOCGWINSZ
@@ -225,7 +225,7 @@ class Terminal {
     destructor() {
         self.out.appendStr("\x1b[0m\x1b[?25h\x1b[?1049l")
         self.flush()
-        tcsetattr(0, 0, self.savedTermios)
+        tcsetattr(0, 0x5402, self.savedTermios)
         deallocate self.savedTermios
     }
 
@@ -234,7 +234,7 @@ class Terminal {
     function close() {
         self.out.appendStr("\x1b[0m\x1b[?25h\x1b[?1049l")
         self.flush()
-        tcsetattr(0, 0, self.savedTermios)
+        tcsetattr(0, 0x5402, self.savedTermios)
         deallocate self.savedTermios
     }
 
