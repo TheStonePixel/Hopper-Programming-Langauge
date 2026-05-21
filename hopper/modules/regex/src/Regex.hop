@@ -1,8 +1,24 @@
-function _swar32(int w, int target) int {
-    int xr = w ^ target
-    int sub = xr - 0x01010101
-    int inv = ~xr
-    return (sub & inv) & 0x80808080
+// One 16-byte load; compare against pbc (first-char broadcast) and 0 (null).
+// Returns fcMask in bits 0–15, nulMask in bits 16–31.
+function _simd16pair(address ptr, int pbc) int {
+    int result = 0
+    asm {
+        rdi = ptr
+        rsi = pbc
+        movd xmm2, esi
+        pshufd xmm2, xmm2, 0
+        pxor xmm3, xmm3
+        movdqu xmm0, [rdi]
+        movdqa xmm1, xmm0
+        pcmpeqb xmm0, xmm2
+        pcmpeqb xmm1, xmm3
+        pmovmskb rax, xmm0
+        pmovmskb rcx, xmm1
+        shl rcx, 16
+        or rax, rcx
+        result = rax
+    }
+    return result
 }
 
 function _atomLen(address pat) int {
@@ -243,8 +259,7 @@ function _litLen(address pat) int {
 }
 
 // Returns start offset of first match, or -1.
-// Scans 8 bytes at a time via split-32-bit SWAR (safe for JS double precision),
-// falling back to byte-at-a-time only when a candidate or end-of-string is found.
+// Scans 16 bytes at a time via SSE2: one load checks both first-char and null.
 function _litSearch(address pat, int plen, address text) int {
     if (plen == 0) { return 0 }
     address pp0 = pat
@@ -255,25 +270,17 @@ function _litSearch(address pat, int plen, address text) int {
 
     int i = 0
     while (true) {
-        address wp = text + i
-        int word = wp::value
-        int wLo = word & 0xFFFFFFFF
-        int wHi = (word >> 32) & 0xFFFFFFFF
+        address tp = text + i
+        int pair    = _simd16pair(tp, pbc)
+        int fcMask  = pair & 0xFFFF
+        int nulMask = (pair >> 16) & 0xFFFF
 
-        // Check for null byte (end of string) in either half
-        int nzLo = _swar32(wLo, 0)
-        int nzHi = _swar32(wHi, 0)
-
-        // Check for first char of pattern in either half
-        int fcLo = _swar32(wLo, pbc)
-        int fcHi = _swar32(wHi, pbc)
-
-        if (nzLo != 0 || nzHi != 0 || fcLo != 0 || fcHi != 0) {
-            // Slow path: inspect each byte in this word
+        if (nulMask != 0) {
+            // Null byte in this window — byte-at-a-time to find exact stop
             int j = 0
-            while (j < 8) {
-                address tp = text + i + j
-                byte tb = tp::value
+            while (j < 16) {
+                address tp2 = text + i + j
+                byte tb = tp2::value
                 int tc = cast tb
                 if (tc == 0) { return -1 }
                 if (tb == pfb) {
@@ -282,21 +289,46 @@ function _litSearch(address pat, int plen, address text) int {
                     while (k < plen) {
                         address pp = pat + k
                         byte pb = pp::value
-                        address tp2 = text + i + j + k
-                        byte tb2 = tp2::value
-                        if (pb != tb2) {
-                            ok = false
-                            k = plen
-                        } else {
-                            k = k + 1
-                        }
+                        address tp3 = text + i + j + k
+                        byte tb3 = tp3::value
+                        if (pb != tb3) {
+                        ok = false
+                        k = plen
+                    } else { k = k + 1 }
                     }
                     if (ok) { return i + j }
                 }
                 j = j + 1
             }
+        } else if (fcMask != 0) {
+            // First-char hits: use BSF to jump to each candidate
+            int fm = fcMask
+            while (fm != 0) {
+                int j = 0
+                asm {
+                    rdi = fm
+                    bsf rax, rdi
+                    j = rax
+                }
+                bool ok = true
+                int k = 1
+                while (k < plen) {
+                    address pp = pat + k
+                    byte pb = pp::value
+                    address tp2 = text + i + j + k
+                    byte tb2 = tp2::value
+                    if (pb != tb2) {
+                        ok = false
+                        k = plen
+                    } else { k = k + 1 }
+                }
+                if (ok) { return i + j }
+                fm = fm & (fm - 1)
+            }
+            i = i + 16
+        } else {
+            i = i + 16
         }
-        i = i + 8
     }
     return -1
 }
