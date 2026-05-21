@@ -72,10 +72,11 @@ function findProjectRoot(startDir) {
     }
 }
 
-// Returns { projectRoot, buildDir, llDir, oDir } for the given entry file and profile.
-function profileDirs(entryFile, profile) {
+// Returns { projectRoot, buildDir, llDir, oDir } for the given entry file.
+// Executables land directly in build/; intermediates go in build/ll/ and build/o/.
+function profileDirs(entryFile, _profile) {
     const projectRoot = findProjectRoot(path.dirname(path.resolve(entryFile)));
-    const buildDir    = path.join(projectRoot, "build", profile);
+    const buildDir    = path.join(projectRoot, "build");
     const llDir       = path.join(buildDir, "ll");
     const oDir        = path.join(buildDir, "o");
     fs.mkdirSync(llDir, { recursive: true });
@@ -627,8 +628,6 @@ async function cmdInit(args) {
 
     fs.writeFileSync(path.join(projectDir, "hopper.json"),
         JSON.stringify(manifest, null, 2) + "\n", "utf8");
-
-    fs.writeFileSync(path.join(projectDir, ".gitignore"), "build/\n", "utf8");
 
     console.log(`\ncreated ${safeName}/`);
     console.log(`  ${safeName}/hopper.json`);
