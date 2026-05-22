@@ -16,7 +16,20 @@ This matters because most systems programming languages treat syscalls as if the
 
 When the constraint is invisible, so is the porting effort. A program that calls `libc.read` appears portable until you try to compile it for a new architecture, at which point you discover that every syscall number is wrong. The mismatch is encoded in libc's implementation, not in the program's type system.
 
-Hopper makes the constraint legible.
+Hopper makes the constraint legible. The goal is not merely portability but inspectability: a developer should be able to find every hardware assumption by reading module names and build files, not by tracing implementation code. The mechanism is naming — where an interface lives in the module system is part of what it means.
+
+---
+
+## Non-Goals
+
+Hopper does not attempt:
+
+- **Transparent cross-platform portability.** There is no runtime layer that silently adapts syscalls to the current architecture. Hardware specificity is named, not hidden.
+- **Runtime abstraction over ISA differences.** When code runs on x86-64, it uses x86-64 instructions. There is no virtual ISA, no JIT that adapts to the target.
+- **Automatic syscall virtualization.** Syscall numbers are compiled in at build time. There is no dynamic dispatch based on detected hardware.
+- **Hidden hardware adaptation.** Portability is achieved by naming differences precisely enough that the only change required is in the build file — not by making differences disappear.
+
+The design philosophy is distinct from most platform abstraction systems. Hopper does not try to make hardware invisible. It tries to make hardware legible.
 
 ---
 
@@ -317,7 +330,7 @@ The same program running on ARM64:
 }
 ```
 
-Every `interface` path is unchanged. Every `from` value is unchanged. The only difference is the `implementation` paths — and for SIMD, the `from` field (because SIMD is ISA-specific with no OS-level analog). The program source compiles identically on both targets.
+Interface paths and contract names are identical across both targets. Only `implementation` paths differ — and for SIMD, the `from` field, because SIMD is ISA-specific with no OS-level analog.
 
 ### What the Compiler Does
 
@@ -360,6 +373,8 @@ The design produces engineering properties that matter in practice.
 
 **Cross-target builds are explicit by construction.** A build targeting both x86-64 and ARM64 has two named target blocks. The differences between them are enumerable and visible in one file. There is no implicit platform detection, no `#ifdef`, no conditional compilation scattered through source.
 
+Hopper trades automatic platform abstraction for explicit build-time architecture mapping. There is no runtime layer that silently adapts to the host; portability work must be named upfront. The benefit of that cost is everything listed above: when the work is named, it can be measured, audited, and verified complete.
+
 ---
 
 ## Porting
@@ -379,11 +394,11 @@ The OS boundary and the ISA boundary are separate axes. Hopper names both explic
 
 ## Why Naming Matters
 
-The most important design decision in this architecture is naming: `LinuxSyscalls` lives in the `x86_64` module.
+The interface name and module location together constitute the type of the constraint. This is the most important design decision in the architecture.
 
-An alternative design might put `LinuxSyscalls` in the `linux` module, treating it as an OS-level abstraction. But that would be wrong. The syscall numbers inside `LinuxSyscalls` are not properties of Linux in the abstract — they are properties of Linux on x86-64. The interface name and module location together constitute the type of the constraint. Moving `LinuxSyscalls` to the `linux` module would misstate the type.
+`LinuxSyscalls` lives in the `x86_64` module. Not the `linux` module — `x86_64`. The syscall numbers inside it are not properties of Linux in the abstract; they are properties of Linux on x86-64. If `LinuxSyscalls` lived in `linux/`, the name would suggest OS-level generality. The module location would contradict the content. The type would be wrong.
 
-Another alternative might name it `X86LinuxABI` or `X86_64LinuxSyscalls`. These are accurate but verbose. `LinuxSyscalls`, scoped to the `x86_64` module, reads correctly: "the Linux syscall interface, as it exists on x86-64." The module name provides the ISA context; the interface name provides the OS context.
+Conversely, a name like `X86_64LinuxSyscalls` in the `x86_64` module would be accurate but redundant — the module already provides the ISA context. `LinuxSyscalls` in `x86_64/` reads correctly: "the Linux syscall interface, as it exists on x86-64." The module name provides the ISA; the interface name provides the OS. Together they are precise.
 
 This naming discipline makes the dependency graph honest. When a program imports `IO from linux`, it depends on the Linux OS abstraction. When the build file resolves that to `x86_64/src/LinuxSyscalls.hop`, it declares the hardware dependency explicitly. When the build system resolves that dependency, it knows exactly what it is providing: not "a syscall interface," but the Linux syscall interface on x86-64.
 
