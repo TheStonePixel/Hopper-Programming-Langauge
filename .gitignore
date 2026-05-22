@@ -1,5 +1,6 @@
 node_modules/
 build/
+!hopper-spec/03-build/
 src/generated/
 *.o
 *.ll
