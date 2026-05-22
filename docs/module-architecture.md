@@ -136,6 +136,204 @@ Programs never write `mov` or `pshufd`. The hardware specifics live in `x86_64/s
 
 ---
 
+## Two Interfaces, Two Hardware Targets
+
+The full picture becomes clearest when you hold two hardware targets side by side. Here are `LinuxSyscalls` and `SIMD` — two interfaces with fundamentally different characters — implemented on both x86-64 and ARM64.
+
+### The Shared Contracts
+
+The `linux` module declares what a Linux program needs. These interface files live in `linux/interfaces/` and are identical regardless of hardware:
+
+```hopper
+// linux/interfaces/IO.hop
+interface IO {
+    function read(int fd, address buf, int count) int
+    function write(int fd, address buf, int count) int
+    function pread64(int fd, address buf, int count, int offset) int
+    function pwrite64(int fd, address buf, int count, int offset) int
+}
+```
+
+```hopper
+// x86_64/interfaces/SIMD.hop  (also the arm64/interfaces/SIMD.hop contract)
+interface SIMD {
+    function scanByte16(address ptr, int b) int
+    function scanByteOR4x16(address ptr, int b1, int b2, int b3, int b4) int
+    function popcnt16(int mask) int
+    function bsf16(int mask) int
+}
+```
+
+These files do not change when hardware changes. They are the stable contracts that programs depend on.
+
+### x86-64: Syscall Instruction, SSE2
+
+`x86_64/src/LinuxSyscalls.hop` implements the Linux kernel's x86-64 ABI. Syscall number into `rax`, arguments into `rdi rsi rdx r10 r8 r9`, return from `rax`:
+
+```hopper
+// x86_64/src/LinuxSyscalls.hop
+
+interface LinuxSyscalls {
+    function read(int fd, address buf, int count) int
+    function write(int fd, address buf, int count) int
+    // ...
+}
+
+function read(int fd, address buf, int count) int {
+    int result
+    asm { rax = 0   rdi = fd   rsi = buf   rdx = count   syscall   result = rax }
+    return result
+}
+
+function write(int fd, address buf, int count) int {
+    int result
+    asm { rax = 1   rdi = fd   rsi = buf   rdx = count   syscall   result = rax }
+    return result
+}
+```
+
+`x86_64/src/SIMD.hop` uses SSE2 to scan 16 bytes per instruction:
+
+```hopper
+// x86_64/src/SIMD.hop
+
+class X86SIMD implements SIMD {
+    function scanByte16(address ptr, int b) int {
+        int result
+        asm {
+            movd    xmm1, b
+            pxor    xmm0, xmm0
+            pshufb  xmm1, xmm0
+            movdqu  xmm0, [ptr]
+            pcmpeqb xmm0, xmm1
+            pmovmskb result, xmm0
+        }
+        return result
+    }
+}
+```
+
+### ARM64: SVC Instruction, NEON
+
+`arm64/src/LinuxSyscalls.hop` implements the same `interface LinuxSyscalls` contract, but with ARM64 syscall numbers (the Linux kernel assigns different numbers on each ISA) and the ARM64 ABI: syscall number into `x8`, arguments into `x0–x5`, `svc #0` to enter the kernel:
+
+```hopper
+// arm64/src/LinuxSyscalls.hop
+
+interface LinuxSyscalls {
+    function read(int fd, address buf, int count) int
+    function write(int fd, address buf, int count) int
+    // ...
+}
+
+function read(int fd, address buf, int count) int {
+    int result
+    asm { x8 = 63   x0 = fd   x1 = buf   x2 = count   svc 0   result = x0 }
+    return result
+}
+
+function write(int fd, address buf, int count) int {
+    int result
+    asm { x8 = 64   x0 = fd   x1 = buf   x2 = count   svc 0   result = x0 }
+    return result
+}
+```
+
+Note syscall numbers: `read` is **0** on x86-64, **63** on ARM64. `write` is **1** on x86-64, **64** on ARM64. The interface contract (`read(int, address, int) int`) is identical. The numbers are completely different.
+
+`arm64/src/SIMD.hop` implements the same `interface SIMD` using NEON, ARM64's vector extension:
+
+```hopper
+// arm64/src/SIMD.hop
+
+class ARM64SIMD implements SIMD {
+    function scanByte16(address ptr, int b) int {
+        int result
+        asm {
+            dup     v1.16b, b
+            ld1     {v0.16b}, [ptr]
+            cmeq    v0.16b, v0.16b, v1.16b
+            shrn    v0.8b, v0.8h, 4
+            fmov    result, d0
+        }
+        return result
+    }
+}
+```
+
+Different instructions, different register names, different encoding — identical interface.
+
+### The Build File: The Only Difference
+
+A program running on x86-64:
+
+```json
+{
+  "targets": {
+    "host": {
+      "IO": {
+        "from":           "linux",
+        "interface":      "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      },
+      "FileSystem": {
+        "from":           "linux",
+        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      },
+      "SIMD": {
+        "from":           "x86_64",
+        "interface":      "modules/x86_64/interfaces/SIMD.hop",
+        "implementation": "modules/x86_64/src/SIMD.hop"
+      }
+    }
+  }
+}
+```
+
+The same program running on ARM64:
+
+```json
+{
+  "targets": {
+    "host": {
+      "IO": {
+        "from":           "linux",
+        "interface":      "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/arm64/src/LinuxSyscalls.hop"
+      },
+      "FileSystem": {
+        "from":           "linux",
+        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "implementation": "modules/arm64/src/LinuxSyscalls.hop"
+      },
+      "SIMD": {
+        "from":           "arm64",
+        "interface":      "modules/arm64/interfaces/SIMD.hop",
+        "implementation": "modules/arm64/src/SIMD.hop"
+      }
+    }
+  }
+}
+```
+
+Every `interface` path is unchanged. Every `from` value is unchanged. The only difference is the `implementation` paths — and for SIMD, the `from` field (because SIMD is ISA-specific with no OS-level analog). The program source compiles identically on both targets.
+
+### What the Compiler Does
+
+When the build system processes the x86-64 target:
+
+1. It loads `linux/interfaces/IO.hop` — the contract. All function signatures come into scope.
+2. It loads `x86_64/src/LinuxSyscalls.hop` — the implementation. The free functions `read`, `write`, `open`, `close`, ... come into scope.
+3. It checks that every function declared in `IO` is present in `LinuxSyscalls.hop` with matching signatures.
+4. It compiles the program, resolving calls to `read(fd, buf, n)` to the x86-64 inline-asm implementation.
+
+When the build system processes the ARM64 target, steps 1–4 are identical — except step 2 loads `arm64/src/LinuxSyscalls.hop`, so the same call `read(fd, buf, n)` resolves to the ARM64 `svc 0` implementation.
+
+The program never sees either choice. It calls `read`. The build file decides which `read`.
+
+---
+
 ## Why the Build File Holds Architecture
 
 The critical design decision is: **source code sees OS, build file sees hardware.**
