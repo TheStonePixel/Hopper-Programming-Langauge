@@ -904,8 +904,6 @@ export function genExpr(ir, expr) {
         }
 
         case "CastExpr": {
-            if (expr.targetType === null)
-                throw new Error("cast requires an assignment context");
             const inner = genExpr(ir, expr.expr);
             return emitCast(ir, inner.value, inner.type, expr.targetType);
         }

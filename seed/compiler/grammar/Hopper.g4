@@ -302,7 +302,7 @@ relational      : shift ( ('<' | '<=' | '>' | '>=') shift )* ;
 shift           : additive ( ('<<' | '>>') additive )* ;
 additive        : multiplicative ( ('+' | '-') multiplicative )* ;
 multiplicative  : unary ( ('*' | '/' | '%') unary )* ;
-unary           : ('!' | '-' | '~') unary | 'cast' unary | castType unary | primary ;
+unary           : ('!' | '-' | '~') unary | castType unary | primary ;
 
 // Type-name-as-cast: int pi, byte x, float count — explicit coercion, usable in any expression
 castType
@@ -317,7 +317,8 @@ castType
     | 'unsigned' 'byte'
     ;
 primary
-    : IntegerLiteral
+    : 'cast' '<' castType '>' '(' expression ')'
+    | IntegerLiteral
     | HexLiteral
     | CharLiteral
     | UnicodeLiteral
