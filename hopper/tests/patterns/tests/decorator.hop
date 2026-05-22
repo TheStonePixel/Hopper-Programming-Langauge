@@ -1,0 +1,92 @@
+// TEST: log decorator wraps calls
+// EXPECT: [square] 4 -> 16
+// EXPECT: [cube] 3 -> 27
+
+// TEST: memo skips computation on repeated arg
+// EXPECT: [memo miss] 10 -> 55
+// EXPECT: [memo  hit] 10 -> 55
+// EXPECT: [memo  hit] 10 -> 55
+
+// TEST: memo miss on new arg
+// EXPECT: [memo miss] 15 -> 610
+
+// TEST: memo miss when cache replaced
+// EXPECT: [memo miss] 10 -> 55
+
+extern function printf(string fmt, ...) int
+
+function computeSquare(int n) int { return n * n }
+function computeCube(int n) int   { return n * n * n }
+
+function computeFib(int n) int {
+    if (n <= 1) { return n }
+    int a = 0
+    int b = 1
+    int i = 2
+    while (i <= n) {
+        int tmp = a + b
+        a = b
+        b = tmp
+        i = i + 1
+    }
+    return b
+}
+
+class LogDecorator {
+    address inner
+    string  name
+
+    constructor(string n, address fn) {
+        self.name  = n
+        self.inner = fn
+    }
+
+    function call(int arg) int {
+        callback(int) int fn = cast self.inner
+        int result = fn(arg)
+        printf("[%s] %lld -> %lld\n", self.name, arg, result)
+        return result
+    }
+}
+
+class MemoDecorator {
+    address inner
+    int     cachedArg
+    int     cachedResult
+    int     valid
+
+    constructor(address fn) {
+        self.inner        = fn
+        self.valid        = 0
+        self.cachedArg    = 0
+        self.cachedResult = 0
+    }
+
+    function call(int arg) int {
+        if (self.valid == 1 && self.cachedArg == arg) {
+            printf("[memo  hit] %lld -> %lld\n", arg, self.cachedResult)
+            return self.cachedResult
+        }
+        callback(int) int fn = cast self.inner
+        int result = fn(arg)
+        self.cachedArg    = arg
+        self.cachedResult = result
+        self.valid        = 1
+        printf("[memo miss] %lld -> %lld\n", arg, result)
+        return result
+    }
+}
+
+entry main {
+    LogDecorator sq = LogDecorator("square", computeSquare::address)
+    LogDecorator cb = LogDecorator("cube",   computeCube::address)
+    sq.call(4)
+    cb.call(3)
+
+    MemoDecorator mfib = MemoDecorator(computeFib::address)
+    mfib.call(10)
+    mfib.call(10)
+    mfib.call(10)
+    mfib.call(15)
+    mfib.call(10)
+}
