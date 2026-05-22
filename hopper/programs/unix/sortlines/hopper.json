@@ -22,8 +22,8 @@
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       },
       "SIMD": {
-        "from": "x86_64",
-        "interface": "modules/x86_64/interfaces/SIMD.hop",
+        "from": "compute",
+        "interface": "modules/compute/interfaces/SIMD.hop",
         "implementation": "modules/x86_64/src/SIMD.hop"
       }
     }

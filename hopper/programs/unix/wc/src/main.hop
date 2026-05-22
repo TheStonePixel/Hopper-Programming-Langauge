@@ -8,7 +8,7 @@
 
 import IO         from linux
 import FileSystem from linux
-import SIMD       from x86_64
+import SIMD       from compute
 
 extern function printf(string fmt, ...) int
 
