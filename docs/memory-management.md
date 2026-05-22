@@ -117,30 +117,31 @@ This is Hopper's RAII. The destructor is not implicit — it is a named, inspect
 
 ## Allocation as a Composable Resource
 
-Memory allocation is not globally fixed. It is composable through explicit strategy injection.
+Memory allocation in Hopper is not fixed policy. It is a composable system behavior.
 
-Allocators are passed as callbacks — explicitly typed function references. A callback is declared by binding a name to a function signature:
+Allocation strategies are passed as fully-specified function contracts. A function pointer in Hopper is not a generic reference — it is a resolved signature that encodes both input and output types at declaration time.
 
-```hopper
-callback alloc = allocate(int) address       // takes size, returns address
-callback free  = deallocate(address)         // takes address, returns nothing
-```
+This follows a strict constraint:
 
-The format is `callback name = functionName(paramTypes) returnType`. The type includes the full signature — parameter types and return type — not just a generic function pointer. A function can also be passed directly by name as a callback argument without declaring a named variable first.
+> A function pointer must be unambiguous at the point of definition. Overloading is not permitted because it destroys contract identity.
 
-This enables allocator substitution without altering pool logic:
+A callback is declared as a named, fully typed function signature:
 
 ```hopper
-callback heapAlloc = allocate(int) address
-callback heapFree  = deallocate(address)
-Pool heap = Pool(65536, heapAlloc, heapFree)
-
-callback mmapAlloc = mmapRegion(int) address
-callback mmapFree  = unmapRegion(address)
-Pool mapped = Pool(65536, mmapAlloc, mmapFree)
+callback alloc = allocate(int) address
+callback free  = deallocate(address)
 ```
 
-Memory policy becomes a parameter, not a hidden runtime behavior. The `Pool` class accepts its allocation strategy in the constructor and stores the raw function addresses, casting them back to callback types when called:
+The signature is part of the type. It is not inferred, not overloaded, and not resolved later.
+
+This allows allocation policy to become a parameter rather than a runtime assumption:
+
+```hopper
+Pool heap   = Pool(65536, allocate(int) address, deallocate(address))
+Pool mapped = Pool(65536, mmapRegion(int) address, unmapRegion(address))
+```
+
+The Pool class stores these functions as raw callable addresses with their signatures preserved at compile time. When invoked, they are cast back into their declared form:
 
 ```hopper
 class Pool {
@@ -150,33 +151,31 @@ class Pool {
     address allocFn
     address freeFn
 
-    constructor(int size, callback(int) address alloc, callback(address) free) {
+    constructor(int size,
+                callback(int) address alloc,
+                callback(address) free) {
         self.allocFn  = alloc::address
         self.freeFn   = free::address
-        self.capacity = size
-        self.used     = 0
         callback(int) address doAlloc = cast self.allocFn
-        self.region = doAlloc(size)
+        self.region   = doAlloc(size)
     }
 
     destructor() {
         callback(address) doFree = cast self.freeFn
         doFree(self.region)
     }
-
-    function push(int size) address {
-        int aligned = (size + 7) & -8
-        if (self.used + aligned > self.capacity) {
-            return cast 0
-        }
-        address ptr = self.region + self.used
-        self.used   = self.used + aligned
-        return ptr
-    }
 }
 ```
 
-`alloc::address` extracts the raw function address from the callback — the same `::address` qualifier used on variables. Storing it as `address` and casting back at the call site is how callbacks survive beyond the immediate call when held in a struct.
+The key constraint is structural:
+
+- function identity is preserved as data
+- invocation requires explicit type restoration
+- no implicit signature matching exists at runtime
+
+This makes allocation strategy substitution a compile-time-visible property rather than a behavioral side effect.
+
+Callbacks in Hopper are not a memory feature. They are a compile-time enforced contract system for runtime behavior injection — the same category as ISA modules, syscall bindings, and build file hardware mappings. Where the rest of Hopper resolves everything at build time, callbacks are runtime-resolved contracts that still carry their full type identity. The signature cannot be ambiguous because ambiguity is forbidden in system interfaces throughout the language.
 
 ---
 
