@@ -1,6 +1,7 @@
 node_modules/
 build/
 !hopper-spec/03-build/
+hopper-spec/builder/*.pdf
 src/generated/
 *.o
 *.ll
