@@ -12,26 +12,46 @@ import FileSystem from linux
 extern function printf(string fmt, ...) int
 
 enum Limits {
-    CHUNK = 4096
-    ROW   = 16
+    CHUNK   = 4096
+    ROW     = 16
+    OUTSIZE = 18000
 }
 
-function hexChar(int n) int {
-    if (n < 10) {
-        return n + 48
+// Build a 512-byte lookup table: table[b*2] = high nibble ASCII, table[b*2+1] = low nibble ASCII.
+// Eliminates per-byte branching and hexChar calls in the inner loop.
+function buildHexTable(address table) {
+    int i = 0
+    while (i < 256) {
+        int hi = (i >> 4) & 0xF
+        int lo = i & 0xF
+        int hc = 0
+        int lc = 0
+        if (hi < 10) { hc = hi + 48 } else { hc = hi + 87 }
+        if (lo < 10) { lc = lo + 48 } else { lc = lo + 87 }
+        address p0 = table + i * 2
+        address p1 = table + i * 2 + 1
+        byte bh = cast hc
+        byte bl = cast lc
+        p0::value = bh
+        p1::value = bl
+        i = i + 1
     }
-    return n + 87
 }
 
-function dumpFd(int fd, address inbuf, address outbuf) {
+function dumpFd(int fd, address inbuf, address outbuf, address hextable) {
     int fileOffset = 0
     bool eof = false
+    byte space = 32
+    byte colon = 58
+    byte nl    = 10
+    byte dot   = 46
 
     while (!eof) {
         int nr = read(fd, inbuf, Limits.CHUNK)
         if (nr <= 0) {
             eof = true
         } else {
+            int pos = 0
             int row = 0
             while (row * Limits.ROW < nr) {
                 int rowStart = row * Limits.ROW
@@ -40,100 +60,104 @@ function dumpFd(int fd, address inbuf, address outbuf) {
                     rowLen = Limits.ROW
                 }
 
-                // offset: 8 hex digits + colon + space = 10 chars
-                int pos = 0
+                int rowOutStart = pos
                 int off = fileOffset + rowStart
-                int shift = 28
+
+                // offset: 4 bytes → 8 hex chars via lookup table (loop, fresh vars each iteration)
+                int shift = 24
                 while (shift >= 0) {
-                    int nibble = (off >> shift) & 0xF
-                    int hci = hexChar(nibble)
-                    byte hcb = cast hci
-                    address op = outbuf + pos
-                    op::value = hcb
+                    int ob = (off >> shift) & 0xFF
+                    address tph = hextable + ob * 2
+                    byte tvh = tph::value
+                    address oph = outbuf + pos
+                    oph::value = tvh
                     pos = pos + 1
-                    shift = shift - 4
+                    address tpl = hextable + ob * 2 + 1
+                    byte tvl = tpl::value
+                    address opl = outbuf + pos
+                    opl::value = tvl
+                    pos = pos + 1
+                    shift = shift - 8
                 }
-                byte colon = 58
-                byte space = 32
-                address pc = outbuf + pos
-                pc::value = colon
+
+                address pcolon = outbuf + pos
+                pcolon::value = colon
                 pos = pos + 1
-                address ps = outbuf + pos
-                ps::value = space
+                address psep = outbuf + pos
+                psep::value = space
                 pos = pos + 1
 
-                // hex pairs grouped by 2: "XX XX " (4 bytes then space)
+                // hex pairs, space after every pair (after col 1, 3, 5 ...)
                 int col = 0
                 while (col < rowLen) {
                     address ip = inbuf + rowStart + col
                     byte b = ip::value
                     int bi = cast b
-                    int hi = hexChar((bi >> 4) & 0xF)
-                    int lo = hexChar(bi & 0xF)
-                    byte hb = cast hi
-                    byte lb = cast lo
-                    address hp = outbuf + pos
-                    hp::value = hb
+                    address tphi = hextable + bi * 2
+                    byte tvhi = tphi::value
+                    address ophi = outbuf + pos
+                    ophi::value = tvhi
                     pos = pos + 1
-                    address lp = outbuf + pos
-                    lp::value = lb
+                    address tpli = hextable + bi * 2 + 1
+                    byte tvli = tpli::value
+                    address opli = outbuf + pos
+                    opli::value = tvli
                     pos = pos + 1
                     if (col % 2 == 1) {
-                        address gp = outbuf + pos
-                        gp::value = space
+                        address pgap = outbuf + pos
+                        pgap::value = space
                         pos = pos + 1
                     }
                     col = col + 1
                 }
 
-                // pad to fixed width (16 bytes = 8 groups of 2 + 8 spaces = 40 chars of hex)
-                int hexEnd = 10 + 40
+                // pad hex field to fixed width (rowOutStart + 50)
+                int hexEnd = rowOutStart + 50
                 while (pos < hexEnd) {
-                    address pp = outbuf + pos
-                    pp::value = space
+                    address ppad = outbuf + pos
+                    ppad::value = space
                     pos = pos + 1
                 }
 
                 // ASCII column
-                address pa = outbuf + pos
-                pa::value = space
-                pos = pos + 1
-
                 col = 0
                 while (col < rowLen) {
-                    address ip = inbuf + rowStart + col
-                    byte b = ip::value
-                    int bi = cast b
-                    byte out = b
-                    if (bi < 32 || bi > 126) {
-                        byte dot = 46
-                        out = dot
+                    address aip = inbuf + rowStart + col
+                    byte ab = aip::value
+                    int abi = cast ab
+                    byte ach = ab
+                    if (abi < 32 || abi > 126) {
+                        ach = dot
                     }
-                    address op = outbuf + pos
-                    op::value = out
+                    address aop = outbuf + pos
+                    aop::value = ach
                     pos = pos + 1
                     col = col + 1
                 }
 
-                byte nl = 10
                 address pnl = outbuf + pos
                 pnl::value = nl
                 pos = pos + 1
 
-                write(StdFd.STDOUT, outbuf, pos)
                 row = row + 1
             }
+
+            // one write per chunk instead of one per row
+            write(StdFd.STDOUT, outbuf, pos)
             fileOffset = fileOffset + nr
         }
     }
 }
 
 entry main(int argc, string[] argv) {
+    address hextable = allocate 512
+    buildHexTable(hextable)
+
     address inbuf  = allocate Limits.CHUNK + 16
-    address outbuf = allocate 128
+    address outbuf = allocate Limits.OUTSIZE
 
     if (argc == 1) {
-        dumpFd(StdFd.STDIN, inbuf, outbuf)
+        dumpFd(StdFd.STDIN, inbuf, outbuf, hextable)
     } else {
         int i = 1
         while (i < argc) {
@@ -142,13 +166,14 @@ entry main(int argc, string[] argv) {
             if (fd < 0) {
                 printf("xxd: %s: cannot open\n", fname)
             } else {
-                dumpFd(fd, inbuf, outbuf)
+                dumpFd(fd, inbuf, outbuf, hextable)
                 close(fd)
             }
             i = i + 1
         }
     }
 
+    deallocate hextable
     deallocate inbuf
     deallocate outbuf
 }
