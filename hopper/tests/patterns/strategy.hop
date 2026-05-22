@@ -4,7 +4,7 @@
 // EXPECT: isNonZero:  6/7 pass
 // EXPECT: isInByte:   5/7 pass
 
-import array from ds
+import Array from ds
 
 extern function printf(string fmt, ...) int
 
@@ -39,12 +39,12 @@ class Validator {
         self.strategy = fn
     }
 
-    function countPassing(Array<int> values) int {
+    function countPassing(StandardArray values) int {
         int passed = 0
         int i = 0
         while (i < values.len()) {
             callback(int) int fn = cast self.strategy
-            passed = passed + fn(values.get(i))
+            passed = passed + fn(cast values.get(i))
             i = i + 1
         }
         return passed
@@ -52,14 +52,14 @@ class Validator {
 }
 
 entry main {
-    Array<int> nums = Array(8)
-    nums.push(-5)
-    nums.push(0)
-    nums.push(3)
-    nums.push(8)
-    nums.push(-2)
-    nums.push(12)
-    nums.push(7)
+    StandardArray nums = StandardArray(8)
+    nums.push(cast -5)
+    nums.push(cast 0)
+    nums.push(cast 3)
+    nums.push(cast 8)
+    nums.push(cast -2)
+    nums.push(cast 12)
+    nums.push(cast 7)
 
     int n = nums.len()
     Validator v = Validator(isPositive::address)

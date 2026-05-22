@@ -11,13 +11,13 @@
 // EXPECT: flip(7)  = 7
 // EXPECT: flip(-5) = 5
 
-import array from ds
+import Array from ds
 extern function printf(string fmt, ...) int
 
 class Pipeline {
-    Array<address> stages
+    StandardArray stages
 
-    constructor() { self.stages = Array(8) }
+    constructor() { self.stages = StandardArray(8) }
 
     function pipe(address stage) { self.stages.push(stage) }
 
