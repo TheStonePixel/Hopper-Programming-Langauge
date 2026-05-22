@@ -1,0 +1,198 @@
+// Linux x86-64 syscall interface.
+//
+// This interface captures the joint constraint of Linux OS ABI + x86-64 ISA.
+// Syscall numbers here are specific to Linux on x86-64 — they differ on every
+// other OS and on every other CPU architecture. Naming it LinuxSyscalls makes
+// that constraint explicit; it is not portable to macOS x86-64 or ARM64 Linux.
+//
+// The linux module depends on this interface to implement its OS abstractions.
+// Programs depend on linux, never on LinuxSyscalls directly.
+
+interface LinuxSyscalls {
+
+    // ── I/O ──────────────────────────────────────────────────────────────────
+
+    function read(int fd, address buf, int count) int
+    function write(int fd, address buf, int count) int
+    function pread64(int fd, address buf, int count, int offset) int
+    function pwrite64(int fd, address buf, int count, int offset) int
+    function readv(int fd, address iov, int iovcnt) int
+    function writev(int fd, address iov, int iovcnt) int
+    function sendfile(int outfd, int infd, address offset, int count) int
+    function splice(int fdin, address offin, int fdout, address offout, int len, int flags) int
+    function tee(int fdin, int fdout, int len, int flags) int
+    function ioctl(int fd, int request, address arg) int
+
+    // ── FileSystem ───────────────────────────────────────────────────────────
+
+    function open(string path, int flags, int mode) int
+    function close(int fd) int
+    function creat(string path, int mode) int
+    function stat(string path, address buf) int
+    function fstat(int fd, address buf) int
+    function lstat(string path, address buf) int
+    function statfs(string path, address buf) int
+    function fstatfs(int fd, address buf) int
+    function lseek(int fd, int offset, int whence) int
+    function access(string path, int mode) int
+    function chmod(string path, int mode) int
+    function fchmod(int fd, int mode) int
+    function chown(string path, int uid, int gid) int
+    function fchown(int fd, int uid, int gid) int
+    function lchown(string path, int uid, int gid) int
+    function umask(int mask) int
+    function truncate(string path, int length) int
+    function ftruncate(int fd, int length) int
+    function fsync(int fd) int
+    function fdatasync(int fd) int
+    function sync() int
+    function getdents64(int fd, address buf, int count) int
+    function getcwd(address buf, int bufsz) int
+    function chdir(string path) int
+    function fchdir(int fd) int
+    function mkdir(string path, int mode) int
+    function rmdir(string path) int
+    function rename(string oldpath, string newpath) int
+    function link(string oldpath, string newpath) int
+    function unlink(string path) int
+    function symlink(string target, string linkpath) int
+    function readlink(string path, address buf, int bufsz) int
+    function dup(int oldfd) int
+    function dup2(int oldfd, int newfd) int
+    function dup3(int oldfd, int newfd, int flags) int
+    function pipe(address fds) int
+    function pipe2(address fds, int flags) int
+    function fcntl(int fd, int cmd, int arg) int
+    function flock(int fd, int op) int
+    function openat(int dirfd, string path, int flags, int mode) int
+    function mkdirat(int dirfd, string path, int mode) int
+    function unlinkat(int dirfd, string path, int flags) int
+    function renameat(int olddirfd, string oldpath, int newdirfd, string newpath) int
+    function linkat(int olddirfd, string oldpath, int newdirfd, string newpath, int flags) int
+    function symlinkat(string target, int newdirfd, string linkpath) int
+    function readlinkat(int dirfd, string path, address buf, int bufsz) int
+    function fchmodat(int dirfd, string path, int mode, int flags) int
+    function faccessat(int dirfd, string path, int mode, int flags) int
+    function fchownat(int dirfd, string path, int uid, int gid, int flags) int
+    function inotify_init1(int flags) int
+    function inotify_add_watch(int fd, string path, int mask) int
+    function inotify_rm_watch(int fd, int wd) int
+
+    // ── Memory ───────────────────────────────────────────────────────────────
+
+    function mmap(address addr, int len, int prot, int flags, int fd, int offset) address
+    function munmap(address addr, int len) int
+    function mprotect(address addr, int len, int prot) int
+    function mremap(address old_addr, int old_size, int new_size, int flags, address new_addr) address
+    function msync(address addr, int len, int flags) int
+    function madvise(address addr, int len, int advice) int
+    function mincore(address addr, int len, address vec) int
+    function mlock(address addr, int len) int
+    function munlock(address addr, int len) int
+    function mlockall(int flags) int
+    function munlockall() int
+    function memfd_create(string name, int flags) int
+
+    // ── Process ──────────────────────────────────────────────────────────────
+
+    function exit(int code)
+    function exit_group(int code)
+    function fork() int
+    function vfork() int
+    function clone(int flags, address stack, address ptid, address ctid, int regs) int
+    function clone3(address args, int argsz) int
+    function execve(string filename, string[] argv, string[] envp) int
+    function execveat(int dirfd, string path, string[] argv, string[] envp, int flags) int
+    function waitpid(int pid, address wstatus, int options) int
+    function waitid(int idtype, int id, address infop, int options) int
+    function getpid() int
+    function getppid() int
+    function gettid() int
+    function getuid() int
+    function getgid() int
+    function geteuid() int
+    function getegid() int
+    function setuid(int uid) int
+    function setgid(int gid) int
+    function setreuid(int ruid, int euid) int
+    function setregid(int rgid, int egid) int
+    function setsid() int
+    function setpgid(int pid, int pgid) int
+    function getpgid(int pid) int
+    function kill(int pid, int sig) int
+    function tkill(int tid, int sig) int
+    function tgkill(int tgid, int tid, int sig) int
+    function pause() int
+    function alarm(int seconds) int
+    function rt_sigaction(int sig, address act, address oldact, int sigsetsize) int
+    function rt_sigprocmask(int how, address set, address oldset, int sigsetsize) int
+    function rt_sigpending(address set, int sigsetsize) int
+    function rt_sigsuspend(address mask, int sigsetsize) int
+    function sigaltstack(address ss, address oss) int
+    function ptrace(int request, int pid, address addr, address data) int
+
+    // ── System ───────────────────────────────────────────────────────────────
+
+    function uname(address buf) int
+    function sysinfo(address buf) int
+    function getrusage(int who, address rusage) int
+    function getrlimit(int resource, address rlim) int
+    function setrlimit(int resource, address rlim) int
+    function prctl(int option, int arg2, int arg3, int arg4, int arg5) int
+    function arch_prctl(int code, address addr) int
+    function nanosleep(address req, address rem) int
+    function clock_gettime(int clockid, address ts) int
+    function clock_settime(int clockid, address ts) int
+    function clock_getres(int clockid, address res) int
+    function clock_nanosleep(int clockid, int flags, address req, address rem) int
+    function gettimeofday(address tv, address tz) int
+    function settimeofday(address tv, address tz) int
+    function times(address buf) int
+    function getitimer(int which, address val) int
+    function setitimer(int which, address val, address oval) int
+    function sched_yield() int
+    function sched_getscheduler(int pid) int
+    function sched_setscheduler(int pid, int policy, address param) int
+    function sched_getparam(int pid, address param) int
+    function sched_setparam(int pid, address param) int
+    function sched_getaffinity(int pid, int cpusetsize, address mask) int
+    function sched_setaffinity(int pid, int cpusetsize, address mask) int
+    function getpriority(int which, int who) int
+    function setpriority(int which, int who, int prio) int
+    function chroot(string path) int
+    function brk(address addr) int
+
+    // ── Socket ───────────────────────────────────────────────────────────────
+
+    function socket(int domain, int type, int protocol) int
+    function socketBind(int fd, address addr, int addrlen) int
+    function listen(int fd, int backlog) int
+    function accept(int fd, address addr, address addrlen) int
+    function accept4(int fd, address addr, address addrlen, int flags) int
+    function connect(int fd, address addr, int addrlen) int
+    function shutdown(int fd, int how) int
+    function getsockname(int fd, address addr, address addrlen) int
+    function getpeername(int fd, address addr, address addrlen) int
+    function socketpair(int domain, int type, int protocol, address fds) int
+    function send(int fd, address buf, int len, int flags) int
+    function recv(int fd, address buf, int len, int flags) int
+    function sendto(int fd, address buf, int len, int flags, address addr, int addrlen) int
+    function recvfrom(int fd, address buf, int len, int flags, address addr, address addrlen) int
+    function sendmsg(int fd, address msg, int flags) int
+    function recvmsg(int fd, address msg, int flags) int
+    function sendmmsg(int fd, address msgs, int vlen, int flags) int
+    function recvmmsg(int fd, address msgs, int vlen, int flags, address timeout) int
+    function setsockopt(int fd, int level, int optname, address optval, int optlen) int
+    function getsockopt(int fd, int level, int optname, address optval, address optlen) int
+
+    // ── Network (I/O multiplexing) ───────────────────────────────────────────
+
+    function select(int nfds, address readfds, address writefds, address exceptfds, address timeout) int
+    function pselect6(int nfds, address readfds, address writefds, address exceptfds, address timeout, address sigmask) int
+    function poll(address fds, int nfds, int timeout) int
+    function ppoll(address fds, int nfds, address tmo, address sigmask, int sigsetsize) int
+    function epoll_create1(int flags) int
+    function epoll_ctl(int epfd, int op, int fd, address event) int
+    function epoll_wait(int epfd, address events, int maxevents, int timeout) int
+    function epoll_pwait(int epfd, address events, int maxevents, int timeout, address sigmask, int sigsetsize) int
+}

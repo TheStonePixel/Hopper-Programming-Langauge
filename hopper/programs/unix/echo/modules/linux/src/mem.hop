@@ -1,0 +1,37 @@
+// Linux memory mapping — architecture-neutral.
+// Delegates to modules/target/mem.hop, which selects the ISA.
+//
+// Imported functions:
+//   mmap munmap mprotect mremap msync madvise mincore
+//   mlock munlock mlockall munlockall memfd_create
+//
+// Quick reference:
+//   Anonymous private:   mmap(0, len, 3, 34, -1, 0)    // PROT_READ|WRITE=3  MAP_PRIVATE|ANON=34
+//   Executable JIT:      mmap(0, len, 5, 34, -1, 0)    // PROT_READ|EXEC=5
+//   File-backed shared:  mmap(0, len, 1, 1, fd, 0)     // PROT_READ=1  MAP_SHARED=1
+//   Error sentinel:      MAP_FAILED = -1 (cast to address)
+//
+// ── prot flags ────────────────────────────────────────────────────────────────
+//   PROT_NONE=0  PROT_READ=1  PROT_WRITE=2  PROT_EXEC=4
+//
+// ── map flags ─────────────────────────────────────────────────────────────────
+//   MAP_SHARED=1  MAP_PRIVATE=2  MAP_FIXED=16  MAP_ANON=32
+//   MAP_GROWSDOWN=256  MAP_LOCKED=8192  MAP_STACK=131072  MAP_HUGETLB=262144
+//
+// ── mremap flags ─────────────────────────────────────────────────────────────
+//   MREMAP_MAYMOVE=1  MREMAP_FIXED=2
+//
+// ── msync flags ───────────────────────────────────────────────────────────────
+//   MS_ASYNC=1  MS_INVALIDATE=2  MS_SYNC=4
+//
+// ── madvise hints ─────────────────────────────────────────────────────────────
+//   MADV_NORMAL=0  MADV_RANDOM=1  MADV_SEQUENTIAL=2
+//   MADV_WILLNEED=3  MADV_DONTNEED=4  MADV_FREE=8
+//
+// ── mlockall flags ────────────────────────────────────────────────────────────
+//   MCL_CURRENT=1  MCL_FUTURE=2  MCL_ONFAULT=4
+//
+// ── memfd flags ───────────────────────────────────────────────────────────────
+//   MFD_CLOEXEC=1  MFD_ALLOW_SEALING=2  MFD_HUGETLB=4
+
+import mem from arch

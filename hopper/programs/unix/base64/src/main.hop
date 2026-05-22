@@ -1,0 +1,298 @@
+// base64 — encode/decode base64
+//
+// Usage: base64 [-d] [file ...]
+//   -d  decode
+//   reads stdin if no files given
+//
+// Encoding wraps at 76 chars per line (RFC 2045).
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    CHUNK   = 4096
+    LINELEN = 76
+}
+
+function b64Char(int n) int {
+    if (n < 26) { return n + 65 }
+    if (n < 52) { return n + 71 }
+    if (n < 62) { return n - 4 }
+    if (n == 62) { return 43 }
+    return 47
+}
+
+function encodeFd(int fd, address inbuf, address outbuf) {
+    int linePos = 0
+    bool eof = false
+    while (!eof) {
+        int nr = read(fd, inbuf, Limits.CHUNK - (Limits.CHUNK % 3))
+        if (nr <= 0) {
+            eof = true
+        } else {
+            int i = 0
+            while (i + 2 < nr) {
+                address p0 = inbuf + i
+                address p1 = inbuf + i + 1
+                address p2 = inbuf + i + 2
+                byte b0 = p0::value
+                byte b1 = p1::value
+                byte b2 = p2::value
+                int n0 = cast b0
+                int n1 = cast b1
+                int n2 = cast b2
+
+                int c0 = (n0 >> 2) & 0x3F
+                int c1 = ((n0 & 0x3) << 4) | ((n1 >> 4) & 0xF)
+                int c2 = ((n1 & 0xF) << 2) | ((n2 >> 6) & 0x3)
+                int c3 = n2 & 0x3F
+
+                int ei0 = b64Char(c0)
+                int ei1 = b64Char(c1)
+                int ei2 = b64Char(c2)
+                int ei3 = b64Char(c3)
+                byte ec0 = cast ei0
+                byte ec1 = cast ei1
+                byte ec2 = cast ei2
+                byte ec3 = cast ei3
+
+                address op0 = outbuf + linePos
+                address op1 = outbuf + linePos + 1
+                address op2 = outbuf + linePos + 2
+                address op3 = outbuf + linePos + 3
+                op0::value = ec0
+                op1::value = ec1
+                op2::value = ec2
+                op3::value = ec3
+                linePos = linePos + 4
+
+                if (linePos >= Limits.LINELEN) {
+                    byte nl = 10
+                    address pnl = outbuf + linePos
+                    pnl::value = nl
+                    linePos = linePos + 1
+                    write(StdFd.STDOUT, outbuf, linePos)
+                    linePos = 0
+                }
+
+                i = i + 3
+            }
+
+            // handle remainder (padding)
+            int rem = nr - i
+            if (rem == 1) {
+                address p0 = inbuf + i
+                byte b0 = p0::value
+                int n0 = cast b0
+                int c0 = (n0 >> 2) & 0x3F
+                int c1 = (n0 & 0x3) << 4
+                int ei0 = b64Char(c0)
+                int ei1 = b64Char(c1)
+                byte ec0 = cast ei0
+                byte ec1 = cast ei1
+                byte eq = 61
+                address op0 = outbuf + linePos
+                address op1 = outbuf + linePos + 1
+                address op2 = outbuf + linePos + 2
+                address op3 = outbuf + linePos + 3
+                op0::value = ec0
+                op1::value = ec1
+                op2::value = eq
+                op3::value = eq
+                linePos = linePos + 4
+            } else if (rem == 2) {
+                address p0 = inbuf + i
+                address p1 = inbuf + i + 1
+                byte b0 = p0::value
+                byte b1 = p1::value
+                int n0 = cast b0
+                int n1 = cast b1
+                int c0 = (n0 >> 2) & 0x3F
+                int c1 = ((n0 & 0x3) << 4) | ((n1 >> 4) & 0xF)
+                int c2 = (n1 & 0xF) << 2
+                int ei0 = b64Char(c0)
+                int ei1 = b64Char(c1)
+                int ei2 = b64Char(c2)
+                byte ec0 = cast ei0
+                byte ec1 = cast ei1
+                byte ec2 = cast ei2
+                byte eq = 61
+                address op0 = outbuf + linePos
+                address op1 = outbuf + linePos + 1
+                address op2 = outbuf + linePos + 2
+                address op3 = outbuf + linePos + 3
+                op0::value = ec0
+                op1::value = ec1
+                op2::value = ec2
+                op3::value = eq
+                linePos = linePos + 4
+            }
+        }
+    }
+
+    if (linePos > 0) {
+        byte nl = 10
+        address pnl = outbuf + linePos
+        pnl::value = nl
+        linePos = linePos + 1
+        write(StdFd.STDOUT, outbuf, linePos)
+    }
+}
+
+// Build decode table: index = ASCII value, value = 6-bit group (255 = invalid)
+function buildDecodeTable(address table) {
+    int i = 0
+    while (i < 256) {
+        address p = table + i
+        byte ff = 255
+        p::value = ff
+        i = i + 1
+    }
+    i = 0
+    while (i < 64) {
+        int ac = b64Char(i)
+        address tp = table + ac
+        byte ib = cast i
+        tp::value = ib
+        i = i + 1
+    }
+}
+
+function decodeFd(int fd, address inbuf, address outbuf, address dtable) {
+    int pending = 0
+    int accumulator = 0
+    bool eof = false
+    while (!eof) {
+        int nr = read(fd, inbuf, Limits.CHUNK)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            int outpos = 0
+            int i = 0
+            while (i < nr) {
+                address ip = inbuf + i
+                byte bc = ip::value
+                int ci = cast bc
+                if (ci == 61) {
+                    // flush partial group before stopping
+                    if (pending == 3) {
+                        int byte0 = (accumulator >> 10) & 0xFF
+                        int byte1 = (accumulator >> 2)  & 0xFF
+                        byte db0 = cast byte0
+                        byte db1 = cast byte1
+                        address op0 = outbuf + outpos
+                        address op1 = outbuf + outpos + 1
+                        op0::value = db0
+                        op1::value = db1
+                        outpos = outpos + 2
+                    } else if (pending == 2) {
+                        int byte0 = (accumulator >> 4) & 0xFF
+                        byte db0 = cast byte0
+                        address op0 = outbuf + outpos
+                        op0::value = db0
+                        outpos = outpos + 1
+                    }
+                    eof = true
+                    i = nr
+                } else if (ci == 10 || ci == 13 || ci == 32) {
+                    i = i + 1
+                } else {
+                    address tp = dtable + ci
+                    byte val = tp::value
+                    int vi = cast val
+                    if (vi == 255) {
+                        i = i + 1
+                    } else {
+                        accumulator = (accumulator << 6) | vi
+                        pending = pending + 1
+                        if (pending == 4) {
+                            int byte0 = (accumulator >> 16) & 0xFF
+                            int byte1 = (accumulator >> 8)  & 0xFF
+                            int byte2 = accumulator          & 0xFF
+                            byte db0 = cast byte0
+                            byte db1 = cast byte1
+                            byte db2 = cast byte2
+                            address op0 = outbuf + outpos
+                            address op1 = outbuf + outpos + 1
+                            address op2 = outbuf + outpos + 2
+                            op0::value = db0
+                            op1::value = db1
+                            op2::value = db2
+                            outpos = outpos + 3
+                            pending = 0
+                            accumulator = 0
+                        }
+                        i = i + 1
+                    }
+                }
+            }
+            if (outpos > 0) {
+                write(StdFd.STDOUT, outbuf, outpos)
+            }
+        }
+    }
+}
+
+function processFd(int fd, address inbuf, address outbuf, address dtable, bool decode) {
+    if (decode) {
+        decodeFd(fd, inbuf, outbuf, dtable)
+    } else {
+        encodeFd(fd, inbuf, outbuf)
+    }
+}
+
+entry main(int argc, string[] argv) {
+    bool decode = false
+    int firstFile = 0
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        address p0 = arg
+        address p1 = arg + 1
+        address p2 = arg + 2
+        byte b0 = p0::value
+        byte b1 = p1::value
+        byte b2 = p2::value
+        int i0 = cast b0
+        int i1 = cast b1
+        int i2 = cast b2
+        if (i0 == 45 && i1 == 100 && i2 == 0) {
+            decode = true
+        } else {
+            if (firstFile == 0) {
+                firstFile = ai
+            }
+        }
+        ai = ai + 1
+    }
+
+    address inbuf  = allocate Limits.CHUNK + 16
+    address outbuf = allocate Limits.CHUNK + 16
+    address dtable = allocate 256
+
+    buildDecodeTable(dtable)
+
+    if (firstFile == 0) {
+        processFd(StdFd.STDIN, inbuf, outbuf, dtable, decode)
+    } else {
+        int fi = firstFile
+        while (fi < argc) {
+            address fname = argv[fi]
+            int fd = open(fname, OpenFlag.O_RDONLY, 0)
+            if (fd < 0) {
+                printf("base64: %s: cannot open\n", fname)
+            } else {
+                processFd(fd, inbuf, outbuf, dtable, decode)
+                close(fd)
+            }
+            fi = fi + 1
+        }
+    }
+
+    deallocate inbuf
+    deallocate outbuf
+    deallocate dtable
+}

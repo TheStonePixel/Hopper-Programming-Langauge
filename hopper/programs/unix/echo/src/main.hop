@@ -1,0 +1,69 @@
+// echo — print arguments to stdout
+//
+// Usage: echo [-n] [string ...]
+//   -n  do not output trailing newline
+
+import IO from linux
+
+function strLen(address s) int {
+    int len = 0
+    bool done = false
+    while (!done) {
+        address p = s + len
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) {
+            done = true
+        } else {
+            len = len + 1
+        }
+    }
+    return len
+}
+
+entry main(int argc, string[] argv) {
+    bool noNewline = false
+    int start = 1
+
+    if (argc > 1) {
+        address arg = argv[1]
+        address p0 = arg
+        address p1 = arg + 1
+        address p2 = arg + 2
+        byte b0 = p0::value
+        byte b1 = p1::value
+        byte b2 = p2::value
+        int i0 = cast b0
+        int i1 = cast b1
+        int i2 = cast b2
+        if (i0 == 45 && i1 == 110 && i2 == 0) {
+            noNewline = true
+            start = 2
+        }
+    }
+
+    address space = allocate 1
+    address nl    = allocate 1
+    byte sp  = 32
+    byte lf  = 10
+    space::value = sp
+    nl::value    = lf
+
+    int i = start
+    while (i < argc) {
+        address s = argv[i]
+        int len = strLen(s)
+        write(StdFd.STDOUT, s, len)
+        if (i < argc - 1) {
+            write(StdFd.STDOUT, space, 1)
+        }
+        i = i + 1
+    }
+
+    if (!noNewline) {
+        write(StdFd.STDOUT, nl, 1)
+    }
+
+    deallocate space
+    deallocate nl
+}

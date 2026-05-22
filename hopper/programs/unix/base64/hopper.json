@@ -1,0 +1,26 @@
+{
+  "name": "base64",
+  "version": "0.1.0",
+  "description": "encode and decode base64",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "linux": "0.1.0",
+    "x86_64": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "IO": {
+        "from": "linux",
+        "interface": "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      },
+      "FileSystem": {
+        "from": "linux",
+        "interface": "modules/linux/interfaces/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      }
+    }
+  }
+}
