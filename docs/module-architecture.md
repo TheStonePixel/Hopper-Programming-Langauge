@@ -22,7 +22,7 @@ Hopper makes the constraint legible.
 
 ## The Two-Tier Module System
 
-Hopper's module system has two tiers visible to the programmer: one for hardware-specific implementations and one for hardware-independent OS interfaces. The build file — not the source code — is the third tier. It is the only place where hardware is named.
+Hopper's module system has two tiers visible to the programmer: one for hardware-specific implementations and one for OS interfaces. The build file — not source code — is the third tier, the architecture selector.
 
 ### Tier 1: x86_64 — The Hardware Layer
 
@@ -94,7 +94,7 @@ entry main {
 }
 ```
 
-The program calls `open`, `read`, `write`, `close` — free functions. It imports `IO from linux` and `FileSystem from linux` — hardware-independent names. It knows nothing about x86-64. It does not instantiate any object. The hardware specifics live entirely in the build file and the `x86_64` module.
+The program calls `open`, `read`, `write`, `close` — free functions. It imports `IO from linux` and `FileSystem from linux`. It knows nothing about x86-64, instantiates nothing. The hardware specifics live entirely in the build file and the `x86_64` module.
 
 When the build system compiles this program, it resolves `IO from linux` to the `interface` path (the contract) and the `implementation` path (the x86-64 free functions). The free functions from `x86_64/src/LinuxSyscalls.hop` come into scope, so `read(fd, buf, n)` in the program compiles to the x86-64 syscall — one `syscall` instruction, no wrappers, no heap allocation, no indirection.
 
@@ -342,28 +342,38 @@ An alternative design might have linux source files import `LinuxSyscalls from x
 
 In Hopper's design, `linux/` contains only interfaces. No file in `linux/` ever names x86-64. The `x86_64` module implements the contracts declared in `linux/` — but that connection is made entirely in the build file. The source files on both sides remain independent.
 
-This means the porting boundary is a list of build file entries, not a set of source files to audit. Every entry that says `x86_64` in the `implementation` field is an porting task. No entry, no task.
+This means the porting boundary is a list of build file entries, not a set of source files to audit. Every `implementation` field that names `x86_64` is a porting task. No entry, no task.
 
 ---
 
-## Porting to ARM64
+## Operational Consequences
 
-To port to ARM64 Linux:
+The design produces engineering properties that matter in practice.
 
-1. Implement `interface LinuxSyscalls` as free functions in an `arm64` module, using the ARM64 syscall numbers and calling convention.
-2. Update `implementation` paths in program `hopper.json` targets from `modules/x86_64/src/LinuxSyscalls.hop` to `modules/arm64/src/LinuxSyscalls.hop`.
-3. For SIMD, implement `interface SIMD` using NEON intrinsics in `arm64/src/SIMD.hop` and update those targets similarly.
+**Ports become enumerable tasks.** Every hardware dependency lives in `hopper.json` `implementation` fields. To scope an ARM64 port, grep for `x86_64` in those fields. The result is a complete mechanical list — not an estimate.
 
-The program source does not change. The `linux/` interface files do not change. The `x86_64/` module does not change. The change is exactly as large as the porting effort — no more, no less.
+**Portability auditing becomes structural.** A file that imports only from `linux` and contains no `x86_64` strings is verifiably portable by inspection. There is no hidden syscall, no architecture-specific constant buried three layers down. The module system makes the absence of hardware dependencies as visible as their presence.
 
-To port to macOS x86-64:
+**Hardware dependencies are grep-able.** In a libc codebase, hardware assumptions scatter across headers, intrinsics, and platform guards. In Hopper, `grep implementation hopper.json` in any directory gives a complete map of that project's hardware surface.
 
-1. The `LinuxSyscalls` interface cannot be reused — syscall numbers and ABI differ.
-2. Implement a new `DarwinSyscalls` interface as free functions in the `x86_64` module (or a `darwin` module).
-3. Implement a new `darwin/` module declaring `interface IO`, `interface FileSystem`, etc. with macOS semantics.
+**Implementation swaps are localized.** Replacing a syscall implementation — for testing, for a new OS, for a custom kernel interface — requires changing one field in a build file. No source changes, no new compilation units, no downstream edits.
+
+**Cross-target builds are explicit by construction.** A build targeting both x86-64 and ARM64 has two named target blocks. The differences between them are enumerable and visible in one file. There is no implicit platform detection, no `#ifdef`, no conditional compilation scattered through source.
+
+---
+
+## Porting
+
+The "Two Interfaces, Two Hardware Targets" section above shows the ARM64 port in full. The complete change is the `implementation` paths in the build file — program source and `linux/` interfaces are untouched. The change is exactly as large as the porting effort, no more.
+
+Porting to macOS x86-64 is structurally different because the OS changes, not just the ISA:
+
+1. `LinuxSyscalls` cannot be reused — macOS syscall numbers and ABI differ from Linux.
+2. Implement `DarwinSyscalls` as free functions in the `x86_64` module (or a new `darwin` module).
+3. Implement a `darwin/` module declaring `interface IO`, `interface FileSystem`, etc. with macOS semantics.
 4. Programs import `IO from darwin` instead of `IO from linux`.
 
-The architecture makes the porting boundary explicit. There is no fiction of automatic portability. There is a named contract that any OS can satisfy, and the build file that says which implementation satisfies it today.
+The OS boundary and the ISA boundary are separate axes. Hopper names both explicitly — they just live in different parts of the module and build system.
 
 ---
 
@@ -377,7 +387,7 @@ Another alternative might name it `X86LinuxABI` or `X86_64LinuxSyscalls`. These 
 
 This naming discipline makes the dependency graph honest. When a program imports `IO from linux`, it depends on the Linux OS abstraction. When the build file resolves that to `x86_64/src/LinuxSyscalls.hop`, it declares the hardware dependency explicitly. When the build system resolves that dependency, it knows exactly what it is providing: not "a syscall interface," but the Linux syscall interface on x86-64.
 
-Systems software has always had these constraints. Hopper makes them part of the type system — and the build file is the one place where they are named.
+Systems software has always had these constraints. Hopper encodes them in the build contract: the interface system verifies that implementations are complete, the dependency graph makes every hardware assumption enumerable, and the build file is the document that names them.
 
 ---
 
@@ -390,4 +400,4 @@ Systems software has always had these constraints. Hopper makes them part of the
 | Architecture selector | `hopper.json` targets | `implementation` paths | Which hardware module satisfies which OS interface |
 | Program | source files | imports from `linux` | Hardware-independent |
 
-The program source is hardware-independent. The linux module is ISA-independent. The x86_64 module is where hardware specificity lives, and it says so in its names. The build file is where the two sides meet — and it is the only place they do.
+The build file is where the two sides meet — the only place they do.
