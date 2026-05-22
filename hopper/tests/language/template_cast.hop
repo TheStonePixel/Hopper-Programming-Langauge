@@ -7,6 +7,12 @@
 // EXPECT: float from int: 7.000000
 // EXPECT: int from bool: 1
 // EXPECT: bool from int: 1
+// EXPECT: byte from float: 3
+// EXPECT: float from byte: 65.000000
+// EXPECT: bool from byte: 1
+// EXPECT: bool from float: 1
+// EXPECT: byte from bool: 1
+// EXPECT: float from bool: 1.000000
 
 extern function printf(string fmt, ...) int
 
@@ -16,8 +22,14 @@ template function cast<int>(float src) int       { return int src      }
 template function cast<int>(bool src) int        { return int src      }
 template function cast<address>(int src) address { return address src  }
 template function cast<byte>(int src) byte       { return byte src     }
+template function cast<byte>(float src) byte     { return byte src     }
+template function cast<byte>(bool src) byte      { return byte src     }
 template function cast<float>(int src) float     { return float src    }
+template function cast<float>(byte src) float    { return float src    }
+template function cast<float>(bool src) float    { return float src    }
 template function cast<bool>(int src) bool       { return bool src     }
+template function cast<bool>(byte src) bool      { return bool src     }
+template function cast<bool>(float src) bool     { return bool src     }
 
 entry main {
     address p = cast<address>(42)
@@ -49,4 +61,28 @@ entry main {
 
     bool b2  = cast<bool>(5)
     printf("bool from int: %lld\n", cast<int>(b2))
+
+    float f3   = 3.9
+    byte bf    = cast<byte>(f3)
+    printf("byte from float: %lld\n", cast<int>(bf))
+
+    byte smallb = 65
+    float fb    = cast<float>(smallb)
+    printf("float from byte: %f\n", fb)
+
+    byte nonzero = 5
+    bool bb      = cast<bool>(nonzero)
+    printf("bool from byte: %lld\n", cast<int>(bb))
+
+    float nzf  = 1.5
+    bool bf2   = cast<bool>(nzf)
+    printf("bool from float: %lld\n", cast<int>(bf2))
+
+    bool trueval = true
+    byte byteb   = cast<byte>(trueval)
+    printf("byte from bool: %lld\n", cast<int>(byteb))
+
+    bool trueval2 = true
+    float floatb  = cast<float>(trueval2)
+    printf("float from bool: %f\n", floatb)
 }

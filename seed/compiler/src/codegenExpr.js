@@ -115,6 +115,22 @@ export function emitCast(ir, srcVal, srcType, targetType) {
         ir.emit(`${tmp} = icmp ne i64 ${srcVal}, 0`);
         return { value: tmp, type: targetType };
     }
+    if (srcType === "bool" && (targetType === "byte" || targetType === "char" || targetType === "unsignedbyte")) {
+        ir.emit(`${tmp} = zext i1 ${srcVal} to i8`);
+        return { value: tmp, type: targetType };
+    }
+    if ((srcType === "byte" || srcType === "char" || srcType === "unsignedbyte") && targetType === "bool") {
+        ir.emit(`${tmp} = icmp ne i8 ${srcVal}, 0`);
+        return { value: tmp, type: "bool" };
+    }
+    if (srcType === "bool" && isFloatType(targetType)) {
+        ir.emit(`${tmp} = uitofp i1 ${srcVal} to double`);
+        return { value: tmp, type: targetType };
+    }
+    if (isFloatType(srcType) && targetType === "bool") {
+        ir.emit(`${tmp} = fcmp une double ${srcVal}, 0.0`);
+        return { value: tmp, type: "bool" };
+    }
 
     throw new Error(`Cannot cast from '${srcType}' to '${targetType}'`);
 }
@@ -923,7 +939,7 @@ export function genExpr(ir, expr) {
                 const match = s.paramTypes.every((pt, i) => {
                     const at = normalizeType(evaled[i].type);
                     if (pt === at) return true;
-                    if ((pt === "byte" || pt === "char") && (at === "byte" || at === "char")) return true;
+                    if ((pt === "byte" || pt === "char" || pt === "unsignedbyte") && (at === "byte" || at === "char" || at === "unsignedbyte")) return true;
                     if ((pt === "address" || pt === "string") && (at === "address" || at === "string")) return true;
                     if ((pt === "int" || pt === "unsignedint") && (at === "int" || at === "unsignedint")) return true;
                     return false;
