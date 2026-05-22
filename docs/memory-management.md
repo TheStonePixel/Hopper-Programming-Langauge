@@ -137,8 +137,8 @@ The signature is part of the type. It is not inferred, not overloaded, and not r
 This allows allocation policy to become a parameter rather than a runtime assumption:
 
 ```hopper
-Pool heap   = Pool(65536, allocate(int) address, deallocate(address))
-Pool mapped = Pool(65536, mmapRegion(int) address, unmapRegion(address))
+Pool heap   = Pool(65536, allocate, deallocate)
+Pool mapped = Pool(65536, mmapRegion, unmapRegion)
 ```
 
 The Pool class stores these functions as raw callable addresses with their signatures preserved at compile time. When invoked, they are cast back into their declared form:
