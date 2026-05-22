@@ -129,7 +129,9 @@ A conforming implementation MUST accept `value`, `address`, and `size` as field 
 
 ### Reserved Keywords
 
-The following identifiers are full reserved keywords and MUST NOT be used as identifiers in any context: `alias`, `allocate`, `asm`, `bind`, `bitfield`, `bool`, `break`, `byte`, `callback`, `cast`, `char`, `class`, `const`, `constrain`, `constructor`, `continue`, `deallocate`, `defer`, `destructor`, `else`, `entry`, `enum`, `ensures`, `extern`, `false`, `float`, `for`, `function`, `if`, `implements`, `import`, `int`, `interface`, `invariant`, `null`, `operator`, `pad`, `requires`, `return`, `strict`, `string`, `struct`, `template`, `true`, `unsigned`, `void`, `while`.
+The following identifiers are full reserved keywords and MUST NOT be used as identifiers in any context: `alias`, `allocate`, `asm`, `bind`, `bit`, `bitfield`, `bool`, `break`, `byte`, `callback`, `char`, `class`, `const`, `constrain`, `constructor`, `continue`, `deallocate`, `defer`, `destructor`, `else`, `entry`, `enum`, `ensures`, `extern`, `false`, `float`, `for`, `from`, `function`, `if`, `implements`, `import`, `int`, `interface`, `invariant`, `null`, `operator`, `pad`, `requires`, `return`, `strict`, `string`, `struct`, `template`, `true`, `unsigned`, `void`, `while`.
+
+> **Correction.** An earlier version of this list included `cast` as a reserved keyword. `cast` is NOT a grammar keyword — it is a plain `Identifier` that names a template function defined in the `cast` module. Programs may define their own identifiers named `cast` without a grammar-level error (though shadowing the `cast` module is inadvisable). Additionally, `from` and `bit` were omitted from the list; both are literal strings in `Hopper.g4` (`from` in `importDecl`, `bit` in `type` and `castType`) and are therefore reserved.
 
 The identifier `String` is special: it is reserved as a class name and template name but may appear in positions where `className` or `templateName` is expected. It MUST NOT be used as an ordinary `Identifier`.
 
