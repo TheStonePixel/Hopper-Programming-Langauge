@@ -1,6 +1,12 @@
 {
   "name": "decorator",
   "version": "0.1.0",
-  "type": "program",
-  "entry": "decorator.hop"
+  "description": "decorator pattern in Hopper",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {},
+  "targets": {
+    "host": {}
+  }
 }

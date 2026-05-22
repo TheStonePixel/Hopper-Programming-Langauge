@@ -1,15 +1,19 @@
 {
   "name": "pipeline",
   "version": "0.1.0",
-  "type": "program",
-  "main": "pipeline.hop",
-  "entry": "pipeline.hop",
+  "description": "Pipeline pattern — compose transformations as a chain of functions",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "ds": "0.1.0"
+  },
   "targets": {
     "host": {
       "Array": {
         "from": "ds",
-        "interface": "../../modules/ds/interfaces/Array.hop",
-        "implementation": "../../modules/ds/src/Array.hop"
+        "interface": "modules/ds/interfaces/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
       }
     }
   }

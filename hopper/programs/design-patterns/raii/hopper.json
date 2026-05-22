@@ -2,6 +2,11 @@
   "name": "raii",
   "version": "0.1.0",
   "description": "RAII — constructor/destructor lifecycle, early-return safety, defer",
-  "type": "program",
-  "entry": "raii.hop"
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {},
+  "targets": {
+    "host": {}
+  }
 }

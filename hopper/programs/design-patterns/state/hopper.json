@@ -1,6 +1,12 @@
 {
   "name": "state",
   "version": "0.1.0",
-  "type": "program",
-  "entry": "state.hop"
+  "description": "state pattern in Hopper",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {},
+  "targets": {
+    "host": {}
+  }
 }

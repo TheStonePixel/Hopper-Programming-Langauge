@@ -1,0 +1,110 @@
+class StandardArray implements Array {
+    address data
+    int length
+    int capacity
+
+    constructor(int initialCap) {
+        self.capacity = initialCap
+        self.length   = 0
+        self.data     = allocate initialCap * 8
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow() {
+        int newCap  = self.capacity * 2
+        address buf = allocate newCap * 8
+        int i = 0
+        while (i < self.length) {
+            address src = self.data + i * 8
+            address dst = buf + i * 8
+            address sv = src::value
+            dst::value = sv
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = buf
+        self.capacity = newCap
+    }
+
+    function len() int { return self.length }
+    function cap() int { return self.capacity }
+    function empty() bool { return self.length == 0 }
+
+    function get(int i) address {
+        address p = self.data + i * 8
+        address v = p::value
+        return v
+    }
+
+    function set(int i, address val) {
+        address p = self.data + i * 8
+        p::value = val
+    }
+
+    function push(address val) {
+        if (self.length == self.capacity) { self._grow() }
+        address p = self.data + self.length * 8
+        p::value = val
+        self.length = self.length + 1
+    }
+
+    function pop() address {
+        self.length = self.length - 1
+        address p = self.data + self.length * 8
+        address v = p::value
+        return v
+    }
+
+    function peek() address {
+        address p = self.data + (self.length - 1) * 8
+        address v = p::value
+        return v
+    }
+
+    function reset() { self.length = 0 }
+
+    function indexOf(address val) int {
+        int i = 0
+        while (i < self.length) {
+            address p = self.data + i * 8
+            address v = p::value
+            if (v == val) { return i }
+            i = i + 1
+        }
+        return -1
+    }
+
+    function contains(address val) bool {
+        return self.indexOf(val) >= 0
+    }
+
+    function remove(int i) {
+        int j = i + 1
+        while (j < self.length) {
+            address src = self.data + j * 8
+            address dst = self.data + (j - 1) * 8
+            address v = src::value
+            dst::value = v
+            j = j + 1
+        }
+        self.length = self.length - 1
+    }
+
+    function insert(int i, address val) {
+        if (self.length == self.capacity) { self._grow() }
+        int j = self.length
+        while (j > i) {
+            address src = self.data + (j - 1) * 8
+            address dst = self.data + j * 8
+            address v = src::value
+            dst::value = v
+            j = j - 1
+        }
+        address p = self.data + i * 8
+        p::value = val
+        self.length = self.length + 1
+    }
+}

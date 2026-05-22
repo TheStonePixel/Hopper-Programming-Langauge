@@ -1,0 +1,65 @@
+class StandardQueue implements Queue {
+    address data
+    int head
+    int tail
+    int length
+    int capacity
+
+    constructor(int initialCap) {
+        self.capacity = initialCap
+        self.length   = 0
+        self.head     = 0
+        self.tail     = 0
+        self.data     = allocate initialCap * 8
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow() {
+        int newCap  = self.capacity * 2
+        address buf = allocate newCap * 8
+        int i = 0
+        while (i < self.length) {
+            int idx = (self.head + i) - ((self.head + i) / self.capacity) * self.capacity
+            address src = self.data + idx * 8
+            address dst = buf + i * 8
+            address v = src::value
+            dst::value = v
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = buf
+        self.capacity = newCap
+        self.head     = 0
+        self.tail     = self.length
+    }
+
+    function len() int    { return self.length }
+    function empty() bool  { return self.length == 0 }
+
+    function peek() address {
+        address p = self.data + self.head * 8
+        address v = p::value
+        return v
+    }
+
+    function push(address val) {
+        if (self.length == self.capacity) { self._grow() }
+        address p = self.data + self.tail * 8
+        p::value = val
+        self.tail = self.tail + 1
+        if (self.tail == self.capacity) { self.tail = 0 }
+        self.length = self.length + 1
+    }
+
+    function pop() address {
+        address p = self.data + self.head * 8
+        address v = p::value
+        self.head = self.head + 1
+        if (self.head == self.capacity) { self.head = 0 }
+        self.length = self.length - 1
+        return v
+    }
+}

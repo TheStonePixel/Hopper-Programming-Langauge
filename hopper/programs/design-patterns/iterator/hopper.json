@@ -2,15 +2,18 @@
   "name": "iterator",
   "version": "0.1.0",
   "description": "Iterator pattern — ArrayIter and RangeIter behind a shared interface",
-  "type": "program",
-  "main": "iterator.hop",
-  "entry": "iterator.hop",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "ds": "0.1.0"
+  },
   "targets": {
     "host": {
       "Array": {
         "from": "ds",
-        "interface": "../../modules/ds/interfaces/Array.hop",
-        "implementation": "../../modules/ds/src/Array.hop"
+        "interface": "modules/ds/interfaces/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
       }
     }
   }

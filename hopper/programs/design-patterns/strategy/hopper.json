@@ -2,15 +2,18 @@
   "name": "strategy",
   "version": "0.1.0",
   "description": "Strategy pattern — swappable validation algorithm via stored callback",
-  "type": "program",
-  "main": "strategy.hop",
-  "entry": "strategy.hop",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "ds": "0.1.0"
+  },
   "targets": {
     "host": {
       "Array": {
         "from": "ds",
-        "interface": "../../modules/ds/interfaces/Array.hop",
-        "implementation": "../../modules/ds/src/Array.hop"
+        "interface": "modules/ds/interfaces/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
       }
     }
   }

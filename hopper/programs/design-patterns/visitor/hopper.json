@@ -1,6 +1,12 @@
 {
   "name": "visitor",
   "version": "0.1.0",
-  "type": "program",
-  "entry": "visitor.hop"
+  "description": "visitor pattern in Hopper",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {},
+  "targets": {
+    "host": {}
+  }
 }
