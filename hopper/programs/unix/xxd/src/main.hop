@@ -1,0 +1,154 @@
+// xxd — hex dump of files
+//
+// Usage: xxd [file ...]
+//   reads stdin if no files given
+//
+// Output format (16 bytes per row):
+//   00000000: 4865 6c6c 6f2c 2057 6f72 6c64 210a      Hello, World!.
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    CHUNK = 4096
+    ROW   = 16
+}
+
+function hexChar(int n) int {
+    if (n < 10) {
+        return n + 48
+    }
+    return n + 87
+}
+
+function dumpFd(int fd, address inbuf, address outbuf) {
+    int fileOffset = 0
+    bool eof = false
+
+    while (!eof) {
+        int nr = read(fd, inbuf, Limits.CHUNK)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            int row = 0
+            while (row * Limits.ROW < nr) {
+                int rowStart = row * Limits.ROW
+                int rowLen = nr - rowStart
+                if (rowLen > Limits.ROW) {
+                    rowLen = Limits.ROW
+                }
+
+                // offset: 8 hex digits + colon + space = 10 chars
+                int pos = 0
+                int off = fileOffset + rowStart
+                int shift = 28
+                while (shift >= 0) {
+                    int nibble = (off >> shift) & 0xF
+                    int hci = hexChar(nibble)
+                    byte hcb = cast hci
+                    address op = outbuf + pos
+                    op::value = hcb
+                    pos = pos + 1
+                    shift = shift - 4
+                }
+                byte colon = 58
+                byte space = 32
+                address pc = outbuf + pos
+                pc::value = colon
+                pos = pos + 1
+                address ps = outbuf + pos
+                ps::value = space
+                pos = pos + 1
+
+                // hex pairs grouped by 2: "XX XX " (4 bytes then space)
+                int col = 0
+                while (col < rowLen) {
+                    address ip = inbuf + rowStart + col
+                    byte b = ip::value
+                    int bi = cast b
+                    int hi = hexChar((bi >> 4) & 0xF)
+                    int lo = hexChar(bi & 0xF)
+                    byte hb = cast hi
+                    byte lb = cast lo
+                    address hp = outbuf + pos
+                    hp::value = hb
+                    pos = pos + 1
+                    address lp = outbuf + pos
+                    lp::value = lb
+                    pos = pos + 1
+                    if (col % 2 == 1) {
+                        address gp = outbuf + pos
+                        gp::value = space
+                        pos = pos + 1
+                    }
+                    col = col + 1
+                }
+
+                // pad to fixed width (16 bytes = 8 groups of 2 + 8 spaces = 40 chars of hex)
+                int hexEnd = 10 + 40
+                while (pos < hexEnd) {
+                    address pp = outbuf + pos
+                    pp::value = space
+                    pos = pos + 1
+                }
+
+                // ASCII column
+                address pa = outbuf + pos
+                pa::value = space
+                pos = pos + 1
+
+                col = 0
+                while (col < rowLen) {
+                    address ip = inbuf + rowStart + col
+                    byte b = ip::value
+                    int bi = cast b
+                    byte out = b
+                    if (bi < 32 || bi > 126) {
+                        byte dot = 46
+                        out = dot
+                    }
+                    address op = outbuf + pos
+                    op::value = out
+                    pos = pos + 1
+                    col = col + 1
+                }
+
+                byte nl = 10
+                address pnl = outbuf + pos
+                pnl::value = nl
+                pos = pos + 1
+
+                write(StdFd.STDOUT, outbuf, pos)
+                row = row + 1
+            }
+            fileOffset = fileOffset + nr
+        }
+    }
+}
+
+entry main(int argc, string[] argv) {
+    address inbuf  = allocate Limits.CHUNK + 16
+    address outbuf = allocate 128
+
+    if (argc == 1) {
+        dumpFd(StdFd.STDIN, inbuf, outbuf)
+    } else {
+        int i = 1
+        while (i < argc) {
+            address fname = argv[i]
+            int fd = open(fname, OpenFlag.O_RDONLY, 0)
+            if (fd < 0) {
+                printf("xxd: %s: cannot open\n", fname)
+            } else {
+                dumpFd(fd, inbuf, outbuf)
+                close(fd)
+            }
+            i = i + 1
+        }
+    }
+
+    deallocate inbuf
+    deallocate outbuf
+}

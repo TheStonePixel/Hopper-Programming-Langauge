@@ -1,0 +1,101 @@
+// echo — print arguments to stdout
+//
+// Usage: echo [-n] [string ...]
+//   -n  do not output trailing newline
+
+import IO from linux
+
+enum Limits {
+    BUFSZ = 4096
+}
+
+function strLen(address s) int {
+    int i = 0
+    bool done = false
+    while (!done) {
+        address p = s + i
+        byte b = p::value
+        int c = cast b
+        if (c == 0) {
+            done = true
+        } else {
+            i = i + 1
+        }
+    }
+    return i
+}
+
+entry main(int argc, string[] argv) {
+    bool noNewline = false
+    int start = 1
+
+    if (argc > 1) {
+        address arg = argv[1]
+        address p0 = arg
+        address p1 = arg + 1
+        address p2 = arg + 2
+        byte b0 = p0::value
+        byte b1 = p1::value
+        byte b2 = p2::value
+        int c0 = cast b0
+        int c1 = cast b1
+        int c2 = cast b2
+        if (c0 == 45 && c1 == 110 && c2 == 0) {
+            noNewline = true
+            start = 2
+        }
+    }
+
+    address buf = allocate Limits.BUFSZ
+    int pos = 0
+
+    int i = start
+    while (i < argc) {
+        address s = argv[i]
+        int len = strLen(s)
+
+        int j = 0
+        while (j < len) {
+            if (pos >= Limits.BUFSZ - 2) {
+                write(StdFd.STDOUT, buf, pos)
+                pos = 0
+            }
+            address sp = s + j
+            byte b = sp::value
+            address dp = buf + pos
+            dp::value = b
+            pos = pos + 1
+            j = j + 1
+        }
+
+        if (i < argc - 1) {
+            if (pos >= Limits.BUFSZ - 1) {
+                write(StdFd.STDOUT, buf, pos)
+                pos = 0
+            }
+            address dp = buf + pos
+            byte space = 32
+            dp::value = space
+            pos = pos + 1
+        }
+
+        i = i + 1
+    }
+
+    if (!noNewline) {
+        if (pos >= Limits.BUFSZ - 1) {
+            write(StdFd.STDOUT, buf, pos)
+            pos = 0
+        }
+        address dp = buf + pos
+        byte nl = 10
+        dp::value = nl
+        pos = pos + 1
+    }
+
+    if (pos > 0) {
+        write(StdFd.STDOUT, buf, pos)
+    }
+
+    deallocate buf
+}

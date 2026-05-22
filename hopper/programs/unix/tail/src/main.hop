@@ -1,0 +1,208 @@
+// tail — output last N lines of files
+//
+// Usage: tail [-n count] [file ...]
+//   -n count  print last count lines (default: 10)
+//
+// Seekable files: lseek to end, scan backward to find Nth-from-last line start,
+// then stream forward. O(output) not O(file size).
+// Stdin: buffer up to MAXBUF then scan backward.
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    CHUNK  = 65536
+    MAXBUF = 1048576
+}
+
+function parseInt(address s) int {
+    int result = 0
+    int i = 0
+    bool done = false
+    while (!done) {
+        address p = s + i
+        byte b = p::value
+        int c = cast b
+        if (c >= 48 && c <= 57) {
+            result = result * 10 + (c - 48)
+            i = i + 1
+        } else {
+            done = true
+        }
+    }
+    return result
+}
+
+// Scan buf[0..len) backward. Returns byte offset of the start of the
+// Nth-from-last line, or 0 if there are fewer than N lines.
+function findTailOffset(address buf, int len, int n) int {
+    int count = 0
+    int i = len - 1
+    // skip a trailing newline so it doesn't count as an empty line
+    if (i >= 0) {
+        address p = buf + i
+        byte b = p::value
+        int c = cast b
+        if (c == 10) {
+            i = i - 1
+        }
+    }
+    while (i >= 0) {
+        address p = buf + i
+        byte b = p::value
+        int c = cast b
+        if (c == 10) {
+            count = count + 1
+            if (count == n) {
+                return i + 1
+            }
+        }
+        i = i - 1
+    }
+    return 0
+}
+
+function writeFromFd(int fd, address buf) {
+    bool eof = false
+    while (!eof) {
+        int nr = read(fd, buf, Limits.CHUNK)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            write(StdFd.STDOUT, buf, nr)
+        }
+    }
+}
+
+function tailSeekable(int fd, address buf, int maxLines) {
+    int fileSize = lseek(fd, 0, SeekWhence.SEEK_END)
+    if (fileSize <= 0) {
+        return
+    }
+
+    int count = 0
+    int startOffset = 0
+    int remaining = fileSize
+    bool found = false
+
+    while (remaining > 0 && !found) {
+        int readSize = remaining
+        if (readSize > Limits.CHUNK) {
+            readSize = Limits.CHUNK
+        }
+        remaining = remaining - readSize
+        lseek(fd, remaining, SeekWhence.SEEK_SET)
+        int nr = read(fd, buf, readSize)
+        if (nr <= 0) {
+            found = true
+        } else {
+            int i = nr - 1
+            // skip trailing newline on the very last chunk
+            if (remaining + nr == fileSize) {
+                address p = buf + i
+                byte b = p::value
+                int c = cast b
+                if (c == 10) {
+                    i = i - 1
+                }
+            }
+            while (i >= 0 && !found) {
+                address p = buf + i
+                byte b = p::value
+                int c = cast b
+                if (c == 10) {
+                    count = count + 1
+                    if (count == maxLines) {
+                        startOffset = remaining + i + 1
+                        found = true
+                    }
+                }
+                i = i - 1
+            }
+        }
+    }
+
+    lseek(fd, startOffset, SeekWhence.SEEK_SET)
+    writeFromFd(fd, buf)
+}
+
+function tailStdin(address buf, int maxLines) {
+    int total = 0
+    bool eof = false
+    while (!eof && total < Limits.MAXBUF) {
+        int space = Limits.MAXBUF - total
+        if (space > Limits.CHUNK) {
+            space = Limits.CHUNK
+        }
+        int nr = read(StdFd.STDIN, buf + total, space)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            total = total + nr
+        }
+    }
+    if (total == 0) {
+        return
+    }
+    int offset = findTailOffset(buf, total, maxLines)
+    write(StdFd.STDOUT, buf + offset, total - offset)
+}
+
+entry main(int argc, string[] argv) {
+    int maxLines = 10
+    int firstFile = 0
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        address p0 = arg
+        byte b0 = p0::value
+        int c0 = cast b0
+        if (c0 == 45) {
+            address p1 = arg + 1
+            byte b1 = p1::value
+            int c1 = cast b1
+            if (c1 == 110) {
+                ai = ai + 1
+                if (ai < argc) {
+                    maxLines = parseInt(argv[ai])
+                }
+            }
+        } else {
+            if (firstFile == 0) {
+                firstFile = ai
+            }
+        }
+        ai = ai + 1
+    }
+
+    address buf = allocate Limits.MAXBUF + 16
+
+    if (firstFile == 0) {
+        tailStdin(buf, maxLines)
+    } else {
+        int fi = firstFile
+        bool multiFile = (argc - firstFile) > 1
+        while (fi < argc) {
+            address fname = argv[fi]
+            int fd = open(fname, OpenFlag.O_RDONLY, 0)
+            if (fd < 0) {
+                printf("tail: %s: cannot open\n", fname)
+            } else {
+                if (multiFile) {
+                    printf("==> %s <==\n", fname)
+                }
+                tailSeekable(fd, buf, maxLines)
+                if (multiFile && fi < argc - 1) {
+                    printf("\n")
+                }
+                close(fd)
+            }
+            fi = fi + 1
+        }
+    }
+
+    deallocate buf
+}
