@@ -40,6 +40,7 @@ function loadBindings(sourceFile, target = "host") {
                         from:           b.from || null,
                         interface:      path.resolve(dir, b.interface),
                         implementation: path.resolve(dir, b.implementation),
+                        inline:         b.inline === true,
                     });
                 }
                 return bindings;

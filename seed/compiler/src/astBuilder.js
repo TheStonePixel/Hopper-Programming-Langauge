@@ -1019,6 +1019,20 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                     baseDir: path.dirname(binding.implementation), visited, bindings, sourceFile: binding.implementation,
                 });
 
+                // Mark all functions and class methods as alwaysinline when the binding
+                // is a pure translation layer (no code of its own, inline: true in hopper.json).
+                if (binding.inline) {
+                    for (const fn of implAst.functions || []) {
+                        if (!fn.isExtern) fn._inline = true;
+                    }
+                    for (const cls of implAst.classes || []) {
+                        for (const m of cls.methods || []) m._inline = true;
+                        if (cls.constructor) {
+                            for (const m of cls.constructor.methods || []) m._inline = true;
+                        }
+                    }
+                }
+
                 // Find the class that matches the binding name; also accept a class that
                 // already declares `implements <bindingName>` in source; fall back to first class.
                 // This handles impl files that export multiple classes (e.g. tui.hop has Key + StandardTUI).

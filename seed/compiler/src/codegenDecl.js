@@ -63,7 +63,8 @@ export function genFunction(fn) {
         return classTypes.has(normT) ? `${lt}* %p${i}` : `${lt} %p${i}`;
     }).join(", ");
 
-    ir.emit(`define ${retLlType} @${fn._mangledName || fn.name}(${paramSig}) {`);
+    const fnAttr = fn._inline ? " alwaysinline" : "";
+    ir.emit(`define ${retLlType} @${fn._mangledName || fn.name}(${paramSig})${fnAttr} {`);
     ir.emit("entry:");
 
     fn.params.forEach((p, i) => {
@@ -119,7 +120,8 @@ export function genMethod(typeName, method, isClass = true) {
             paramParts.push(`${llvmType(normT)} %p${i}`);
         }
     });
-    ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")}) {`);
+    const methodAttr = method._inline ? " alwaysinline" : "";
+    ir.emit(`define ${retLlType} @${mangled}(${paramParts.join(", ")})${methodAttr} {`);
     ir.emit("entry:");
 
     ir.vars.set("self", {
