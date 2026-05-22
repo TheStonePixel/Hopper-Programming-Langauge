@@ -1,7 +1,7 @@
 {
   "name": "regex",
   "version": "0.1.0",
-  "description": "grep-like line search \u2014 regex flags, recursive, stdin, case-insensitive",
+  "description": "grep-like line search — regex flags, recursive, stdin, case-insensitive",
   "license": "MIT",
   "type": "executable",
   "entry": "src/main.hop",

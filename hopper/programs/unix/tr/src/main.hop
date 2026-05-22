@@ -5,10 +5,11 @@
 //   tr -d SET1      delete chars in SET1
 //   tr -s SET1      squeeze consecutive repeated chars in SET1
 
-import IO from linux
+import IO   from linux
+import SIMD from x86_64
 
 enum Limits {
-    BUFSZ = 4096
+    BUFSZ = 65536
 }
 
 // Expand set string (handling a-z ranges) into 256-byte presence table.
@@ -201,38 +202,96 @@ entry main(int argc, string[] argv) {
             expandSet(set1, stable)
         }
 
-        int lastOut = -1
+        // Detect if translation is a single contiguous range XOR (e.g. a-z -> A-Z).
+        int trLo = -1
+        int trHi = -1
+        int trXor = 0
+        bool isRangeXor = true
+        int ci = 0
+        while (ci < 256) {
+            address tp = ttable + ci
+            byte tv = tp::value
+            int tvi = cast tv
+            tvi = tvi & 255
+            if (tvi != ci) {
+                int xv = ci ^ tvi
+                if (trLo == -1) {
+                    trLo = ci
+                    trHi = ci
+                    trXor = xv
+                } else if (ci == trHi + 1 && xv == trXor) {
+                    trHi = ci
+                } else {
+                    isRangeXor = false
+                }
+            }
+            ci = ci + 1
+        }
+
         bool eof = false
-        while (!eof) {
-            int nr = read(StdFd.STDIN, inbuf, Limits.BUFSZ)
-            if (nr <= 0) {
-                eof = true
-            } else {
-                int outpos = 0
-                int i = 0
-                while (i < nr) {
-                    address ip = inbuf + i
-                    byte b = ip::value
-                    int bi = cast b
-                    address tp = ttable + bi
-                    byte mapped = tp::value
-                    int mappedi = cast mapped
-                    bool skip = false
-                    if (flagS != 0) {
+        if (flagS == 0 && isRangeXor && trLo >= 0) {
+            X86SIMD simd = X86SIMD()
+            while (!eof) {
+                int nr = read(StdFd.STDIN, inbuf, Limits.BUFSZ)
+                if (nr <= 0) {
+                    eof = true
+                } else {
+                    simd.translateRange(inbuf, outbuf, nr, trLo, trHi, trXor)
+                    write(StdFd.STDOUT, outbuf, nr)
+                }
+            }
+        } else if (flagS == 0) {
+            while (!eof) {
+                int nr = read(StdFd.STDIN, inbuf, Limits.BUFSZ)
+                if (nr <= 0) {
+                    eof = true
+                } else {
+                    int i = 0
+                    while (i < nr) {
+                        address ip = inbuf + i
+                        byte b = ip::value
+                        int bi = cast b
+                        bi = bi & 255
+                        address tp = ttable + bi
+                        byte mapped = tp::value
+                        address op = outbuf + i
+                        op::value = mapped
+                        i = i + 1
+                    }
+                    write(StdFd.STDOUT, outbuf, nr)
+                }
+            }
+        } else {
+            int lastOut = -1
+            while (!eof) {
+                int nr = read(StdFd.STDIN, inbuf, Limits.BUFSZ)
+                if (nr <= 0) {
+                    eof = true
+                } else {
+                    int outpos = 0
+                    int i = 0
+                    while (i < nr) {
+                        address ip = inbuf + i
+                        byte b = ip::value
+                        int bi = cast b
+                        address tp = ttable + bi
+                        byte mapped = tp::value
+                        int mappedi = cast mapped
+                        bool skip = false
                         address stp = stable + mappedi
                         byte sv = stp::value
                         int svi = cast sv
                         if (svi != 0 && mappedi == lastOut) { skip = true }
+                        if (!skip) {
+                            address op = outbuf + outpos
+                            op::value = mapped
+                            outpos = outpos + 1
+                            lastOut = mappedi
+                        }
+                        i = i + 1
                     }
-                    if (!skip) {
-                        address op = outbuf + outpos
-                        op::value = mapped
-                        outpos = outpos + 1
-                        lastOut = mappedi
-                    }
-                    i = i + 1
+                    if (outpos > 0) { write(StdFd.STDOUT, outbuf, outpos) }
                 }
-                if (outpos > 0) { write(StdFd.STDOUT, outbuf, outpos) }
             }
         }
         deallocate stable

@@ -16,4 +16,15 @@ interface SIMD {
 
     // Index of lowest set bit (0-15). mask must be non-zero.
     function bsf16(int mask) int
+
+    // Copy exactly 16 bytes from src to dst using a single SIMD load+store.
+    function copy16(address src, address dst)
+
+    // Load 16 bytes from src, XOR bytes whose value is in [lo,hi] with xorVal, store to dst.
+    // Uses unsigned range check: works for any ASCII range (lo >= 0, hi <= 127).
+    function rangeXor16(address src, address dst, int lo, int hi, int xorVal)
+
+    // Translate bytes in [lo,hi] by XORing with xorVal across an entire buffer.
+    // Processes bytes in chunks of 16 (SIMD) with scalar tail. Returns bytes written (== count).
+    function translateRange(address src, address dst, int count, int lo, int hi, int xorVal) int
 }
