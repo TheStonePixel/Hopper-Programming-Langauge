@@ -6,7 +6,7 @@ Memory management is one of the deepest fault lines in systems programming. High
 
 > Memory is a finite, shared, failure-prone resource that cannot be made logically free.
 
-Hopper does not attempt to remove manual memory management. Instead, it treats memory as a first-class, explicitly managed system resource — consistent with its approach to hardware interfaces, OS syscalls, and process control. The goal is not to hide allocation, but to make it *visible, structured, and traceable through program structure*.
+Hopper does not attempt to remove manual memory management. Instead, it treats memory as a first-class, explicitly managed system resource — consistent with its approach to hardware interfaces, OS syscalls, and process control. The goal is not to hide allocation, but to make every memory operation *a visible, intentional act*.
 
 ---
 
@@ -26,62 +26,87 @@ Hopper's design rejects this separation.
 
 ---
 
-## Memory as a System Interface
+## One Address Type
 
-In Hopper, memory is not a runtime concern. It is a system capability, declared and consumed the same way as IO, process control, or filesystem operations.
+C encodes type information into pointers: `int*`, `float*`, `char*`. The type travels with the pointer, and dereferencing silently interprets the bytes as the declared type. This is convenient but ambiguous — a `*(int*)ptr` simultaneously casts, dereferences, and declares a width, and any of those three things can be wrong without the compiler saying so.
 
-The `linux` module exposes memory operations as an explicit interface:
+Hopper has one pointer type: `address`. It carries no type information. An `address` is a location in memory and nothing more. What those bytes mean is the programmer's explicit responsibility.
+
+This removes a class of ambiguity at the cost of one extra step. That step is intentional.
+
+---
+
+## Memory Qualifiers: `::address`, `::value`, `::size`
+
+Instead of C's operators (`&`, `*`, `sizeof`), Hopper uses explicit qualifiers on variables:
+
+| Qualifier | C equivalent | What it produces |
+|-----------|-------------|-----------------|
+| `var::address` | `&var` | the memory location where `var` lives |
+| `var::value` | `*var` | the bytes stored at that location |
+| `var::size` | `sizeof(var)` | how many bytes `var` occupies |
+
+Each qualifier is one operation. There is no overloaded `*` that means three different things depending on context. A reader can look at any single expression and know exactly what it does.
 
 ```hopper
-import Memory from linux
-
-// OS-level memory mapping
-address region = mmap(0, size, prot, flags, fd, 0)
-// ... use region ...
-munmap(region, size)
-
-// Page protection
-mprotect(region, size, newProt)
-
-// Advise the kernel about access patterns
-madvise(region, size, MADV_SEQUENTIAL)
+int x = 42
+address ptr = x::address      // where x lives in memory
+int copy = ptr::value         // read what's at that address
+int bytes = x::size           // how many bytes x occupies (8 for int)
 ```
 
-These are not convenience wrappers. They are the actual Linux syscalls — the same operations a C program would call — expressed as Hopper free functions with the hardware dependency named in the build file, not buried in a library.
+For pointer arithmetic, the declared type drives the operation. `address + int` is always pointer arithmetic — no qualifier needed:
+
+```hopper
+address buf = allocate 4096
+address mid = buf + 2048      // pointer arithmetic — type is address
+address row = buf + (i * 64) // same
+```
+
+Reading a value from an offset requires being explicit about how the bytes are interpreted. There is no implicit type — you work with the raw bits using masks and shifts, or overlay a struct:
+
+```hopper
+address field = buf + 4
+int byte0 = field::value & 0xFF           // lowest byte
+int byte1 = (field + 1)::value & 0xFF    // next byte
+int word   = (byte1 << 8) | byte0        // construct a 16-bit value
+```
+
+Every step is visible. There is no `*(uint16_t*)(buf + 4)` that silently declares width and endianness.
+
+> These qualifiers are the intended design. The current compiler uses `cast` as a transitional mechanism. `::address`, `::value`, and `::size` are a near-term compiler goal — the principle is already in place, the syntax is in progress.
 
 ---
 
 ## Primitive Allocation
 
-For heap allocation, Hopper provides two primitives:
+Heap allocation uses two explicit primitives:
 
 ```hopper
-address buf = allocate 4096   // malloc(4096) — returns address
-deallocate buf                // free(buf)
+address buf = allocate 4096   // acquire: malloc(4096)
+deallocate buf                // release: free(buf)
 ```
 
-`allocate` is not hidden heap allocation. It is a declared resource acquisition that appears in source at exactly the point where memory is consumed. `deallocate` is the corresponding release.
+`allocate` is not hidden heap allocation. It is a declared resource acquisition that appears in source at exactly the point where memory is consumed. The allocation site is always visible. There is no implicit allocation triggered by assignment, return, or function call.
 
-The `address` type is a raw pointer — `i8*` in the compiled representation. There is no implicit conversion, no null safety layer, no bounds tracking. The programmer holds the allocation and is responsible for releasing it.
-
-A simple pattern:
+A simple read-and-echo:
 
 ```hopper
 entry main {
     address buf = allocate 1024
-    int n = read(0, buf, 1024)    // read from stdin
-    write(1, buf, n)              // write to stdout
+    int n = read(0, buf, 1024)
+    write(1, buf, n)
     deallocate buf
 }
 ```
 
-The allocation site, the use site, and the release site are all visible in the same function. There is no lifetime inference, no hidden release point, no runtime to decide when the memory is no longer needed.
+Allocation site, use site, release site — all present in the same function. No lifetime inference, no hidden release point.
 
 ---
 
 ## Structured Lifecycle: Constructors and Destructors
 
-The primary structured lifecycle mechanism in Hopper is the class constructor/destructor pair. This is the closest analog to RAII in the language — resource acquisition in the constructor, release in the destructor.
+For anything beyond a trivial allocation, the class constructor/destructor pair provides structured lifetime. This is Hopper's RAII — resource acquisition in the constructor, release in the destructor.
 
 ```hopper
 class Buffer {
@@ -100,19 +125,20 @@ class Buffer {
     }
 
     function write(address src, int n) int {
-        // ... bounds check, copy, update length ...
+        // copy n bytes from src into self.data at self.length
+        // update self.length
         return n
     }
 
-    function bytes() address {
+    function ptr() address {
         return self.data
     }
 }
 ```
 
-The destructor makes the release point explicit and co-located with the class definition. A reader inspecting `Buffer` sees both the acquisition and the release in the same place. Ownership is not inferred — it is stated by the structure of the class.
+The destructor makes the release co-located with the class definition. A reader inspecting `Buffer` sees acquisition and release in the same place. Ownership is stated by structure, not inferred.
 
-A more complete example — a fixed-size arena:
+A bump-pointer arena — one allocation, many suballocations, one release:
 
 ```hopper
 class Arena {
@@ -146,114 +172,148 @@ class Arena {
 }
 ```
 
-`Arena` acquires one large allocation in its constructor and suballocates from it. `reset()` rewinds the cursor without touching the OS — useful for per-request or per-frame allocation patterns. The single `deallocate` in the destructor releases the entire arena at once.
-
-Programs using `Arena` never call `deallocate` on individual allocations from it — they reset or destroy the arena. The ownership model is explicit in the interface: you push into the arena, and the arena owns the memory.
+`Arena` acquires one large region in its constructor and suballocates from it with a cursor. `reset()` rewinds without touching the OS. The single `deallocate` in the destructor releases everything. Programs using `Arena` never call `deallocate` on individual items — they reset or destroy the arena.
 
 ---
 
-## Casting Between Address and Integer
+## RAII and Generics: Safer Pointers by Construction
 
-Because `address` is a raw pointer, arithmetic requires explicit casting:
+The destructor pattern becomes significantly more powerful with generics. A generic owning wrapper makes it structurally impossible to forget deallocation — the release is encoded in the type, not in the programmer's discipline.
+
+The intended design for a generic owning pointer:
 
 ```hopper
-address buf = allocate 64
-int base = cast buf          // address → int for arithmetic
-address offset = cast (base + 16)  // int → address to index into buffer
+class Box<T> {
+    address data
+
+    constructor() {
+        self.data = allocate T::size
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function ptr() address {
+        return self.data
+    }
+
+    function value() address {
+        return self.data::value
+    }
+}
 ```
 
-The `cast` keyword makes pointer arithmetic visible at every site. There is no implicit conversion between `address` and `int`. A reader can identify every place pointer arithmetic occurs by searching for `cast`.
+`T::size` uses the `::size` qualifier on a type rather than a variable — it resolves at compile time to the byte size of `T`. `Box<int>` allocates exactly 8 bytes. `Box<Buffer>` allocates exactly as many bytes as `Buffer` requires. The programmer cannot get the allocation size wrong.
+
+A non-owning view — borrows an address without claiming responsibility for it:
+
+```hopper
+class Ref<T> {
+    address ptr
+
+    constructor(address ptr) {
+        self.ptr = ptr
+    }
+
+    // no destructor — Ref does not own the memory
+
+    function get() address {
+        return self.ptr
+    }
+}
+```
+
+A bounds-checked slice over a region:
+
+```hopper
+class Slice<T> {
+    address data
+    int length
+
+    constructor(address data, int length) {
+        self.data = data
+        self.length = length
+    }
+
+    function at(int i) address {
+        if (i < 0 | i >= self.length) {
+            return cast 0
+        }
+        return self.data + (i * T::size)
+    }
+
+    function length() int {
+        return self.length
+    }
+}
+```
+
+`Slice<T>` provides indexed access into a region with a runtime bounds check. `at(i)` returns an address or null — the caller handles the null case explicitly. There is no implicit out-of-bounds dereference.
+
+These three types — `Box<T>`, `Ref<T>`, `Slice<T>` — cover the ownership triangle:
+
+| Type | Owns memory | Allocates | Deallocates |
+|------|-------------|-----------|-------------|
+| `Box<T>` | yes | in constructor | in destructor |
+| `Ref<T>` | no | never | never |
+| `Slice<T>` | no | never | never |
+
+The ownership relationship is encoded in the type, visible at the declaration site, and enforced by the destructor. A function that receives a `Ref<T>` cannot accidentally free the memory it points to. A function that receives a `Box<T>` knows it is taking ownership.
+
+> Generics are a forward compiler goal. The destructor mechanism exists today. The generic wrapper types described here are the natural extension once generic class support is in place.
 
 ---
 
-## Memory Is Not Freed — It Is Released
+## Memory as a System Interface
 
-A conceptual distinction in Hopper's framing: memory is not *freed*, it is *released*. This aligns memory with every other system resource:
+For OS-level memory operations, the `linux` module exposes a `Memory` interface:
 
-| Resource | Acquire | Release |
-|----------|---------|---------|
-| Memory | `allocate` | `deallocate` |
-| File descriptor | `open` | `close` |
-| Socket | `socket` | `close` |
-| Memory map | `mmap` | `munmap` |
-| Lock | `lock` | `unlock` |
+```hopper
+import Memory from linux
 
-All of these follow the same lifecycle. Memory is not a special case requiring a separate abstraction layer — it is one instance of the general pattern of resource acquisition and release.
+address region = mmap(0, size, prot, flags, fd, 0)
+// ... use region ...
+munmap(region, size)
 
-This consistency matters for reasoning. A function that opens a file and allocates a buffer has two resources to track. Both are visible in source, both follow the same acquire/release model, and both are subject to the same structural discipline.
+mprotect(region, size, newProt)
+madvise(region, size, MADV_SEQUENTIAL)
+```
 
----
-
-## What Is Not Hidden
-
-Hopper makes no attempt to hide the following:
-
-**Allocation sites.** Every heap allocation appears in source as an `allocate` expression. There is no implicit allocation triggered by assignment, return, or function call.
-
-**Release points.** Every `deallocate` is explicit. For class instances, the destructor names the release explicitly and co-locates it with the type definition.
-
-**Pointer arithmetic.** Every address computation that involves integer offsets requires `cast`. The arithmetic is visible, not implicit.
-
-**OS-level memory operations.** `mmap`, `munmap`, `mprotect`, and related calls appear as direct free function calls — not wrapped in a memory allocator that hides them.
+These are the actual Linux syscalls — not wrapped in an allocator, not hidden behind a runtime. The same `::address`/`::value`/`::size` discipline applies: `region` is an `address`, and interpreting what it contains is explicit.
 
 ---
 
 ## Why Full Abstraction Is Rejected
 
-Even in systems with garbage collection, the following remain true:
+Even in systems with garbage collection:
 
 - allocation frequency affects GC pressure
 - allocation patterns affect cache behavior
 - memory fragmentation affects long-running performance
 - heap size affects OS memory accounting
 
-Hopper treats these as fundamental constraints rather than implementation artifacts to be hidden. Abstraction is permitted — an `Arena` is an abstraction over raw `allocate`. But abstraction that removes observability is not. A developer can always inspect where memory is acquired, where it is held, and where it is released, because those facts are present in source.
+Hopper treats these as fundamental constraints rather than implementation artifacts to hide. A programmer may build higher-level allocation patterns — and `Arena`, `Box`, `Slice` are examples — but those patterns must remain inspectable. The `allocate` inside `Box<T>` is visible in its constructor. The `deallocate` is visible in its destructor. There is no magic.
 
 > Abstraction is allowed. Invisibility is not.
 
 ---
 
-## Forward Goals
-
-The current model — explicit `allocate`/`deallocate`, class-based lifecycle via destructors — is the foundation. Several directions remain as forward goals rather than current capabilities:
-
-**Scope-tied allocation.** The compiler could enforce that an `address` value allocated in a scope is not returned or stored past that scope without an explicit transfer. Currently this is a convention; eventually it could be a verifiable constraint.
-
-**Ownership annotations.** A function signature could declare whether it acquires, borrows, or transfers ownership of a pointer parameter. Currently this is expressed in documentation; eventually it could be part of the type.
-
-**Compile-time leak detection.** Static analysis over `allocate`/`deallocate` pairs could identify allocations with no corresponding release on all paths. Currently leaks are runtime phenomena; a future compiler pass could make some of them compile-time errors.
-
-**Declared allocation functions.** A function that performs allocation could be required to declare that fact — making implicit allocation visible at call sites even when the `allocate` is hidden inside an abstraction.
-
-These are not current capabilities. They are the coherent next steps from the foundation that already exists.
-
----
-
-## Relationship to the Broader Model
-
-Memory management in Hopper follows the same principle as hardware interfaces and OS syscalls:
-
-- hardware is named in ISA modules, not hidden in the compiler
-- OS operations are explicit contracts, not runtime abstractions
-- memory is an explicit system resource, not a hidden runtime concern
-
-The compiler does not manage memory on the programmer's behalf. It preserves allocation semantics through the IR, allows optimization of provably unnecessary allocations, and respects destructor ordering. It does not introduce implicit allocation or implicit release.
-
----
-
 ## Summary
 
-| Aspect | Current Model |
-|--------|--------------|
+| Aspect | Model |
+|--------|-------|
+| Pointer type | Single untyped `address` — no `int*`, `float*` |
+| Address of variable | `var::address` (near-term goal; `cast` currently) |
+| Read from address | `var::value` (near-term goal; `cast` currently) |
+| Size of type | `T::size` / `var::size` (near-term goal) |
 | Heap allocation | `allocate N` — explicit, returns `address` |
 | Heap release | `deallocate ptr` — explicit |
-| Structured lifecycle | Class constructor/destructor pairs |
-| Pointer arithmetic | Explicit `cast` at every site |
-| OS memory operations | `mmap`, `munmap`, etc. as free functions from `Memory` interface |
-| Ownership model | Structural convention; destructors encode release |
-| Compile-time safety | Forward goal; not current capability |
+| Structured lifecycle | Constructor acquires, destructor releases |
+| Generic ownership | `Box<T>`, `Ref<T>`, `Slice<T>` — forward goal |
+| OS memory operations | `mmap`, `munmap` etc. as free functions |
 | Abstraction | Permitted; must remain inspectable |
 
-The closing principle is consistent with every other layer of Hopper:
+The design principle across every layer:
 
-> Memory is not a runtime concern hidden from the programmer. It is a system resource managed explicitly, structured through the same mechanisms as every other resource the program holds.
+> Every memory operation is a visible, intentional act. The type carries no hidden meaning. The qualifiers make each operation explicit. The ownership structure is readable in source.
