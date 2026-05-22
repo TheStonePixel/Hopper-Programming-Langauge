@@ -1,0 +1,18 @@
+{
+  "name": "hopper-build-system",
+  "version": "1.0.0",
+  "description": "Hopper build system — CLI, test runner, program builder",
+  "bin": {
+    "hopper": "./hopper"
+  },
+  "scripts": {
+    "test":        "node tools/test.js",
+    "build":       "node tools/build.js",
+    "run":         "node tools/run.js",
+    "install:ext": "node tools/install-ext.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "module"
+}

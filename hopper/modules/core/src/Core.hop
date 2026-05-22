@@ -1,0 +1,270 @@
+import io  from arch
+import sys from arch
+
+function _coreStrLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { break }
+        n = n + 1
+    }
+    return n
+}
+
+function _coreWriteInt(int fd, int n) {
+    if (n == 0) {
+        byte z = 48
+        address p = allocate 1
+        p::value = z
+        write(fd, p, 1)
+        deallocate p
+        return
+    }
+    bool neg = false
+    if (n < 0) {
+        neg = true
+        n = 0 - n
+    }
+    address tmp = allocate 24
+    int count = 0
+    while (n > 0) {
+        int d = n % 10
+        int dch = d + 48
+        byte db = cast dch
+        address p = tmp + count
+        p::value = db
+        count = count + 1
+        n = n / 10
+    }
+    if (neg) {
+        byte minus = 45
+        address pm = tmp + count
+        pm::value = minus
+        count = count + 1
+    }
+    address rev = allocate 24
+    int i = 0
+    while (i < count) {
+        address src = tmp + (count - 1 - i)
+        address dst = rev + i
+        byte b = src::value
+        dst::value = b
+        i = i + 1
+    }
+    write(fd, rev, count)
+    deallocate tmp
+    deallocate rev
+}
+
+class StandardCore implements Core {
+    constructor() { }
+    destructor()  { }
+
+    function panic(address msg) {
+        int len = _coreStrLen(msg)
+        write(2, msg, len)
+        exit(1)
+    }
+
+    function assert(bool cond, address msg) {
+        if (!cond) {
+            int len = _coreStrLen(msg)
+            write(2, msg, len)
+            exit(1)
+        }
+    }
+
+    function soft(bool cond, address msg) {
+        if (!cond) {
+            int len = _coreStrLen(msg)
+            write(2, msg, len)
+        }
+    }
+
+    function printStr(address s) {
+        int len = _coreStrLen(s)
+        write(1, s, len)
+    }
+
+    function printInt(int n) {
+        _coreWriteInt(1, n)
+    }
+
+    function printBool(bool b) {
+        if (b) {
+            write(1, "true", 4)
+        } else {
+            write(1, "false", 5)
+        }
+    }
+
+    function printByte(byte c) {
+        address buf = allocate 1
+        buf::value = c
+        write(1, buf, 1)
+        deallocate buf
+    }
+
+    function newline() {
+        write(1, "\n", 1)
+    }
+
+    function eprintStr(address s) {
+        int len = _coreStrLen(s)
+        write(2, s, len)
+    }
+
+    function readLine(address buf, int maxLen) int {
+        address tmp = allocate 1
+        int total = 0
+        while (total < maxLen) {
+            int n = read(0, tmp, 1)
+            if (n <= 0) {
+                deallocate tmp
+                return total
+            }
+            byte b = tmp::value
+            int bi = cast b
+            if (bi == 10) {
+                deallocate tmp
+                return total
+            }
+            address slot = buf + total
+            slot::value = b
+            total = total + 1
+        }
+        deallocate tmp
+        return total
+    }
+
+    function parseIntBuf(address buf, int len) int {
+        int result = 0
+        int i = 0
+        bool neg = false
+        if (len > 0) {
+            address first = buf
+            byte fc = first::value
+            int fci = cast fc
+            if (fci == 45) {
+                neg = true
+                i = 1
+            }
+        }
+        while (i < len) {
+            address p = buf + i
+            byte b = p::value
+            int bi = cast b
+            if (bi >= 48) {
+                if (bi <= 57) {
+                    result = result * 10 + (bi - 48)
+                }
+            }
+            i = i + 1
+        }
+        if (neg) { return 0 - result }
+        return result
+    }
+}
+
+// TestSuite — lightweight test runner; not behind an interface
+class TestSuite {
+    int     pass
+    int     fail
+    address suiteName
+
+    constructor(address name) {
+        self.pass      = 0
+        self.fail      = 0
+        self.suiteName = name
+    }
+
+    destructor() { }
+
+    function check(bool cond, address label) {
+        if (cond) {
+            write(1, "PASS  ", 6)
+            int len = _coreStrLen(label)
+            write(1, label, len)
+            write(1, "\n", 1)
+            self.pass = self.pass + 1
+        } else {
+            write(1, "FAIL  ", 6)
+            int len = _coreStrLen(label)
+            write(1, label, len)
+            write(1, "\n", 1)
+            self.fail = self.fail + 1
+        }
+    }
+
+    function checkEq(int actual, int expected, address label) {
+        if (actual == expected) {
+            write(1, "PASS  ", 6)
+            int len = _coreStrLen(label)
+            write(1, label, len)
+            write(1, "\n", 1)
+            self.pass = self.pass + 1
+        } else {
+            write(1, "FAIL  ", 6)
+            int len = _coreStrLen(label)
+            write(1, label, len)
+            write(1, "  (got ", 7)
+            _coreWriteInt(1, actual)
+            write(1, ", want ", 7)
+            _coreWriteInt(1, expected)
+            write(1, ")\n", 2)
+            self.fail = self.fail + 1
+        }
+    }
+
+    function checkStrEq(address actual, address expected, address label) {
+        bool ok = true
+        int i = 0
+        while (true) {
+            address pa = actual + i
+            address pb = expected + i
+            byte ba = pa::value
+            byte bb = pb::value
+            int ai = cast ba
+            int bi = cast bb
+            if (ai != bi) {
+                ok = false
+                break
+            }
+            if (ai == 0)  { break }
+            i = i + 1
+        }
+        if (ok) {
+            write(1, "PASS  ", 6)
+            int len = _coreStrLen(label)
+            write(1, label, len)
+            write(1, "\n", 1)
+            self.pass = self.pass + 1
+        } else {
+            write(1, "FAIL  ", 6)
+            int len = _coreStrLen(label)
+            write(1, label, len)
+            write(1, "  (got \"", 8)
+            int alen = _coreStrLen(actual)
+            write(1, actual, alen)
+            write(1, "\", want \"", 9)
+            int elen = _coreStrLen(expected)
+            write(1, expected, elen)
+            write(1, "\")\n", 3)
+            self.fail = self.fail + 1
+        }
+    }
+
+    function done() bool {
+        int nameLen = _coreStrLen(self.suiteName)
+        write(1, self.suiteName, nameLen)
+        write(1, ": ", 2)
+        _coreWriteInt(1, self.pass)
+        write(1, " passed, ", 9)
+        _coreWriteInt(1, self.fail)
+        write(1, " failed\n", 8)
+        if (self.fail > 0) { exit(1) }
+        return self.fail == 0
+    }
+}

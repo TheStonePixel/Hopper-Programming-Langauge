@@ -1,0 +1,64 @@
+import net from arch
+
+class LinuxSocket implements Socket {
+    function socket(int domain, int type, int protocol) int {
+        return socket(domain, type, protocol)
+    }
+    function bind(int fd, address addr, int addrlen) int {
+        return bind(fd, addr, addrlen)
+    }
+    function listen(int fd, int backlog) int {
+        return listen(fd, backlog)
+    }
+    function accept(int fd, address addr, address addrlen) int {
+        return accept(fd, addr, addrlen)
+    }
+    function accept4(int fd, address addr, address addrlen, int flags) int {
+        return accept4(fd, addr, addrlen, flags)
+    }
+    function connect(int fd, address addr, int addrlen) int {
+        return connect(fd, addr, addrlen)
+    }
+    function shutdown(int fd, int how) int {
+        return shutdown(fd, how)
+    }
+    function getsockname(int fd, address addr, address addrlen) int {
+        return getsockname(fd, addr, addrlen)
+    }
+    function getpeername(int fd, address addr, address addrlen) int {
+        return getpeername(fd, addr, addrlen)
+    }
+    function socketpair(int domain, int type, int protocol, address fds) int {
+        return socketpair(domain, type, protocol, fds)
+    }
+    function send(int fd, address buf, int len, int flags) int {
+        return send(fd, buf, len, flags)
+    }
+    function recv(int fd, address buf, int len, int flags) int {
+        return recv(fd, buf, len, flags)
+    }
+    function sendto(int fd, address buf, int len, int flags, address addr, int addrlen) int {
+        return sendto(fd, buf, len, flags, addr, addrlen)
+    }
+    function recvfrom(int fd, address buf, int len, int flags, address addr, address addrlen) int {
+        return recvfrom(fd, buf, len, flags, addr, addrlen)
+    }
+    function sendmsg(int fd, address msg, int flags) int {
+        return sendmsg(fd, msg, flags)
+    }
+    function recvmsg(int fd, address msg, int flags) int {
+        return recvmsg(fd, msg, flags)
+    }
+    function sendmmsg(int fd, address msgs, int vlen, int flags) int {
+        return sendmmsg(fd, msgs, vlen, flags)
+    }
+    function recvmmsg(int fd, address msgs, int vlen, int flags, address timeout) int {
+        return recvmmsg(fd, msgs, vlen, flags, timeout)
+    }
+    function setsockopt(int fd, int level, int optname, address optval, int optlen) int {
+        return setsockopt(fd, level, optname, optval, optlen)
+    }
+    function getsockopt(int fd, int level, int optname, address optval, address optlen) int {
+        return getsockopt(fd, level, optname, optval, optlen)
+    }
+}

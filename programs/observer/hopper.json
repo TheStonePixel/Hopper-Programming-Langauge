@@ -1,7 +1,0 @@
-{
-  "name": "observer",
-  "version": "0.1.0",
-  "description": "Observer pattern — event pub/sub via callback dispatch tables",
-  "type": "program",
-  "main": "observer.hop"
-}

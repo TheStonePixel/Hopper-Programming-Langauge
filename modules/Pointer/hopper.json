@@ -1,8 +1,0 @@
-{
-  "name": "Pointer",
-  "version": "0.1.0",
-  "description": "Smart pointers \u2014 Unique<T> (owning) and Shared<T> (ref-counted)",
-  "license": "Apache-2.0",
-  "type": "library",
-  "main": "src/unique.hop"
-}

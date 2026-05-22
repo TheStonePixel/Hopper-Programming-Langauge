@@ -1,0 +1,6 @@
+{
+  "name": "visitor",
+  "version": "0.1.0",
+  "type": "program",
+  "entry": "visitor.hop"
+}

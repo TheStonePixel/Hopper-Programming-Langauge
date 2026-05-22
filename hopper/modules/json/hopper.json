@@ -1,0 +1,28 @@
+{
+  "name": "json",
+  "version": "0.1.0",
+  "description": "JSON parser: recursive-descent reader producing a node tree",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "JSON": {
+      "interface":      "interfaces/JSON.hop",
+      "implementation": "src/JSON.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "JSON": {
+        "from":           "json",
+        "interface":      "interfaces/JSON.hop",
+        "implementation": "src/JSON.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "interface":      "../core/interfaces/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
+  }
+}

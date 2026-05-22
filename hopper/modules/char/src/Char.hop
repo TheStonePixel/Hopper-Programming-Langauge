@@ -1,0 +1,120 @@
+class StandardChar implements Char {
+    function isAlpha(byte c) bool {
+        int n = cast c
+        if (n >= 65) {
+            if (n <= 90) { return true }
+        }
+        if (n >= 97) {
+            if (n <= 122) { return true }
+        }
+        return false
+    }
+
+    function isDigit(byte c) bool {
+        int n = cast c
+        if (n >= 48) {
+            if (n <= 57) { return true }
+        }
+        return false
+    }
+
+    function isAlphaNum(byte c) bool {
+        if (self.isAlpha(c)) { return true }
+        return self.isDigit(c)
+    }
+
+    function isSpace(byte c) bool {
+        int n = cast c
+        if (n == 32) { return true }
+        if (n == 9)  { return true }
+        if (n == 10) { return true }
+        if (n == 13) { return true }
+        if (n == 11) { return true }
+        if (n == 12) { return true }
+        return false
+    }
+
+    function isUpper(byte c) bool {
+        int n = cast c
+        if (n >= 65) {
+            if (n <= 90) { return true }
+        }
+        return false
+    }
+
+    function isLower(byte c) bool {
+        int n = cast c
+        if (n >= 97) {
+            if (n <= 122) { return true }
+        }
+        return false
+    }
+
+    function isHex(byte c) bool {
+        if (self.isDigit(c)) { return true }
+        int n = cast c
+        if (n >= 65) {
+            if (n <= 70) { return true }
+        }
+        if (n >= 97) {
+            if (n <= 102) { return true }
+        }
+        return false
+    }
+
+    function isPrint(byte c) bool {
+        int n = cast c
+        if (n >= 32) {
+            if (n <= 126) { return true }
+        }
+        return false
+    }
+
+    function isPunct(byte c) bool {
+        if (self.isPrint(c)) {
+            if (self.isAlphaNum(c)) { return false }
+            if (self.isSpace(c))    { return false }
+            return true
+        }
+        return false
+    }
+
+    function toUpper(byte c) byte {
+        if (self.isLower(c)) {
+            int n = cast c
+            int u = n - 32
+            byte r = cast u
+            return r
+        }
+        return c
+    }
+
+    function toLower(byte c) byte {
+        if (self.isUpper(c)) {
+            int n = cast c
+            int l = n + 32
+            byte r = cast l
+            return r
+        }
+        return c
+    }
+
+    function digitValue(byte c) int {
+        int n = cast c
+        return n - 48
+    }
+
+    function hexValue(byte c) int {
+        int n = cast c
+        if (n >= 48) {
+            if (n <= 57) { return n - 48 }
+        }
+        if (n >= 65) {
+            if (n <= 70) { return n - 55 }
+        }
+        if (n >= 97) {
+            if (n <= 102) { return n - 87 }
+        }
+        return 0
+    }
+}

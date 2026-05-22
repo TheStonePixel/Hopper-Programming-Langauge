@@ -1,0 +1,24 @@
+// Tests StandardMath: abs, min, max, clamp, pow, gcd, fib
+// EXPECT: PASS  abs
+// EXPECT: PASS  min
+// EXPECT: PASS  max
+// EXPECT: PASS  clamp
+// EXPECT: PASS  pow
+// EXPECT: PASS  gcd
+// EXPECT: PASS  fib
+// EXPECT: math: 7 passed, 0 failed
+import Core from core
+import Math from math
+
+entry main {
+    TestSuite t = TestSuite("math")
+    StandardMath m
+    t.checkEq(m.abs(-5), 5, "abs")
+    t.checkEq(m.min(3, 7), 3, "min")
+    t.checkEq(m.max(3, 7), 7, "max")
+    t.checkEq(m.clamp(10, 0, 5), 5, "clamp")
+    t.checkEq(m.pow(2, 8), 256, "pow")
+    t.checkEq(m.gcd(12, 8), 4, "gcd")
+    t.checkEq(m.fib(7), 13, "fib")
+    t.done()
+}

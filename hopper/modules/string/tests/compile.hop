@@ -1,0 +1,6 @@
+// COMPILE_ONLY
+// Verifies AsciiString class and IString interface compile
+import IString from string
+
+entry main {
+}

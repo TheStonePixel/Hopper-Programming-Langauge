@@ -1,0 +1,167 @@
+class StandardMap implements Map {
+    address keys
+    address vals
+    address used
+    int length
+    int capacity
+
+    constructor(int initialCap) {
+        self.capacity = initialCap
+        self.length   = 0
+        self.keys     = allocate initialCap * 8
+        self.vals     = allocate initialCap * 8
+        self.used     = allocate initialCap * 8
+        int i = 0
+        while (i < initialCap) {
+            address p = self.used + i * 8
+            address z = cast 0
+            p::value = z
+            i = i + 1
+        }
+    }
+
+    destructor() {
+        deallocate self.keys
+        deallocate self.vals
+        deallocate self.used
+    }
+
+    function _hash(address key) int {
+        int h = 14695981039346656037
+        int i = 0
+        while (true) {
+            address p = key + i
+            byte b = p::value
+            int bv = cast b
+            if (bv == 0) { break }
+            h = h * 1099511628211
+            h = h ^ bv
+            i = i + 1
+        }
+        if (h < 0) { h = 0 - h }
+        return h
+    }
+
+    function _probe(address key) int {
+        int h = self._hash(key)
+        int idx = h - (h / self.capacity) * self.capacity
+        int first = -1
+        int i = 0
+        while (i < self.capacity) {
+            address up = self.used + idx * 8
+            address uv = up::value
+            int us = cast uv
+            if (us == 0) {
+                if (first >= 0) { return first }
+                return idx
+            }
+            if (us == 2) {
+                if (first < 0) { first = idx }
+            } else {
+                address kp = self.keys + idx * 8
+                address kv = kp::value
+                if (kv == key) { return idx }
+            }
+            idx = idx + 1
+            if (idx == self.capacity) { idx = 0 }
+            i = i + 1
+        }
+        if (first >= 0) { return first }
+        return -1
+    }
+
+    function _grow() {
+        int oldCap    = self.capacity
+        address oldK  = self.keys
+        address oldV  = self.vals
+        address oldU  = self.used
+        int newCap    = oldCap * 2
+        self.capacity = newCap
+        self.length   = 0
+        self.keys     = allocate newCap * 8
+        self.vals     = allocate newCap * 8
+        self.used     = allocate newCap * 8
+        int i = 0
+        while (i < newCap) {
+            address p = self.used + i * 8
+            address z = cast 0
+            p::value = z
+            i = i + 1
+        }
+        i = 0
+        while (i < oldCap) {
+            address up = oldU + i * 8
+            address uv = up::value
+            int us = cast uv
+            if (us == 1) {
+                address kp = oldK + i * 8
+                address vp = oldV + i * 8
+                address k = kp::value
+                address v = vp::value
+                self.set(k, v)
+            }
+            i = i + 1
+        }
+        deallocate oldK
+        deallocate oldV
+        deallocate oldU
+    }
+
+    function len() int { return self.length }
+
+    function contains(address key) bool {
+        int idx = self._probe(key)
+        if (idx < 0) { return false }
+        address up = self.used + idx * 8
+        address uv = up::value
+        int us = cast uv
+        return us == 1
+    }
+
+    function get(address key) address {
+        int idx = self._probe(key)
+        if (idx < 0) {
+            address z = cast 0
+            return z
+        }
+        address up = self.used + idx * 8
+        address uv = up::value
+        int us = cast uv
+        if (us != 1) {
+            address z = cast 0
+            return z
+        }
+        address vp = self.vals + idx * 8
+        address v = vp::value
+        return v
+    }
+
+    function set(address key, address val) {
+        int load4 = self.length * 4
+        int cap3  = self.capacity * 3
+        if (load4 >= cap3) { self._grow() }
+        int idx = self._probe(key)
+        address up = self.used + idx * 8
+        address uv = up::value
+        int us = cast uv
+        if (us != 1) { self.length = self.length + 1 }
+        address kp = self.keys + idx * 8
+        address vp = self.vals + idx * 8
+        kp::value = key
+        vp::value = val
+        address one = cast 1
+        up::value = one
+    }
+
+    function remove(address key) {
+        int idx = self._probe(key)
+        if (idx < 0) { return }
+        address up = self.used + idx * 8
+        address uv = up::value
+        int us = cast uv
+        if (us != 1) { return }
+        address two = cast 2
+        up::value = two
+        self.length = self.length - 1
+    }
+}

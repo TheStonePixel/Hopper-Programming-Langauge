@@ -1,0 +1,39 @@
+// Tests JsonReader: parse integer, bool, null, array, object
+// EXPECT: PASS  int kind
+// EXPECT: PASS  int value
+// EXPECT: PASS  bool kind
+// EXPECT: PASS  true value
+// EXPECT: PASS  null kind
+// EXPECT: PASS  array kind
+// EXPECT: PASS  array len
+// EXPECT: PASS  object kind
+// EXPECT: PASS  object len
+// EXPECT: json: 9 passed, 0 failed
+import Core from core
+import JSON from json
+
+entry main {
+    TestSuite t = TestSuite("json")
+    JsonReader r = JsonReader("", 0)
+
+    address n1 = r.parse("42", 2)
+    t.checkEq(r.nodeKind(n1), 2, "int kind")
+    t.checkEq(r.nodeInt(n1), 42, "int value")
+
+    address n2 = r.parse("true", 4)
+    t.checkEq(r.nodeKind(n2), 1, "bool kind")
+    t.checkEq(r.nodeInt(n2), 1, "true value")
+
+    address n3 = r.parse("null", 4)
+    t.checkEq(r.nodeKind(n3), 0, "null kind")
+
+    address n4 = r.parse("[1,2,3]", 7)
+    t.checkEq(r.nodeKind(n4), 4, "array kind")
+    t.checkEq(r.nodeLen(n4), 3, "array len")
+
+    address n5 = r.parse("{\"a\":1}", 7)
+    t.checkEq(r.nodeKind(n5), 5, "object kind")
+    t.checkEq(r.nodeLen(n5), 1, "object len")
+
+    t.done()
+}

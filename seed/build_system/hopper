@@ -1,0 +1,1518 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import https from "node:https";
+import readline from "node:readline";
+import { fileURLToPath } from "node:url";
+import { execSync, spawn } from "node:child_process";
+import { buildAstFromSource } from "../compiler/src/astBuilder.js";
+import { genModule } from "../compiler/src/codegenLLVM.js";
+import { parseSource } from "../compiler/src/parse.js";
+import { formatAst } from "../compiler/src/formatter.js";
+
+const __filename  = fileURLToPath(import.meta.url);
+const __dirname   = path.dirname(__filename);
+const ROOT        = path.resolve(__dirname, "..", "..");
+const MODULES_DIR = path.join(ROOT, "hopper", "modules");
+
+// ── registry ───────────────────────────────────────────────────────────────
+const REGISTRY_ORG = "HopperLangauge";               // github.com/HopperLangauge/<pkg>
+const REGISTRY_URL = `https://github.com/${REGISTRY_ORG}`;  // swap for thestonepixel.com/hopper later
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function baseName(file) {
+    return path.basename(file, path.extname(file));
+}
+
+// Walk up from the source file to find hopper.json; return a Map of target bindings.
+function loadBindings(sourceFile, target = "host") {
+    let dir = path.dirname(path.resolve(sourceFile));
+    while (true) {
+        const candidate = path.join(dir, "hopper.json");
+        if (fs.existsSync(candidate)) {
+            try {
+                const config = JSON.parse(fs.readFileSync(candidate, "utf8"));
+                const targetBindings = (config.targets || {})[target] || {};
+                const bindings = new Map();
+                for (const [name, b] of Object.entries(targetBindings)) {
+                    bindings.set(name, {
+                        from:           b.from || null,
+                        interface:      path.resolve(dir, b.interface),
+                        implementation: path.resolve(dir, b.implementation),
+                    });
+                }
+                return bindings;
+            } catch { /* malformed hopper.json — skip */ }
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return new Map();
+}
+
+function toIR(file, target = "host") {
+    const abs      = path.resolve(file);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, target);
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+    return genModule(ast, { target });
+}
+
+// Walk up from startDir to find the nearest directory containing hopper.json.
+// Falls back to startDir itself if none is found.
+function findProjectRoot(startDir) {
+    let cursor = path.resolve(startDir);
+    while (true) {
+        if (fs.existsSync(path.join(cursor, "hopper.json"))) return cursor;
+        const parent = path.dirname(cursor);
+        if (parent === cursor) return path.resolve(startDir);
+        cursor = parent;
+    }
+}
+
+// Returns { projectRoot, buildDir, llDir, oDir } for the given entry file.
+// Executables land directly in build/; intermediates go in build/ll/ and build/o/.
+function profileDirs(entryFile, _profile) {
+    const projectRoot = findProjectRoot(path.dirname(path.resolve(entryFile)));
+    const buildDir    = path.join(projectRoot, "build");
+    const llDir       = path.join(buildDir, "ll");
+    const oDir        = path.join(buildDir, "o");
+    fs.mkdirSync(llDir, { recursive: true });
+    fs.mkdirSync(oDir,  { recursive: true });
+    return { projectRoot, buildDir, llDir, oDir };
+}
+
+// Clang flags per build profile.
+function clangFlags(profile) {
+    if (profile === "production") return "-O2 -c -fPIC -Wno-override-module";
+    return "-g -O0 -c -fPIC -Wno-override-module"; // dev and test
+}
+
+// ── bare-metal board support ───────────────────────────────────────────────
+
+// Known board configurations.  Adding a new board is just a new entry here.
+const BOARD_CONFIGS = {
+    "pi-zero": {
+        // ── compile / link ────────────────────────────────────────────────
+        llvmTarget:    "armv6-bare",
+        clangTarget:   "arm-none-eabi",
+        mcpu:          "arm1176jzf-s",
+        floatAbi:      "soft",
+        textBase:      0x8000,
+        linkerEntry:   "_start",
+        bootStub:      path.join(__dirname, "boards", "pi-zero", "boot.s"),
+
+        // ── binary metadata (recorded in .meta.json after every build) ────
+        meta: {
+            arch:        "armv6",
+            endian:      "little",
+            bits:        32,
+            loadAddress: "0x8000",
+            entrySymbol: "_start",
+        },
+
+        // ── flash configuration ───────────────────────────────────────────
+        flash: {
+            method:          "sd-card",      // how to deliver the image
+            outputFile:      "kernel.img",   // filename written to the SD card
+            // firmware blobs that must already exist on the card
+            requiredFirmware: ["bootcode.bin", "start.elf"],
+            // lines the flash command ensures are present in config.txt
+            configLines: [
+                "init_uart_clock=3000000",
+                "dtparam=act_led_trigger=none",
+            ],
+        },
+    },
+};
+
+// Read the "board" field from hopper.json in the project root, if any.
+function readBoard(projectRoot) {
+    const mf = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(mf)) return null;
+    try { return JSON.parse(fs.readFileSync(mf, "utf8")).board ?? null; }
+    catch { return null; }
+}
+
+// Generate a minimal linker script for a known board.
+// The entry symbol is always the boot stub's _start, which calls the Hopper entry.
+function generateLinkerScript(cfg) {
+    const base = `0x${cfg.textBase.toString(16)}`;
+    return `ENTRY(${cfg.linkerEntry})
+SECTIONS
+{
+    . = ${base};
+    .text.boot : { KEEP(*(.text.boot)) }
+    .text       : { *(.text*) }
+    .rodata     : { *(.rodata*) }
+    .data       : { *(.data*) }
+    .bss        : {
+        . = ALIGN(4);
+        __bss_start = .;
+        *(.bss*)
+        *(COMMON)
+        . = ALIGN(4);
+        __bss_end = .;
+    }
+    /DISCARD/ : {
+        *(.ARM.exidx*)
+        *(.ARM.extab*)
+        *(.note*)
+    }
+}
+`;
+}
+
+// Compile one .hop file for a bare-metal target.
+function dedupeDeclarations(ir) {
+    const seen = new Set();
+    return ir.split("\n").filter(line => {
+        if (!line.startsWith("declare ")) return true;
+        if (seen.has(line)) return false;
+        seen.add(line);
+        return true;
+    }).join("\n");
+}
+
+function toObjectBare(file, llDir, oDir, cfg) {
+    const abs      = path.resolve(file);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, cfg.llvmTarget);
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+    const ir       = dedupeDeclarations(genModule(ast, { target: cfg.llvmTarget }));
+    const llFile  = path.join(llDir, `${baseName(file)}.ll`);
+    const objFile = path.join(oDir,  `${baseName(file)}.o`);
+    fs.writeFileSync(llFile, ir, "utf8");
+    const flags = `-target ${cfg.clangTarget} -mcpu=${cfg.mcpu} -mfloat-abi=${cfg.floatAbi} -ffreestanding -nostdlib -O2 -c -Wno-override-module`;
+    execSync(`clang ${flags} "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    return { objFile, entryName: ast.entry?.name ?? "main" };
+}
+
+// Link bare-metal objects into an ELF then strip to a raw kernel.img.
+// Writes a .meta.json file alongside the image for use by `hopper flash`.
+function linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg) {
+    const objs = [`"${bootObj}"`, ...results.map(r => `"${r.objFile}"`)].join(" ");
+    execSync(`ld.lld -T "${ldScript}" ${objs} -o "${outELF}"`, { stdio: "inherit" });
+    execSync(`llvm-objcopy -O binary "${outELF}" "${outImg}"`, { stdio: "inherit" });
+
+    // Build metadata — consumed by `hopper flash`
+    const metaPath = path.join(path.dirname(outImg), `${binaryName}.meta.json`);
+    const meta = {
+        name:       binaryName,
+        board:      boardName,
+        outputFile: boardCfg.flash.outputFile,
+        ...boardCfg.meta,
+        size:       fs.statSync(outImg).size,
+        builtAt:    new Date().toISOString(),
+    };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2) + "\n");
+    return outImg;
+}
+
+// ── hosted build helpers ───────────────────────────────────────────────────
+
+// Binary name: from hopper.json "name" field, or entry file basename.
+function projectBinaryName(entryFile, projectRoot) {
+    const mf = path.join(projectRoot, "hopper.json");
+    if (fs.existsSync(mf)) {
+        try {
+            const m = JSON.parse(fs.readFileSync(mf, "utf8"));
+            if (m.name) return m.name;
+        } catch {}
+    }
+    return baseName(entryFile);
+}
+
+function toObject(file, llDir, oDir, flags) {
+    const abs      = path.resolve(file);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, "host");
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+    const ir       = dedupeDeclarations(genModule(ast));
+    const llFile  = path.join(llDir, `${baseName(file)}.ll`);
+    const objFile = path.join(oDir,  `${baseName(file)}.o`);
+    fs.writeFileSync(llFile, ir, "utf8");
+    execSync(`clang ${flags} "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
+    return { objFile, entryName: ast.entry?.name ?? "main" };
+}
+
+function link(results, outFile) {
+    const objs = results.map(r => `"${r.objFile}"`).join(" ");
+    execSync(`clang ${objs} -lpthread -o "${outFile}"`, { stdio: "inherit" });
+    return outFile;
+}
+
+function compile(files, outFile, llDir, oDir, flags) {
+    const results = files.map(f => toObject(f, llDir, oDir, flags));
+    link(results, outFile);
+    return outFile;
+}
+
+function findHopFiles(dir) {
+    return fs.readdirSync(dir)
+        .filter(f => f.endsWith(".hop"))
+        .map(f => path.join(dir, f));
+}
+
+// ── flash helpers ──────────────────────────────────────────────────────────
+
+// Read the full manifest from a given project root directory.
+function readManifestAt(projectRoot) {
+    const mf = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(mf)) return {};
+    try { return JSON.parse(fs.readFileSync(mf, "utf8")); } catch { return {}; }
+}
+
+// Auto-detect a mounted SD card by looking for a known firmware file.
+// On Linux reads /proc/mounts for vfat filesystems.
+// On macOS scans /Volumes/.
+function detectSdCard(flashCfg) {
+    const marker = flashCfg.requiredFirmware[0];  // e.g. "bootcode.bin"
+
+    if (process.platform === "linux") {
+        try {
+            const mounts = fs.readFileSync("/proc/mounts", "utf8");
+            for (const line of mounts.split("\n")) {
+                const parts = line.split(" ");
+                if (parts[2] === "vfat" || parts[2] === "msdosfs") {
+                    const mp = parts[1].replace(/\\040/g, " ");
+                    if (fs.existsSync(path.join(mp, marker))) return mp;
+                }
+            }
+        } catch { /* /proc not available */ }
+
+        // Fallback: walk common user-mount locations
+        for (const base of ["/media", "/mnt", "/run/media"]) {
+            if (!fs.existsSync(base)) continue;
+            try {
+                for (const user of fs.readdirSync(base)) {
+                    const userDir = path.join(base, user);
+                    for (const vol of fs.readdirSync(userDir)) {
+                        const mp = path.join(userDir, vol);
+                        if (fs.existsSync(path.join(mp, marker))) return mp;
+                    }
+                }
+            } catch { /* skip unreadable dirs */ }
+        }
+    }
+
+    if (process.platform === "darwin") {
+        try {
+            for (const vol of fs.readdirSync("/Volumes")) {
+                const mp = path.join("/Volumes", vol);
+                if (fs.existsSync(path.join(mp, marker))) return mp;
+            }
+        } catch {}
+    }
+
+    return null;
+}
+
+// Ensure every line in `required` appears in the config.txt at `cfgPath`.
+// Creates the file if it doesn't exist; otherwise appends only the missing lines.
+function ensureConfigLines(cfgPath, required) {
+    let existing = fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, "utf8") : "";
+    const missing = required.filter(l => !existing.split("\n").some(e => e.trim() === l.trim()));
+    if (missing.length === 0) return 0;
+    if (existing.length > 0 && !existing.endsWith("\n")) existing += "\n";
+    fs.writeFileSync(cfgPath, existing + missing.join("\n") + "\n");
+    return missing.length;
+}
+
+// ── subcommands ────────────────────────────────────────────────────────────
+
+function cmdBuild(args) {
+    if (args[0] === "module") { cmdBuildModule(args.slice(1)); return; }
+
+    // Parse build profile (default: dev)
+    let profile = "dev";
+    if (args.includes("--production")) profile = "production";
+    else if (args.includes("--test"))  profile = "test";
+    args = args.filter(a => a !== "--dev" && a !== "--production" && a !== "--test");
+
+    const outputIdx = args.indexOf("-o");
+    let output = null;
+    if (outputIdx !== -1) {
+        output = args[outputIdx + 1];
+        args.splice(outputIdx, 2);
+    }
+
+    let files;
+    if (args.length) {
+        files = args;
+    } else {
+        // Read entry from hopper.json in cwd if present
+        const mf = path.join(process.cwd(), "hopper.json");
+        if (fs.existsSync(mf)) {
+            try {
+                const m = JSON.parse(fs.readFileSync(mf, "utf8"));
+                files = [m.entry || "src/main.hop"];
+            } catch { files = ["src/main.hop"]; }
+        } else {
+            files = ["src/main.hop"];
+        }
+    }
+    const missing = files.filter(f => !fs.existsSync(f));
+    if (missing.length) {
+        console.error(`hopper: file not found: ${missing.join(", ")}`);
+        process.exit(1);
+    }
+
+    const { projectRoot, buildDir, llDir, oDir } = profileDirs(files[0], profile);
+    const boardName = readBoard(projectRoot);
+    const boardCfg  = boardName ? BOARD_CONFIGS[boardName] : null;
+
+    if (boardCfg) {
+        // ── bare-metal build ───────────────────────────────────────────────
+        if (!boardCfg) {
+            console.error(`hopper: unknown board '${boardName}'. Known boards: ${Object.keys(BOARD_CONFIGS).join(", ")}`);
+            process.exit(1);
+        }
+
+        // Compile all .hop files for the target
+        const results = files.map(f => toObjectBare(f, llDir, oDir, boardCfg));
+
+        // Compile the board boot stub
+        const bootObj = path.join(oDir, "boot.o");
+        const asmFlags = `-target ${boardCfg.clangTarget} -mcpu=${boardCfg.mcpu} -mfloat-abi=${boardCfg.floatAbi} -ffreestanding -nostdlib -c`;
+        execSync(`clang ${asmFlags} "${boardCfg.bootStub}" -o "${bootObj}"`, { stdio: "inherit" });
+
+        // Write auto-generated linker script
+        const ldScript = path.join(buildDir, "link.ld");
+        fs.writeFileSync(ldScript, generateLinkerScript(boardCfg));
+
+        // Link and convert to raw kernel.img
+        const binaryName = output ? path.basename(output, ".img") : projectBinaryName(files[0], projectRoot);
+        const outELF = path.join(buildDir, `${binaryName}.elf`);
+        const outImg = output || path.join(buildDir, "kernel.img");
+        linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg);
+        console.log(`built [bare-metal/${boardName}]: ${outImg}`);
+    } else {
+        // ── hosted build ──────────────────────────────────────────────────
+        const flags   = clangFlags(profile);
+        const results = files.map(f => toObject(f, llDir, oDir, flags));
+        const outFile = output || path.join(buildDir, projectBinaryName(files[0], projectRoot));
+        link(results, outFile);
+        console.log(`built [${profile}]: ${outFile}`);
+    }
+}
+
+function cmdBuildModule(args) {
+    const name = args[0];
+    if (!name) {
+        console.error("hopper: build module requires a name");
+        process.exit(1);
+    }
+
+    const moduleDir = path.join(MODULES_DIR, name);
+    const testsDir  = path.join(moduleDir, "tests");
+    const existed   = fs.existsSync(moduleDir);
+
+    fs.mkdirSync(testsDir, { recursive: true });
+
+    if (existed) {
+        console.log(`module: ${name}  (already exists)`);
+        console.log(`  ensured: modules/${name}/tests/`);
+    } else {
+        console.log(`module: ${name}`);
+        console.log(`  created: modules/${name}/`);
+        console.log(`  created: modules/${name}/tests/`);
+    }
+}
+
+// hopper run — execute binaries and tests, NOT a compiler
+function cmdRun(args) {
+    // hopper run test [module]
+    if (args[0] === "test") { cmdTest(args.slice(1)); return; }
+
+    // hopper run <binary>  — execute a specific binary
+    if (args[0]) {
+        const bin = path.resolve(args[0]);
+        if (!fs.existsSync(bin)) {
+            console.error(`hopper: binary not found: ${args[0]}`);
+            process.exit(1);
+        }
+        execSync(bin, { stdio: "inherit" });
+        return;
+    }
+
+    // hopper run — find and execute the dev build from the project's build/dev/
+    const projectRoot = findProjectRoot(process.cwd());
+    const mf = path.join(projectRoot, "hopper.json");
+    let name = "main";
+    if (fs.existsSync(mf)) {
+        try { name = JSON.parse(fs.readFileSync(mf, "utf8")).name || name; } catch {}
+    }
+    const bin = path.join(projectRoot, "build", "dev", name);
+    if (!fs.existsSync(bin)) {
+        console.error(`hopper: no binary at ${bin} — run 'hopper build' first`);
+        process.exit(1);
+    }
+    execSync(bin, { stdio: "inherit" });
+}
+
+function cmdDev(args) {
+    const files = args.length ? args : ["main.hop"];
+    const missing = files.filter(f => !fs.existsSync(f));
+    if (missing.length) {
+        console.error(`hopper: file not found: ${missing.join(", ")}`);
+        process.exit(1);
+    }
+
+    const { projectRoot, buildDir, llDir, oDir } = profileDirs(files[0], "dev");
+    const flags   = clangFlags("dev");
+    const outFile = path.join(buildDir, projectBinaryName(files[0], projectRoot));
+    const watchDirs = [...new Set(files.map(f => path.dirname(path.resolve(f))))];
+
+    let running = null;
+    let rebuilding = false;
+    let dirty = false;
+
+    function runProcess() {
+        if (running) {
+            running.kill();
+            running = null;
+        }
+        try {
+            running = spawn(outFile, [], { stdio: "inherit" });
+            running.on("exit", (code) => {
+                if (code !== null) process.stdout.write(`\n[hopper dev] exited (${code})\n`);
+                running = null;
+            });
+        } catch (e) {
+            console.error(`[hopper dev] failed to start: ${e.message}`);
+        }
+    }
+
+    function rebuild() {
+        if (rebuilding) { dirty = true; return; }
+        rebuilding = true;
+        dirty = false;
+        console.log("\n[hopper dev] rebuilding...");
+        try {
+            compile(files, outFile, llDir, oDir, flags);
+            console.log("[hopper dev] ok — running");
+            runProcess();
+        } catch (e) {
+            console.error("[hopper dev] build failed");
+        }
+        rebuilding = false;
+        if (dirty) setTimeout(rebuild, 50);
+    }
+
+    console.log(`[hopper dev] watching ${watchDirs.join(", ")} ...`);
+    rebuild();
+
+    let debounce = null;
+    for (const dir of watchDirs) {
+        fs.watch(dir, { recursive: false }, (event, filename) => {
+            if (filename && filename.endsWith(".hop")) {
+                clearTimeout(debounce);
+                debounce = setTimeout(rebuild, 150);
+            }
+        });
+    }
+}
+
+function readManifest() {
+    const mf = "hopper.json";
+    if (!fs.existsSync(mf)) return null;
+    try { return JSON.parse(fs.readFileSync(mf, "utf8")); }
+    catch (e) { console.error(`hopper: bad hopper.json — ${e.message}`); process.exit(1); }
+}
+
+function writeManifest(obj) {
+    fs.writeFileSync("hopper.json", JSON.stringify(obj, null, 2) + "\n", "utf8");
+}
+
+async function cmdInit(args) {
+    // Parse flags: --yes/-y skips prompts, --type=library|executable, --description=..., --license=...
+    const yesFlag   = args.includes("--yes") || args.includes("-y");
+    const typeFlag  = (args.find(a => a.startsWith("--type="))        || "").slice("--type=".length)        || null;
+    const descFlag  = (args.find(a => a.startsWith("--description=")) || "").slice("--description=".length) || null;
+    const licFlag   = (args.find(a => a.startsWith("--license="))     || "").slice("--license=".length)     || null;
+    const versionFlag = (args.find(a => a.startsWith("--version="))   || "").slice("--version=".length)     || null;
+    const nameArg   = args.find(a => !a.startsWith("-"));
+
+    if (!nameArg) {
+        console.error("hopper: init requires a project name  —  hopper init <name>");
+        process.exit(1);
+    }
+
+    const rawName  = nameArg;
+    const safeName = rawName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const projectDir = path.resolve(process.cwd(), safeName);
+
+    if (fs.existsSync(projectDir)) {
+        console.error(`hopper: '${safeName}' already exists`);
+        process.exit(1);
+    }
+
+    let name, version, description, license, typeChoice;
+
+    if (yesFlag) {
+        name        = safeName;
+        version     = versionFlag  || "0.1.0";
+        description = descFlag     || "";
+        license     = licFlag      || "MIT";
+        typeChoice  = typeFlag     || "executable";
+    } else {
+        const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const ask = (q, def) => new Promise(resolve =>
+            rl.question(`${q}: ${def ? `(${def}) ` : ""}`, ans => resolve(ans.trim() || def || ""))
+        );
+
+        console.log("\nThis utility will walk you through creating a hopper.json file.\n");
+
+        name        = await ask("name",        safeName);
+        version     = await ask("version",     versionFlag  || "0.1.0");
+        description = await ask("description", descFlag     || "");
+        license     = await ask("license",     licFlag      || "MIT");
+        typeChoice  = await ask("type (executable/library)", typeFlag || "executable");
+
+        const isLibPreview = typeChoice.startsWith("l");
+        const previewManifest = isLibPreview ? {
+            name, version, description, license,
+            type: "library",
+            main: `src/${name}.hop`,
+        } : {
+            name, version, description, license,
+            type: "executable",
+            entry: "src/main.hop",
+            targets: { host: {} },
+        };
+        console.log(`\n${JSON.stringify(previewManifest, null, 2)}\n`);
+
+        const confirm = await ask("Is this ok?", "yes");
+        rl.close();
+        if (confirm !== "yes" && confirm !== "y") {
+            console.log("aborted.");
+            process.exit(0);
+        }
+    }
+
+    const isLib = typeChoice.startsWith("l");
+
+    const manifest = isLib ? {
+        name, version, description, license,
+        type: "library",
+        main: `src/${name}.hop`,
+    } : {
+        name, version, description, license,
+        type: "executable",
+        entry: "src/main.hop",
+        targets: {
+            host: {},
+        },
+    };
+
+    if (yesFlag) {
+        console.log(`\ncreating ${safeName} (${manifest.type})...`);
+    }
+
+    fs.mkdirSync(path.join(projectDir, "src"),        { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "modules"),     { recursive: true });
+    fs.mkdirSync(path.join(projectDir, "tests"),       { recursive: true });
+    if (!isLib) {
+        fs.mkdirSync(path.join(projectDir, "interfaces"), { recursive: true });
+    }
+    fs.writeFileSync(path.join(projectDir, "modules", ".gitkeep"), "", "utf8");
+    fs.writeFileSync(path.join(projectDir, "tests",   ".gitkeep"), "", "utf8");
+
+    const entryFile = isLib
+        ? path.join(projectDir, "src", `${name}.hop`)
+        : path.join(projectDir, "src", "main.hop");
+    fs.writeFileSync(entryFile, "", "utf8");
+
+    fs.writeFileSync(path.join(projectDir, "hopper.json"),
+        JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
+    console.log(`\ncreated ${safeName}/`);
+    console.log(`  ${safeName}/hopper.json`);
+    console.log(`  ${safeName}/src/`);
+    if (!isLib) console.log(`  ${safeName}/interfaces/`);
+    console.log(`  ${safeName}/modules/`);
+    console.log(`  ${safeName}/tests/`);
+}
+
+// ── package helpers ────────────────────────────────────────────────────────
+
+function fetchTarball(url, destDir) {
+    return new Promise((resolve, reject) => {
+        const tmp = path.join(destDir, `_pkg_${Date.now()}.tar.gz`);
+        const file = fs.createWriteStream(tmp);
+
+        function get(url) {
+            https.get(url, { headers: { "User-Agent": "hopper-cli" } }, res => {
+                if (res.statusCode === 301 || res.statusCode === 302) {
+                    get(res.headers.location);
+                    return;
+                }
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode} fetching ${url}`));
+                    return;
+                }
+                res.pipe(file);
+                file.on("finish", () => {
+                    file.close();
+                    fs.mkdirSync(destDir, { recursive: true });
+                    try {
+                        execSync(`tar -xz -f "${tmp}" -C "${destDir}" --strip-components=1`, { stdio: "pipe" });
+                        fs.unlinkSync(tmp);
+                        resolve();
+                    } catch (e) { reject(e); }
+                });
+            }).on("error", reject);
+        }
+        get(url);
+    });
+}
+
+const INSTALL_STDLIB = path.join(__dirname, "..", "..", "hopper", "modules");
+
+// Install a module into targetModulesDir, then recursively install its
+// dependencies into that module's own modules/ dir — producing a nested tree
+// that mirrors the dependency graph. Deduplication happens at build time.
+function installModule(name, targetModulesDir, depth = 0) {
+    const dest = path.join(targetModulesDir, name);
+    if (fs.existsSync(dest)) return;
+
+    const src = path.join(INSTALL_STDLIB, name);
+    if (!fs.existsSync(src)) {
+        console.error(`hopper: module '${name}' not found in stdlib`);
+        process.exit(1);
+    }
+
+    fs.mkdirSync(dest, { recursive: true });
+    fs.copyFileSync(path.join(src, "hopper.json"), path.join(dest, "hopper.json"));
+    for (const entry of ["src", "interfaces"]) {
+        const s = path.join(src, entry);
+        if (fs.existsSync(s)) copyDir(s, path.join(dest, entry));
+    }
+    console.log(`${"  ".repeat(depth + 1)}installed: ${name}`);
+
+    // Install this module's deps into its own modules/ directory
+    let m;
+    try { m = JSON.parse(fs.readFileSync(path.join(dest, "hopper.json"), "utf8")); } catch { return; }
+    for (const dep of Object.keys(m.dependencies || {})) {
+        installModule(dep, path.join(dest, "modules"), depth + 1);
+    }
+}
+
+// Rewrite hopper.json binding paths to point at locally installed modules.
+function localizeBindings(projectRoot, installedNames) {
+    const manifestPath = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(manifestPath)) return;
+    let manifest;
+    try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch { return; }
+
+    const targets = manifest.targets || {};
+    let changed = false;
+    for (const bindings of Object.values(targets)) {
+        for (const b of Object.values(bindings)) {
+            if (!b.from || !installedNames.has(b.from)) continue;
+            const mod = b.from;
+            for (const key of ["interface", "implementation"]) {
+                if (!b[key]) continue;
+                const idx = b[key].indexOf(`/${mod}/`);
+                if (idx !== -1) {
+                    b[key] = `modules/${mod}` + b[key].slice(idx + mod.length + 1);
+                    changed = true;
+                }
+            }
+        }
+    }
+    if (changed) fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+}
+
+async function cmdInstall(args) {
+    const projectRoot   = process.cwd();
+    const localModules  = path.join(projectRoot, "modules");
+    let names = args.filter(a => !a.startsWith("-"));
+
+    if (names.length === 0) {
+        const manifest = readManifest();
+        if (!manifest) { console.error("hopper: no hopper.json and no package names given"); process.exit(1); }
+        const deps = manifest.dependencies || {};
+        if (Object.keys(deps).length === 0) { console.log("hopper: nothing to install"); return; }
+        names = Object.keys(deps);
+    }
+
+    fs.mkdirSync(localModules, { recursive: true });
+    console.log("installing:");
+    for (const name of names) installModule(name, localModules);
+    localizeBindings(projectRoot, new Set(names));
+    console.log("done");
+}
+
+function cmdUninstall(args) {
+    if (!args[0]) { console.error("hopper: uninstall requires a package name"); process.exit(1); }
+    const LOCAL_MODULES = path.join(process.cwd(), "modules");
+
+    for (const name of args) {
+        const dest = path.join(LOCAL_MODULES, name);
+        if (!fs.existsSync(dest)) { console.log(`not installed: ${name}`); continue; }
+        fs.rmSync(dest, { recursive: true, force: true });
+        const manifest = readManifest();
+        if (manifest && manifest.dependencies) {
+            delete manifest.dependencies[name];
+            writeManifest(manifest);
+        }
+        console.log(`uninstalled: ${name}`);
+    }
+}
+
+function githubAPI(method, endpoint, body, token) {
+    return new Promise((resolve, reject) => {
+        const data = body ? JSON.stringify(body) : null;
+        const opts = {
+            hostname: "api.github.com",
+            path: endpoint,
+            method,
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "User-Agent": "hopper-cli",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                ...(data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}),
+            },
+        };
+        const req = https.request(opts, res => {
+            let buf = "";
+            res.on("data", chunk => buf += chunk);
+            res.on("end", () => {
+                let parsed = null;
+                try { parsed = buf ? JSON.parse(buf) : null; } catch { parsed = null; }
+                resolve({ status: res.statusCode, body: parsed });
+            });
+        });
+        req.on("error", reject);
+        if (data) req.write(data);
+        req.end();
+    });
+}
+
+function requireToken() {
+    const token = process.env.HOPPER_TOKEN || process.env.GITHUB_TOKEN;
+    if (!token) {
+        console.error("hopper: publish/revoke requires HOPPER_TOKEN or GITHUB_TOKEN env var");
+        process.exit(1);
+    }
+    return token;
+}
+
+async function cmdPublish(args) {
+    const manifest = readManifest();
+    if (!manifest) { console.error("hopper: no hopper.json found"); process.exit(1); }
+
+    const name    = args[0] || manifest.name;
+    const version = manifest.version || "0.1.0";
+    const repoUrl = `${REGISTRY_URL}/${name}`;
+    const token   = requireToken();
+
+    try { execSync("git rev-parse --git-dir", { stdio: "pipe" }); }
+    catch { console.error("hopper: publish requires a git repository"); process.exit(1); }
+
+    console.log(`publishing: ${name}@${version}  →  ${repoUrl}`);
+
+    const res = await githubAPI("POST", `/orgs/${REGISTRY_ORG}/repos`, { name, private: false }, token);
+    if (res.status !== 201 && res.status !== 422) {
+        console.error(`hopper: failed to create registry repo — ${res.body?.message || res.status}`);
+        process.exit(1);
+    }
+
+    try {
+        execSync(`git remote add registry ${repoUrl}.git 2>/dev/null; true`, { stdio: "pipe", shell: true });
+        execSync(`git push registry main`, { stdio: "inherit" });
+    } catch (e) {
+        console.error(`hopper: publish failed — ${e.message}`);
+        process.exit(1);
+    }
+
+    console.log(`published: ${name}@${version}  ✓`);
+    console.log(`  ${repoUrl}`);
+    console.log(`  hopper install ${name}`);
+}
+
+async function cmdRevoke(args) {
+    const manifest = readManifest();
+    const name     = args[0] || (manifest && manifest.name);
+    if (!name) { console.error("hopper: revoke requires a package name"); process.exit(1); }
+
+    const token = requireToken();
+
+    const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q) => new Promise(resolve => rl.question(q, ans => resolve(ans.trim())));
+
+    console.log(`\n  This will delete ${REGISTRY_ORG}/${name} from the registry permanently.`);
+    console.log(`  Anyone who has not installed it yet will no longer be able to.\n`);
+    const confirm = await ask(`  type the package name to confirm: `);
+    rl.close();
+
+    if (confirm !== name) { console.log("aborted."); process.exit(0); }
+
+    const res = await githubAPI("DELETE", `/repos/${REGISTRY_ORG}/${name}`, null, token);
+    if (res.status !== 204) {
+        console.error(`hopper: revoke failed — ${res.body?.message || res.status}`);
+        process.exit(1);
+    }
+    console.log(`revoked: ${name}  — registry entry deleted`);
+}
+
+function copyDir(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        const s = path.join(src, entry.name);
+        const d = path.join(dest, entry.name);
+        if (entry.isDirectory()) copyDir(s, d);
+        else fs.copyFileSync(s, d);
+    }
+}
+
+// ── profile: coming soon ──────────────────────────────────────────────────
+
+function cmdProfile(_args) {
+    console.log("hopper: profile support coming soon");
+}
+
+// ── check: compile with sanitizers ────────────────────────────────────────
+
+function cmdCheck(args) {
+    const sanitizers = [];
+    const rest = [];
+    for (const a of args) {
+        if (a === "--asan")   { sanitizers.push("address");       continue; }
+        if (a === "--tsan")   { sanitizers.push("thread");        continue; }
+        if (a === "--ubsan")  { sanitizers.push("undefined");     continue; }
+        if (a === "--msan")   { sanitizers.push("memory");        continue; }
+        rest.push(a);
+    }
+    if (sanitizers.length === 0) sanitizers.push("address");
+
+    const files   = rest.length ? rest : ["main.hop"];
+    const missing = files.filter(f => !fs.existsSync(f));
+    if (missing.length) {
+        console.error(`hopper: file not found: ${missing.join(", ")}`);
+        process.exit(1);
+    }
+
+    const { buildDir, llDir, oDir } = profileDirs(files[0], "dev");
+    const flags   = "-g -O0 -c -fPIC -Wno-override-module";
+    const outFile = path.join(buildDir, baseName(files[0]) + ".check");
+    const results = files.map(f => toObject(f, llDir, oDir, flags));
+    const objs    = results.map(r => `"${r.objFile}"`).join(" ");
+    const san     = sanitizers.join(",");
+    execSync(`clang ${objs} -lpthread -fsanitize=${san} -o "${outFile}"`, { stdio: "inherit" });
+    console.log(`check build: ${outFile}  (sanitizers: ${san})`);
+    console.log(`run with: ${outFile}`);
+}
+
+// ── debug: coming soon ────────────────────────────────────────────────────
+
+function cmdDebug(_args) {
+    console.log("hopper: debug support coming soon");
+}
+
+// ── format: reformat source files via the AST ─────────────────────────────
+
+function formatNode(node, indent) {
+    // Minimal formatter — emits canonical Hopper source from the AST.
+    // Handles the most common statement and expression forms.
+    const I = "    ".repeat(indent);
+    const I1 = "    ".repeat(indent + 1);
+
+    function fmtType(t) { return t; }
+    function fmtExpr(e) {
+        if (!e) return "";
+        switch (e.kind) {
+            case "Int":
+            case "IntLiteral":   return String(e.value);
+            case "Float":
+            case "FloatLiteral": return String(e.value);
+            case "Bool":
+            case "BoolLiteral":  return String(e.value);
+            case "Str":
+            case "StringLiteral": return `"${e.value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
+            case "Char":
+            case "CharLiteral":  return `'${e.value}'`;
+            case "Null":     return "null";
+            case "Var":      return e.name;
+            case "Self":     return "self";
+            case "CastExpr": return `cast ${fmtExpr(e.expr)}`;
+            case "Deref":    return `${fmtExpr(e.expr)}::value`;
+            case "AddressOf": return `${e.name}::address`;
+            case "FieldAccess": return `${e.object}.${e.field}`;
+            case "Unary":    return `${e.op}${fmtExpr(e.operand)}`;
+            case "Binary":   return `${fmtExpr(e.left)} ${e.op} ${fmtExpr(e.right)}`;
+            case "Call":     return `${e.callee}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "MethodCall": return `${e.object}.${e.method}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "ChainedMethodCall": return `${fmtExpr(e.receiver)}.${e.method}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "ArrayAccess": return `${e.name}[${fmtExpr(e.index)}]`;
+            case "New":      return `new ${e.type}(${(e.args || []).map(fmtExpr).join(", ")})`;
+            case "SizeOf":   return `sizeof(${e.type})`;
+            default:         return `/* ${e.kind} */`;
+        }
+    }
+    function fmtStmts(stmts, ind) {
+        return (stmts || []).map(s => fmtStmt(s, ind)).join("\n");
+    }
+    function fmtStmt(s, ind) {
+        const Pi  = "    ".repeat(ind);
+        const Pi1 = "    ".repeat(ind + 1);
+        if (!s) return "";
+        switch (s.kind) {
+            case "VarDecl":
+                return s.init
+                    ? `${Pi}${fmtType(s.type)} ${s.name} = ${fmtExpr(s.init)}`
+                    : `${Pi}${fmtType(s.type)} ${s.name}`;
+            case "AssignStmt":
+            case "Assign":
+                return `${Pi}${fmtExpr(s.target || s.lhs)} = ${fmtExpr(s.value || s.rhs)}`;
+            case "ExprStmt":
+                return `${Pi}${fmtExpr(s.expr)}`;
+            case "ReturnStmt":
+            case "Return":
+                return s.expr ? `${Pi}return ${fmtExpr(s.expr)}` : `${Pi}return`;
+            case "IfStmt":
+            case "If": {
+                const cond = s.cond || s.condition;
+                const then_ = getStmts(s.thenBlock || s.then);
+                const else_ = getStmts(s.elseBlock || s.else_);
+                let out = `${Pi}if (${fmtExpr(cond)}) {\n${fmtStmts(then_, ind + 1)}\n${Pi}}`;
+                if (else_.length) out += ` else {\n${fmtStmts(else_, ind + 1)}\n${Pi}}`;
+                return out;
+            }
+            case "WhileStmt":
+            case "While": {
+                const cond = s.cond || s.condition;
+                return `${Pi}while (${fmtExpr(cond)}) {\n${fmtStmts(getStmts(s.body), ind + 1)}\n${Pi}}`;
+            }
+            case "ForStmt":
+            case "For":
+                return `${Pi}for (${fmtStmt(s.init, 0).trim()}; ${fmtExpr(s.cond || s.condition)}; ${fmtStmt(s.update, 0).trim()}) {\n${fmtStmts(getStmts(s.body), ind + 1)}\n${Pi}}`;
+            case "BreakStmt":
+            case "Break":    return `${Pi}break`;
+            case "ContinueStmt":
+            case "Continue": return `${Pi}continue`;
+            case "Defer":    return `${Pi}defer ${fmtStmt(s.stmt, 0).trim()}`;
+            default:         return `${Pi}/* ${s.kind} */`;
+        }
+    }
+    return fmtStmt(node, indent);
+}
+
+function formatSource(ast, originalSource) {
+    return formatAst(ast, originalSource);
+}
+
+function _legacyFormatSource(ast, originalSource) {
+    // Reconstruct imports from the original source (they're stripped before AST build)
+    const importLines = [];
+    for (const line of originalSource.split("\n")) {
+        if (/^\s*import\s+/.test(line)) importLines.push(line.trim());
+    }
+
+    const parts = [];
+    if (importLines.length) parts.push(importLines.join("\n") + "\n");
+
+    for (const c of (ast.consts || [])) {
+        parts.push(`const ${c.type} ${c.name} = ${c.value}`);
+    }
+
+    for (const fn of (ast.functions || [])) {
+        if (fn.isBuiltin || fn.isImported || fn.isExtern) continue;
+        const params = (fn.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+        const ret    = fn.returnType ? ` ${fn.returnType}` : "";
+        const body   = getStmts(fn.body).map(s => formatNode(s, 1)).join("\n");
+        parts.push(`function ${fn.name}(${params})${ret} {\n${body}\n}`);
+    }
+
+    for (const cls of (ast.classes || [])) {
+        if (cls.isBuiltin) continue;
+        const lines = [`class ${cls.name} {`];
+        for (const f of (cls.fields || [])) lines.push(`    ${f.type} ${f.name}`);
+        if (cls.constructor) {
+            const params = (cls.constructor.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+            const body   = getStmts(cls.constructor.body).map(s => formatNode(s, 2)).join("\n");
+            lines.push(`\n    constructor(${params}) {\n${body}\n    }`);
+        }
+        for (const m of (cls.methods || [])) {
+            const params  = (m.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+            const ret     = m.returnType ? ` ${m.returnType}` : "";
+            const body    = getStmts(m.body).map(s => formatNode(s, 2)).join("\n");
+            lines.push(`\n    function ${m.name}(${params})${ret} {\n${body}\n    }`);
+        }
+        if (cls.destructor) {
+            const body = getStmts(cls.destructor.body).map(s => formatNode(s, 2)).join("\n");
+            lines.push(`\n    destructor() {\n${body}\n    }`);
+        }
+        lines.push("}");
+        parts.push(lines.join("\n"));
+    }
+
+    if (ast.entry) {
+        const params = (ast.entry.params || []).map(p => `${p.type} ${p.name}`).join(", ");
+        const body   = getStmts(ast.entry.body).map(s => formatNode(s, 1)).join("\n");
+        const sig    = params.length ? `(${params})` : "";
+        parts.push(`entry ${ast.entry.name}${sig} {\n${body}\n}`);
+    }
+
+    return parts.join("\n\n") + "\n";
+}
+
+function cmdFormat(args) {
+    const inPlace = args.includes("--write") || args.includes("-w");
+    const files   = args.filter(a => a.endsWith(".hop"));
+
+    if (files.length === 0) {
+        console.error("hopper: format requires at least one .hop file");
+        process.exit(1);
+    }
+
+    for (const file of files) {
+        if (!fs.existsSync(file)) {
+            console.error(`hopper: file not found: ${file}`);
+            process.exit(1);
+        }
+        const src = fs.readFileSync(file, "utf8");
+        const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), noImports: true });
+        const formatted = formatSource(ast, src);
+        if (inPlace) {
+            fs.writeFileSync(file, formatted, "utf8");
+            console.log(`formatted: ${file}`);
+        } else {
+            process.stdout.write(formatted);
+        }
+    }
+}
+
+function cmdIR(args) {
+    if (!args[0]) { console.error("hopper: ir requires a file"); process.exit(1); }
+    console.log(toIR(args[0]));
+}
+
+function cmdAST(args) {
+    if (!args[0]) { console.error("hopper: ast requires a file"); process.exit(1); }
+    const abs      = path.resolve(args[0]);
+    const src      = fs.readFileSync(abs, "utf8");
+    const bindings = loadBindings(abs, "host");
+    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+    console.log(JSON.stringify(ast, null, 2));
+}
+
+function cmdParse(args) {
+    if (!args[0]) { console.error("hopper: parse requires a file"); process.exit(1); }
+    const src = fs.readFileSync(args[0], "utf8");
+    const { parser, tree } = parseSource(src);
+    console.log(tree.toStringTree(parser.ruleNames));
+}
+
+function cmdTest(args) {
+    const depsFlag  = args.includes("--deps");
+    const rest      = args.filter(a => a !== "--deps");
+    const extraArgs = depsFlag ? ["--deps"] : [];
+
+    // If the first positional arg is a module name, pass it through directly.
+    // Otherwise auto-detect the nearest project root from CWD so tests are
+    // scoped to whatever module the user is working in.
+    const nameArg = rest.find(a => !a.startsWith("-"));
+    if (!nameArg) {
+        const projectRoot = findProjectRoot(process.cwd());
+        if (fs.existsSync(path.join(projectRoot, "hopper.json"))) {
+            extraArgs.push(`--root=${projectRoot}`);
+        }
+    }
+
+    const testScript = path.join(__dirname, "tools", "test.js");
+    const allArgs    = [...rest, ...extraArgs].map(a => `"${a}"`).join(" ");
+    execSync(`node "${testScript}" ${allArgs}`, { stdio: "inherit" });
+}
+
+// ── flash ──────────────────────────────────────────────────────────────────
+
+function cmdFlash(args) {
+    // ── parse flags ───────────────────────────────────────────────────────
+    let mountArg = null;
+    let dryRun   = false;
+    let profile  = "dev";
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === "--mount" || args[i] === "-m")  { mountArg = args[++i]; continue; }
+        if (args[i].startsWith("--mount="))             { mountArg = args[i].slice(8); continue; }
+        if (args[i] === "--dry-run")                    { dryRun   = true; continue; }
+        if (args[i] === "--production")                 { profile  = "production"; continue; }
+    }
+
+    // ── load project ──────────────────────────────────────────────────────
+    const projectRoot = findProjectRoot(process.cwd());
+    const manifest    = readManifestAt(projectRoot);
+    const boardName   = manifest.board;
+
+    if (!boardName) {
+        console.error("hopper: 'board' is not set in hopper.json — flash only works for bare-metal targets");
+        process.exit(1);
+    }
+
+    const boardCfg = BOARD_CONFIGS[boardName];
+    if (!boardCfg?.flash) {
+        console.error(`hopper: board '${boardName}' does not have a flash configuration`);
+        process.exit(1);
+    }
+
+    const flashCfg = boardCfg.flash;
+
+    // ── locate built binary ───────────────────────────────────────────────
+    const buildDir  = path.join(projectRoot, "build", profile);
+    const imgPath   = path.join(buildDir, flashCfg.outputFile);
+    const name      = manifest.name || "project";
+    const metaPath  = path.join(buildDir, `${name}.meta.json`);
+
+    if (!fs.existsSync(imgPath)) {
+        console.error([
+            `hopper: ${flashCfg.outputFile} not found at ${buildDir}`,
+            `  Run 'hopper build' first.`,
+        ].join("\n"));
+        process.exit(1);
+    }
+
+    // ── read build metadata ───────────────────────────────────────────────
+    let meta = null;
+    if (fs.existsSync(metaPath)) {
+        try { meta = JSON.parse(fs.readFileSync(metaPath, "utf8")); } catch {}
+    }
+
+    // ── find the SD card ──────────────────────────────────────────────────
+    const mountOverride = mountArg || manifest.flash?.mount || null;
+    let mountPoint = mountOverride;
+
+    if (!mountPoint) {
+        mountPoint = detectSdCard(flashCfg);
+        if (!mountPoint) {
+            console.error([
+                `hopper: could not auto-detect an SD card with ${flashCfg.requiredFirmware[0]}.`,
+                ``,
+                `  Make sure the card is mounted, then try again.`,
+                `  Or specify the path explicitly:`,
+                `    hopper flash --mount /path/to/sdcard`,
+                ``,
+                `  The SD card needs the Pi Zero firmware blobs in its root:`,
+                `    bootcode.bin  start.elf`,
+                `  Download from: https://github.com/raspberrypi/firmware/tree/master/boot`,
+            ].join("\n"));
+            process.exit(1);
+        }
+    }
+
+    // ── verify required firmware blobs ────────────────────────────────────
+    const missing = flashCfg.requiredFirmware.filter(f => !fs.existsSync(path.join(mountPoint, f)));
+    if (missing.length) {
+        console.error([
+            `hopper: missing firmware on SD card at ${mountPoint}:`,
+            ...missing.map(f => `  ✗  ${f}`),
+            ``,
+            `  Download from: https://github.com/raspberrypi/firmware/tree/master/boot`,
+            `  Copy the missing files to the SD card root and try again.`,
+        ].join("\n"));
+        process.exit(1);
+    }
+
+    // ── print summary ─────────────────────────────────────────────────────
+    const imgSize = fs.statSync(imgPath).size;
+    const arch    = meta?.arch    ?? boardCfg.meta?.arch    ?? "unknown";
+    const endian  = meta?.endian  ?? boardCfg.meta?.endian  ?? "unknown";
+    const bits    = meta?.bits    ?? boardCfg.meta?.bits    ?? "?";
+    const loadAt  = meta?.loadAddress ?? boardCfg.meta?.loadAddress ?? "?";
+
+    console.log(`\nhopper: flash  ${name}  →  ${mountPoint}`);
+    console.log(`  board     ${boardName}  (${arch} ${endian}-endian ${bits}-bit, load ${loadAt})`);
+    if (meta?.builtAt) {
+        const when = new Date(meta.builtAt).toLocaleString();
+        console.log(`  built     ${when}`);
+    }
+    console.log(`  image     ${flashCfg.outputFile}  (${(imgSize / 1024).toFixed(1)} KB)`);
+    for (const f of flashCfg.requiredFirmware) {
+        console.log(`  found     ${f} ✓`);
+    }
+
+    if (dryRun) {
+        console.log(`\n  [dry run — nothing written]\n`);
+        return;
+    }
+
+    // ── copy kernel image ─────────────────────────────────────────────────
+    const destImg = path.join(mountPoint, flashCfg.outputFile);
+    fs.copyFileSync(imgPath, destImg);
+    console.log(`  wrote     ${flashCfg.outputFile}`);
+
+    // ── ensure config.txt has required lines ──────────────────────────────
+    if (flashCfg.configLines?.length) {
+        const cfgPath = path.join(mountPoint, "config.txt");
+        const added   = ensureConfigLines(cfgPath, flashCfg.configLines);
+        if (added > 0) {
+            console.log(`  wrote     config.txt  (+${added} line${added > 1 ? "s" : ""})`);
+        } else {
+            console.log(`  config.txt already up to date ✓`);
+        }
+    }
+
+    // ── sync ─────────────────────────────────────────────────────────────
+    try { execSync("sync", { stdio: "ignore" }); } catch {}
+    console.log(`\nhopper: done — remove SD card safely, insert in Pi Zero, power on\n`);
+}
+
+// ── fix: validate and auto-repair a project ───────────────────────────────
+
+function cmdFix(args) {
+    const G = "\x1b[32m", R = "\x1b[31m", Y = "\x1b[33m";
+    const DIM = "\x1b[2m", BOLD = "\x1b[1m", RST = "\x1b[0m";
+    const TICK = "✓", CROSS = "✗";
+
+    const dryRun    = args.includes("--dry-run") || args.includes("-n");
+    const pathArg   = args.find(a => !a.startsWith("-"));
+    const projectRoot = pathArg
+        ? path.resolve(pathArg)
+        : findProjectRoot(process.cwd());
+
+    const manifestPath = path.join(projectRoot, "hopper.json");
+    if (!fs.existsSync(manifestPath)) {
+        console.error(`hopper fix: no hopper.json found in ${projectRoot}`);
+        process.exit(1);
+    }
+
+    let manifest;
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch (e) {
+        console.error(`hopper fix: malformed hopper.json — ${e.message}`);
+        console.error(`  ${CROSS}  manual fix required: repair JSON syntax`);
+        process.exit(1);
+    }
+
+    const fixes  = [];
+    const manual = [];
+    let   manifestDirty = false;
+
+    const isLib  = manifest.type === "library";
+
+    // ── 1. Standard directories ──────────────────────────────────────────
+    const standardDirs = ["src", "tests"];
+    if (isLib) standardDirs.push("interfaces");
+
+    for (const d of standardDirs) {
+        const dirPath = path.join(projectRoot, d);
+        if (!fs.existsSync(dirPath)) {
+            if (!dryRun) fs.mkdirSync(dirPath, { recursive: true });
+            fixes.push(`created ${d}/`);
+        }
+    }
+
+    // ── 2. Entry file for executables ────────────────────────────────────
+    if (!isLib && manifest.entry) {
+        const entryAbs = path.join(projectRoot, manifest.entry);
+        if (!fs.existsSync(entryAbs)) {
+            if (!dryRun) {
+                fs.mkdirSync(path.dirname(entryAbs), { recursive: true });
+                fs.writeFileSync(entryAbs, `entry main {\n}\n`, "utf8");
+            }
+            fixes.push(`created ${manifest.entry}  (stub entry point)`);
+        }
+    }
+
+    // ── 3. Export files for libraries ────────────────────────────────────
+    for (const [exportName, exp] of Object.entries(manifest.exports || {})) {
+        const pairs = [
+            ["interface",      exp.interface],
+            ["implementation", exp.implementation],
+        ];
+        for (const [field, relPath] of pairs) {
+            if (!relPath) continue;
+            const absPath = path.join(projectRoot, relPath);
+            if (!fs.existsSync(absPath)) {
+                if (!dryRun) {
+                    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+                    const stub = field === "interface"
+                        ? `interface ${exportName} {\n}\n`
+                        : `class Standard${exportName} implements ${exportName} {\n    constructor() { }\n    destructor() { }\n}\n`;
+                    fs.writeFileSync(absPath, stub, "utf8");
+                }
+                fixes.push(`created ${relPath}  (stub ${field})`);
+            }
+        }
+    }
+
+    // ── 4. Scan source files for undeclared imports ───────────────────────
+    const declaredDeps = new Set(Object.keys(manifest.dependencies || {}));
+
+    // Collect binding-declared module names (from targets) — these don't
+    // need a separate entry in dependencies.
+    const targetBound = new Set();
+    for (const bindings of Object.values(manifest.targets || {})) {
+        for (const b of Object.values(bindings || {})) {
+            if (b.from) targetBound.add(b.from);
+        }
+    }
+
+    // All project source files to scan (skip modules/ subdirectory)
+    const toScan = new Set();
+    for (const subdir of ["src", "interfaces"]) {
+        const d = path.join(projectRoot, subdir);
+        if (fs.existsSync(d)) {
+            for (const f of fs.readdirSync(d).filter(x => x.endsWith(".hop")))
+                toScan.add(path.join(d, f));
+        }
+    }
+    // Also scan files referenced explicitly in exports and entry
+    for (const exp of Object.values(manifest.exports || {})) {
+        for (const relPath of [exp.interface, exp.implementation]) {
+            if (!relPath) continue;
+            const abs = path.join(projectRoot, relPath);
+            if (fs.existsSync(abs)) toScan.add(abs);
+        }
+    }
+    if (manifest.entry) {
+        const abs = path.join(projectRoot, manifest.entry);
+        if (fs.existsSync(abs)) toScan.add(abs);
+    }
+
+    const missingDeps = new Map();  // moduleName → Set of importing files
+    const importRe = /^[ \t]*import\s+\S+\s+from\s+([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*$/gm;
+
+    for (const filePath of toScan) {
+        let content;
+        try { content = fs.readFileSync(filePath, "utf8"); } catch { continue; }
+        importRe.lastIndex = 0;
+        let m;
+        while ((m = importRe.exec(content)) !== null) {
+            const mod = m[1];
+            if (mod === manifest.name)    continue;   // self-import
+            if (declaredDeps.has(mod))    continue;   // already declared
+            if (targetBound.has(mod))     continue;   // covered by targets
+            if (!missingDeps.has(mod)) missingDeps.set(mod, new Set());
+            missingDeps.get(mod).add(path.relative(projectRoot, filePath));
+        }
+    }
+
+    for (const [dep, files] of missingDeps) {
+        const modPath = path.join(MODULES_DIR, dep);
+        const fileList = [...files].join(", ");
+        if (fs.existsSync(modPath)) {
+            let version = "0.1.0";
+            try {
+                const dm = JSON.parse(fs.readFileSync(path.join(modPath, "hopper.json"), "utf8"));
+                if (dm.version) version = dm.version;
+            } catch {}
+            if (!dryRun) {
+                if (!manifest.dependencies) manifest.dependencies = {};
+                manifest.dependencies[dep] = version;
+                declaredDeps.add(dep);
+                manifestDirty = true;
+            }
+            fixes.push(`added dependency "${dep}": "${version}"  (imported in ${fileList})`);
+        } else {
+            manual.push(`import '${dep}' in ${fileList} — not in module store  →  hopper install ${dep}`);
+        }
+    }
+
+    if (manifestDirty) {
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+    }
+
+    // ── Report ─────────────────────────────────────────────────────────────
+    const rel = path.relative(process.cwd(), projectRoot) || ".";
+    console.log();
+    if (fixes.length === 0 && manual.length === 0) {
+        console.log(`${G}${TICK}${RST}  ${BOLD}nothing to fix${RST}  ${DIM}${rel}${RST}`);
+    } else {
+        console.log(`${BOLD}hopper fix${RST}  ${DIM}${rel}${RST}${dryRun ? `  ${Y}[dry run]${RST}` : ""}`);
+        if (fixes.length > 0) {
+            console.log();
+            console.log(`  ${G}Fixed (${fixes.length})${RST}`);
+            for (const f of fixes) console.log(`  ${G}${TICK}${RST}  ${f}`);
+        }
+        if (manual.length > 0) {
+            console.log();
+            console.log(`  ${Y}Needs manual resolution (${manual.length})${RST}`);
+            for (const m of manual) console.log(`  ${R}${CROSS}${RST}  ${m}`);
+        }
+    }
+    console.log();
+
+    if (manual.length > 0) process.exit(1);
+}
+
+// ── usage ──────────────────────────────────────────────────────────────────
+
+function usage() {
+    console.log([
+        "",
+        "  Hopper  — systems programming language",
+        "",
+        "  hopper init <name>                  scaffold a new project",
+        "  hopper build [file.hop] [-o out]    compile to executable (default: main.hop)",
+        "  hopper build module <name>          scaffold modules/<name>/ with tests/ dir",
+        "  hopper run [binary]                 execute a built binary (default: build/<entry>)",
+        "  hopper run test [module]            run tests (all, or a specific module)",
+        "  hopper flash [--mount <path>]       write bare-metal image to SD card",
+        "              [--dry-run]             show what would be flashed without writing",
+        "  hopper install [module...]          install packages from stdlib or registry",
+        "  hopper uninstall <module...>        remove installed packages",
+        "  hopper publish [name]               publish this package to the registry",
+        "  hopper revoke [name]                permanently delete a package from the registry",
+        "  hopper fix [path] [--dry-run]       auto-repair missing files and undeclared deps",
+        "  hopper check [file.hop] [--asan|--tsan|--ubsan|--msan]",
+        "                                      compile with sanitizers (default: --asan)",
+        "  hopper debug [file.hop]             debug support (coming soon)",
+        "  hopper profile [file.hop]           performance profiling (coming soon)",
+        "  hopper format [-w] <file.hop...>    reformat source files (-w to edit in place)",
+        "  hopper test [module]                run tests (all, or a specific module)",
+        "  hopper ir <file.hop>                print LLVM IR",
+        "  hopper ast <file.hop>               print AST as JSON",
+        "  hopper parse <file.hop>             print parse tree",
+        "",
+    ].join("\n"));
+    process.exit(1);
+}
+
+// ── entry ──────────────────────────────────────────────────────────────────
+
+const argv = process.argv.slice(2);
+
+// legacy flag compat
+if (argv[0] === "-c" || argv[0] === "--compile") { cmdBuild(argv.slice(1)); process.exit(0); }
+if (argv[0] === "-r" || argv[0] === "--run")     { cmdRun(argv.slice(1));   process.exit(0); }
+if (argv[0] === "--ir")    { cmdIR(argv.slice(1));    process.exit(0); }
+if (argv[0] === "--ast")   { cmdAST(argv.slice(1));   process.exit(0); }
+if (argv[0] === "--parse") { cmdParse(argv.slice(1)); process.exit(0); }
+
+const [sub, ...rest] = argv;
+
+const asyncCmds = {
+    init:      () => cmdInit(rest),
+    install:   () => cmdInstall(rest),
+    publish:   () => cmdPublish(rest),
+    revoke:    () => cmdRevoke(rest),
+};
+
+if (asyncCmds[sub]) {
+    asyncCmds[sub]().catch(e => { console.error(`hopper: ${e.message}`); process.exit(1); });
+} else {
+    switch (sub) {
+        case "build":     cmdBuild(rest);    break;
+        case "run":       cmdRun(rest);      break;
+        case "dev":       cmdDev(rest);      break;
+        case "uninstall": cmdUninstall(rest); break;
+        case "fix":       cmdFix(rest);      break;
+        case "check":     cmdCheck(rest);    break;
+        case "debug":     cmdDebug(rest);    break;
+        case "profile":   cmdProfile(rest);  break;
+        case "format":
+        case "fmt":       cmdFormat(rest);   break;
+        case "test":      cmdTest(rest);     break;
+        case "flash":     cmdFlash(rest);   break;
+        case "ir":        cmdIR(rest);       break;
+        case "ast":       cmdAST(rest);      break;
+        case "parse":     cmdParse(rest);    break;
+        default:          usage();
+    }
+}

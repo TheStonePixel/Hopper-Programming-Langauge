@@ -1,0 +1,23 @@
+{
+  "name": "uart",
+  "version": "0.1.0",
+  "description": "BCM2835 UART0 (PL011) bare-metal serial driver for Raspberry Pi",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Uart": {
+      "interface":      "interfaces/Uart.hop",
+      "implementation": "src/Uart.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Uart": {
+        "from":           "uart",
+        "interface":      "interfaces/Uart.hop",
+        "implementation": "src/Uart.hop"
+      }
+    }
+  }
+}

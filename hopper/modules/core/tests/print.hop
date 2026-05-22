@@ -1,0 +1,21 @@
+// Tests StandardCore printing functions: printStr, printInt, printBool, printByte, newline
+// EXPECT: hello world
+// EXPECT: 42
+// EXPECT: -7
+// EXPECT: true
+// EXPECT: false
+import Core from core
+
+entry main {
+    StandardCore c = StandardCore()
+    c.printStr("hello world")
+    c.newline()
+    c.printInt(42)
+    c.newline()
+    c.printInt(-7)
+    c.newline()
+    c.printBool(true)
+    c.newline()
+    c.printBool(false)
+    c.newline()
+}

@@ -1,0 +1,11 @@
+{
+  "name": "x86_64",
+  "version": "0.1.0",
+  "description": "Raw x86-64 inline-ASM syscall wrappers and SIMD primitives",
+  "license": "Apache-2.0",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "SIMD": { "interface": "interfaces/SIMD.hop", "implementation": "src/SIMD.hop" }
+  }
+}

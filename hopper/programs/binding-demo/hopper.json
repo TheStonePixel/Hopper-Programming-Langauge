@@ -1,0 +1,13 @@
+{
+  "name": "binding-demo",
+  "type": "program",
+  "targets": {
+    "host": {
+      "Text": {
+        "from": "ascii",
+        "interface": "./interfaces/Text.hop",
+        "implementation": "./modules/ascii/String.hop"
+      }
+    }
+  }
+}

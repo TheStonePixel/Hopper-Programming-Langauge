@@ -1,0 +1,15 @@
+interface Concurrent { }
+
+interface Mutex {
+    function lock()
+    function tryLock() bool
+    function unlock()
+    function rawHandle() address
+}
+
+interface Condvar {
+    function wait(address mutHandle)
+    function signal()
+    function broadcast()
+    function rawHandle() address
+}

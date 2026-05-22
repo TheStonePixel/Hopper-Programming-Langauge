@@ -1,0 +1,40 @@
+// Tests StandardArray: push, len, get, peek, pop
+// EXPECT: PASS  push and len
+// EXPECT: PASS  get first
+// EXPECT: PASS  get second
+// EXPECT: PASS  peek
+// EXPECT: PASS  pop value
+// EXPECT: PASS  len after pop
+// EXPECT: ds: 6 passed, 0 failed
+import Core from core
+import Array from ds
+
+entry main {
+    TestSuite t = TestSuite("ds")
+    StandardArray arr = StandardArray(4)
+
+    address v1 = cast 100
+    address v2 = cast 200
+    arr.push(v1)
+    arr.push(v2)
+    t.checkEq(arr.len(), 2, "push and len")
+
+    address got1 = arr.get(0)
+    int i1 = cast got1
+    t.checkEq(i1, 100, "get first")
+
+    address got2 = arr.get(1)
+    int i2 = cast got2
+    t.checkEq(i2, 200, "get second")
+
+    address pk = arr.peek()
+    int pi = cast pk
+    t.checkEq(pi, 200, "peek")
+
+    address popped = arr.pop()
+    int poi = cast popped
+    t.checkEq(poi, 200, "pop value")
+
+    t.checkEq(arr.len(), 1, "len after pop")
+    t.done()
+}

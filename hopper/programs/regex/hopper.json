@@ -1,0 +1,35 @@
+{
+  "name": "regex",
+  "version": "0.1.0",
+  "description": "grep-like line search — regex flags, recursive, stdin, case-insensitive",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "x86_64": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "Regex": {
+        "from": "regex",
+        "interface": "modules/regex/interfaces/Regex.hop",
+        "implementation": "modules/regex/src/Regex.hop"
+      },
+      "IO": {
+        "from": "linux",
+        "interface": "../../modules/linux/interfaces/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      },
+      "FileSystem": {
+        "from": "linux",
+        "interface": "../../modules/linux/interfaces/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      },
+      "SIMD": {
+        "from": "x86_64",
+        "interface": "modules/x86_64/interfaces/SIMD.hop",
+        "implementation": "modules/x86_64/src/SIMD.hop"
+      }
+    }
+  }
+}

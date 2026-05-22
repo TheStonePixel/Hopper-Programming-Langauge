@@ -1,0 +1,6 @@
+// COMPILE_ONLY
+// Verifies Regex module compiles
+import Regex from regex
+
+entry main {
+}

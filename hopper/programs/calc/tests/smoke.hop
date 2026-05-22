@@ -1,0 +1,43 @@
+// Tests: RPN arithmetic, math module (factorial, fib, gcd, pow)
+// EXPECT: 3 4 + 2 * = 14
+// EXPECT: 5! = 120
+// EXPECT: fib(10) = 55
+// EXPECT: gcd(48,18) = 6
+// EXPECT: 2^10 = 1024
+
+import Array from ds
+import Math  from math
+
+extern function printf(string fmt, ...) int
+
+function add(int a, int b) int { return a + b }
+function mul(int a, int b) int { return a * b }
+
+function applyBin(StandardArray stack, callback(int, int) int op) {
+    int b = cast stack.pop()
+    int a = cast stack.pop()
+    int r = op(a, b)
+    address _r = cast r
+    stack.push(_r)
+}
+
+entry main {
+    StandardArray stack = StandardArray(8)
+    Math m = Math()
+
+    address _3 = cast 3
+    stack.push(_3)
+    address _4 = cast 4
+    stack.push(_4)
+    applyBin(stack, add)
+    address _2 = cast 2
+    stack.push(_2)
+    applyBin(stack, mul)
+    int r1 = cast stack.pop()
+    printf("3 4 + 2 * = %lld\n", r1)
+
+    printf("5! = %lld\n", m.factorial(5))
+    printf("fib(10) = %lld\n", m.fib(10))
+    printf("gcd(48,18) = %lld\n", m.gcd(48, 18))
+    printf("2^10 = %lld\n", m.pow(2, 10))
+}

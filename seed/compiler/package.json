@@ -1,0 +1,16 @@
+{
+  "name": "hopper-compiler",
+  "version": "1.0.0",
+  "description": "Hopper → LLVM IR compiler (JS bootstrap)",
+  "main": "hopperc.js",
+  "scripts": {
+    "gen:grammar": "java -jar tools/antlr-4.13.1-complete.jar -Dlanguage=JavaScript -visitor -o src/generated grammar/Hopper.g4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "antlr4": "^4.13.2"
+  }
+}

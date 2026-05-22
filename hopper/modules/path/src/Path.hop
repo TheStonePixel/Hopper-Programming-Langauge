@@ -1,0 +1,225 @@
+function _pathStrLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { break }
+        n = n + 1
+    }
+    return n
+}
+
+class StandardPath implements Path {
+    address data
+    int     len
+    int     cap
+
+    constructor(address src) {
+        int srcLen = _pathStrLen(src)
+        int c = 64
+        if (srcLen + 1 > c) { c = srcLen + 1 }
+        self.cap  = c
+        self.len  = srcLen
+        self.data = allocate c
+        int i = 0
+        while (i < srcLen) {
+            address s = src + i
+            address d = self.data + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        address term = self.data + srcLen
+        byte z = 0
+        term::value = z
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow(int needed) {
+        int newCap = self.cap * 2
+        if (newCap < needed) { newCap = needed }
+        address nb = allocate newCap
+        int i = 0
+        while (i < self.len) {
+            address s = self.data + i
+            address d = nb + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        address term = nb + self.len
+        byte z = 0
+        term::value = z
+        deallocate self.data
+        self.data = nb
+        self.cap  = newCap
+    }
+
+    function _appendByte(byte c) {
+        if (self.len + 2 > self.cap) { self._grow(self.len + 2) }
+        address p = self.data + self.len
+        p::value = c
+        self.len = self.len + 1
+        address term = self.data + self.len
+        byte z = 0
+        term::value = z
+    }
+
+    function _appendStr(address src) {
+        int i = 0
+        while (true) {
+            address p = src + i
+            byte b = p::value
+            int bi = cast b
+            if (bi == 0) { break }
+            self._appendByte(b)
+            i = i + 1
+        }
+    }
+
+    function ptr() address { return self.data }
+    function length() int  { return self.len  }
+
+    function isAbsolute() bool {
+        if (self.len == 0) { return false }
+        address p = self.data
+        byte b = p::value
+        int bi = cast b
+        return bi == 47
+    }
+
+    function join(address segment) {
+        if (self.len == 0) {
+            self._appendStr(segment)
+            return
+        }
+        address last = self.data + self.len - 1
+        byte lb = last::value
+        int li = cast lb
+        if (li != 47) {
+            byte slash = 47
+            self._appendByte(slash)
+        }
+        address seg = segment
+        byte fb = seg::value
+        int fi = cast fb
+        if (fi == 47) { seg = seg + 1 }
+        self._appendStr(seg)
+    }
+
+    function _basenameStart() int {
+        int i = self.len - 1
+        while (i >= 0) {
+            address p = self.data + i
+            byte b = p::value
+            int bi = cast b
+            if (bi == 47) { return i + 1 }
+            i = i - 1
+        }
+        return 0
+    }
+
+    function _extStart() int {
+        int base = self._basenameStart()
+        int i = self.len - 1
+        while (i > base) {
+            address p = self.data + i
+            byte b = p::value
+            int bi = cast b
+            if (bi == 46) { return i }
+            i = i - 1
+        }
+        return -1
+    }
+
+    function basename(address out, int maxLen) int {
+        int start = self._basenameStart()
+        int blen = self.len - start
+        if (blen >= maxLen) { blen = maxLen - 1 }
+        int i = 0
+        while (i < blen) {
+            address s = self.data + start + i
+            address d = out + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        address term = out + blen
+        byte z = 0
+        term::value = z
+        return blen
+    }
+
+    function dirname(address out, int maxLen) int {
+        int base = self._basenameStart()
+        int dlen = base - 1
+        if (dlen <= 0) {
+            if (self.isAbsolute()) {
+                if (maxLen > 1) {
+                    byte slash = 47
+                    address d = out
+                    d::value = slash
+                    address term = out + 1
+                    byte z = 0
+                    term::value = z
+                    return 1
+                }
+                return 0
+            } else {
+                if (maxLen > 1) {
+                    byte dot = 46
+                    address d = out
+                    d::value = dot
+                    address term = out + 1
+                    byte z = 0
+                    term::value = z
+                    return 1
+                }
+                return 0
+            }
+        }
+        if (dlen >= maxLen) { dlen = maxLen - 1 }
+        int i = 0
+        while (i < dlen) {
+            address s = self.data + i
+            address d = out + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        address term = out + dlen
+        byte z = 0
+        term::value = z
+        return dlen
+    }
+
+    function ext(address out, int maxLen) int {
+        int start = self._extStart()
+        if (start == -1) {
+            if (maxLen > 0) {
+                byte z = 0
+                address p = out
+                p::value = z
+            }
+            return 0
+        }
+        int elen = self.len - start
+        if (elen >= maxLen) { elen = maxLen - 1 }
+        int i = 0
+        while (i < elen) {
+            address s = self.data + start + i
+            address d = out + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        address term = out + elen
+        byte z = 0
+        term::value = z
+        return elen
+    }
+}

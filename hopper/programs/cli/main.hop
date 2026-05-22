@@ -1,0 +1,5 @@
+extern function printf(string fmt, ...) int
+
+entry main(int argc, string[] argv) {
+    printf("Hello, Hopper\n")
+}

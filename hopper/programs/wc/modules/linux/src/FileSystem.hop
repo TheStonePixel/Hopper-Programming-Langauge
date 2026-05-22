@@ -1,0 +1,160 @@
+import fs from arch
+
+class LinuxFileSystem implements FileSystem {
+    function open(string path, int flags, int mode) int {
+        return open(path, flags, mode)
+    }
+    function close(int fd) int {
+        return close(fd)
+    }
+    function creat(string path, int mode) int {
+        return creat(path, mode)
+    }
+    function stat(string path, address buf) int {
+        return stat(path, buf)
+    }
+    function fstat(int fd, address buf) int {
+        return fstat(fd, buf)
+    }
+    function lstat(string path, address buf) int {
+        return lstat(path, buf)
+    }
+    function statfs(string path, address buf) int {
+        return statfs(path, buf)
+    }
+    function fstatfs(int fd, address buf) int {
+        return fstatfs(fd, buf)
+    }
+    function lseek(int fd, int offset, int whence) int {
+        return lseek(fd, offset, whence)
+    }
+    function access(string path, int mode) int {
+        return access(path, mode)
+    }
+    function chmod(string path, int mode) int {
+        return chmod(path, mode)
+    }
+    function fchmod(int fd, int mode) int {
+        return fchmod(fd, mode)
+    }
+    function chown(string path, int uid, int gid) int {
+        return chown(path, uid, gid)
+    }
+    function fchown(int fd, int uid, int gid) int {
+        return fchown(fd, uid, gid)
+    }
+    function lchown(string path, int uid, int gid) int {
+        return lchown(path, uid, gid)
+    }
+    function umask(int mask) int {
+        return umask(mask)
+    }
+    function truncate(string path, int length) int {
+        return truncate(path, length)
+    }
+    function ftruncate(int fd, int length) int {
+        return ftruncate(fd, length)
+    }
+    function fsync(int fd) int {
+        return fsync(fd)
+    }
+    function fdatasync(int fd) int {
+        return fdatasync(fd)
+    }
+    function sync() int {
+        return sync()
+    }
+    function getdents64(int fd, address buf, int count) int {
+        return getdents64(fd, buf, count)
+    }
+    function getcwd(address buf, int bufsz) int {
+        return getcwd(buf, bufsz)
+    }
+    function chdir(string path) int {
+        return chdir(path)
+    }
+    function fchdir(int fd) int {
+        return fchdir(fd)
+    }
+    function mkdir(string path, int mode) int {
+        return mkdir(path, mode)
+    }
+    function rmdir(string path) int {
+        return rmdir(path)
+    }
+    function rename(string oldpath, string newpath) int {
+        return rename(oldpath, newpath)
+    }
+    function link(string oldpath, string newpath) int {
+        return link(oldpath, newpath)
+    }
+    function unlink(string path) int {
+        return unlink(path)
+    }
+    function symlink(string target, string linkpath) int {
+        return symlink(target, linkpath)
+    }
+    function readlink(string path, address buf, int bufsz) int {
+        return readlink(path, buf, bufsz)
+    }
+    function dup(int fd) int {
+        return dup(fd)
+    }
+    function dup2(int oldfd, int newfd) int {
+        return dup2(oldfd, newfd)
+    }
+    function dup3(int oldfd, int newfd, int flags) int {
+        return dup3(oldfd, newfd, flags)
+    }
+    function pipe(address fds) int {
+        return pipe(fds)
+    }
+    function pipe2(address fds, int flags) int {
+        return pipe2(fds, flags)
+    }
+    function fcntl(int fd, int cmd, int arg) int {
+        return fcntl(fd, cmd, arg)
+    }
+    function flock(int fd, int operation) int {
+        return flock(fd, operation)
+    }
+    function openat(int dirfd, string path, int flags, int mode) int {
+        return openat(dirfd, path, flags, mode)
+    }
+    function mkdirat(int dirfd, string path, int mode) int {
+        return mkdirat(dirfd, path, mode)
+    }
+    function unlinkat(int dirfd, string path, int flags) int {
+        return unlinkat(dirfd, path, flags)
+    }
+    function renameat(int olddirfd, string oldpath, int newdirfd, string newpath) int {
+        return renameat(olddirfd, oldpath, newdirfd, newpath)
+    }
+    function linkat(int olddirfd, string oldpath, int newdirfd, string newpath, int flags) int {
+        return linkat(olddirfd, oldpath, newdirfd, newpath, flags)
+    }
+    function symlinkat(string target, int newdirfd, string linkpath) int {
+        return symlinkat(target, newdirfd, linkpath)
+    }
+    function readlinkat(int dirfd, string path, address buf, int bufsz) int {
+        return readlinkat(dirfd, path, buf, bufsz)
+    }
+    function fchmodat(int dirfd, string path, int mode, int flags) int {
+        return fchmodat(dirfd, path, mode, flags)
+    }
+    function faccessat(int dirfd, string path, int mode, int flags) int {
+        return faccessat(dirfd, path, mode, flags)
+    }
+    function fchownat(int dirfd, string path, int uid, int gid, int flags) int {
+        return fchownat(dirfd, path, uid, gid, flags)
+    }
+    function inotify_init1(int flags) int {
+        return inotify_init1(flags)
+    }
+    function inotify_add_watch(int fd, string path, int mask) int {
+        return inotify_add_watch(fd, path, mask)
+    }
+    function inotify_rm_watch(int fd, int wd) int {
+        return inotify_rm_watch(fd, wd)
+    }
+}

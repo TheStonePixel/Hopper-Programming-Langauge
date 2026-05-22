@@ -1,7 +1,0 @@
-{
-  "name": "builder",
-  "version": "0.1.0",
-  "description": "Builder pattern — multi-step HTTP request construction with defaults",
-  "type": "program",
-  "main": "builder.hop"
-}

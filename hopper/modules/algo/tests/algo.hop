@@ -1,0 +1,94 @@
+// Tests StandardAlgo: insertionSort, quickSort, mergeSort
+// EXPECT: PASS  insertionSort ordered
+// EXPECT: PASS  insertionSort smallest first
+// EXPECT: PASS  quickSort ordered
+// EXPECT: PASS  quickSort smallest first
+// EXPECT: PASS  mergeSort ordered
+// EXPECT: PASS  mergeSort smallest first
+// EXPECT: algo: 6 passed, 0 failed
+import Core from core
+import Algo from algo
+
+function intCmp(address a, address b) int {
+    int ia = cast a
+    int ib = cast b
+    if (ia < ib) { return -1 }
+    if (ia > ib) { return 1 }
+    return 0
+}
+
+entry main {
+    TestSuite t = TestSuite("algo")
+    StandardAlgo alg = StandardAlgo()
+
+    // insertionSort test
+    address arr1 = allocate 24
+    address p0 = arr1
+    address p1 = arr1 + 8
+    address p2 = arr1 + 16
+    address v3 = cast 3
+    address v1 = cast 1
+    address v2 = cast 2
+    p0::value = v3
+    p1::value = v1
+    p2::value = v2
+    callback cmp1 = intCmp(address, address) int
+    alg.insertionSort(arr1, 3, cmp1)
+    address r0 = arr1::value
+    address r1ptr = arr1 + 8
+    address r1 = r1ptr::value
+    int r0i = cast r0
+    int r1i = cast r1
+    t.checkEq(r0i < r1i, 1, "insertionSort ordered")
+    t.checkEq(r0i, 1, "insertionSort smallest first")
+    deallocate arr1
+
+    // quickSort test
+    address arr2 = allocate 32
+    address q0 = arr2
+    address q1 = arr2 + 8
+    address q2 = arr2 + 16
+    address q3 = arr2 + 24
+    address v5 = cast 5
+    address v8 = cast 8
+    address v4 = cast 4
+    address v9 = cast 9
+    q0::value = v5
+    q1::value = v8
+    q2::value = v4
+    q3::value = v9
+    callback cmp2 = intCmp(address, address) int
+    alg.quickSort(arr2, 4, cmp2)
+    address qa = arr2::value
+    address qb_ptr = arr2 + 8
+    address qb = qb_ptr::value
+    int qai = cast qa
+    int qbi = cast qb
+    t.checkEq(qai < qbi, 1, "quickSort ordered")
+    t.checkEq(qai, 4, "quickSort smallest first")
+    deallocate arr2
+
+    // mergeSort test
+    address arr3 = allocate 24
+    address m0 = arr3
+    address m1 = arr3 + 8
+    address m2 = arr3 + 16
+    address v7 = cast 7
+    address v6 = cast 6
+    address v10 = cast 10
+    m0::value = v7
+    m1::value = v6
+    m2::value = v10
+    callback cmp3 = intCmp(address, address) int
+    alg.mergeSort(arr3, 3, cmp3)
+    address ma = arr3::value
+    address mb_ptr = arr3 + 8
+    address mb = mb_ptr::value
+    int mai = cast ma
+    int mbi = cast mb
+    t.checkEq(mai < mbi, 1, "mergeSort ordered")
+    t.checkEq(mai, 6, "mergeSort smallest first")
+    deallocate arr3
+
+    t.done()
+}

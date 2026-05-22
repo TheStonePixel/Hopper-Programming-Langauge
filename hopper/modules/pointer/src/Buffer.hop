@@ -1,0 +1,54 @@
+class OwnedBuffer implements Buffer {
+    address data
+    int length
+
+    constructor(int size) {
+        self.length = size
+        self.data   = allocate size
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function ptr() address { return self.data }
+    function len() int     { return self.length }
+
+    function get(int i) byte {
+        address p = self.data + i
+        byte b = p::value
+        return b
+    }
+
+    function set(int i, byte val) {
+        address p = self.data + i
+        p::value = val
+    }
+
+    function zero() {
+        int i = 0
+        byte z = 0
+        while (i < self.length) {
+            address p = self.data + i
+            p::value = z
+            i = i + 1
+        }
+    }
+
+    function resize(int newLen) {
+        address nb = allocate newLen
+        int copy = newLen
+        if (self.length < copy) { copy = self.length }
+        int i = 0
+        while (i < copy) {
+            address s = self.data + i
+            address d = nb + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        deallocate self.data
+        self.data   = nb
+        self.length = newLen
+    }
+}

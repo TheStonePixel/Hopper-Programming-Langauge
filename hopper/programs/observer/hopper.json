@@ -1,0 +1,17 @@
+{
+  "name": "observer",
+  "version": "0.1.0",
+  "description": "Observer pattern — event pub/sub via callback dispatch tables",
+  "type": "program",
+  "main": "observer.hop",
+  "entry": "observer.hop",
+  "targets": {
+    "host": {
+      "Array": {
+        "from": "ds",
+        "interface": "../../modules/ds/interfaces/Array.hop",
+        "implementation": "../../modules/ds/src/Array.hop"
+      }
+    }
+  }
+}

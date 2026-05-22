@@ -1,0 +1,9 @@
+interface Path {
+    function ptr() address
+    function length() int
+    function isAbsolute() bool
+    function join(address segment)
+    function basename(address out, int maxLen) int
+    function dirname(address out, int maxLen) int
+    function ext(address out, int maxLen) int
+}

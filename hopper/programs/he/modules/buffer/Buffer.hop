@@ -1,0 +1,260 @@
+// Buffer — text buffer as parallel arrays of heap-allocated lines
+// Addresses are stored as int (i64) via ptrtoint/inttoptr to avoid typed-pointer issues.
+
+extern function malloc(int n) address
+extern function free(address p)
+extern function memcpy(address dst, address src, int n) address
+
+enum BufferLimits {
+    MAX_LINES = 4096
+    INIT_CAP  = 64
+}
+
+class Buffer {
+    address data_arr  // int[] — line data pointers (stored as ptrtoint)
+    address len_arr   // int[] — line lengths
+    address cap_arr   // int[] — line capacities
+    int count
+    int dirty
+
+    constructor() {
+        self.data_arr = allocate BufferLimits.MAX_LINES * 8
+        self.len_arr  = allocate BufferLimits.MAX_LINES * 8
+        self.cap_arr  = allocate BufferLimits.MAX_LINES * 8
+        self.count    = 0
+        self.dirty    = 0
+    }
+
+    destructor() {
+        int i = 0
+        while (i < self.count) {
+            address slot = self.data_arr + i * 8
+            int pval = slot::value
+            if (pval != 0) {
+                address d = address pval
+                deallocate d
+            }
+            i = i + 1
+        }
+        deallocate self.data_arr
+        deallocate self.len_arr
+        deallocate self.cap_arr
+    }
+
+    function line_data(int i) address {
+        address slot = self.data_arr + i * 8
+        int pval = slot::value
+        return address pval
+    }
+
+    function line_len(int i) int {
+        address slot = self.len_arr + i * 8
+        int v = slot::value
+        return v
+    }
+
+    function line_cap(int i) int {
+        address slot = self.cap_arr + i * 8
+        int v = slot::value
+        return v
+    }
+
+    function set_data(int i, address ptr) {
+        address slot = self.data_arr + i * 8
+        slot::value = int ptr
+    }
+
+    function set_len(int i, int len) {
+        address slot = self.len_arr + i * 8
+        slot::value = len
+    }
+
+    function set_cap(int i, int cap) {
+        address slot = self.cap_arr + i * 8
+        slot::value = cap
+    }
+
+    function get_count() int { return self.count }
+    function get_dirty() int { return self.dirty }
+
+    function append_line(address src, int srclen) {
+        int cap = BufferLimits.INIT_CAP
+        if (srclen + 1 > cap) { cap = srclen + 1 }
+        address data = allocate cap
+        if (srclen > 0 && int src != 0) {
+            memcpy(data, src, srclen)
+        }
+        int row = self.count
+        self.set_data(row, data)
+        self.set_len(row, srclen)
+        self.set_cap(row, cap)
+        self.count = self.count + 1
+    }
+
+    function grow_line(int row, int need) {
+        int cap = self.line_cap(row)
+        if (need <= cap) { return }
+        int newcap = cap * 2
+        if (newcap < need) { newcap = need }
+        address old = self.line_data(row)
+        address nd = allocate newcap
+        int len = self.line_len(row)
+        if (len > 0 && int old != 0) {
+            memcpy(nd, old, len)
+        }
+        if (int old != 0) { deallocate old }
+        self.set_data(row, nd)
+        self.set_cap(row, newcap)
+    }
+
+    function insert_char(int row, int col, byte b) {
+        int len = self.line_len(row)
+        self.grow_line(row, len + 2)
+        address data = self.line_data(row)
+        int i = len
+        while (i > col) {
+            address dst = data + i
+            address src = data + i - 1
+            byte ch = src::value
+            dst::value = ch
+            i = i - 1
+        }
+        address cp = data + col
+        cp::value = b
+        self.set_len(row, len + 1)
+        self.dirty = 1
+    }
+
+    function delete_char(int row, int col) {
+        if (row < 0 || row >= self.count) { return }
+        int len = self.line_len(row)
+        if (col < 0 || col >= len) { return }
+        address data = self.line_data(row)
+        int i = col
+        while (i < len - 1) {
+            address dst = data + i
+            address src = data + i + 1
+            byte ch = src::value
+            dst::value = ch
+            i = i + 1
+        }
+        self.set_len(row, len - 1)
+        self.dirty = 1
+    }
+
+    function join_lines(int row) {
+        if (row + 1 >= self.count) { return }
+        int len0 = self.line_len(row)
+        int len1 = self.line_len(row + 1)
+        self.grow_line(row, len0 + len1 + 1)
+        address data0 = self.line_data(row)
+        address data1 = self.line_data(row + 1)
+        address dst = data0 + len0
+        if (len1 > 0) { memcpy(dst, data1, len1) }
+        self.set_len(row, len0 + len1)
+        if (int data1 != 0) { deallocate data1 }
+        // shift lines above row+1 down
+        int i = row + 1
+        while (i < self.count - 1) {
+            address ds = self.data_arr + i * 8
+            address ls = self.len_arr  + i * 8
+            address cs = self.cap_arr  + i * 8
+            address dn = self.data_arr + (i + 1) * 8
+            address ln = self.len_arr  + (i + 1) * 8
+            address cn = self.cap_arr  + (i + 1) * 8
+            int dv = dn::value
+            int lv = ln::value
+            int cv = cn::value
+            ds::value = dv
+            ls::value = lv
+            cs::value = cv
+            i = i + 1
+        }
+        self.count = self.count - 1
+        self.dirty = 1
+    }
+
+    function split_line(int row, int col) {
+        int len = self.line_len(row)
+        address data = self.line_data(row)
+        int taillen = len - col
+        address tail = data + col
+        // append the tail as a new line at the end, then rotate into place
+        self.append_line(tail, taillen)
+        // rotate new line (at self.count-1) into position row+1
+        int last = self.count - 1
+        while (last > row + 1) {
+            address da = self.data_arr + last * 8
+            address la = self.len_arr  + last * 8
+            address ca = self.cap_arr  + last * 8
+            address db = self.data_arr + (last - 1) * 8
+            address lb = self.len_arr  + (last - 1) * 8
+            address cb = self.cap_arr  + (last - 1) * 8
+            int dav = da::value
+            int lav = la::value
+            int cav = ca::value
+            int dbv = db::value
+            int lbv = lb::value
+            int cbv = cb::value
+            da::value = dbv
+            la::value = lbv
+            ca::value = cbv
+            db::value = dav
+            lb::value = lav
+            cb::value = cav
+            last = last - 1
+        }
+        self.set_len(row, col)
+        self.dirty = 1
+    }
+
+    function load(address data, int len) {
+        int start = 0
+        int i = 0
+        while (i <= len) {
+            address cp = data + i
+            int ch = 0
+            if (i < len) {
+                byte b = cp::value
+                ch = int b
+            }
+            if (ch == 10 || i == len) {
+                address lstart = data + start
+                self.append_line(lstart, i - start)
+                start = i + 1
+            }
+            i = i + 1
+        }
+        if (self.count == 0) {
+            self.append_line(null, 0)
+        }
+        self.dirty = 0
+    }
+
+    function flatten(address out_len) address {
+        int total = 0
+        int i = 0
+        while (i < self.count) {
+            total = total + self.line_len(i) + 1
+            i = i + 1
+        }
+        address out = allocate total + 1
+        int pos = 0
+        i = 0
+        while (i < self.count) {
+            address d = self.line_data(i)
+            int l = self.line_len(i)
+            if (l > 0 && int d != 0) {
+                address dst = out + pos
+                memcpy(dst, d, l)
+                pos = pos + l
+            }
+            address nl = out + pos
+            nl::value = 10
+            pos = pos + 1
+            i = i + 1
+        }
+        out_len::value = pos
+        return out
+    }
+}

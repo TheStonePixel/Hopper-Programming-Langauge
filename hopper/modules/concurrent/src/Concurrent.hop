@@ -1,0 +1,154 @@
+import sem from arch
+
+// Store/load int at an address (semids are ints stored as addresses)
+function _concStoreInt(address p, int v) {
+    address pi = p
+    pi::value = v
+}
+
+function _concLoadInt(address p) int {
+    address pi = p
+    int v = pi::value
+    return v
+}
+
+// Write struct sembuf {sem_num, sem_op, sem_flg} as three little-endian shorts
+function _writeSembuf(address p, int semNum, int semOp, int semFlg) {
+    int n0 = semNum & 255
+    int n1 = (semNum >> 8) & 255
+    int o0 = semOp & 255
+    int o1 = (semOp >> 8) & 255
+    int f0 = semFlg & 255
+    int f1 = (semFlg >> 8) & 255
+    byte b0 = cast n0
+    byte b1 = cast n1
+    byte b2 = cast o0
+    byte b3 = cast o1
+    byte b4 = cast f0
+    byte b5 = cast f1
+    address p0 = p
+    address p1 = p + 1
+    address p2 = p + 2
+    address p3 = p + 3
+    address p4 = p + 4
+    address p5 = p + 5
+    p0::value = b0
+    p1::value = b1
+    p2::value = b2
+    p3::value = b3
+    p4::value = b4
+    p5::value = b5
+}
+
+// Binary semaphore mutex using SysV semget/semop/semctl.
+// semget(IPC_PRIVATE=0, 1, IPC_CREAT=512|0600=384) = 896
+// semctl(semid, 0, SETVAL=16, 1) initializes value to 1.
+// lock: semop -1 (blocks when 0), unlock: semop +1.
+class StandardMutex implements Mutex {
+    address handle   // 8-byte heap block holding the semid
+
+    constructor() {
+        self.handle = allocate 8
+        int semid = semget(0, 1, 896)
+        _concStoreInt(self.handle, semid)
+        semctl(semid, 0, 16, 1)
+    }
+
+    destructor() {
+        int semid = _concLoadInt(self.handle)
+        semctl(semid, 0, 0, 0)
+        deallocate self.handle
+    }
+
+    function lock() {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, -1, 0)
+        semop(semid, sop, 1)
+        deallocate sop
+    }
+
+    function tryLock() bool {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, -1, 2048)
+        int r = semop(semid, sop, 1)
+        deallocate sop
+        return r == 0
+    }
+
+    function unlock() {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, 1, 0)
+        semop(semid, sop, 1)
+        deallocate sop
+    }
+
+    function rawHandle() address { return self.handle }
+}
+
+// Counting semaphore condvar using SysV semaphores (initial value 0).
+// wait: unlocks mutex, blocks on condvar sem, relocks mutex.
+// signal: increments condvar sem by 1 (wakes one waiter).
+// broadcast: increments condvar sem by current waiter count (wakes all).
+// Note: there is a narrow race between mutex unlock and semop -1 in wait.
+// Callers should use a boolean predicate loop (while not ready: wait).
+class StandardCondvar implements Condvar {
+    address handle   // 8-byte heap block holding the condvar semid
+
+    constructor() {
+        self.handle = allocate 8
+        int semid = semget(0, 1, 896)
+        _concStoreInt(self.handle, semid)
+        semctl(semid, 0, 16, 0)
+    }
+
+    destructor() {
+        int semid = _concLoadInt(self.handle)
+        semctl(semid, 0, 0, 0)
+        deallocate self.handle
+    }
+
+    function wait(address mutHandle) {
+        int mutSemid  = _concLoadInt(mutHandle)
+        int condSemid = _concLoadInt(self.handle)
+        // Unlock mutex
+        address mop = allocate 8
+        _writeSembuf(mop, 0, 1, 0)
+        semop(mutSemid, mop, 1)
+        deallocate mop
+        // Block on condvar
+        address cop = allocate 8
+        _writeSembuf(cop, 0, -1, 0)
+        semop(condSemid, cop, 1)
+        deallocate cop
+        // Relock mutex
+        address rop = allocate 8
+        _writeSembuf(rop, 0, -1, 0)
+        semop(mutSemid, rop, 1)
+        deallocate rop
+    }
+
+    function signal() {
+        int semid = _concLoadInt(self.handle)
+        address sop = allocate 8
+        _writeSembuf(sop, 0, 1, 0)
+        semop(semid, sop, 1)
+        deallocate sop
+    }
+
+    function broadcast() {
+        int semid = _concLoadInt(self.handle)
+        // GETNCNT=14: number of threads blocked waiting for sem > 0
+        int waiters = semctl(semid, 0, 14, 0)
+        if (waiters > 0) {
+            address sop = allocate 8
+            _writeSembuf(sop, 0, waiters, 0)
+            semop(semid, sop, 1)
+            deallocate sop
+        }
+    }
+
+    function rawHandle() address { return self.handle }
+}

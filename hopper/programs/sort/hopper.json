@@ -1,0 +1,15 @@
+{
+  "name": "sort",
+  "version": "0.1.0",
+  "type": "program",
+  "entry": "sort.hop",
+  "targets": {
+    "host": {
+      "Array": {
+        "from": "ds",
+        "interface": "../../modules/ds/interfaces/Array.hop",
+        "implementation": "../../modules/ds/src/Array.hop"
+      }
+    }
+  }
+}

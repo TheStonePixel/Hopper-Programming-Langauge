@@ -1,0 +1,40 @@
+import mem from arch
+
+class LinuxMemory implements Memory {
+    function mmap(address addr, int len, int prot, int flags, int fd, int offset) address {
+        return mmap(addr, len, prot, flags, fd, offset)
+    }
+    function munmap(address addr, int len) int {
+        return munmap(addr, len)
+    }
+    function mprotect(address addr, int len, int prot) int {
+        return mprotect(addr, len, prot)
+    }
+    function mremap(address old_addr, int old_size, int new_size, int flags, address new_addr) address {
+        return mremap(old_addr, old_size, new_size, flags, new_addr)
+    }
+    function msync(address addr, int len, int flags) int {
+        return msync(addr, len, flags)
+    }
+    function madvise(address addr, int len, int advice) int {
+        return madvise(addr, len, advice)
+    }
+    function mincore(address addr, int len, address vec) int {
+        return mincore(addr, len, vec)
+    }
+    function mlock(address addr, int len) int {
+        return mlock(addr, len)
+    }
+    function munlock(address addr, int len) int {
+        return munlock(addr, len)
+    }
+    function mlockall(int flags) int {
+        return mlockall(flags)
+    }
+    function munlockall() int {
+        return munlockall()
+    }
+    function memfd_create(string name, int flags) int {
+        return memfd_create(name, flags)
+    }
+}

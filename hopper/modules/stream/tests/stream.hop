@@ -1,0 +1,63 @@
+// Tests ByteStream: peek, advance, remaining, atEnd, reset, peekAt, pos
+// EXPECT: PASS  remaining at start
+// EXPECT: PASS  peek first byte
+// EXPECT: PASS  not atEnd
+// EXPECT: PASS  pos after advance
+// EXPECT: PASS  remaining after advance
+// EXPECT: PASS  peekAt offset 1
+// EXPECT: PASS  atEnd when exhausted
+// EXPECT: PASS  reset pos
+// EXPECT: PASS  peek zero at end
+// EXPECT: stream: 9 passed, 0 failed
+import Core from core
+import Stream from stream
+
+entry main {
+    TestSuite t = TestSuite("stream")
+
+    address buf = allocate 3
+    address p0 = buf
+    address p1 = buf + 1
+    address p2 = buf + 2
+    byte b0 = 65
+    byte b1 = 66
+    byte b2 = 67
+    p0::value = b0
+    p1::value = b1
+    p2::value = b2
+
+    ByteStream s = ByteStream(buf, 3)
+
+    t.checkEq(s.remaining(), 3, "remaining at start")
+
+    byte first = s.peek()
+    int firsti = cast first
+    t.checkEq(firsti, 65, "peek first byte")
+
+    t.check(!s.atEnd(), "not atEnd")
+
+    s.advance()
+    t.checkEq(s.pos(), 1, "pos after advance")
+    t.checkEq(s.remaining(), 2, "remaining after advance")
+
+    byte at1 = s.peekAt(1)
+    int at1i = cast at1
+    t.checkEq(at1i, 67, "peekAt offset 1")
+
+    s.advance()
+    s.advance()
+    t.check(s.atEnd(), "atEnd when exhausted")
+
+    s.reset()
+    t.checkEq(s.pos(), 0, "reset pos")
+
+    s.advance()
+    s.advance()
+    s.advance()
+    byte z = s.peek()
+    int zi = cast z
+    t.checkEq(zi, 0, "peek zero at end")
+
+    deallocate buf
+    t.done()
+}
