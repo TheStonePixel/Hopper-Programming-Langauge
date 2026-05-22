@@ -8,6 +8,7 @@ program
 
 topLevelDecl
     : functionDecl
+    | templateFunctionDecl
     | structDecl
     | classDecl
     | templateDecl
@@ -67,6 +68,13 @@ functionDecl
     | 'extern' 'function' Identifier '(' externParamList? ')'        # ExternProcDecl
     | 'function' Identifier '(' paramList? ')' type (NEWLINE+ contractClause)* block   # FuncDecl
     | 'function' Identifier '(' paramList? ')' (NEWLINE+ contractClause)* block        # ProcDecl
+    ;
+
+// template function = compile-time dispatch by type parameter (concrete specialization)
+// e.g.  template function cast<int>(address src) int { return int src }
+templateFunctionDecl
+    : 'template' 'function' Identifier '<' type '>' '(' paramList? ')' type (NEWLINE+ contractClause)* block   # TemplateFuncDecl
+    | 'template' 'function' Identifier '<' type '>' '(' paramList? ')' (NEWLINE+ contractClause)* block        # TemplateProcDecl
     ;
 
 // Compile-time contract clauses (Hoare Logic)
@@ -330,6 +338,7 @@ primary
     | Identifier '::' 'address'                         // address of variable/function
     | Identifier '::' 'value'                           // dereference address
     | Identifier '::' 'size'                            // byte size of variable or type
+    | Identifier '<' type '>' '(' argList? ')'                              // template function call: cast<int>(x)
     | Identifier '(' argList? ')'                                           // function call
     | Identifier '.' fieldName '.' fieldName '(' argList? ')'               // chained method call: obj.field.method(...)
     | Identifier '.' fieldName '(' argList? ')'                              // method call

@@ -26,6 +26,8 @@ import {
     EnumDecl,
     AliasDecl,
     TemplateDecl,
+    TemplateFuncDecl,
+    TemplateFuncCall,
     EntryDecl,
     BindDecl,
     StrictDecl,
@@ -115,6 +117,7 @@ export class AstBuilder extends HopperVisitor {
         const enums = [];
         const aliases = [];
         const templates = [];
+        const templateFunctions = [];
         const binds = [];
         const stricts = [];
         const bitfields = [];
@@ -125,6 +128,7 @@ export class AstBuilder extends HopperVisitor {
             const node = this.visit(decl);
             if (!node) continue;
             if (node.kind === "FunctionDecl")        functions.push(node);
+            else if (node.kind === "TemplateFuncDecl") templateFunctions.push(node);
             else if (node.kind === "StructDecl")     structs.push(node);
             else if (node.kind === "ClassDecl")      classes.push(node);
             else if (node.kind === "EnumDecl")       enums.push(node);
@@ -137,7 +141,7 @@ export class AstBuilder extends HopperVisitor {
             else if (node.kind === "InterfaceDecl")  interfaces.push(node);
         }
 
-        return Program(functions, structs, classes, [], aliases, templates, entry, binds, stricts, bitfields, interfaces, enums);
+        return Program(functions, structs, classes, [], aliases, templates, entry, binds, stricts, bitfields, interfaces, enums, templateFunctions);
     }
 
     visitTopLevelDecl(ctx) {
@@ -484,6 +488,33 @@ export class AstBuilder extends HopperVisitor {
         const params = epl ? epl.param().map(p => Param(p.paramName().getText(), p.type().getText())) : [];
         const isVariadic = epl ? epl.getText().endsWith("...") : false;
         return FunctionDecl(name, params, null, null, true, isVariadic);
+    }
+
+    // ── template functions ──────────────────────────────────────────────────
+
+    visitTemplateFuncDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        // ctx.type() returns array: [0]=typeParam (inside <>), [1]=returnType
+        const types = ctx.type();
+        const typeParam  = types[0].getText();
+        const returnType = types[1].getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
+            : [];
+        const body = this.visit(ctx.block());
+        return TemplateFuncDecl(name, typeParam, params, returnType, body);
+    }
+
+    visitTemplateProcDecl(ctx) {
+        const name = ctx.Identifier().getText();
+        // ctx.type() returns array: [0]=typeParam (inside <>), no return type
+        const types = ctx.type();
+        const typeParam = types[0].getText();
+        const params = ctx.paramList()
+            ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
+            : [];
+        const body = this.visit(ctx.block());
+        return TemplateFuncDecl(name, typeParam, params, null, body);
     }
 
     // ── block / statements ─────────────────────────────────────────────────
@@ -882,6 +913,19 @@ export class AstBuilder extends HopperVisitor {
             }
         }
 
+        // template function call: name<type>(args) — before regular function call check
+        if (idName && childTexts.includes('<') && childTexts.includes('>') && childTexts.includes('(')) {
+            const typeCtxs = ctx.type ? ctx.type() : null;
+            const typeCtx = typeCtxs ? (Array.isArray(typeCtxs) ? typeCtxs[0] : typeCtxs) : null;
+            if (typeCtx) {
+                const typeArg = typeCtx.getText();
+                const args = ctx.argList && ctx.argList()
+                    ? ctx.argList().expression().map(e => this.visit(e))
+                    : [];
+                return TemplateFuncCall(idName, typeArg, args);
+            }
+        }
+
         // function call: name(args) — no dot
         if (idName && childTexts.includes('(')) {
             const args = ctx.argList && ctx.argList()
@@ -1009,6 +1053,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                 ast.functions.unshift(...ifaceAst.functions);
                 ast.enums.unshift(...(ifaceAst.enums || []));
                 ast.classes.unshift(...(ifaceAst.classes || []));
+                ast.templateFunctions.unshift(...(ifaceAst.templateFunctions || []));
             }
 
             // Load implementation file
@@ -1054,6 +1099,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
                 ast.enums.unshift(...(implAst.enums || []));
                 ast.aliases.unshift(...implAst.aliases);
                 ast.templates.unshift(...implAst.templates);
+                ast.templateFunctions.unshift(...(implAst.templateFunctions || []));
                 ast.binds.unshift(...implAst.binds);
                 ast.stricts.unshift(...implAst.stricts);
                 ast.interfaces.unshift(...implAst.interfaces);
@@ -1081,6 +1127,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             ast.enums.unshift(...(importedAst.enums || []));
             ast.aliases.unshift(...importedAst.aliases);
             ast.templates.unshift(...importedAst.templates);
+            ast.templateFunctions.unshift(...(importedAst.templateFunctions || []));
             ast.binds.unshift(...importedAst.binds);
             ast.stricts.unshift(...importedAst.stricts);
             ast.interfaces.unshift(...importedAst.interfaces);

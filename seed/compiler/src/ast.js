@@ -1,7 +1,19 @@
 // Hopper AST node builders
 
-export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = [], interfaces = [], enums = []) {
-    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums };
+export function Program(functions, structs = [], classes = [], consts = [], aliases = [], templates = [], entry = null, binds = [], stricts = [], bitfields = [], interfaces = [], enums = [], templateFunctions = []) {
+    return { kind: "Program", functions, structs, classes, consts, aliases, templates, entry, binds, stricts, bitfields, interfaces, enums, templateFunctions };
+}
+
+// template function specialization — compile-time dispatch by concrete type parameter
+// e.g.  template function cast<int>(address src) int { return int src }
+export function TemplateFuncDecl(name, typeParam, params, returnType, body) {
+    return { kind: "TemplateFuncDecl", name, typeParam, params, returnType, body };
+}
+
+// template function call site — resolved to mangled specialization at compile time
+// e.g.  cast<int>(myPtr)
+export function TemplateFuncCall(name, typeArg, args) {
+    return { kind: "TemplateFuncCall", name, typeArg, args };
 }
 
 // bind — linker directive: place function pointer at hardware address
