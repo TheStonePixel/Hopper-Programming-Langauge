@@ -46,7 +46,7 @@ function shellCapture(address cmd, address outBuf, int maxLen) int {
     while (true) {
         address pp = prefix + pi
         byte b = pp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         address dp = shellCmd + pos
         dp::value = b
@@ -58,7 +58,7 @@ function shellCapture(address cmd, address outBuf, int maxLen) int {
     while (true) {
         address cp = cmd + ci
         byte b = cp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         address dp = shellCmd + pos
         dp::value = b
@@ -71,7 +71,7 @@ function shellCapture(address cmd, address outBuf, int maxLen) int {
     while (true) {
         address sp = suffix + si
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         address dp = shellCmd + pos
         dp::value = b
@@ -101,7 +101,7 @@ function shellCaptureEx(address cmd, address outBuf, int maxLen, address codeBuf
     while (true) {
         address pp = prefix + pi
         byte b = pp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         address dp = shellCmd + pos
         dp::value = b
@@ -113,7 +113,7 @@ function shellCaptureEx(address cmd, address outBuf, int maxLen, address codeBuf
     while (true) {
         address cp = cmd + ci
         byte b = cp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         address dp = shellCmd + pos
         dp::value = b
@@ -126,7 +126,7 @@ function shellCaptureEx(address cmd, address outBuf, int maxLen, address codeBuf
     while (true) {
         address sp = suffix + si
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         address dp = shellCmd + pos
         dp::value = b

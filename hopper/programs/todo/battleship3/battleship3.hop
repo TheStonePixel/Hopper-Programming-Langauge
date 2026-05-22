@@ -135,7 +135,7 @@ function parseDigits(Unique<byte> buf, int start, int count) int {
     int i = start
     while (i < start + count) {
         byte ch = buf.get(i)
-        int d = cast ch
+        int d = cast<int>(ch)
         d = d - 48
         if (d >= 0) {
             if (d <= 9) {
@@ -158,7 +158,7 @@ function playerTurn(Unique<int> board) {
         int i = 0
         while (i < n) {
             byte ch = buf.get(i)
-            int chi = cast ch
+            int chi = cast<int>(ch)
             if (chi == 32) {
                 spaceIdx = i
                 i = n

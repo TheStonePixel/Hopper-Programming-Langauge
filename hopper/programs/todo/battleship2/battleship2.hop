@@ -240,7 +240,7 @@ class Game {
             while (i < n) {
                 address p = buf.ptr() + i
                 byte ch = p::value
-                int chi = cast ch
+                int chi = cast<int>(ch)
                 if (chi == 32) {
                     spaceIdx = i
                     i = n

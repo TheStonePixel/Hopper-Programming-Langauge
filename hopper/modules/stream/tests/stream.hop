@@ -31,7 +31,7 @@ entry main {
     t.checkEq(s.remaining(), 3, "remaining at start")
 
     byte first = s.peek()
-    int firsti = cast first
+    int firsti = cast<int>(first)
     t.checkEq(firsti, 65, "peek first byte")
 
     t.check(!s.atEnd(), "not atEnd")
@@ -41,7 +41,7 @@ entry main {
     t.checkEq(s.remaining(), 2, "remaining after advance")
 
     byte at1 = s.peekAt(1)
-    int at1i = cast at1
+    int at1i = cast<int>(at1)
     t.checkEq(at1i, 67, "peekAt offset 1")
 
     s.advance()
@@ -55,7 +55,7 @@ entry main {
     s.advance()
     s.advance()
     byte z = s.peek()
-    int zi = cast z
+    int zi = cast<int>(z)
     t.checkEq(zi, 0, "peek zero at end")
 
     deallocate buf

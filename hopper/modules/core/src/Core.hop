@@ -6,7 +6,7 @@ function _coreStrLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         n = n + 1
     }
@@ -32,7 +32,7 @@ function _coreWriteInt(int fd, int n) {
     while (n > 0) {
         int d = n % 10
         int dch = d + 48
-        byte db = cast dch
+        byte db = cast<byte>(dch)
         address p = tmp + count
         p::value = db
         count = count + 1
@@ -126,7 +126,7 @@ class StandardCore implements Core {
                 return total
             }
             byte b = tmp::value
-            int bi = cast b
+            int bi = cast<int>(b)
             if (bi == 10) {
                 deallocate tmp
                 return total
@@ -146,7 +146,7 @@ class StandardCore implements Core {
         if (len > 0) {
             address first = buf
             byte fc = first::value
-            int fci = cast fc
+            int fci = cast<int>(fc)
             if (fci == 45) {
                 neg = true
                 i = 1
@@ -155,7 +155,7 @@ class StandardCore implements Core {
         while (i < len) {
             address p = buf + i
             byte b = p::value
-            int bi = cast b
+            int bi = cast<int>(b)
             if (bi >= 48) {
                 if (bi <= 57) {
                     result = result * 10 + (bi - 48)
@@ -226,8 +226,8 @@ class TestSuite {
             address pb = expected + i
             byte ba = pa::value
             byte bb = pb::value
-            int ai = cast ba
-            int bi = cast bb
+            int ai = cast<int>(ba)
+            int bi = cast<int>(bb)
             if (ai != bi) {
                 ok = false
                 break

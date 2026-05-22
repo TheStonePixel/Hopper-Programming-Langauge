@@ -15,7 +15,7 @@ function strLen(address s) int {
     while (!done) {
         address p = s + i
         byte b = p::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0) {
             done = true
         } else {
@@ -37,9 +37,9 @@ entry main(int argc, string[] argv) {
         byte b0 = p0::value
         byte b1 = p1::value
         byte b2 = p2::value
-        int c0 = cast b0
-        int c1 = cast b1
-        int c2 = cast b2
+        int c0 = cast<int>(b0)
+        int c1 = cast<int>(b1)
+        int c2 = cast<int>(b2)
         if (c0 == 45 && c1 == 110 && c2 == 0) {
             noNewline = true
             start = 2

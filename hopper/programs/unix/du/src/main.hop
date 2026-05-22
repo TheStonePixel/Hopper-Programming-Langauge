@@ -20,7 +20,7 @@ function strLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { return n }
         n = n + 1
     }
@@ -42,21 +42,21 @@ function direntReclen(address e) int {
 function direntType(address e) int {
     address tp = e + 18
     byte t = tp::value
-    return cast t
+    return cast<int>(t)
 }
 
 function isDot(address name) bool {
     byte b0 = name::value
-    int i0 = cast b0
+    int i0 = cast<int>(b0)
     if (i0 != 46) { return false }
     address p1 = name + 1
     byte b1 = p1::value
-    int i1 = cast b1
+    int i1 = cast<int>(b1)
     if (i1 == 0) { return true }
     if (i1 != 46) { return false }
     address p2 = name + 2
     byte b2 = p2::value
-    int i2 = cast b2
+    int i2 = cast<int>(b2)
     return i2 == 0
 }
 
@@ -113,7 +113,7 @@ function duPath(address path, int flagS, int flagH, address statbuf) int {
                         }
                         address lp = path + plen - 1
                         byte lb = lp::value
-                        int lbi = cast lb
+                        int lbi = cast<int>(lb)
                         if (lbi != 47) {
                             address slashp = pathbuf + plen
                             byte slash = 47
@@ -130,7 +130,7 @@ function duPath(address path, int flagS, int flagH, address statbuf) int {
                             ni = ni + 1
                         }
                         address termp = pathbuf + ci + nlen
-                        byte nul = cast 0
+                        byte nul = cast<byte>(0)
                         termp::value = nul
 
                         if (dtype == 4) {
@@ -172,14 +172,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast a0
+        int a0i = cast<int>(a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast fc
+                int fci = cast<int>(fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 115) {
@@ -201,7 +201,7 @@ entry main(int argc, string[] argv) {
     address statbuf = allocate Limits.STATBUF
 
     if (pathStart == argc) {
-        address dot = cast "."
+        address dot = cast<address>(".")
         int total = duPath(dot, flagS, flagH, statbuf)
         if (flagH != 0) {
             printHuman(total)

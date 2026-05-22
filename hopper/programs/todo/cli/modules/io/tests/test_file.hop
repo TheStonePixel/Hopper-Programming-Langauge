@@ -23,7 +23,7 @@ entry main(int argc, address argv) {
         if (n > 0) {
             address last = buf + (n - 1)
             byte lb = last::value
-            int li = cast lb
+            int li = cast<int>(lb)
             if (li == '\n') {
                 n = n - 1
             }

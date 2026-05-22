@@ -66,7 +66,7 @@ class OutputBuf {
     // Append a single byte value (as int for convenience).
     function appendByte(int bi) {
         if (self.length + 1 > self.capacity) { self._grow(self.length + 2) }
-        byte b = cast bi
+        byte b = cast<byte>(bi)
         address p = self.data + self.length
         p::value = b
         self.length = self.length + 1
@@ -78,7 +78,7 @@ class OutputBuf {
         while (true) {
             address p = src + i
             byte b = p::value
-            int bv = cast b
+            int bv = cast<int>(b)
             if (bv == 0) { break }
             self.appendByte(bv)
             i = i + 1
@@ -101,7 +101,7 @@ class OutputBuf {
         while (v > 0) {
             int d = v - (v / 10) * 10
             int dch = d + 48
-            byte db = cast dch
+            byte db = cast<byte>(dch)
             address tp = tmp + count
             tp::value = db
             count = count + 1
@@ -111,7 +111,7 @@ class OutputBuf {
         while (i >= 0) {
             address tp = tmp + i
             byte b = tp::value
-            int bv = cast b
+            int bv = cast<int>(b)
             self.appendByte(bv)
             i = i - 1
         }
@@ -130,16 +130,16 @@ function direntReclen(address e) int {
 function isDotEntry(address e) bool {
     address np = e + 19
     byte b0 = np::value
-    int i0 = cast b0
+    int i0 = cast<int>(b0)
     if (i0 != 46) { return false }
     address np1 = np + 1
     byte b1 = np1::value
-    int i1 = cast b1
+    int i1 = cast<int>(b1)
     if (i1 == 0)  { return true }
     if (i1 != 46) { return false }
     address np2 = np + 2
     byte b2 = np2::value
-    int i2 = cast b2
+    int i2 = cast<int>(b2)
     return i2 == 0
 }
 
@@ -150,7 +150,7 @@ function isAllDigits(address s) bool {
     while (true) {
         address p = s + i
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0)  { return i > 0 }
         if (bi < 48)  { return false }
         if (bi > 57)  { return false }
@@ -165,7 +165,7 @@ function strToInt(address s) int {
     while (true) {
         address p = s + i
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi < 48 || bi > 57) { return n }
         n = n * 10 + (bi - 48)
         i = i + 1
@@ -176,10 +176,10 @@ function strToInt(address s) int {
 // Write decimal integer n into dst. Returns number of digits written.
 function intToAddr(int n, address dst) int {
     if (n == 0) {
-        byte z = cast 48
+        byte z = cast<byte>(48)
         dst::value = z
         address ep = dst + 1
-        byte nul = cast 0
+        byte nul = cast<byte>(0)
         ep::value = nul
         return 1
     }
@@ -188,7 +188,7 @@ function intToAddr(int n, address dst) int {
     int v = n
     while (v > 0) {
         int d = v % 10
-        byte db = cast (d + 48)
+        byte db = cast<byte>((d + 48))
         address tp = tmp + len
         tp::value = db
         v = v / 10
@@ -203,7 +203,7 @@ function intToAddr(int n, address dst) int {
         i = i + 1
     }
     address ep = dst + len
-    byte nul = cast 0
+    byte nul = cast<byte>(0)
     ep::value = nul
     deallocate tmp
     return len
@@ -212,12 +212,12 @@ function intToAddr(int n, address dst) int {
 // Build /proc/<pid>/stat into pathBuf.
 function buildStatPath(int pid, address pathBuf) {
     // "/proc/"
-    address prefix = cast "/proc/"
+    address prefix = cast<address>("/proc/")
     int i = 0
     while (true) {
         address sp = prefix + i
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         address dp = pathBuf + i
         dp::value = b
         if (bi == 0) { break }
@@ -227,12 +227,12 @@ function buildStatPath(int pid, address pathBuf) {
     int pidLen = intToAddr(pid, pathBuf + i)
     i = i + pidLen
     // "/stat"
-    address suffix = cast "/stat"
+    address suffix = cast<address>("/stat")
     int j = 0
     while (true) {
         address sp = suffix + j
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         address dp = pathBuf + i + j
         dp::value = b
         if (bi == 0) { break }
@@ -242,7 +242,7 @@ function buildStatPath(int pid, address pathBuf) {
 
 // Open path, read into buf, close. Returns bytes read or -1.
 function readFile(address pathBuf, address buf, int maxLen) int {
-    string ps = cast pathBuf
+    string ps = cast<string>(pathBuf)
     int fd = open(ps, 0, 0)
     if (fd < 0) { return -1 }
     int n = read(fd, buf, maxLen)
@@ -250,7 +250,7 @@ function readFile(address pathBuf, address buf, int maxLen) int {
     if (n < 0) { return -1 }
     if (n < maxLen) {
         address ep = buf + n
-        byte z = cast 0
+        byte z = cast<byte>(0)
         ep::value = z
     }
     return n
@@ -262,7 +262,7 @@ function nextField(address buf, int pos) int {
     while (true) {
         address p = buf + pos
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0 || bi == 32 || bi == 10 || bi == 9) { break }
         pos = pos + 1
     }
@@ -270,7 +270,7 @@ function nextField(address buf, int pos) int {
     while (true) {
         address p = buf + pos
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0 || (bi != 32 && bi != 10 && bi != 9)) { return pos }
         pos = pos + 1
     }
@@ -282,7 +282,7 @@ function parseIntAt(address buf, int pos) int {
     bool neg = false
     address p0 = buf + pos
     byte b0 = p0::value
-    int bi0 = cast b0
+    int bi0 = cast<int>(b0)
     if (bi0 == 45) {
         neg = true
         pos = pos + 1
@@ -291,7 +291,7 @@ function parseIntAt(address buf, int pos) int {
     while (true) {
         address p = buf + pos
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi < 48 || bi > 57) { break }
         n = n * 10 + (bi - 48)
         pos = pos + 1
@@ -302,16 +302,16 @@ function parseIntAt(address buf, int pos) int {
 
 // True if buf[pos..] starts with the null-terminated string pat.
 function matchesAt(address buf, int pos, string pat) bool {
-    address pp = cast pat
+    address pp = cast<address>(pat)
     int i = 0
     while (true) {
         address pp2 = pp + i
         byte pb = pp2::value
-        int pbi = cast pb
+        int pbi = cast<int>(pb)
         if (pbi == 0) { return true }
         address bp = buf + pos + i
         byte bb = bp::value
-        int bbi = cast bb
+        int bbi = cast<int>(bb)
         if (bbi != pbi) { return false }
         i = i + 1
     }
@@ -326,7 +326,7 @@ function parseProcStat(address buf, int n, address utimeOut, address stimeOut, a
     while (closeP > 0) {
         address p = buf + closeP
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 41) { break }   // ')'
         closeP = closeP - 1
     }
@@ -336,7 +336,7 @@ function parseProcStat(address buf, int n, address utimeOut, address stimeOut, a
     while (openP < closeP) {
         address p = buf + openP
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 40) { break }   // '('
         openP = openP + 1
     }
@@ -354,7 +354,7 @@ function parseProcStat(address buf, int n, address utimeOut, address stimeOut, a
         k = k + 1
     }
     address nulp = nameDst + nameLen
-    byte nul = cast 0
+    byte nul = cast<byte>(0)
     nulp::value = nul
 
     // Parse fields after ')'
@@ -364,7 +364,7 @@ function parseProcStat(address buf, int n, address utimeOut, address stimeOut, a
     pos = nextField(buf, pos)
     address sp2 = buf + pos
     byte state = sp2::value
-    int stateInt = cast state
+    int stateInt = cast<int>(state)
     stateOut::value = stateInt
     pos = pos + 1
 
@@ -437,7 +437,7 @@ function parseMemInfo(address buf, int n, address totalKBOut, address availKBOut
         while (pos < n) {
             address p = buf + pos
             byte b = p::value
-            int bi = cast b
+            int bi = cast<int>(b)
             pos = pos + 1
             if (bi == 10) { break }
         }
@@ -505,7 +505,7 @@ class Monitor {
     }
 
     function collectProcs(address readBuf, address pathBuf, address dirBuf) {
-        string procPath = cast "/proc"
+        string procPath = cast<string>("/proc")
         int procFd = open(procPath, 0, 0)
         if (procFd < 0) { return }
         int dirN = getdents64(procFd, dirBuf, 65536)
@@ -539,12 +539,12 @@ class Monitor {
 
             parseProcStat(readBuf, n, utime::address, stime::address, vsizeKB::address, rssKB::address, state::address, nameBuf)
 
-            address pidA    = cast pid
-            address utimeA  = cast utime
-            address stimeA  = cast stime
-            address vsizeA  = cast vsizeKB
-            address rssKBA  = cast rssKB
-            address stateA  = cast state
+            address pidA = cast<address>(pid)
+            address utimeA = cast<address>(utime)
+            address stimeA = cast<address>(stime)
+            address vsizeA = cast<address>(vsizeKB)
+            address rssKBA = cast<address>(rssKB)
+            address stateA = cast<address>(state)
             self.pids.push(pidA)
             self.ut.push(utimeA)
             self.st.push(stimeA)
@@ -552,14 +552,14 @@ class Monitor {
             self.rssKB.push(rssKBA)
             self.states.push(stateA)
             self.names.push(nameBuf)
-            address zero = cast 0
+            address zero = cast<address>(0)
             self.cpu10.push(zero)
         }
     }
 
     function computeCPU(address readBuf, address pathBuf) {
         // System-wide CPU
-        address statPath = cast "/proc/stat"
+        address statPath = cast<address>("/proc/stat")
         int n = readFile(statPath, readBuf, 65536)
         if (n > 0) {
             int totalCPU = 0
@@ -580,17 +580,17 @@ class Monitor {
         int i = 0
         while (i < count) {
             address pidA = self.pids.get(i)
-            int pid = cast pidA
+            int pid = cast<int>(pidA)
             address utA = self.ut.get(i)
-            int utv = cast utA
+            int utv = cast<int>(utA)
             address stA = self.st.get(i)
-            int stv = cast stA
+            int stv = cast<int>(stA)
             int curr = utv + stv
             int prev = 0
-            address pidKey = cast pid
+            address pidKey = cast<address>(pid)
             if (self.prevTicks.contains(pidKey)) {
                 address prevA = self.prevTicks.get(pidKey)
-                prev = cast prevA
+                prev = cast<int>(prevA)
             }
             int delta = curr - prev
             if (delta < 0) { delta = 0 }
@@ -600,16 +600,16 @@ class Monitor {
                 c10 = delta * 1000 / (dTot / 100)
                 if (c10 > 9999) { c10 = 9999 }
             }
-            address c10A = cast c10
+            address c10A = cast<address>(c10)
             self.cpu10.set(i, c10A)
-            address currA = cast curr
+            address currA = cast<address>(curr)
             self.prevTicks.set(pidKey, currA)
             i = i + 1
         }
     }
 
     function readMem(address readBuf) {
-        address memPath = cast "/proc/meminfo"
+        address memPath = cast<address>("/proc/meminfo")
         int n = readFile(memPath, readBuf, 8192)
         if (n > 0) {
             int tmpTotal = 0
@@ -626,7 +626,7 @@ class Monitor {
         int n = self.pids.len()
         int i = 0
         while (i < n) {
-            address ia = cast i
+            address ia = cast<address>(i)
             self.order.push(ia)
             i = i + 1
         }
@@ -637,12 +637,12 @@ class Monitor {
             while (j < n - 1) {
                 address aA = self.order.get(j)
                 address bA = self.order.get(j + 1)
-                int a = cast aA
-                int b = cast bA
+                int a = cast<int>(aA)
+                int b = cast<int>(bA)
                 address acpuA = self.cpu10.get(a)
                 address bcpuA = self.cpu10.get(b)
-                int acpu = cast acpuA
-                int bcpu = cast bcpuA
+                int acpu = cast<int>(acpuA)
+                int bcpu = cast<int>(bcpuA)
                 if (acpu < bcpu) {
                     self.order.set(j, bA)
                     self.order.set(j + 1, aA)
@@ -669,7 +669,7 @@ class Monitor {
         while (i < len) {
             address tp = tmp + i
             byte b = tp::value
-            int bi = cast b
+            int bi = cast<int>(b)
             self.out.appendByte(bi)
             i = i + 1
         }
@@ -743,7 +743,7 @@ class Monitor {
         if (filled > 20) { filled = 20 }
         if (filled < 0)  { filled = 0 }
         self.out.appendLiteral("\x1b[0m")
-        address fc = cast fillColor
+        address fc = cast<address>(fillColor)
         self.out.appendLiteral(fc)
         int i = 0
         while (i < filled) {
@@ -806,15 +806,15 @@ class Monitor {
         int i = 0
         while (i < count && shown < 35) {
             address idxA = self.order.get(i)
-            int idx = cast idxA
+            int idx = cast<int>(idxA)
             address pidA = self.pids.get(idx)
-            int pid = cast pidA
+            int pid = cast<int>(pidA)
             address c10A = self.cpu10.get(idx)
-            int c10 = cast c10A
+            int c10 = cast<int>(c10A)
             address rssA = self.rssKB.get(idx)
-            int rss = cast rssA
+            int rss = cast<int>(rssA)
             address stA = self.states.get(idx)
-            int st = cast stA
+            int st = cast<int>(stA)
             address nm = self.names.get(idx)
 
             self.appendPadded(pid, 6)
@@ -832,7 +832,7 @@ class Monitor {
             while (ni < 22) {
                 address np = nm + ni
                 byte nb = np::value
-                int nbi = cast nb
+                int nbi = cast<int>(nb)
                 if (nbi == 0) { break }
                 self.out.appendByte(nbi)
                 ni = ni + 1
@@ -857,7 +857,7 @@ class Monitor {
         address dirBuf  = allocate 65536
 
         // Hide cursor
-        address hideCursor = cast "\x1b[?25l"
+        address hideCursor = cast<address>("\x1b[?25l")
         write(1, hideCursor, 6)
 
         while (true) {
@@ -873,7 +873,7 @@ class Monitor {
             ts::value = 1
             address nsp = ts + 8
             nsp::value = 0
-            address nullPtr = cast 0
+            address nullPtr = cast<address>(0)
             nanosleep(ts, nullPtr)
             deallocate ts
         }

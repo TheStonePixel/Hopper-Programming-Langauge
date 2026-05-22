@@ -24,7 +24,7 @@ function _patIsLit(address pat) bool {
     while (true) {
         address p = pat + i
         byte b = p::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0)  { return true }
         if (c == 46) { return false }
         if (c == 42) { return false }
@@ -45,7 +45,7 @@ function _patLen(address pat) int {
     while (true) {
         address p = pat + n
         byte b = p::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0) { return n }
         n = n + 1
     }
@@ -86,7 +86,7 @@ function strLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { return n }
         n = n + 1
     }
@@ -112,7 +112,7 @@ function strAppend(address src, address dst, int off) int {
     while (true) {
         address sp = src + i
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { return off + i }
         address dp = dst + off + i
         dp::value = b
@@ -126,9 +126,9 @@ function strLower(address s, int len) {
     while (i < len) {
         address p = s + i
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi >= 65 && bi <= 90) {
-            byte lo = cast (bi + 32)
+            byte lo = cast<byte>((bi + 32))
             p::value = lo
         }
         i = i + 1
@@ -144,22 +144,22 @@ function direntReclen(address e) int {
 function direntType(address e) int {
     address tp = e + 18
     byte t = tp::value
-    return cast t
+    return cast<int>(t)
 }
 
 function direntIsDot(address e) bool {
     address np = e + 19
     byte b0 = np::value
-    int i0 = cast b0
+    int i0 = cast<int>(b0)
     if (i0 != 46) { return false }
     address np1 = np + 1
     byte b1 = np1::value
-    int i1 = cast b1
+    int i1 = cast<int>(b1)
     if (i1 == 0) { return true }
     if (i1 != 46) { return false }
     address np2 = np + 2
     byte b2 = np2::value
-    int i2 = cast b2
+    int i2 = cast<int>(b2)
     return i2 == 0
 }
 
@@ -169,9 +169,9 @@ function lowerRegion(address buf, int start, int len) {
     while (k < len) {
         address p = buf + start + k
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi >= 65 && bi <= 90) {
-            byte lo = cast (bi + 32)
+            byte lo = cast<byte>((bi + 32))
             p::value = lo
         }
         k = k + 1
@@ -203,7 +203,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
             if (plen > 0) {
                 address pp0 = pat
                 byte pfb = pp0::value
-                pfc = cast pfb
+                pfc = cast<int>(pfb)
                 pfc = pfc & 0xFF
             }
         }
@@ -304,7 +304,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                     address matchFrom = chunk + lineStart
                                     address nlp = chunk + ci + pos
                                     byte savedNL = nlp::value
-                                    byte nulB = cast 0
+                                    byte nulB = cast<byte>(0)
                                     nlp::value = nulB
                                     printf("%s\n", matchFrom)
                                     nlp::value = savedNL
@@ -326,7 +326,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                 k = k + 1
                             }
                             address term = lineBuf + lineLen
-                            byte nul = cast 0
+                            byte nul = cast<byte>(0)
                             term::value = nul
                             bool m = re.matchAt(pat, lineBuf)
                             if (flagV != 0) { m = !m }
@@ -372,12 +372,12 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                     while (k < 16) {
                                         address sp = chunk + ci + k
                                         byte sb = sp::value
-                                        int sbi = cast sb
+                                        int sbi = cast<int>(sb)
                                         address dlp = lineBuf + lineLen + k
                                         dlp::value = sb
                                         int blo = sbi
                                         if (blo >= 65 && blo <= 90) { blo = blo + 32 }
-                                        byte bloB = cast blo
+                                        byte bloB = cast<byte>(blo)
                                         address dlw = lowBuf + lineLen + k
                                         dlw::value = bloB
                                         k = k + 1
@@ -395,7 +395,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                             address matchFrom = chunk + lineStart
                             address nlp = chunk + ci + pos
                             byte savedNL = nlp::value
-                            byte nulB = cast 0
+                            byte nulB = cast<byte>(0)
                             nlp::value = nulB
                             bool m = re.matchAt(pat, matchFrom)
                             if (flagV != 0) { m = !m }
@@ -420,13 +420,13 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                 if (lineLen < Limits.LINE_MAX - 1) {
                                     address sp = chunk + ci + k
                                     byte sb = sp::value
-                                    int sbi = cast sb
+                                    int sbi = cast<int>(sb)
                                     address dlp = lineBuf + lineLen
                                     dlp::value = sb
                                     if (flagI != 0) {
                                         int blo = sbi
                                         if (blo >= 65 && blo <= 90) { blo = blo + 32 }
-                                        byte bloB = cast blo
+                                        byte bloB = cast<byte>(blo)
                                         address dlw = lowBuf + lineLen
                                         dlw::value = bloB
                                     }
@@ -435,7 +435,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                 k = k + 1
                             }
                             address term = lineBuf + lineLen
-                            byte nul = cast 0
+                            byte nul = cast<byte>(0)
                             term::value = nul
                             if (flagI != 0) {
                                 address lt = lowBuf + lineLen
@@ -470,7 +470,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
             while (ci < nr) {
                 address cp = chunk + ci
                 byte b = cp::value
-                int bi = cast b
+                int bi = cast<int>(b)
                 if (bi == 10) {
                     lineNum = lineNum + 1
                     if (lineStart >= 0) {
@@ -490,7 +490,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                                     address matchFrom = chunk + lineStart
                                     address nlp = chunk + ci
                                     byte savedNL = nlp::value
-                                    byte nulB = cast 0
+                                    byte nulB = cast<byte>(0)
                                     nlp::value = nulB
                                     printf("%s\n", matchFrom)
                                     nlp::value = savedNL
@@ -502,7 +502,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                             address matchFrom = chunk + lineStart
                             address nlp = chunk + ci
                             byte savedNL = nlp::value
-                            byte nulB = cast 0
+                            byte nulB = cast<byte>(0)
                             nlp::value = nulB
                             bool m = re.matchAt(pat, matchFrom)
                             if (flagV != 0) { m = !m }
@@ -524,7 +524,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                         }
                     } else {
                         address term = lineBuf + lineLen
-                        byte nul = cast 0
+                        byte nul = cast<byte>(0)
                         term::value = nul
                         if (flagI != 0) {
                             address lt = lowBuf + lineLen
@@ -567,7 +567,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
                             if (flagI != 0) {
                                 int blo = bi
                                 if (blo >= 65 && blo <= 90) { blo = blo + 32 }
-                                byte bloB = cast blo
+                                byte bloB = cast<byte>(blo)
                                 address dp = lowBuf + lineLen
                                 dp::value = bloB
                             }
@@ -598,7 +598,7 @@ function grepFd(StandardRegex re, address pat, int fd, address name, int flags, 
     if (lineLen > 0) {
         lineNum = lineNum + 1
         address term = lineBuf + lineLen
-        byte nul = cast 0
+        byte nul = cast<byte>(0)
         term::value = nul
         if (flagI != 0) {
             address lt = lowBuf + lineLen
@@ -683,17 +683,17 @@ function collectFiles(address pathStr, address filePtrs, address countPtr, int f
                         if (coff > 0) {
                             address last = child + coff - 1
                             byte lb = last::value
-                            int lbi = cast lb
+                            int lbi = cast<int>(lb)
                             if (lbi != 47) {
                                 address slashp = child + coff
-                                byte slash = cast 47
+                                byte slash = cast<byte>(47)
                                 slashp::value = slash
                                 coff = coff + 1
                             }
                         }
                         coff = strAppend(name, child, coff)
                         address termp = child + coff
-                        byte nul = cast 0
+                        byte nul = cast<byte>(0)
                         termp::value = nul
 
                         if (dtype == 8) {
@@ -731,14 +731,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc && patIdx == 0) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast a0
+        int a0i = cast<int>(a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast fc
+                int fci = cast<int>(fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 110) {
@@ -791,7 +791,7 @@ entry main(int argc, string[] argv) {
     }
 
     if (fileCount == 0) {
-        address stdinStr = cast "stdin"
+        address stdinStr = cast<address>("stdin")
         grepFd(re, pat, 0, stdinStr, flags, 0)
     } else {
         int showName = 0

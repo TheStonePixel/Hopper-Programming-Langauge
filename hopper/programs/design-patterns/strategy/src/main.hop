@@ -50,7 +50,7 @@ class Validator {
     }
 
     function check(int value) int {
-        callback(int) int fn = cast self.strategy
+        callback(int) int fn = cast<address>(self.strategy)
         return fn(value)
     }
 
@@ -58,9 +58,9 @@ class Validator {
         int passed = 0
         int i = 0
         while (i < values.len()) {
-            callback(int) int fn = cast self.strategy
+            callback(int) int fn = cast<address>(self.strategy)
             address _a = values.get(i)
-            int val = cast _a
+            int val = cast<int>(_a)
             passed = passed + fn(val)
             i = i + 1
         }
@@ -72,19 +72,19 @@ class Validator {
 
 entry main {
     StandardArray nums = StandardArray(8)
-    address _n0 = cast -5
+    address _n0 = cast<address>(-5)
     nums.push(_n0)
-    address _n1 = cast 0
+    address _n1 = cast<address>(0)
     nums.push(_n1)
-    address _n2 = cast 3
+    address _n2 = cast<address>(3)
     nums.push(_n2)
-    address _n3 = cast 8
+    address _n3 = cast<address>(8)
     nums.push(_n3)
-    address _n4 = cast -2
+    address _n4 = cast<address>(-2)
     nums.push(_n4)
-    address _n5 = cast 12
+    address _n5 = cast<address>(12)
     nums.push(_n5)
-    address _n6 = cast 7
+    address _n6 = cast<address>(7)
     nums.push(_n6)
 
     int n = nums.len()

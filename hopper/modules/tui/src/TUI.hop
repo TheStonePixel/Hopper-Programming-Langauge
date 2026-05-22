@@ -29,10 +29,10 @@ function _tuiReadU32(address p) int {
     byte b2 = p2::value
     address p3 = p + 3
     byte b3 = p3::value
-    int i0 = cast b0
-    int i1 = cast b1
-    int i2 = cast b2
-    int i3 = cast b3
+    int i0 = cast<int>(b0)
+    int i1 = cast<int>(b1)
+    int i2 = cast<int>(b2)
+    int i3 = cast<int>(b3)
     return i0 | (i1 << 8) | (i2 << 16) | (i3 << 24)
 }
 
@@ -41,10 +41,10 @@ function _tuiWriteU32(address p, int val) {
     int v1 = (val >> 8) & 255
     int v2 = (val >> 16) & 255
     int v3 = (val >> 24) & 255
-    byte b0 = cast v0
-    byte b1 = cast v1
-    byte b2 = cast v2
-    byte b3 = cast v3
+    byte b0 = cast<byte>(v0)
+    byte b1 = cast<byte>(v1)
+    byte b2 = cast<byte>(v2)
+    byte b3 = cast<byte>(v3)
     address p1 = p + 1
     address p2 = p + 2
     address p3 = p + 3
@@ -58,8 +58,8 @@ function _tuiReadU16(address p) int {
     byte lo = p::value
     address ph = p + 1
     byte hi = ph::value
-    int li = cast lo
-    int hi2 = cast hi
+    int li = cast<int>(lo)
+    int hi2 = cast<int>(hi)
     return li | (hi2 << 8)
 }
 
@@ -68,7 +68,7 @@ function _tuiStrLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { break }
         n = n + 1
     }
@@ -183,7 +183,7 @@ class StandardTUI implements TUI {
         while (true) {
             address p = s + i
             byte b = p::value
-            int bi = cast b
+            int bi = cast<int>(b)
             if (bi == 0) { break }
             self._outByte(b)
             i = i + 1
@@ -201,7 +201,7 @@ class StandardTUI implements TUI {
         while (n > 0) {
             int d = n % 10
             int dch = d + 48
-            byte db = cast dch
+            byte db = cast<byte>(dch)
             address p = tmp + count
             p::value = db
             count = count + 1
@@ -373,7 +373,7 @@ class StandardTUI implements TUI {
         }
 
         byte b = buf::value
-        int bi = cast b
+        int bi = cast<int>(b)
 
         if (bi == 3) {
             deallocate buf
@@ -415,7 +415,7 @@ class StandardTUI implements TUI {
             return Key(4, 0)
         }
         byte b2 = buf::value
-        int b2i = cast b2
+        int b2i = cast<int>(b2)
         if (b2i != 91) {
             deallocate buf
             return Key(4, 0)
@@ -427,7 +427,7 @@ class StandardTUI implements TUI {
             return Key(4, 0)
         }
         byte b3 = buf::value
-        int b3i = cast b3
+        int b3i = cast<int>(b3)
 
         if (b3i == 65) {
             deallocate buf

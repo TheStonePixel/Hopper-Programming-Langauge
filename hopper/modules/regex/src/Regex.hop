@@ -24,19 +24,19 @@ function _simd16pair(address ptr, int pbc) int {
 function _atomLen(address pat) int {
     address p0 = pat + 0
     byte b0 = p0::value
-    int c0 = cast b0
+    int c0 = cast<int>(b0)
     if (c0 == 91) {
         int i = 1
         if (true) {
             address pi = pat + i
             byte bi = pi::value
-            int ci = cast bi
+            int ci = cast<int>(bi)
             if (ci == 94) { i = i + 1 }
         }
         while (true) {
             address pi = pat + i
             byte bi = pi::value
-            int ci = cast bi
+            int ci = cast<int>(bi)
             if (ci == 0)  { return i }
             if (ci == 93) { return i + 1 }
             i = i + 1
@@ -47,10 +47,10 @@ function _atomLen(address pat) int {
 }
 
 function _matchClass(address pat, byte c) bool {
-    int cv = cast c
+    int cv = cast<int>(c)
     address p0 = pat + 0
     byte b0 = p0::value
-    int c0 = cast b0
+    int c0 = cast<int>(b0)
     bool negate = false
     int i = 0
     if (c0 == 94) {
@@ -60,15 +60,15 @@ function _matchClass(address pat, byte c) bool {
     while (true) {
         address pi = pat + i
         byte bi = pi::value
-        int ci = cast bi
+        int ci = cast<int>(bi)
         if (ci == 0)  { return negate }
         if (ci == 93) { return negate }
         address pi1 = pat + i + 1
         byte bi1 = pi1::value
-        int ci1 = cast bi1
+        int ci1 = cast<int>(bi1)
         address pi2 = pat + i + 2
         byte bi2 = pi2::value
-        int ci2 = cast bi2
+        int ci2 = cast<int>(bi2)
         if (ci1 == 45) {
             if (ci2 != 93) {
                 if (cv >= ci) {
@@ -97,10 +97,10 @@ function _matchClass(address pat, byte c) bool {
 }
 
 function _matchOne(address pat, byte c) bool {
-    int cv = cast c
+    int cv = cast<int>(c)
     address p0 = pat + 0
     byte b0 = p0::value
-    int c0 = cast b0
+    int c0 = cast<int>(b0)
     if (c0 == 46) { return cv != 10 }
     if (c0 == 91) {
         address inner = pat + 1
@@ -109,7 +109,7 @@ function _matchOne(address pat, byte c) bool {
     if (c0 == 92) {
         address p1 = pat + 1
         byte b1 = p1::value
-        int c1 = cast b1
+        int c1 = cast<int>(b1)
         if (c1 == 100) {
             if (cv >= 48) { if (cv <= 57) { return true } }
             return false
@@ -158,7 +158,7 @@ function _matchStar(address pat, address text, bool plus) bool {
     while (true) {
         address tp = text + i
         byte tb = tp::value
-        int tc = cast tb
+        int tc = cast<int>(tb)
         if (tc == 0) { break }
         if (_matchOne(pat, tb) == false) { break }
         i = i + 1
@@ -182,29 +182,29 @@ function _matchStar(address pat, address text, bool plus) bool {
 function _matchHere(address pat, address text) bool {
     address p0 = pat + 0
     byte b0 = p0::value
-    int c0 = cast b0
+    int c0 = cast<int>(b0)
     if (c0 == 0) { return true }
     if (c0 == 36) {
         address p1 = pat + 1
         byte b1 = p1::value
-        int c1 = cast b1
+        int c1 = cast<int>(b1)
         if (c1 == 0) {
             address t0 = text + 0
             byte tb = t0::value
-            int tc = cast tb
+            int tc = cast<int>(tb)
             return tc == 0
         }
     }
     int alen = _atomLen(pat)
     address quantifier = pat + alen
     byte qb = quantifier::value
-    int qc = cast qb
+    int qc = cast<int>(qb)
     if (qc == 42) { return _matchStar(pat, text, false) }
     if (qc == 43) { return _matchStar(pat, text, true)  }
     if (qc == 63) {
         address t0 = text + 0
         byte tb = t0::value
-        int tc = cast tb
+        int tc = cast<int>(tb)
         address nextPat = pat + alen + 1
         if (tc != 0) {
             if (_matchOne(pat, tb)) {
@@ -216,7 +216,7 @@ function _matchHere(address pat, address text) bool {
     }
     address t0 = text + 0
     byte tb = t0::value
-    int tc = cast tb
+    int tc = cast<int>(tb)
     if (tc == 0) { return false }
     if (_matchOne(pat, tb) == false) { return false }
     address nextPat  = pat  + alen
@@ -231,7 +231,7 @@ function _isLitPat(address pat) bool {
     while (true) {
         address p = pat + i
         byte b = p::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0)  { return true }
         if (c == 46) { return false }
         if (c == 42) { return false }
@@ -251,7 +251,7 @@ function _litLen(address pat) int {
     while (true) {
         address p = pat + n
         byte b = p::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0) { return n }
         n = n + 1
     }
@@ -264,7 +264,7 @@ function _litSearch(address pat, int plen, address text) int {
     if (plen == 0) { return 0 }
     address pp0 = pat
     byte pfb = pp0::value
-    int pfs = cast pfb
+    int pfs = cast<int>(pfb)
     int pfu = pfs & 0xFF
     int pbc = pfu * 0x01010101
 
@@ -281,7 +281,7 @@ function _litSearch(address pat, int plen, address text) int {
             while (j < 16) {
                 address tp2 = text + i + j
                 byte tb = tp2::value
-                int tc = cast tb
+                int tc = cast<int>(tb)
                 if (tc == 0) { return -1 }
                 if (tb == pfb) {
                     bool ok = true
@@ -343,7 +343,7 @@ class StandardRegex implements Regex {
         }
         address p0 = pattern + 0
         byte b0 = p0::value
-        int c0 = cast b0
+        int c0 = cast<int>(b0)
         if (c0 == 94) {
             address inner = pattern + 1
             return _matchHere(inner, text)
@@ -359,7 +359,7 @@ class StandardRegex implements Regex {
         }
         address p0 = pattern + 0
         byte b0 = p0::value
-        int c0 = cast b0
+        int c0 = cast<int>(b0)
         if (c0 == 94) {
             address inner = pattern + 1
             if (_matchHere(inner, text)) { return 0 }
@@ -369,7 +369,7 @@ class StandardRegex implements Regex {
         while (true) {
             address tp = text + i
             byte tb = tp::value
-            int tc = cast tb
+            int tc = cast<int>(tb)
             if (_matchHere(pattern, tp)) { return i }
             if (tc == 0) { break }
             i = i + 1

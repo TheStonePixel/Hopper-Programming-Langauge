@@ -36,7 +36,7 @@ function shmat(int shmid, address shmaddr, int shmflg) address {
         syscall
         result = rax
     }
-    address r = cast result
+    address r = cast<address>(result)
     return r
 }
 

@@ -18,33 +18,33 @@ function expandSet(address set, address table) {
     while (true) {
         address sp = set + i
         byte b = sp::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0) { return }
         address sp1 = set + i + 1
         byte b1 = sp1::value
-        int c1 = cast b1
+        int c1 = cast<int>(b1)
         if (c1 == 45) {
             address sp2 = set + i + 2
             byte b2 = sp2::value
-            int c2 = cast b2
+            int c2 = cast<int>(b2)
             if (c2 > c) {
                 int r = c
                 while (r <= c2) {
                     address tp = table + r
-                    byte one = cast 1
+                    byte one = cast<byte>(1)
                     tp::value = one
                     r = r + 1
                 }
                 i = i + 3
             } else {
                 address tp = table + c
-                byte one = cast 1
+                byte one = cast<byte>(1)
                 tp::value = one
                 i = i + 1
             }
         } else {
             address tp = table + c
-            byte one = cast 1
+            byte one = cast<byte>(1)
             tp::value = one
             i = i + 1
         }
@@ -58,20 +58,20 @@ function expandSeq(address set, address seq) int {
     while (true) {
         address sp = set + i
         byte b = sp::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0) { return n }
         address sp1 = set + i + 1
         byte b1 = sp1::value
-        int c1 = cast b1
+        int c1 = cast<int>(b1)
         if (c1 == 45) {
             address sp2 = set + i + 2
             byte b2 = sp2::value
-            int c2 = cast b2
+            int c2 = cast<int>(b2)
             if (c2 > c) {
                 int r = c
                 while (r <= c2) {
                     address op = seq + n
-                    byte rb = cast r
+                    byte rb = cast<byte>(r)
                     op::value = rb
                     n = n + 1
                     r = r + 1
@@ -102,14 +102,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast a0
+        int a0i = cast<int>(a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast fc
+                int fci = cast<int>(fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 100) {
@@ -151,10 +151,10 @@ entry main(int argc, string[] argv) {
                 while (i < nr) {
                     address ip = inbuf + i
                     byte b = ip::value
-                    int bi = cast b
+                    int bi = cast<int>(b)
                     address dt = dtable + bi
                     byte dv = dt::value
-                    int dvi = cast dv
+                    int dvi = cast<int>(dv)
                     if (dvi == 0) {
                         address op = outbuf + outpos
                         op::value = b
@@ -177,7 +177,7 @@ entry main(int argc, string[] argv) {
         int ti = 0
         while (ti < 256) {
             address tp = ttable + ti
-            byte tib = cast ti
+            byte tib = cast<byte>(ti)
             tp::value = tib
             ti = ti + 1
         }
@@ -185,7 +185,7 @@ entry main(int argc, string[] argv) {
         while (ti < n1 && n2 > 0) {
             address s1p = seq1 + ti
             byte c1 = s1p::value
-            int c1i = cast c1
+            int c1i = cast<int>(c1)
             int j = ti
             if (j >= n2) { j = n2 - 1 }
             address s2p = seq2 + j
@@ -211,7 +211,7 @@ entry main(int argc, string[] argv) {
         while (ci < 256) {
             address tp = ttable + ci
             byte tv = tp::value
-            int tvi = cast tv
+            int tvi = cast<int>(tv)
             tvi = tvi & 255
             if (tvi != ci) {
                 int xv = ci ^ tvi
@@ -250,7 +250,7 @@ entry main(int argc, string[] argv) {
                     while (i < nr) {
                         address ip = inbuf + i
                         byte b = ip::value
-                        int bi = cast b
+                        int bi = cast<int>(b)
                         bi = bi & 255
                         address tp = ttable + bi
                         byte mapped = tp::value
@@ -273,14 +273,14 @@ entry main(int argc, string[] argv) {
                     while (i < nr) {
                         address ip = inbuf + i
                         byte b = ip::value
-                        int bi = cast b
+                        int bi = cast<int>(b)
                         address tp = ttable + bi
                         byte mapped = tp::value
-                        int mappedi = cast mapped
+                        int mappedi = cast<int>(mapped)
                         bool skip = false
                         address stp = stable + mappedi
                         byte sv = stp::value
-                        int svi = cast sv
+                        int svi = cast<int>(sv)
                         if (svi != 0 && mappedi == lastOut) { skip = true }
                         if (!skip) {
                             address op = outbuf + outpos

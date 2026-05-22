@@ -28,7 +28,7 @@ function mmap(address addr, int len, int prot, int flags, int fd, int offset) ad
         syscall
         result = rax
     }
-    address r = cast result
+    address r = cast<address>(result)
     return r
 }
 
@@ -75,7 +75,7 @@ function mremap(address old_addr, int old_size, int new_size, int flags, address
         syscall
         result = rax
     }
-    address r = cast result
+    address r = cast<address>(result)
     return r
 }
 

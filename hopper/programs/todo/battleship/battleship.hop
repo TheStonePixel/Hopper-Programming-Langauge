@@ -166,7 +166,7 @@ function parseShot(address buf, int n, address rowOut, address colOut) bool {
     while (i < n) {
         address p = buf + i
         byte ch = p::value
-        int chi = cast ch
+        int chi = cast<int>(ch)
         if (chi == 32) {
             spaceIdx = i
             i = n

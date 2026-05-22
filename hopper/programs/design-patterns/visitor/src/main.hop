@@ -31,7 +31,7 @@ class Shape {
 
     // accept hands self's data to any visitor function
     function accept(address visitor) int {
-        callback(int, int, int) int fn = cast visitor
+        callback(int, int, int) int fn = cast<address>(visitor)
         return fn(self.kind, self.a, self.b)
     }
 }

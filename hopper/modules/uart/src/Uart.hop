@@ -48,12 +48,12 @@ function _uartGetc() int {
 function _uartPuts(address s) {
     address p = s
     byte b = p::value
-    int bi = cast b
+    int bi = cast<int>(b)
     while (bi != 0) {
         _uartPutc(bi)
         p = p + 1
         b = p::value
-        bi = cast b
+        bi = cast<int>(b)
     }
 }
 
@@ -77,7 +77,7 @@ function _uartPutInt(int n) {
     while (n > 0) {
         int d = n % 10
         int dch = d + 48
-        byte db = cast dch
+        byte db = cast<byte>(dch)
         address p = tmp + count
         p::value = db
         count = count + 1
@@ -87,7 +87,7 @@ function _uartPutInt(int n) {
     while (i >= 0) {
         address p = tmp + i
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         _uartPutc(bi)
         i = i - 1
     }

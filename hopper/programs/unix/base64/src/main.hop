@@ -38,7 +38,7 @@ function buildDecodeTable(address dtable) {
     while (i < 64) {
         int ac = b64Char(i)
         address tp = dtable + ac
-        byte ib = cast i
+        byte ib = cast<byte>(i)
         tp::value = ib
         i = i + 1
     }
@@ -61,9 +61,9 @@ function encodeFd(int fd, address inbuf, address outbuf) {
                 byte b0 = p0::value
                 byte b1 = p1::value
                 byte b2 = p2::value
-                int n0 = cast b0
-                int n1 = cast b1
-                int n2 = cast b2
+                int n0 = cast<int>(b0)
+                int n1 = cast<int>(b1)
+                int n2 = cast<int>(b2)
 
                 int c0 = (n0 >> 2) & 0x3F
                 int c1 = ((n0 & 0x3) << 4) | ((n1 >> 4) & 0xF)
@@ -74,10 +74,10 @@ function encodeFd(int fd, address inbuf, address outbuf) {
                 int ei1 = b64Char(c1)
                 int ei2 = b64Char(c2)
                 int ei3 = b64Char(c3)
-                byte ec0 = cast ei0
-                byte ec1 = cast ei1
-                byte ec2 = cast ei2
-                byte ec3 = cast ei3
+                byte ec0 = cast<byte>(ei0)
+                byte ec1 = cast<byte>(ei1)
+                byte ec2 = cast<byte>(ei2)
+                byte ec3 = cast<byte>(ei3)
 
                 address op0 = outbuf + linePos
                 address op1 = outbuf + linePos + 1
@@ -106,13 +106,13 @@ function encodeFd(int fd, address inbuf, address outbuf) {
             if (rem == 1) {
                 address p0 = inbuf + i
                 byte b0 = p0::value
-                int n0 = cast b0
+                int n0 = cast<int>(b0)
                 int c0 = (n0 >> 2) & 0x3F
                 int c1 = (n0 & 0x3) << 4
                 int ei0 = b64Char(c0)
                 int ei1 = b64Char(c1)
-                byte ec0 = cast ei0
-                byte ec1 = cast ei1
+                byte ec0 = cast<byte>(ei0)
+                byte ec1 = cast<byte>(ei1)
                 byte eq = 61
                 address op0 = outbuf + linePos
                 address op1 = outbuf + linePos + 1
@@ -128,17 +128,17 @@ function encodeFd(int fd, address inbuf, address outbuf) {
                 address p1 = inbuf + i + 1
                 byte b0 = p0::value
                 byte b1 = p1::value
-                int n0 = cast b0
-                int n1 = cast b1
+                int n0 = cast<int>(b0)
+                int n1 = cast<int>(b1)
                 int c0 = (n0 >> 2) & 0x3F
                 int c1 = ((n0 & 0x3) << 4) | ((n1 >> 4) & 0xF)
                 int c2 = (n1 & 0xF) << 2
                 int ei0 = b64Char(c0)
                 int ei1 = b64Char(c1)
                 int ei2 = b64Char(c2)
-                byte ec0 = cast ei0
-                byte ec1 = cast ei1
-                byte ec2 = cast ei2
+                byte ec0 = cast<byte>(ei0)
+                byte ec1 = cast<byte>(ei1)
+                byte ec2 = cast<byte>(ei2)
                 byte eq = 61
                 address op0 = outbuf + linePos
                 address op1 = outbuf + linePos + 1
@@ -176,14 +176,14 @@ function decodeFd(int fd, address inbuf, address outbuf, address dtable) {
             while (i < nr) {
                 address ip = inbuf + i
                 byte bc = ip::value
-                int ci = cast bc
+                int ci = cast<int>(bc)
                 if (ci == 61) {
                     // padding — flush partial group and stop
                     if (pending == 3) {
                         int byte0 = (accumulator >> 10) & 0xFF
                         int byte1 = (accumulator >> 2)  & 0xFF
-                        byte db0 = cast byte0
-                        byte db1 = cast byte1
+                        byte db0 = cast<byte>(byte0)
+                        byte db1 = cast<byte>(byte1)
                         address op0 = outbuf + outpos
                         address op1 = outbuf + outpos + 1
                         op0::value = db0
@@ -191,7 +191,7 @@ function decodeFd(int fd, address inbuf, address outbuf, address dtable) {
                         outpos = outpos + 2
                     } else if (pending == 2) {
                         int byte0 = (accumulator >> 4) & 0xFF
-                        byte db0 = cast byte0
+                        byte db0 = cast<byte>(byte0)
                         address op0 = outbuf + outpos
                         op0::value = db0
                         outpos = outpos + 1
@@ -203,7 +203,7 @@ function decodeFd(int fd, address inbuf, address outbuf, address dtable) {
                 } else {
                     address tp = dtable + ci
                     byte val = tp::value
-                    int vi = cast val
+                    int vi = cast<int>(val)
                     if (vi == 255) {
                         i = i + 1
                     } else {
@@ -213,9 +213,9 @@ function decodeFd(int fd, address inbuf, address outbuf, address dtable) {
                             int byte0 = (accumulator >> 16) & 0xFF
                             int byte1 = (accumulator >> 8)  & 0xFF
                             int byte2 = accumulator          & 0xFF
-                            byte db0 = cast byte0
-                            byte db1 = cast byte1
-                            byte db2 = cast byte2
+                            byte db0 = cast<byte>(byte0)
+                            byte db1 = cast<byte>(byte1)
+                            byte db2 = cast<byte>(byte2)
                             address op0 = outbuf + outpos
                             address op1 = outbuf + outpos + 1
                             address op2 = outbuf + outpos + 2
@@ -258,9 +258,9 @@ entry main(int argc, string[] argv) {
         byte b0 = p0::value
         byte b1 = p1::value
         byte b2 = p2::value
-        int i0 = cast b0
-        int i1 = cast b1
-        int i2 = cast b2
+        int i0 = cast<int>(b0)
+        int i1 = cast<int>(b1)
+        int i2 = cast<int>(b2)
         if (i0 == 45 && i1 == 100 && i2 == 0) {
             decode = true
         } else {

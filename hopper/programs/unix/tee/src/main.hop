@@ -22,11 +22,11 @@ entry main(int argc, string[] argv) {
     while (ai < argc && parsingFlags) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast a0
+        int a0i = cast<int>(a0)
         if (a0i == 45) {
             address a1p = arg + 1
             byte a1 = a1p::value
-            int a1i = cast a1
+            int a1i = cast<int>(a1)
             if (a1i == 97) {
                 flagA = 1
                 ai = ai + 1

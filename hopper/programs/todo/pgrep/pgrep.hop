@@ -28,7 +28,7 @@ function pgStrLen(address s) int {
     while (!done) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { done = true }
         if (!done) { n = n + 1 }
     }
@@ -58,7 +58,7 @@ function pgStrAppend(address src, address dst, int off) int {
     while (!done) {
         address sp = src + i
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { done = true }
         if (!done) {
             address dp = dst + off + i
@@ -82,22 +82,22 @@ function pgDirentReclen(address e) int {
 function pgDirentType(address e) int {
     address tp = e + 18
     byte t = tp::value
-    return cast t
+    return cast<int>(t)
 }
 
 function pgIsDot(address e) bool {
     address np = e + 19
     byte b0 = np::value
-    int i0 = cast b0
+    int i0 = cast<int>(b0)
     if (i0 != '.') { return false }
     address np1 = np + 1
     byte b1 = np1::value
-    int i1 = cast b1
+    int i1 = cast<int>(b1)
     if (i1 == 0) { return true }
     if (i1 != '.') { return false }
     address np2 = np + 2
     byte b2 = np2::value
-    int i2 = cast b2
+    int i2 = cast<int>(b2)
     return i2 == 0
 }
 
@@ -149,7 +149,7 @@ function collectFiles(address pathStr, address filePtrs, address countPtr) {
                         if (cOff > 0) {
                             address lastSlot = childBuf + cOff - 1
                             byte lastB = lastSlot::value
-                            int lastI = cast lastB
+                            int lastI = cast<int>(lastB)
                             if (lastI != '/') {
                                 address slashSlot = childBuf + cOff
                                 byte slashB = '/'
@@ -159,7 +159,7 @@ function collectFiles(address pathStr, address filePtrs, address countPtr) {
                         }
                         cOff = pgStrAppend(name, childBuf, cOff)
                         address termSlot = childBuf + cOff
-                        byte nulB = cast 0
+                        byte nulB = cast<byte>(0)
                         termSlot::value = nulB
 
                         if (dtype == 8) {
@@ -208,11 +208,11 @@ function grepFile(StandardRegex r, address pattern, address filename, StandardMu
         }
         if (!eof) {
             byte b = byteBuf::value
-            int bi = cast b
+            int bi = cast<int>(b)
             if (bi == '\n') {
                 // Null-terminate and test the line.
                 address termPtr = lineBuf + lineLen
-                byte nulB = cast 0
+                byte nulB = cast<byte>(0)
                 termPtr::value = nulB
                 bool m = r.matchAt(pattern, lineBuf)
                 if (m) {
@@ -235,7 +235,7 @@ function grepFile(StandardRegex r, address pattern, address filename, StandardMu
     // Handle last line without trailing newline.
     if (lineLen > 0) {
         address termPtr = lineBuf + lineLen
-        byte nulB = cast 0
+        byte nulB = cast<byte>(0)
         termPtr::value = nulB
         bool m = r.matchAt(pattern, lineBuf)
         if (m) {

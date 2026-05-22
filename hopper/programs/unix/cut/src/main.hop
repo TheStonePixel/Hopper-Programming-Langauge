@@ -26,7 +26,7 @@ function parseRanges(address spec, address lo, address hi) int {
     while (true) {
         address sp = spec + i
         byte b = sp::value
-        int c = cast b
+        int c = cast<int>(b)
         if (c == 0) {
             if (n < Limits.MAXRANGES) {
                 address lop = lo + n * 8
@@ -43,7 +43,7 @@ function parseRanges(address spec, address lo, address hi) int {
                 i = i + 1
                 address sp2 = spec + i
                 byte b2 = sp2::value
-                c = cast b2
+                c = cast<int>(b2)
             }
             int lo1 = val
             int hi1 = val
@@ -51,14 +51,14 @@ function parseRanges(address spec, address lo, address hi) int {
                 i = i + 1
                 address sp3 = spec + i
                 byte b3 = sp3::value
-                c = cast b3
+                c = cast<int>(b3)
                 int val2 = 0
                 while (c >= 48 && c <= 57) {
                     val2 = val2 * 10 + c - 48
                     i = i + 1
                     address sp4 = spec + i
                     byte b4 = sp4::value
-                    c = cast b4
+                    c = cast<int>(b4)
                 }
                 if (val2 >= lo1) { hi1 = val2 } else { hi1 = lo1 }
             }
@@ -111,7 +111,7 @@ function cutLine(address line, int len, int mode, address lo, address hi, int nr
         outpos = outpos + 1
     } else {
         // field mode: use SIMD to scan for delimiter
-        byte delimb = cast delim
+        byte delimb = cast<byte>(delim)
         X86SIMD simd = X86SIMD()
         int field = 1
         int start = 0
@@ -136,7 +136,7 @@ function cutLine(address line, int len, int mode, address lo, address hi, int nr
                 while (!found && j < len) {
                     address jp = line + j
                     byte jb = jp::value
-                    int jbi = cast jb
+                    int jbi = cast<int>(jb)
                     if (jbi == delim) {
                         dlpos = j
                         found = true
@@ -218,7 +218,7 @@ function cutFd(int fd, int mode, address lo, address hi, int nranges, int delim)
                     while (i < blkend) {
                         address ip = inbuf + i
                         byte b = ip::value
-                        int bi = cast b
+                        int bi = cast<int>(b)
                         if (bi == 10) {
                             int lineoutlen = cutLine(linebuf, linelen, mode, lo, hi, nranges, delim, outbuf + outpos)
                             outpos = outpos + lineoutlen
@@ -242,7 +242,7 @@ function cutFd(int fd, int mode, address lo, address hi, int nranges, int delim)
             while (i < nr) {
                 address ip = inbuf + i
                 byte b = ip::value
-                int bi = cast b
+                int bi = cast<int>(b)
                 if (bi == 10) {
                     int lineoutlen = cutLine(linebuf, linelen, mode, lo, hi, nranges, delim, outbuf + outpos)
                     outpos = outpos + lineoutlen
@@ -285,10 +285,10 @@ entry main(int argc, string[] argv) {
     while (ai < argc) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast a0
+        int a0i = cast<int>(a0)
         address a1p = arg + 1
         byte a1 = a1p::value
-        int a1i = cast a1
+        int a1i = cast<int>(a1)
         if (a0i == 45 && a1i == 102) {
             mode = 102
             if (ai + 1 < argc) {
@@ -309,7 +309,7 @@ entry main(int argc, string[] argv) {
             if (ai + 1 < argc) {
                 address darg = argv[ai + 1]
                 byte db = darg::value
-                delim = cast db
+                delim = cast<int>(db)
                 ai = ai + 2
             } else {
                 ai = ai + 1
@@ -335,7 +335,7 @@ entry main(int argc, string[] argv) {
         while (i < argc) {
             address arg = argv[i]
             byte a0 = arg::value
-            int a0i = cast a0
+            int a0i = cast<int>(a0)
             if (a0i != 45) {
                 int fd = open(arg, OpenFlag.O_RDONLY, 0)
                 if (fd >= 0) {

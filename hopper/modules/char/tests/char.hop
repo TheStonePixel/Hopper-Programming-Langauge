@@ -63,19 +63,19 @@ entry main {
     t.check(!c.isLower(bA), "isLower not upper")
 
     byte up = c.toUpper(ba)
-    int upi = cast up
+    int upi = cast<int>(up)
     t.checkEq(upi, 65, "toUpper a")
 
     byte upA = c.toUpper(bA)
-    int upAi = cast upA
+    int upAi = cast<int>(upA)
     t.checkEq(upAi, 65, "toUpper already upper")
 
     byte lo = c.toLower(bZ)
-    int loi = cast lo
+    int loi = cast<int>(lo)
     t.checkEq(loi, 122, "toLower Z")
 
     byte loz = c.toLower(bz)
-    int lozi = cast loz
+    int lozi = cast<int>(loz)
     t.checkEq(lozi, 122, "toLower already lower")
 
     t.checkEq(c.digitValue(b7), 7, "digitValue 7")

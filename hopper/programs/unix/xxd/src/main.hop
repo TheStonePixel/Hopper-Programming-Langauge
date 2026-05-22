@@ -30,8 +30,8 @@ function buildHexTable(address table) {
         if (lo < 10) { lc = lo + 48 } else { lc = lo + 87 }
         address p0 = table + i * 2
         address p1 = table + i * 2 + 1
-        byte bh = cast hc
-        byte bl = cast lc
+        byte bh = cast<byte>(hc)
+        byte bl = cast<byte>(lc)
         p0::value = bh
         p1::value = bl
         i = i + 1
@@ -92,7 +92,7 @@ function dumpFd(int fd, address inbuf, address outbuf, address hextable) {
                 while (col < rowLen) {
                     address ip = inbuf + rowStart + col
                     byte b = ip::value
-                    int bi = cast b
+                    int bi = cast<int>(b)
                     address tphi = hextable + bi * 2
                     byte tvhi = tphi::value
                     address ophi = outbuf + pos
@@ -124,7 +124,7 @@ function dumpFd(int fd, address inbuf, address outbuf, address hextable) {
                 while (col < rowLen) {
                     address aip = inbuf + rowStart + col
                     byte ab = aip::value
-                    int abi = cast ab
+                    int abi = cast<int>(ab)
                     byte ach = ab
                     if (abi < 32 || abi > 126) {
                         ach = dot

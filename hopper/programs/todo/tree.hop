@@ -30,23 +30,23 @@ function direntReclen(address e) int {
 function direntType(address e) int {
     address tp = e + 18
     byte t = tp::value
-    return cast t
+    return cast<int>(t)
 }
 
 // True if the entry is "." or ".."
 function isDotEntry(address e) bool {
     address np = e + 19
     byte b0 = np::value
-    int i0 = cast b0
+    int i0 = cast<int>(b0)
     if (i0 != 46) { return false }
     address np1 = np + 1
     byte b1 = np1::value
-    int i1 = cast b1
+    int i1 = cast<int>(b1)
     if (i1 == 0)  { return true }
     if (i1 != 46) { return false }
     address np2 = np + 2
     byte b2 = np2::value
-    int i2 = cast b2
+    int i2 = cast<int>(b2)
     return i2 == 0
 }
 
@@ -57,7 +57,7 @@ function strLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { return n }
         n = n + 1
     }
@@ -70,7 +70,7 @@ function strCopy(address src, address dst) int {
     while (true) {
         address sp = src + i
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         address dp = dst + i
         dp::value = b
         if (bi == 0) { return i }
@@ -84,7 +84,7 @@ function appendByte(address dst, int offset, byte c) int {
     address dp = dst + offset
     dp::value = c
     address np = dst + offset + 1
-    byte nul = cast 0
+    byte nul = cast<byte>(0)
     np::value = nul
     return offset + 1
 }
@@ -95,7 +95,7 @@ function appendStr(address src, address dst, int offset) int {
     while (true) {
         address sp = src + i
         byte b = sp::value
-        int bi = cast b
+        int bi = cast<int>(b)
         address dp = dst + offset + i
         dp::value = b
         if (bi == 0) { return offset + i }
@@ -121,7 +121,7 @@ function countEntries(address buf, int n) int {
 // ── recursive tree walk ───────────────────────────────────────────────────────
 
 function walkDir(address pathBuf, int pathLen, address prefixBuf, address dirs, address files) {
-    string pathStr = cast pathBuf
+    string pathStr = cast<string>(pathBuf)
     int fd = open(pathStr, 0, 0)
     if (fd < 0) {
         printf("\x1b[31mopen: cannot read %s\x1b[0m\n", pathBuf)
@@ -189,14 +189,14 @@ function walkDir(address pathBuf, int pathLen, address prefixBuf, address dirs, 
         if (dtype == 4) {
             // Build child path: pathBuf "/" nameBuf
             int cpLen = strCopy(pathBuf, childPath)
-            byte slash = cast 47
+            byte slash = cast<byte>(47)
             cpLen = appendByte(childPath, cpLen, slash)
             cpLen = appendStr(nameBuf, childPath, cpLen)
 
             // Build child prefix: prefixBuf + ("    " | "│   ")
             int pfxLen = strCopy(prefixBuf, childPfx)
             if (last) {
-                byte sp = cast 32
+                byte sp = cast<byte>(32)
                 pfxLen = appendByte(childPfx, pfxLen, sp)
                 pfxLen = appendByte(childPfx, pfxLen, sp)
                 pfxLen = appendByte(childPfx, pfxLen, sp)
@@ -204,10 +204,10 @@ function walkDir(address pathBuf, int pathLen, address prefixBuf, address dirs, 
             }
             if (!last) {
                 // │ = U+2502 = E2 94 82, then three spaces
-                byte b0 = cast 0xE2
-                byte b1 = cast 0x94
-                byte b2 = cast 0x82
-                byte sp = cast 32
+                byte b0 = cast<byte>(0xE2)
+                byte b1 = cast<byte>(0x94)
+                byte b2 = cast<byte>(0x82)
+                byte sp = cast<byte>(32)
                 pfxLen = appendByte(childPfx, pfxLen, b0)
                 pfxLen = appendByte(childPfx, pfxLen, b1)
                 pfxLen = appendByte(childPfx, pfxLen, b2)
@@ -230,7 +230,7 @@ function walkDir(address pathBuf, int pathLen, address prefixBuf, address dirs, 
 
 entry main(int argc, address argv) {
     // Default to current directory
-    address root = cast "."
+    address root = cast<address>(".")
     if (argc > 1) {
         // argv is char**, so argv[1] is at *(argv + 8) on 64-bit
         address arg1ptr = argv + 8
@@ -240,7 +240,7 @@ entry main(int argc, address argv) {
     printf("\x1b[1m\x1b[34m%s\x1b[0m\n", root)
 
     address prefixBuf = allocate 1024
-    byte nul = cast 0
+    byte nul = cast<byte>(0)
     prefixBuf::value = nul
 
     int rootLen = strLen(root)

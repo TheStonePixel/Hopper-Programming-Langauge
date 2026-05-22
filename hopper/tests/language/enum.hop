@@ -64,8 +64,8 @@ function strEq(address a, address b) bool {
         address pb = b + i
         byte ba = pa::value
         byte bb = pb::value
-        int ai = cast ba
-        int bi = cast bb
+        int ai = cast<int>(ba)
+        int bi = cast<int>(bb)
         if (ai != bi) { return false }
         if (ai == 0)  { return true }
         i = i + 1

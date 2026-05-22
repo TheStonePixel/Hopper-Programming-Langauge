@@ -577,7 +577,7 @@ function inotify_rm_watch(int fd, int wd) int {
 function mmap(address addr, int len, int prot, int flags, int fd, int offset) address {
     int result
     asm { rax = 9   rdi = addr   rsi = len   rdx = prot   r10 = flags   r8 = fd   r9 = offset   syscall   result = rax }
-    address p = cast result
+    address p = cast<address>(result)
     return p
 }
 
@@ -596,7 +596,7 @@ function mprotect(address addr, int len, int prot) int {
 function mremap(address old_addr, int old_size, int new_size, int flags, address new_addr) address {
     int result
     asm { rax = 25   rdi = old_addr   rsi = old_size   rdx = new_size   r10 = flags   r8 = new_addr   syscall   result = rax }
-    address p = cast result
+    address p = cast<address>(result)
     return p
 }
 

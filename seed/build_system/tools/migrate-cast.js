@@ -8,10 +8,12 @@
 //   D: reassignment `VAR = cast EXPR`  → `VAR = cast<TYPE>(EXPR)` using tracked decl type
 //   E: `return cast EXPR`              → `return cast<RET_TYPE>(EXPR)` from enclosing function
 
-'use strict';
+import fs   from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const fs   = require('fs');
-const path = require('path');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 

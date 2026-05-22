@@ -1,6 +1,6 @@
 class StandardChar implements Char {
     function isAlpha(byte c) bool {
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 65) {
             if (n <= 90) { return true }
         }
@@ -11,7 +11,7 @@ class StandardChar implements Char {
     }
 
     function isDigit(byte c) bool {
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 48) {
             if (n <= 57) { return true }
         }
@@ -24,7 +24,7 @@ class StandardChar implements Char {
     }
 
     function isSpace(byte c) bool {
-        int n = cast c
+        int n = cast<int>(c)
         if (n == 32) { return true }
         if (n == 9)  { return true }
         if (n == 10) { return true }
@@ -35,7 +35,7 @@ class StandardChar implements Char {
     }
 
     function isUpper(byte c) bool {
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 65) {
             if (n <= 90) { return true }
         }
@@ -43,7 +43,7 @@ class StandardChar implements Char {
     }
 
     function isLower(byte c) bool {
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 97) {
             if (n <= 122) { return true }
         }
@@ -52,7 +52,7 @@ class StandardChar implements Char {
 
     function isHex(byte c) bool {
         if (self.isDigit(c)) { return true }
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 65) {
             if (n <= 70) { return true }
         }
@@ -63,7 +63,7 @@ class StandardChar implements Char {
     }
 
     function isPrint(byte c) bool {
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 32) {
             if (n <= 126) { return true }
         }
@@ -81,9 +81,9 @@ class StandardChar implements Char {
 
     function toUpper(byte c) byte {
         if (self.isLower(c)) {
-            int n = cast c
+            int n = cast<int>(c)
             int u = n - 32
-            byte r = cast u
+            byte r = cast<byte>(u)
             return r
         }
         return c
@@ -91,21 +91,21 @@ class StandardChar implements Char {
 
     function toLower(byte c) byte {
         if (self.isUpper(c)) {
-            int n = cast c
+            int n = cast<int>(c)
             int l = n + 32
-            byte r = cast l
+            byte r = cast<byte>(l)
             return r
         }
         return c
     }
 
     function digitValue(byte c) int {
-        int n = cast c
+        int n = cast<int>(c)
         return n - 48
     }
 
     function hexValue(byte c) int {
-        int n = cast c
+        int n = cast<int>(c)
         if (n >= 48) {
             if (n <= 57) { return n - 48 }
         }

@@ -14,10 +14,10 @@ function add(int a, int b) int { return a + b }
 function mul(int a, int b) int { return a * b }
 
 function applyBin(StandardArray stack, callback(int, int) int op) {
-    int b = cast stack.pop()
-    int a = cast stack.pop()
+    int b = cast<int>(stack.pop())
+    int a = cast<int>(stack.pop())
     int r = op(a, b)
-    address _r = cast r
+    address _r = cast<address>(r)
     stack.push(_r)
 }
 
@@ -25,15 +25,15 @@ entry main {
     StandardArray stack = StandardArray(8)
     Math m = Math()
 
-    address _3 = cast 3
+    address _3 = cast<address>(3)
     stack.push(_3)
-    address _4 = cast 4
+    address _4 = cast<address>(4)
     stack.push(_4)
     applyBin(stack, add)
-    address _2 = cast 2
+    address _2 = cast<address>(2)
     stack.push(_2)
     applyBin(stack, mul)
-    int r1 = cast stack.pop()
+    int r1 = cast<int>(stack.pop())
     printf("3 4 + 2 * = %lld\n", r1)
 
     printf("5! = %lld\n", m.factorial(5))

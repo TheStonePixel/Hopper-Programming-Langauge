@@ -17,12 +17,12 @@ entry main {
     byte v = 42
     buf.set(3, v)
     byte got = buf.get(3)
-    int goti = cast got
+    int goti = cast<int>(got)
     t.checkEq(goti, 42, "set and get byte")
 
     buf.zero()
     byte z = buf.get(3)
-    int zi = cast z
+    int zi = cast<int>(z)
     t.checkEq(zi, 0, "zero clears byte")
 
     byte w = 99
@@ -31,7 +31,7 @@ entry main {
     t.checkEq(buf.len(), 16, "resize grows len")
 
     byte preserved = buf.get(0)
-    int pi = cast preserved
+    int pi = cast<int>(preserved)
     t.checkEq(pi, 99, "resize preserves data")
 
     t.done()

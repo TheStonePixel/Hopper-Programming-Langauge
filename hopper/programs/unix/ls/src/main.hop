@@ -43,7 +43,7 @@ function strLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast b
+        int bi = cast<int>(b)
         if (bi == 0) { return n }
         n = n + 1
     }
@@ -90,7 +90,7 @@ function direntReclen(address e) int {
 function direntType(address e) int {
     address tp = e + 18
     byte t = tp::value
-    return cast t
+    return cast<int>(t)
 }
 
 function listDir(address path, int flagL, int flagA) {
@@ -118,7 +118,7 @@ function listDir(address path, int flagL, int flagA) {
                 if (reclen > 0) {
                     address name = ent + 19
                     byte nb0 = name::value
-                    int nb0i = cast nb0
+                    int nb0i = cast<int>(nb0)
                     bool show = true
                     if (nb0i == 46 && flagA == 0) { show = false }
                     if (show) {
@@ -134,7 +134,7 @@ function listDir(address path, int flagL, int flagA) {
                             }
                             address lp = path + plen - 1
                             byte lb = lp::value
-                            int lbi = cast lb
+                            int lbi = cast<int>(lb)
                             if (lbi != 47) {
                                 address slashp = pathbuf + plen
                                 byte slash = 47
@@ -151,7 +151,7 @@ function listDir(address path, int flagL, int flagA) {
                                 ni = ni + 1
                             }
                             address termp = pathbuf + ci + nlen
-                            byte nul = cast 0
+                            byte nul = cast<byte>(0)
                             termp::value = nul
 
                             int sr = lstat(pathbuf, statbuf)
@@ -189,14 +189,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast a0
+        int a0i = cast<int>(a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast fc
+                int fci = cast<int>(fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 108) {
@@ -216,7 +216,7 @@ entry main(int argc, string[] argv) {
     }
 
     if (pathStart == argc) {
-        address dot = cast "."
+        address dot = cast<address>(".")
         listDir(dot, flagL, flagA)
     } else {
         int i = pathStart
