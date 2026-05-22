@@ -1,0 +1,225 @@
+// uniq — filter adjacent duplicate lines
+//
+// Usage: uniq [-cdu] [file]
+//   -c  prefix each line with its count
+//   -d  only print duplicate lines
+//   -u  only print unique lines
+
+import IO         from linux
+import FileSystem from linux
+
+enum Limits {
+    BUFSZ   = 65536
+    LINEBUF = 4096
+}
+
+function strEq(address a, int alen, address b, int blen) bool {
+    if (alen != blen) { return false }
+    int i = 0
+    while (i < alen) {
+        address ap = a + i
+        address bp = b + i
+        byte ab = ap::value
+        byte bb = bp::value
+        if (ab != bb) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function copyLine(address src, int len, address dst) {
+    int i = 0
+    while (i < len) {
+        address sp = src + i
+        address dp = dst + i
+        byte b = sp::value
+        dp::value = b
+        i = i + 1
+    }
+}
+
+// Write count+space+line+newline into outbuf. Returns bytes written.
+function emitCount(int count, address line, int len, address outbuf) int {
+    int pos = 0
+    address tmp = allocate 24
+    int c = count
+    int digits = 0
+    int npad = 0
+    int di = 0
+    int i = 0
+    if (c == 0) {
+        address tp = tmp
+        byte z = 48
+        tp::value = z
+        digits = 1
+    } else {
+        while (c > 0) {
+            int dval = c % 10 + 48
+            byte db = cast dval
+            address tp = tmp + digits
+            tp::value = db
+            digits = digits + 1
+            c = c / 10
+        }
+    }
+    npad = 7 - digits
+    while (npad > 0) {
+        address op = outbuf + pos
+        byte sp = 32
+        op::value = sp
+        pos = pos + 1
+        npad = npad - 1
+    }
+    di = digits - 1
+    while (di >= 0) {
+        address op = outbuf + pos
+        address tp = tmp + di
+        byte db = tp::value
+        op::value = db
+        pos = pos + 1
+        di = di - 1
+    }
+    deallocate tmp
+    address spp = outbuf + pos
+    byte space = 32
+    spp::value = space
+    pos = pos + 1
+    while (i < len) {
+        address lp = line + i
+        byte b = lp::value
+        address op = outbuf + pos
+        op::value = b
+        pos = pos + 1
+        i = i + 1
+    }
+    byte nl = 10
+    address nlp = outbuf + pos
+    nlp::value = nl
+    pos = pos + 1
+    return pos
+}
+
+function flush(int count, address prevbuf, int prevlen, int flagC, int flagD, int flagU, address outbuf) {
+    bool shouldPrint = true
+    if (flagD != 0 && count == 1) { shouldPrint = false }
+    if (flagU != 0 && count > 1)  { shouldPrint = false }
+    if (shouldPrint) {
+        if (flagC != 0) {
+            int outlen = emitCount(count, prevbuf, prevlen, outbuf)
+            write(StdFd.STDOUT, outbuf, outlen)
+        } else {
+            write(StdFd.STDOUT, prevbuf, prevlen)
+            byte nl = 10
+            address nlp = outbuf
+            nlp::value = nl
+            write(StdFd.STDOUT, outbuf, 1)
+        }
+    }
+}
+
+function uniqFd(int fd, int flagC, int flagD, int flagU) {
+    address inbuf   = allocate Limits.BUFSZ
+    address prevbuf = allocate Limits.LINEBUF
+    address curbuf  = allocate Limits.LINEBUF
+    address outbuf  = allocate Limits.LINEBUF + 32
+    int prevlen = 0
+    int curlen  = 0
+    int count   = 0
+
+    bool eof = false
+    while (!eof) {
+        int nr = read(fd, inbuf, Limits.BUFSZ)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            int i = 0
+            while (i < nr) {
+                address ip = inbuf + i
+                byte b = ip::value
+                int bi = cast b
+                if (bi == 10) {
+                    if (count == 0) {
+                        copyLine(curbuf, curlen, prevbuf)
+                        prevlen = curlen
+                        count = 1
+                    } else if (strEq(curbuf, curlen, prevbuf, prevlen)) {
+                        count = count + 1
+                    } else {
+                        flush(count, prevbuf, prevlen, flagC, flagD, flagU, outbuf)
+                        copyLine(curbuf, curlen, prevbuf)
+                        prevlen = curlen
+                        count = 1
+                    }
+                    curlen = 0
+                } else {
+                    if (curlen < Limits.LINEBUF - 1) {
+                        address cp = curbuf + curlen
+                        cp::value = b
+                        curlen = curlen + 1
+                    }
+                }
+                i = i + 1
+            }
+        }
+    }
+
+    if (count > 0) {
+        flush(count, prevbuf, prevlen, flagC, flagD, flagU, outbuf)
+    }
+
+    deallocate outbuf
+    deallocate curbuf
+    deallocate prevbuf
+    deallocate inbuf
+}
+
+entry main(int argc, string[] argv) {
+    int flagC = 0
+    int flagD = 0
+    int flagU = 0
+    int fileArg = 0
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = cast a0
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = cast fc
+                if (fci == 0)    {
+                    done = true
+                } else if (fci == 99) {
+                    flagC = 1
+                    fi = fi + 1
+                } else if (fci == 100) {
+                    flagD = 1
+                    fi = fi + 1
+                } else if (fci == 117) {
+                    flagU = 1
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            if (fileArg == 0) { fileArg = ai }
+        }
+        ai = ai + 1
+    }
+
+    if (fileArg == 0) {
+        uniqFd(StdFd.STDIN, flagC, flagD, flagU)
+    } else {
+        address fname = argv[fileArg]
+        int fd = open(fname, OpenFlag.O_RDONLY, 0)
+        if (fd >= 0) {
+            uniqFd(fd, flagC, flagD, flagU)
+            close(fd)
+        }
+    }
+}

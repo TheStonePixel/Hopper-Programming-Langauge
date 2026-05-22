@@ -1,0 +1,228 @@
+// du — disk usage
+//
+// Usage: du [-sh] [path ...]
+//   -s  summary only (don't recurse output)
+//   -h  human-readable sizes (K, M, G)
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    BUFSZ    = 65536
+    PATHBUF  = 4096
+    STATBUF  = 144
+}
+
+function strLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { return n }
+        n = n + 1
+    }
+}
+
+// st_blocks at offset 64: 512-byte blocks
+function statBlocks(address buf) int {
+    address p = buf + 64
+    int v = p::value
+    return v
+}
+
+function direntReclen(address e) int {
+    address rp = e + 16
+    int r = rp::value
+    return r & 0xFFFF
+}
+
+function direntType(address e) int {
+    address tp = e + 18
+    byte t = tp::value
+    return cast t
+}
+
+function isDot(address name) bool {
+    byte b0 = name::value
+    int i0 = cast b0
+    if (i0 != 46) { return false }
+    address p1 = name + 1
+    byte b1 = p1::value
+    int i1 = cast b1
+    if (i1 == 0) { return true }
+    if (i1 != 46) { return false }
+    address p2 = name + 2
+    byte b2 = p2::value
+    int i2 = cast b2
+    return i2 == 0
+}
+
+function printHuman(int blocks) {
+    // blocks are 512-byte units; convert to KB (round up)
+    int kb = (blocks + 1) / 2
+    if (kb < 1024) {
+        printf("%lldK", kb)
+    } else if (kb < 1048576) {
+        int mb = kb / 1024
+        printf("%lldM", mb)
+    } else {
+        int gb = kb / 1048576
+        printf("%lldG", gb)
+    }
+}
+
+// Returns total 512-byte block count for path (recursively).
+function duPath(address path, int flagS, int flagH, address statbuf) int {
+    int fd = open(path, OpenFlag.O_RDONLY | OpenFlag.O_DIRECTORY, 0)
+    if (fd < 0) {
+        // It's a file
+        int sr = lstat(path, statbuf)
+        if (sr == 0) { return statBlocks(statbuf) }
+        return 0
+    }
+
+    address buf     = allocate Limits.BUFSZ
+    address pathbuf = allocate Limits.PATHBUF
+    int total = 0
+
+    bool reading = true
+    while (reading) {
+        int nr = getdents64(fd, buf, Limits.BUFSZ)
+        if (nr <= 0) { reading = false }
+        if (reading) {
+            int off = 0
+            while (off < nr) {
+                address ent = buf + off
+                int reclen = direntReclen(ent)
+                if (reclen <= 0) { off = nr }
+                if (reclen > 0) {
+                    address name = ent + 19
+                    if (!isDot(name)) {
+                        int dtype = direntType(ent)
+                        int plen = strLen(path)
+                        int ci = 0
+                        while (ci < plen) {
+                            address pp = path + ci
+                            byte pb = pp::value
+                            address dp = pathbuf + ci
+                            dp::value = pb
+                            ci = ci + 1
+                        }
+                        address lp = path + plen - 1
+                        byte lb = lp::value
+                        int lbi = cast lb
+                        if (lbi != 47) {
+                            address slashp = pathbuf + plen
+                            byte slash = 47
+                            slashp::value = slash
+                            ci = plen + 1
+                        }
+                        int nlen = strLen(name)
+                        int ni = 0
+                        while (ni < nlen) {
+                            address np = name + ni
+                            byte npb = np::value
+                            address dp = pathbuf + ci + ni
+                            dp::value = npb
+                            ni = ni + 1
+                        }
+                        address termp = pathbuf + ci + nlen
+                        byte nul = cast 0
+                        termp::value = nul
+
+                        if (dtype == 4) {
+                            int sub = duPath(pathbuf, flagS, flagH, statbuf)
+                            total = total + sub
+                            if (flagS == 0) {
+                                if (flagH != 0) {
+                                    printHuman(sub)
+                                } else {
+                                    printf("%lld", sub / 2)
+                                }
+                                printf("\t%s\n", pathbuf)
+                            }
+                        } else {
+                            int sr = lstat(pathbuf, statbuf)
+                            if (sr == 0) {
+                                total = total + statBlocks(statbuf)
+                            }
+                        }
+                    }
+                    off = off + reclen
+                }
+            }
+        }
+    }
+
+    deallocate pathbuf
+    deallocate buf
+    close(fd)
+    return total
+}
+
+entry main(int argc, string[] argv) {
+    int flagS = 0
+    int flagH = 0
+    int pathStart = argc
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = cast a0
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = cast fc
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 115) {
+                    flagS = 1
+                    fi = fi + 1
+                } else if (fci == 104) {
+                    flagH = 1
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            if (pathStart == argc) { pathStart = ai }
+        }
+        ai = ai + 1
+    }
+
+    address statbuf = allocate Limits.STATBUF
+
+    if (pathStart == argc) {
+        address dot = cast "."
+        int total = duPath(dot, flagS, flagH, statbuf)
+        if (flagH != 0) {
+            printHuman(total)
+        } else {
+            printf("%lld", total / 2)
+        }
+        printf("\t.\n")
+    } else {
+        int i = pathStart
+        while (i < argc) {
+            address path = argv[i]
+            int total = duPath(path, flagS, flagH, statbuf)
+            if (flagH != 0) {
+                printHuman(total)
+            } else {
+                printf("%lld", total / 2)
+            }
+            printf("\t%s\n", path)
+            i = i + 1
+        }
+    }
+
+    deallocate statbuf
+}

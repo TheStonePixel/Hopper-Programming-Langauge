@@ -1,0 +1,228 @@
+// ls — list directory contents
+//
+// Usage: ls [-la] [path ...]
+//   -l  long format (permissions, nlink, size, name)
+//   -a  include hidden files (starting with .)
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    BUFSZ   = 65536
+    PATHBUF = 512
+    STATBUF = 144
+}
+
+// x86-64 Linux stat struct offsets:
+//   st_nlink  offset 16  (8 bytes)
+//   st_mode   offset 24  (4 bytes, low 16 are mode bits)
+//   st_size   offset 48  (8 bytes)
+
+function statNlink(address buf) int {
+    address p = buf + 16
+    int v = p::value
+    return v
+}
+
+function statMode(address buf) int {
+    address p = buf + 24
+    int v = p::value
+    return v & 0xFFFF
+}
+
+function statSize(address buf) int {
+    address p = buf + 48
+    int v = p::value
+    return v
+}
+
+function strLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = cast b
+        if (bi == 0) { return n }
+        n = n + 1
+    }
+}
+
+// Write 10-char mode string (e.g. "-rw-r--r--") into out[0..9].
+function writeModeStr(int mode, address out) {
+    int ftype = mode & 0xF000
+    byte tc = 45
+    if (ftype == 0x4000) { tc = 100 }
+    if (ftype == 0xA000) { tc = 108 }
+    address p = out
+    p::value = tc
+
+    int bits = mode & 0x1FF
+    int shift = 8
+    int i = 1
+    while (i <= 9) {
+        int bitval = (bits >> shift) & 1
+        byte rwx = 45
+        int rem = i % 3
+        if (bitval != 0) {
+            if (rem == 1) {
+                rwx = 114
+            } else if (rem == 2) {
+                rwx = 119
+            } else {
+                rwx = 120
+            }
+        }
+        address bp = out + i
+        bp::value = rwx
+        shift = shift - 1
+        i = i + 1
+    }
+}
+
+function direntReclen(address e) int {
+    address rp = e + 16
+    int r = rp::value
+    return r & 0xFFFF
+}
+
+function direntType(address e) int {
+    address tp = e + 18
+    byte t = tp::value
+    return cast t
+}
+
+function listDir(address path, int flagL, int flagA) {
+    int fd = open(path, OpenFlag.O_RDONLY | OpenFlag.O_DIRECTORY, 0)
+    if (fd < 0) {
+        printf("ls: %s: cannot open\n", path)
+        return
+    }
+
+    address buf     = allocate Limits.BUFSZ
+    address statbuf = allocate Limits.STATBUF
+    address pathbuf = allocate Limits.PATHBUF
+    address modebuf = allocate 12
+
+    bool reading = true
+    while (reading) {
+        int nr = getdents64(fd, buf, Limits.BUFSZ)
+        if (nr <= 0) { reading = false }
+        if (reading) {
+            int off = 0
+            while (off < nr) {
+                address ent = buf + off
+                int reclen = direntReclen(ent)
+                if (reclen <= 0) { off = nr }
+                if (reclen > 0) {
+                    address name = ent + 19
+                    byte nb0 = name::value
+                    int nb0i = cast nb0
+                    bool show = true
+                    if (nb0i == 46 && flagA == 0) { show = false }
+                    if (show) {
+                        if (flagL != 0) {
+                            int plen = strLen(path)
+                            int ci = 0
+                            while (ci < plen) {
+                                address pp = path + ci
+                                byte pb = pp::value
+                                address dp = pathbuf + ci
+                                dp::value = pb
+                                ci = ci + 1
+                            }
+                            address lp = path + plen - 1
+                            byte lb = lp::value
+                            int lbi = cast lb
+                            if (lbi != 47) {
+                                address slashp = pathbuf + plen
+                                byte slash = 47
+                                slashp::value = slash
+                                ci = plen + 1
+                            }
+                            int nlen = strLen(name)
+                            int ni = 0
+                            while (ni < nlen) {
+                                address np = name + ni
+                                byte npb = np::value
+                                address dp = pathbuf + ci + ni
+                                dp::value = npb
+                                ni = ni + 1
+                            }
+                            address termp = pathbuf + ci + nlen
+                            byte nul = cast 0
+                            termp::value = nul
+
+                            int sr = lstat(pathbuf, statbuf)
+                            if (sr == 0) {
+                                int mode = statMode(statbuf)
+                                writeModeStr(mode, modebuf)
+                                printf("%.10s ", modebuf)
+                                int nlink = statNlink(statbuf)
+                                printf("%lld ", nlink)
+                                int sz = statSize(statbuf)
+                                printf("%lld ", sz)
+                            }
+                        }
+                        printf("%s\n", name)
+                    }
+                    off = off + reclen
+                }
+            }
+        }
+    }
+
+    deallocate modebuf
+    deallocate pathbuf
+    deallocate statbuf
+    deallocate buf
+    close(fd)
+}
+
+entry main(int argc, string[] argv) {
+    int flagL = 0
+    int flagA = 0
+    int pathStart = argc
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = cast a0
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = cast fc
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 108) {
+                    flagL = 1
+                    fi = fi + 1
+                } else if (fci == 97) {
+                    flagA = 1
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            if (pathStart == argc) { pathStart = ai }
+        }
+        ai = ai + 1
+    }
+
+    if (pathStart == argc) {
+        address dot = cast "."
+        listDir(dot, flagL, flagA)
+    } else {
+        int i = pathStart
+        while (i < argc) {
+            listDir(argv[i], flagL, flagA)
+            i = i + 1
+        }
+    }
+}

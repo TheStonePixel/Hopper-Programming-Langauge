@@ -1,0 +1,16 @@
+{
+  "name": "linux",
+  "version": "0.1.0",
+  "description": "Linux OS interfaces — IO, FileSystem, System, Process, Socket, Network, Memory",
+  "license": "Apache-2.0",
+  "type": "library",
+  "exports": {
+    "IO":         { "interface": "interfaces/IO.hop"         },
+    "FileSystem": { "interface": "interfaces/FileSystem.hop" },
+    "System":     { "interface": "interfaces/System.hop"     },
+    "Process":    { "interface": "interfaces/Process.hop"    },
+    "Socket":     { "interface": "interfaces/Socket.hop"     },
+    "Network":    { "interface": "interfaces/Network.hop"    },
+    "Memory":     { "interface": "interfaces/Memory.hop"     }
+  }
+}

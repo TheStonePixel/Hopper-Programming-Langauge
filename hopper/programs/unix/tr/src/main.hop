@@ -1,0 +1,246 @@
+// tr — translate or delete characters
+//
+// Usage: tr [-ds] SET1 [SET2]
+//   tr SET1 SET2    translate chars in SET1 to corresponding chars in SET2
+//   tr -d SET1      delete chars in SET1
+//   tr -s SET1      squeeze consecutive repeated chars in SET1
+
+import IO from linux
+
+enum Limits {
+    BUFSZ = 4096
+}
+
+// Expand set string (handling a-z ranges) into 256-byte presence table.
+function expandSet(address set, address table) {
+    int i = 0
+    while (true) {
+        address sp = set + i
+        byte b = sp::value
+        int c = cast b
+        if (c == 0) { return }
+        address sp1 = set + i + 1
+        byte b1 = sp1::value
+        int c1 = cast b1
+        if (c1 == 45) {
+            address sp2 = set + i + 2
+            byte b2 = sp2::value
+            int c2 = cast b2
+            if (c2 > c) {
+                int r = c
+                while (r <= c2) {
+                    address tp = table + r
+                    byte one = cast 1
+                    tp::value = one
+                    r = r + 1
+                }
+                i = i + 3
+            } else {
+                address tp = table + c
+                byte one = cast 1
+                tp::value = one
+                i = i + 1
+            }
+        } else {
+            address tp = table + c
+            byte one = cast 1
+            tp::value = one
+            i = i + 1
+        }
+    }
+}
+
+// Expand set string into a byte sequence. Returns length.
+function expandSeq(address set, address seq) int {
+    int n = 0
+    int i = 0
+    while (true) {
+        address sp = set + i
+        byte b = sp::value
+        int c = cast b
+        if (c == 0) { return n }
+        address sp1 = set + i + 1
+        byte b1 = sp1::value
+        int c1 = cast b1
+        if (c1 == 45) {
+            address sp2 = set + i + 2
+            byte b2 = sp2::value
+            int c2 = cast b2
+            if (c2 > c) {
+                int r = c
+                while (r <= c2) {
+                    address op = seq + n
+                    byte rb = cast r
+                    op::value = rb
+                    n = n + 1
+                    r = r + 1
+                }
+                i = i + 3
+            } else {
+                address op = seq + n
+                op::value = b
+                n = n + 1
+                i = i + 1
+            }
+        } else {
+            address op = seq + n
+            op::value = b
+            n = n + 1
+            i = i + 1
+        }
+    }
+    return n
+}
+
+entry main(int argc, string[] argv) {
+    int flagD = 0
+    int flagS = 0
+    int setIdx = 1
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = cast a0
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = cast fc
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 100) {
+                    flagD = 1
+                    fi = fi + 1
+                } else if (fci == 115) {
+                    flagS = 1
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+            setIdx = ai + 1
+            ai = ai + 1
+        } else {
+            ai = argc
+        }
+    }
+
+    if (setIdx >= argc) { return }
+    address set1 = argv[setIdx]
+    address set2 = null
+    if (setIdx + 1 < argc) { set2 = argv[setIdx + 1] }
+
+    address inbuf  = allocate Limits.BUFSZ
+    address outbuf = allocate Limits.BUFSZ
+
+    if (flagD != 0) {
+        address dtable = allocate 256
+        expandSet(set1, dtable)
+        bool eof = false
+        while (!eof) {
+            int nr = read(StdFd.STDIN, inbuf, Limits.BUFSZ)
+            if (nr <= 0) {
+                eof = true
+            } else {
+                int outpos = 0
+                int i = 0
+                while (i < nr) {
+                    address ip = inbuf + i
+                    byte b = ip::value
+                    int bi = cast b
+                    address dt = dtable + bi
+                    byte dv = dt::value
+                    int dvi = cast dv
+                    if (dvi == 0) {
+                        address op = outbuf + outpos
+                        op::value = b
+                        outpos = outpos + 1
+                    }
+                    i = i + 1
+                }
+                if (outpos > 0) { write(StdFd.STDOUT, outbuf, outpos) }
+            }
+        }
+        deallocate dtable
+    } else {
+        address seq1 = allocate 512
+        address seq2 = allocate 512
+        int n1 = expandSeq(set1, seq1)
+        int n2 = 0
+        if (set2 != null) { n2 = expandSeq(set2, seq2) }
+
+        address ttable = allocate 256
+        int ti = 0
+        while (ti < 256) {
+            address tp = ttable + ti
+            byte tib = cast ti
+            tp::value = tib
+            ti = ti + 1
+        }
+        ti = 0
+        while (ti < n1 && n2 > 0) {
+            address s1p = seq1 + ti
+            byte c1 = s1p::value
+            int c1i = cast c1
+            int j = ti
+            if (j >= n2) { j = n2 - 1 }
+            address s2p = seq2 + j
+            byte c2 = s2p::value
+            address tp = ttable + c1i
+            tp::value = c2
+            ti = ti + 1
+        }
+
+        address stable = allocate 256
+        if (flagS != 0 && n2 > 0) {
+            expandSet(set2, stable)
+        } else if (flagS != 0) {
+            expandSet(set1, stable)
+        }
+
+        int lastOut = -1
+        bool eof = false
+        while (!eof) {
+            int nr = read(StdFd.STDIN, inbuf, Limits.BUFSZ)
+            if (nr <= 0) {
+                eof = true
+            } else {
+                int outpos = 0
+                int i = 0
+                while (i < nr) {
+                    address ip = inbuf + i
+                    byte b = ip::value
+                    int bi = cast b
+                    address tp = ttable + bi
+                    byte mapped = tp::value
+                    int mappedi = cast mapped
+                    bool skip = false
+                    if (flagS != 0) {
+                        address stp = stable + mappedi
+                        byte sv = stp::value
+                        int svi = cast sv
+                        if (svi != 0 && mappedi == lastOut) { skip = true }
+                    }
+                    if (!skip) {
+                        address op = outbuf + outpos
+                        op::value = mapped
+                        outpos = outpos + 1
+                        lastOut = mappedi
+                    }
+                    i = i + 1
+                }
+                if (outpos > 0) { write(StdFd.STDOUT, outbuf, outpos) }
+            }
+        }
+        deallocate stable
+        deallocate ttable
+        deallocate seq2
+        deallocate seq1
+    }
+
+    deallocate outbuf
+    deallocate inbuf
+}

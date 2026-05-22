@@ -1,0 +1,96 @@
+// tee — read stdin, write to stdout and files
+//
+// Usage: tee [-a] [file ...]
+//   -a  append to files instead of truncating
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    BUFSZ    = 65536
+    MAXFILES = 64
+}
+
+entry main(int argc, string[] argv) {
+    int flagA   = 0
+    int fileStart = argc
+
+    int ai = 1
+    bool parsingFlags = true
+    while (ai < argc && parsingFlags) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = cast a0
+        if (a0i == 45) {
+            address a1p = arg + 1
+            byte a1 = a1p::value
+            int a1i = cast a1
+            if (a1i == 97) {
+                flagA = 1
+                ai = ai + 1
+            } else {
+                parsingFlags = false
+                fileStart = ai
+            }
+        } else {
+            parsingFlags = false
+            fileStart = ai
+        }
+    }
+
+    // Open all output files
+    address fds = allocate Limits.MAXFILES * 8
+    int nfds = 0
+
+    int oflags = OpenFlag.O_WRONLY | OpenFlag.O_CREAT
+    if (flagA != 0) {
+        oflags = oflags | OpenFlag.O_APPEND
+    } else {
+        oflags = oflags | OpenFlag.O_TRUNC
+    }
+
+    int fi = fileStart
+    while (fi < argc && nfds < Limits.MAXFILES) {
+        address fname = argv[fi]
+        int fd = open(fname, oflags, 420)
+        if (fd < 0) {
+            printf("tee: %s: cannot open\n", fname)
+        } else {
+            address fdp = fds + nfds * 8
+            fdp::value = fd
+            nfds = nfds + 1
+        }
+        fi = fi + 1
+    }
+
+    address buf = allocate Limits.BUFSZ
+    bool eof = false
+    while (!eof) {
+        int nr = read(StdFd.STDIN, buf, Limits.BUFSZ)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            write(StdFd.STDOUT, buf, nr)
+            int i = 0
+            while (i < nfds) {
+                address fdp = fds + i * 8
+                int fd = fdp::value
+                write(fd, buf, nr)
+                i = i + 1
+            }
+        }
+    }
+
+    int i = 0
+    while (i < nfds) {
+        address fdp = fds + i * 8
+        int fd = fdp::value
+        close(fd)
+        i = i + 1
+    }
+
+    deallocate buf
+    deallocate fds
+}
