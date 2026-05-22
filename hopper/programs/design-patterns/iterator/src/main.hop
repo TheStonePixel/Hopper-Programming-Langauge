@@ -34,7 +34,7 @@ class ArrayIter implements Iterator {
     }
 
     function push(int val) {
-        address _val = cast<address>(val)
+        address _val = address (val)
         self.data.push(_val)
     }
 
@@ -44,7 +44,7 @@ class ArrayIter implements Iterator {
 
     function next() int {
         address _a = self.data.get(self.cursor)
-        int val = cast<int>(_a)
+        int val = int (_a)
         self.cursor = self.cursor + 1
         return val
     }
@@ -111,7 +111,7 @@ function countWhere(ArrayIter it, address pred) int {
     it.reset()
     int count = 0
     while (it.hasNext()) {
-        callback(int) int fn = cast<address>(pred)
+        callback(int) int fn = address (pred)
         if (fn(it.next()) == 1) {
             count = count + 1
         }

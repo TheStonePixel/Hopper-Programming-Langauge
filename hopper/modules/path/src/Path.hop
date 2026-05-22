@@ -3,7 +3,7 @@ function _pathStrLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         if (bi == 0) { break }
         n = n + 1
     }
@@ -74,7 +74,7 @@ class StandardPath implements Path {
         while (true) {
             address p = src + i
             byte b = p::value
-            int bi = cast<int>(b)
+            int bi = int (b)
             if (bi == 0) { break }
             self._appendByte(b)
             i = i + 1
@@ -88,7 +88,7 @@ class StandardPath implements Path {
         if (self.len == 0) { return false }
         address p = self.data
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         return bi == 47
     }
 
@@ -99,14 +99,14 @@ class StandardPath implements Path {
         }
         address last = self.data + self.len - 1
         byte lb = last::value
-        int li = cast<int>(lb)
+        int li = int (lb)
         if (li != 47) {
             byte slash = 47
             self._appendByte(slash)
         }
         address seg = segment
         byte fb = seg::value
-        int fi = cast<int>(fb)
+        int fi = int (fb)
         if (fi == 47) { seg = seg + 1 }
         self._appendStr(seg)
     }
@@ -116,7 +116,7 @@ class StandardPath implements Path {
         while (i >= 0) {
             address p = self.data + i
             byte b = p::value
-            int bi = cast<int>(b)
+            int bi = int (b)
             if (bi == 47) { return i + 1 }
             i = i - 1
         }
@@ -129,7 +129,7 @@ class StandardPath implements Path {
         while (i > base) {
             address p = self.data + i
             byte b = p::value
-            int bi = cast<int>(b)
+            int bi = int (b)
             if (bi == 46) { return i }
             i = i - 1
         }

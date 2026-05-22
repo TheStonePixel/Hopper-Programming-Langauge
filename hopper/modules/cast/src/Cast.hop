@@ -1,0 +1,11 @@
+function ptrToInt(address ptr) int      { return int ptr           }
+function intToPtr(int n) address        { return address n         }
+function byteToInt(byte b) int          { return int b             }
+function ubyteToInt(byte b) int         { return unsigned int b    }
+function intToByte(int n) byte          { return byte n            }
+function charToInt(byte c) int          { return int c             }
+function intToChar(int n) byte          { return byte n            }
+function floatToInt(float f) int        { return int f             }
+function intToFloat(int n) float        { return float n           }
+function boolToInt(bool b) int          { return int b             }
+function intToBool(int n) bool          { return bool n            }

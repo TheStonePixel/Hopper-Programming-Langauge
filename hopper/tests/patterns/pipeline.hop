@@ -26,7 +26,7 @@ class Pipeline {
         int i = 0
         while (i < self.stages.len()) {
             address fn = self.stages.get(i)
-            callback(int) int stage = cast<address>(fn)
+            callback(int) int stage = address (fn)
             val = stage(val)
             i = i + 1
         }

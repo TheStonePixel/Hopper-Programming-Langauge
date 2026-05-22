@@ -13,26 +13,26 @@ entry main {
     TestSuite t = TestSuite("ds")
     StandardArray arr = StandardArray(4)
 
-    address v1 = cast<address>(100)
-    address v2 = cast<address>(200)
+    address v1 = address (100)
+    address v2 = address (200)
     arr.push(v1)
     arr.push(v2)
     t.checkEq(arr.len(), 2, "push and len")
 
     address got1 = arr.get(0)
-    int i1 = cast<int>(got1)
+    int i1 = int (got1)
     t.checkEq(i1, 100, "get first")
 
     address got2 = arr.get(1)
-    int i2 = cast<int>(got2)
+    int i2 = int (got2)
     t.checkEq(i2, 200, "get second")
 
     address pk = arr.peek()
-    int pi = cast<int>(pk)
+    int pi = int (pk)
     t.checkEq(pi, 200, "peek")
 
     address popped = arr.pop()
-    int poi = cast<int>(popped)
+    int poi = int (popped)
     t.checkEq(poi, 200, "pop value")
 
     t.checkEq(arr.len(), 1, "len after pop")

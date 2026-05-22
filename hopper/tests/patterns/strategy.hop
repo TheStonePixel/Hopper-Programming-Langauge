@@ -43,9 +43,9 @@ class Validator {
         int passed = 0
         int i = 0
         while (i < values.len()) {
-            callback(int) int fn = cast<address>(self.strategy)
+            callback(int) int fn = address (self.strategy)
             address raw = values.get(i)
-            int val = cast<int>(raw)
+            int val = int (raw)
             passed = passed + fn(val)
             i = i + 1
         }
@@ -55,19 +55,19 @@ class Validator {
 
 entry main {
     StandardArray nums = StandardArray(8)
-    address a0 = cast<address>(-5)
+    address a0 = address (-5)
     nums.push(a0)
-    address a1 = cast<address>(0)
+    address a1 = address (0)
     nums.push(a1)
-    address a2 = cast<address>(3)
+    address a2 = address (3)
     nums.push(a2)
-    address a3 = cast<address>(8)
+    address a3 = address (8)
     nums.push(a3)
-    address a4 = cast<address>(-2)
+    address a4 = address (-2)
     nums.push(a4)
-    address a5 = cast<address>(12)
+    address a5 = address (12)
     nums.push(a5)
-    address a6 = cast<address>(7)
+    address a6 = address (7)
     nums.push(a6)
 
     int n = nums.len()

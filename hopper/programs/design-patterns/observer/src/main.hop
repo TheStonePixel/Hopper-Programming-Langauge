@@ -57,7 +57,7 @@ class Observable {
         int i = 0
         while (i < self.listeners.len()) {
             address fn = self.listeners.get(i)
-            callback(int, int) int handler = cast<address>(fn)
+            callback(int, int) int handler = address (fn)
             handler(old, newVal)
             i = i + 1
         }

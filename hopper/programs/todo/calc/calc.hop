@@ -23,10 +23,10 @@ function mod(int a, int b) int { return a % b }
 // ── stack helpers ─────────────────────────────────────────────────────────────
 
 function applyBin(StandardArray stack, callback(int, int) int op) {
-    int b = cast<int>(stack.pop())
-    int a = cast<int>(stack.pop())
+    int b = int (stack.pop())
+    int a = int (stack.pop())
     int r = op(a, b)
-    address _r = cast<address>(r)
+    address _r = address (r)
     stack.push(_r)
 }
 
@@ -35,7 +35,7 @@ function applyBin(StandardArray stack, callback(int, int) int op) {
 function fold(StandardArray arr, int acc, callback(int, int) int fn) int {
     int i = 0
     while (i < arr.len()) {
-        int v = cast<int>(arr.get(i))
+        int v = int (arr.get(i))
         acc = fn(acc, v)
         i = i + 1
     }
@@ -51,42 +51,42 @@ entry main {
     // ── basic RPN expressions ─────────────────────────────────────────────────
 
     // 3 4 + 2 * = 14
-    address _3 = cast<address>(3)
+    address _3 = address (3)
     stack.push(_3)
-    address _4 = cast<address>(4)
+    address _4 = address (4)
     stack.push(_4)
     applyBin(stack, add)
-    address _2 = cast<address>(2)
+    address _2 = address (2)
     stack.push(_2)
     applyBin(stack, mul)
-    int r1 = cast<int>(stack.pop())
+    int r1 = int (stack.pop())
     printf("3 4 + 2 *        = %lld\n", r1)
 
     // 5 1 2 + 4 * + 3 - = 14
-    address _5 = cast<address>(5)
+    address _5 = address (5)
     stack.push(_5)
-    address _1a = cast<address>(1)
+    address _1a = address (1)
     stack.push(_1a)
-    address _2b = cast<address>(2)
+    address _2b = address (2)
     stack.push(_2b)
     applyBin(stack, add)
-    address _4b = cast<address>(4)
+    address _4b = address (4)
     stack.push(_4b)
     applyBin(stack, mul)
     applyBin(stack, add)
-    address _3b = cast<address>(3)
+    address _3b = address (3)
     stack.push(_3b)
     applyBin(stack, sub)
-    int r2 = cast<int>(stack.pop())
+    int r2 = int (stack.pop())
     printf("5 1 2 + 4 * + 3 -= %lld\n", r2)
 
     // 100 7 mod = 2
-    address _100 = cast<address>(100)
+    address _100 = address (100)
     stack.push(_100)
-    address _7 = cast<address>(7)
+    address _7 = address (7)
     stack.push(_7)
     applyBin(stack, mod)
-    int r3 = cast<int>(stack.pop())
+    int r3 = int (stack.pop())
     printf("100 7 mod        = %lld\n", r3)
 
     // ── math module ───────────────────────────────────────────────────────────
@@ -111,13 +111,13 @@ entry main {
     int i = 0
     while (i < ops.len()) {
         address fnAddr = ops.get(i)
-        callback(int, int) int op = cast<address>(fnAddr)
-        address _10 = cast<address>(10)
+        callback(int, int) int op = address (fnAddr)
+        address _10 = address (10)
         stack.push(_10)
-        address _3c = cast<address>(3)
+        address _3c = address (3)
         stack.push(_3c)
         applyBin(stack, op)
-        int rv = cast<int>(stack.pop())
+        int rv = int (stack.pop())
         printf("  op[%lld]: %lld\n", i, rv)
         i = i + 1
     }
@@ -125,15 +125,15 @@ entry main {
     // ── fold ──────────────────────────────────────────────────────────────────
 
     StandardArray nums = StandardArray(5)
-    address _n1 = cast<address>(1)
+    address _n1 = address (1)
     nums.push(_n1)
-    address _n2 = cast<address>(2)
+    address _n2 = address (2)
     nums.push(_n2)
-    address _n3 = cast<address>(3)
+    address _n3 = address (3)
     nums.push(_n3)
-    address _n4 = cast<address>(4)
+    address _n4 = address (4)
     nums.push(_n4)
-    address _n5 = cast<address>(5)
+    address _n5 = address (5)
     nums.push(_n5)
 
     int sum = fold(nums, 0, add)

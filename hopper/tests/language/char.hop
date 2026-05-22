@@ -14,7 +14,7 @@ entry main {
     printf("%c\n", c)
 
     // cast char to int to get its numeric value (65 for 'A')
-    int n = cast<int>(c)
+    int n = int (c)
     printf("%ld\n", n)
 
     // comparison: if (c == 'A')
@@ -24,7 +24,7 @@ entry main {
 
     // escape sequence: '\n' is newline (value 10)
     char nl = '\n'
-    int nl_val = cast<int>(nl)
+    int nl_val = int (nl)
     if (nl_val == 10) {
         printf("newline ok\n")
     }

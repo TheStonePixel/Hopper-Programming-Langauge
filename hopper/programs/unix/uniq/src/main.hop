@@ -23,8 +23,8 @@ function strEq(address a, int alen, address b, int blen) bool {
         address bp = b + i
         byte ab = ap::value
         byte bb = bp::value
-        int ac = cast<int>(ab)
-        int bc = cast<int>(bb)
+        int ac = int (ab)
+        int bc = int (bb)
         if (ac != bc) { return false }
         i = i + 1
     }
@@ -59,7 +59,7 @@ function emitCount(int count, address line, int len, address outbuf) int {
     } else {
         while (c > 0) {
             int dval = c % 10 + 48
-            byte db = cast<byte>(dval)
+            byte db = byte (dval)
             address tp = tmp + digits
             tp::value = db
             digits = digits + 1
@@ -165,7 +165,7 @@ function uniqFd(int fd, int flagC, int flagD, int flagU) {
                     while (i < blkend) {
                         address ip = inbuf + i
                         byte b = ip::value
-                        int bi = cast<int>(b)
+                        int bi = int (b)
                         if (bi == 10) {
                             if (count == 0) {
                                 copyLine(curbuf, curlen, prevbuf)
@@ -199,7 +199,7 @@ function uniqFd(int fd, int flagC, int flagD, int flagU) {
             while (i < nr) {
                 address ip = inbuf + i
                 byte b = ip::value
-                int bi = cast<int>(b)
+                int bi = int (b)
                 if (bi == 10) {
                     if (count == 0) {
                         copyLine(curbuf, curlen, prevbuf)
@@ -253,14 +253,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast<int>(a0)
+        int a0i = int (a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast<int>(fc)
+                int fci = int (fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 99) {

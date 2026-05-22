@@ -27,7 +27,7 @@ function print(int n) {
     int start = 0
     int end = 0
     if (n < 0) {
-        byte minus = cast<byte>(45)
+        byte minus = byte (45)
         buf::value = minus
         start = 1
         end = 1
@@ -35,7 +35,7 @@ function print(int n) {
     }
     while (n > 0) {
         int d = n % 10
-        byte db = cast<byte>((d + 48))
+        byte db = byte ((d + 48))
         address tp = buf + end
         tp::value = db
         n = n / 10
@@ -80,7 +80,7 @@ function print(address s) {
     while (true) {
         address p = s + len
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         if (bi == 0) { break }
         len = len + 1
     }
@@ -125,7 +125,7 @@ function readLine(address buf, int maxLen) int {
             return total
         }
         byte b = tmp::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         if (bi == 10) {
             deallocate tmp
             return total
@@ -146,7 +146,7 @@ function parseInt(address buf, int len) int {
     if (len > 0) {
         address first = buf
         byte fc = first::value
-        int fci = cast<int>(fc)
+        int fci = int (fc)
         if (fci == 45) {
             neg = 1
             i = 1
@@ -155,7 +155,7 @@ function parseInt(address buf, int len) int {
     while (i < len) {
         address p = buf + i
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         if (bi >= 48) {
             if (bi <= 57) {
                 result = result * 10 + (bi - 48)

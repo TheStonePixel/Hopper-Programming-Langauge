@@ -56,7 +56,7 @@ function wcFd(int fd, address linesOut, address wordsOut, address bytesOut) {
             while (ci < nr) {
                 address cp = chunk + ci
                 byte b = cp::value
-                int bi = cast<int>(b)
+                int bi = int (b)
                 bool isSpace = false
                 if (bi == 32) { isSpace = true }
                 if (bi == 9)  { isSpace = true }
@@ -107,14 +107,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc && firstFile == 0) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast<int>(a0)
+        int a0i = int (a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast<int>(fc)
+                int fci = int (fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 108) {
@@ -170,7 +170,7 @@ entry main(int argc, string[] argv) {
         }
 
         if (fileCount > 1) {
-            address totalStr = cast<address>("total")
+            address totalStr = address ("total")
             printCounts(totalLines, totalWords, totalBytes, showL, showW, showC, totalStr)
         }
     }

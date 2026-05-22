@@ -6,7 +6,7 @@ function _ioStrLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         if (bi == 0) { break }
         n = n + 1
     }

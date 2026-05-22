@@ -67,7 +67,7 @@ class StandardStringBuilder implements StringBuilder {
         while (true) {
             address p = s + i
             byte b = p::value
-            int bv = cast<int>(b)
+            int bv = int (b)
             if (bv == 0) { break }
             self.appendChar(b)
             i = i + 1
@@ -91,7 +91,7 @@ class StandardStringBuilder implements StringBuilder {
             int digit = n - (n / 10) * 10
             int dch = digit + 48
             address p = tmp + count
-            byte b = cast<byte>(dch)
+            byte b = byte (dch)
             p::value = b
             count = count + 1
             n = n / 10

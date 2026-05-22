@@ -29,7 +29,7 @@ class Shape {
     }
 
     function accept(address visitor) int {
-        callback(int, int, int) int fn = cast<address>(visitor)
+        callback(int, int, int) int fn = address (visitor)
         return fn(self.kind, self.a, self.b)
     }
 }

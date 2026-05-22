@@ -17,7 +17,7 @@ function strLen(address s) int {
     while (true) {
         address p = s + n
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         if (bi == 0) { return n }
         n = n + 1
     }
@@ -30,8 +30,8 @@ function strEq(address a, address b) bool {
         address bp = b + i
         byte ab = ap::value
         byte bb = bp::value
-        int ac = cast<int>(ab)
-        int bc = cast<int>(bb)
+        int ac = int (ab)
+        int bc = int (bb)
         if (ac != bc) { return false }
         if (ac == 0)  { return true }
         i = i + 1
@@ -46,7 +46,7 @@ function parseInt(address s) int {
     while (!done) {
         address p = s + i
         byte b = p::value
-        int c = cast<int>(b)
+        int c = int (b)
         if (c >= 48 && c <= 57) {
             n = n * 10 + c - 48
             i = i + 1
@@ -68,10 +68,10 @@ function globMatch(address pat, address name) bool {
     while (running) {
         address pp = pat + pi
         byte pb = pp::value
-        int pc = cast<int>(pb)
+        int pc = int (pb)
         address np = name + ni
         byte nb = np::value
-        int nc = cast<int>(nb)
+        int nc = int (nb)
 
         if (pc == 0 && nc == 0) {
             matched = true
@@ -103,21 +103,21 @@ function direntReclen(address e) int {
 function direntType(address e) int {
     address tp = e + 18
     byte t = tp::value
-    return cast<int>(t)
+    return int (t)
 }
 
 function isDot(address name) bool {
     byte b0 = name::value
-    int i0 = cast<int>(b0)
+    int i0 = int (b0)
     if (i0 != 46) { return false }
     address p1 = name + 1
     byte b1 = p1::value
-    int i1 = cast<int>(b1)
+    int i1 = int (b1)
     if (i1 == 0) { return true }
     if (i1 != 46) { return false }
     address p2 = name + 2
     byte b2 = p2::value
-    int i2 = cast<int>(b2)
+    int i2 = int (b2)
     return i2 == 0
 }
 
@@ -132,7 +132,7 @@ function buildPath(address dir, int dlen, address name, address out) int {
     }
     address lastp = dir + dlen - 1
     byte lastb = lastp::value
-    int lasti = cast<int>(lastb)
+    int lasti = int (lastb)
     int pos = dlen
     if (lasti != 47) {
         address slashp = out + pos
@@ -150,7 +150,7 @@ function buildPath(address dir, int dlen, address name, address out) int {
         ni = ni + 1
     }
     address termp = out + pos + nlen
-    byte nul = cast<byte>(0)
+    byte nul = byte (0)
     termp::value = nul
     return pos + nlen
 }
@@ -213,7 +213,7 @@ function doFind(address path, address namePattern, int typeFilter, int maxDepth,
 }
 
 entry main(int argc, string[] argv) {
-    address startPath = cast<address>(".")
+    address startPath = address (".")
     address namePattern = null
     int typeFilter      = 0
     int maxDepth        = -1
@@ -222,11 +222,11 @@ entry main(int argc, string[] argv) {
     while (ai < argc) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast<int>(a0)
+        int a0i = int (a0)
         if (a0i == 45) {
-            address nflag = cast<address>("-name")
-            address tflag = cast<address>("-type")
-            address mflag = cast<address>("-maxdepth")
+            address nflag = address ("-name")
+            address tflag = address ("-type")
+            address mflag = address ("-maxdepth")
             if (strEq(arg, nflag)) {
                 if (ai + 1 < argc) {
                     namePattern = argv[ai + 1]
@@ -238,7 +238,7 @@ entry main(int argc, string[] argv) {
                 if (ai + 1 < argc) {
                     address tv = argv[ai + 1]
                     byte tvb = tv::value
-                    typeFilter = cast<int>(tvb)
+                    typeFilter = int (tvb)
                     ai = ai + 2
                 } else {
                     ai = ai + 1

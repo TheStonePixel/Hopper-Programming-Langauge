@@ -1,0 +1,13 @@
+{
+  "name": "cast",
+  "version": "0.1.0",
+  "description": "Type conversion functions — the only place casting lives in Hopper",
+  "license": "MIT",
+  "type": "library",
+  "exports": {
+    "Cast": {
+      "interface":      "interfaces/Cast.hop",
+      "implementation": "src/Cast.hop"
+    }
+  }
+}

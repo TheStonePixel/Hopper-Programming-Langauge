@@ -20,13 +20,13 @@ enum Limits {
 function getLine(address lineArr, int i) address {
     address slot = lineArr + (i * 8)
     int val = slot::value
-    address ptr = cast<address>(val)
+    address ptr = address (val)
     return ptr
 }
 
 function setLine(address lineArr, int i, address ptr) {
     address slot = lineArr + (i * 8)
-    int val = cast<int>(ptr)
+    int val = int (ptr)
     slot::value = val
 }
 
@@ -46,8 +46,8 @@ function strCmp(address a, address b) int {
         address bp = b + i
         byte ab = ap::value
         byte bb = bp::value
-        int ac = cast<int>(ab)
-        int bc = cast<int>(bb)
+        int ac = int (ab)
+        int bc = int (bb)
         ac = ac & 0xFF
         bc = bc & 0xFF
         if (ac != bc) {
@@ -170,7 +170,7 @@ function indexLines(address inputBuf, int scanStart, int endPos, address lineArr
     while (i < endPos) {
         address p = inputBuf + i
         byte b = p::value
-        int c = cast<int>(b)
+        int c = int (b)
         if (c == 10) {
             byte z = 0
             p::value = z
@@ -211,7 +211,7 @@ function sortTop(address lineArr, address tempArr, int lo, int hi, bool reverse)
     while (i <= hi) {
         address line = getLine(lineArr, i)
         byte fb = line::value
-        int fbi = cast<int>(fb)
+        int fbi = int (fb)
         fbi = fbi & 0xFF
         int key = fbi
         if (reverse) { key = 255 - fbi }
@@ -248,7 +248,7 @@ function sortTop(address lineArr, address tempArr, int lo, int hi, bool reverse)
     while (i <= hi) {
         address line = getLine(lineArr, i)
         byte fb = line::value
-        int fbi = cast<int>(fb)
+        int fbi = int (fb)
         fbi = fbi & 0xFF
         int key = fbi
         if (reverse) { key = 255 - fbi }
@@ -321,7 +321,7 @@ function writeLines(address lineArr, int lineCount, bool unique) {
             while (!lineEnd) {
                 address sp = line + j
                 byte b = sp::value
-                int c = cast<int>(b)
+                int c = int (b)
                 if (c == 0) {
                     lineEnd = true
                 } else {
@@ -364,14 +364,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc && firstFile == 0) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast<int>(a0)
+        int a0i = int (a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast<int>(fc)
+                int fci = int (fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 114) {

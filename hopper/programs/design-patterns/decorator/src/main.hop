@@ -43,7 +43,7 @@ class LogDecorator {
     }
 
     function call(int arg) int {
-        callback(int) int fn = cast<address>(self.inner)
+        callback(int) int fn = address (self.inner)
         int result = fn(arg)
         printf("[%s] %lld -> %lld\n", self.name, arg, result)
         return result
@@ -70,7 +70,7 @@ class MemoDecorator {
             printf("[memo  hit] %lld -> %lld\n", arg, self.cachedResult)
             return self.cachedResult
         }
-        callback(int) int fn = cast<address>(self.inner)
+        callback(int) int fn = address (self.inner)
         int result = fn(arg)
         self.cachedArg    = arg
         self.cachedResult = result

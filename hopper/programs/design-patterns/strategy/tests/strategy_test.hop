@@ -26,7 +26,7 @@ function countPassing(StandardArray nums, callback(int) int pred) int {
     int count = 0
     int i = 0
     while (i < nums.len()) {
-        int v = cast<int>(nums.get(i))
+        int v = int (nums.get(i))
         if (pred(v) == 1) {
             count = count + 1
         }
@@ -37,19 +37,19 @@ function countPassing(StandardArray nums, callback(int) int pred) int {
 
 entry main {
     StandardArray nums = StandardArray(8)
-    address _n0 = cast<address>(-5)
+    address _n0 = address (-5)
     nums.push(_n0)
-    address _n1 = cast<address>(0)
+    address _n1 = address (0)
     nums.push(_n1)
-    address _n2 = cast<address>(3)
+    address _n2 = address (3)
     nums.push(_n2)
-    address _n3 = cast<address>(8)
+    address _n3 = address (8)
     nums.push(_n3)
-    address _n4 = cast<address>(-2)
+    address _n4 = address (-2)
     nums.push(_n4)
-    address _n5 = cast<address>(12)
+    address _n5 = address (12)
     nums.push(_n5)
-    address _n6 = cast<address>(7)
+    address _n6 = address (7)
     nums.push(_n6)
 
     int n = nums.len()

@@ -31,7 +31,7 @@ function writeLineNum(int lineNum, address numBuf) {
     while (m > 0) {
         int digit = m % 10
         int dc = digit + 48
-        byte db = cast<byte>(dc)
+        byte db = byte (dc)
         address dp = numBuf + pos
         dp::value = db
         m = m / 10
@@ -68,7 +68,7 @@ function catFd(int fd, address buf, address numBuf, int lineNum, bool showN) int
                 while (j < nr) {
                     address p = buf + j
                     byte b = p::value
-                    int c = cast<int>(b)
+                    int c = int (b)
                     if (c == 10) {
                         foundNl = true
                         break
@@ -108,14 +108,14 @@ entry main(int argc, string[] argv) {
     while (ai < argc && firstFile == 0) {
         address arg = argv[ai]
         byte a0 = arg::value
-        int a0i = cast<int>(a0)
+        int a0i = int (a0)
         if (a0i == 45) {
             int fi = 1
             bool done = false
             while (!done) {
                 address fp = arg + fi
                 byte fc = fp::value
-                int fci = cast<int>(fc)
+                int fci = int (fc)
                 if (fci == 0) {
                     done = true
                 } else if (fci == 110) {

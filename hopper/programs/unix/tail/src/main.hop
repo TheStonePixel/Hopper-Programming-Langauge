@@ -24,7 +24,7 @@ function parseInt(address s) int {
     while (!done) {
         address p = s + i
         byte b = p::value
-        int c = cast<int>(b)
+        int c = int (b)
         if (c >= 48 && c <= 57) {
             result = result * 10 + (c - 48)
             i = i + 1
@@ -44,7 +44,7 @@ function findTailOffset(address buf, int len, int n) int {
     if (i >= 0) {
         address p = buf + i
         byte b = p::value
-        int c = cast<int>(b)
+        int c = int (b)
         if (c == 10) {
             i = i - 1
         }
@@ -52,7 +52,7 @@ function findTailOffset(address buf, int len, int n) int {
     while (i >= 0) {
         address p = buf + i
         byte b = p::value
-        int c = cast<int>(b)
+        int c = int (b)
         if (c == 10) {
             count = count + 1
             if (count == n) {
@@ -103,7 +103,7 @@ function tailSeekable(int fd, address buf, int maxLines) {
             if (remaining + nr == fileSize) {
                 address p = buf + i
                 byte b = p::value
-                int c = cast<int>(b)
+                int c = int (b)
                 if (c == 10) {
                     i = i - 1
                 }
@@ -111,7 +111,7 @@ function tailSeekable(int fd, address buf, int maxLines) {
             while (i >= 0 && !found) {
                 address p = buf + i
                 byte b = p::value
-                int c = cast<int>(b)
+                int c = int (b)
                 if (c == 10) {
                     count = count + 1
                     if (count == maxLines) {
@@ -159,11 +159,11 @@ entry main(int argc, string[] argv) {
         address arg = argv[ai]
         address p0 = arg
         byte b0 = p0::value
-        int c0 = cast<int>(b0)
+        int c0 = int (b0)
         if (c0 == 45) {
             address p1 = arg + 1
             byte b1 = p1::value
-            int c1 = cast<int>(b1)
+            int c1 = int (b1)
             if (c1 == 110) {
                 ai = ai + 1
                 if (ai < argc) {

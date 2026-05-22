@@ -51,7 +51,7 @@ class Editor {
     }
 
     function open_file(string path) {
-        address pathp = cast<address>(path)
+        address pathp = address (path)
         int plen = 0
         while (true) {
             address cp = pathp + plen
@@ -362,7 +362,7 @@ class Editor {
             return
         }
         if (code == KeyCode.CHAR && val >= 32 && val < 127) {
-            byte bval = cast<byte>(val)
+            byte bval = byte (val)
             self.buf.insert_char(self.cy, self.cx, bval)
             self.cx = self.cx + 1
         }
@@ -388,7 +388,7 @@ class Editor {
         }
         if (code == KeyCode.CHAR && val >= 32 && val < 127 && self.cmdlen < 126) {
             address cp = self.cmdbuf + self.cmdlen
-            byte bval = cast<byte>(val)
+            byte bval = byte (val)
             cp::value = bval
             self.cmdlen = self.cmdlen + 1
         }

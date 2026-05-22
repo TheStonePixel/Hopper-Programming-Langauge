@@ -190,11 +190,11 @@ class X86SIMD implements SIMD {
         while (i < count) {
             address sp = src + i
             byte b = sp::value
-            int bi = cast<int>(b)
+            int bi = int (b)
             address dp = dst + i
             if (bi >= lo && bi <= hi) {
                 int mapped = bi ^ xorVal
-                byte mb = cast<byte>(mapped)
+                byte mb = byte (mapped)
                 dp::value = mb
             } else {
                 dp::value = b

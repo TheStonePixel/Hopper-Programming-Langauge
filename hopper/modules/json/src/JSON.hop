@@ -57,7 +57,7 @@ class JsonReader implements JSON {
         if (self.pos >= self.dataLen) { return -1 }
         address p = self.data + self.pos
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         return bi
     }
 
@@ -65,7 +65,7 @@ class JsonReader implements JSON {
         if (self.pos >= self.dataLen) { return -1 }
         address p = self.data + self.pos
         byte b = p::value
-        int bi = cast<int>(b)
+        int bi = int (b)
         self.pos = self.pos + 1
         return bi
     }
@@ -122,7 +122,7 @@ class JsonReader implements JSON {
                 buf    = nb
                 bufCap = newCap
             }
-            byte cb = cast<byte>(c)
+            byte cb = byte (c)
             address wp = buf + bufLen
             wp::value = cb
             bufLen = bufLen + 1

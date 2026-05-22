@@ -10,8 +10,8 @@ import Core from core
 import Algo from algo
 
 function intCmp(address a, address b) int {
-    int ia = cast<int>(a)
-    int ib = cast<int>(b)
+    int ia = int (a)
+    int ib = int (b)
     if (ia < ib) { return -1 }
     if (ia > ib) { return 1 }
     return 0
@@ -26,9 +26,9 @@ entry main {
     address p0 = arr1
     address p1 = arr1 + 8
     address p2 = arr1 + 16
-    address v3 = cast<address>(3)
-    address v1 = cast<address>(1)
-    address v2 = cast<address>(2)
+    address v3 = address (3)
+    address v1 = address (1)
+    address v2 = address (2)
     p0::value = v3
     p1::value = v1
     p2::value = v2
@@ -37,8 +37,8 @@ entry main {
     address r0 = arr1::value
     address r1ptr = arr1 + 8
     address r1 = r1ptr::value
-    int r0i = cast<int>(r0)
-    int r1i = cast<int>(r1)
+    int r0i = int (r0)
+    int r1i = int (r1)
     t.checkEq(r0i < r1i, 1, "insertionSort ordered")
     t.checkEq(r0i, 1, "insertionSort smallest first")
     deallocate arr1
@@ -49,10 +49,10 @@ entry main {
     address q1 = arr2 + 8
     address q2 = arr2 + 16
     address q3 = arr2 + 24
-    address v5 = cast<address>(5)
-    address v8 = cast<address>(8)
-    address v4 = cast<address>(4)
-    address v9 = cast<address>(9)
+    address v5 = address (5)
+    address v8 = address (8)
+    address v4 = address (4)
+    address v9 = address (9)
     q0::value = v5
     q1::value = v8
     q2::value = v4
@@ -62,8 +62,8 @@ entry main {
     address qa = arr2::value
     address qb_ptr = arr2 + 8
     address qb = qb_ptr::value
-    int qai = cast<int>(qa)
-    int qbi = cast<int>(qb)
+    int qai = int (qa)
+    int qbi = int (qb)
     t.checkEq(qai < qbi, 1, "quickSort ordered")
     t.checkEq(qai, 4, "quickSort smallest first")
     deallocate arr2
@@ -73,9 +73,9 @@ entry main {
     address m0 = arr3
     address m1 = arr3 + 8
     address m2 = arr3 + 16
-    address v7 = cast<address>(7)
-    address v6 = cast<address>(6)
-    address v10 = cast<address>(10)
+    address v7 = address (7)
+    address v6 = address (6)
+    address v10 = address (10)
     m0::value = v7
     m1::value = v6
     m2::value = v10
@@ -84,8 +84,8 @@ entry main {
     address ma = arr3::value
     address mb_ptr = arr3 + 8
     address mb = mb_ptr::value
-    int mai = cast<int>(ma)
-    int mbi = cast<int>(mb)
+    int mai = int (ma)
+    int mbi = int (mb)
     t.checkEq(mai < mbi, 1, "mergeSort ordered")
     t.checkEq(mai, 6, "mergeSort smallest first")
     deallocate arr3

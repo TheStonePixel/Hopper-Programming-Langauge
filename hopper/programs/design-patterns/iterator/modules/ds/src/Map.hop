@@ -14,7 +14,7 @@ class StandardMap implements Map {
         int i = 0
         while (i < initialCap) {
             address p = self.used + i * 8
-            address z = cast<address>(0)
+            address z = address (0)
             p::value = z
             i = i + 1
         }
@@ -32,7 +32,7 @@ class StandardMap implements Map {
         while (true) {
             address p = key + i
             byte b = p::value
-            int bv = cast<int>(b)
+            int bv = int (b)
             if (bv == 0) { break }
             h = h * 1099511628211
             h = h ^ bv
@@ -50,7 +50,7 @@ class StandardMap implements Map {
         while (i < self.capacity) {
             address up = self.used + idx * 8
             address uv = up::value
-            int us = cast<int>(uv)
+            int us = int (uv)
             if (us == 0) {
                 if (first >= 0) { return first }
                 return idx
@@ -84,7 +84,7 @@ class StandardMap implements Map {
         int i = 0
         while (i < newCap) {
             address p = self.used + i * 8
-            address z = cast<address>(0)
+            address z = address (0)
             p::value = z
             i = i + 1
         }
@@ -92,7 +92,7 @@ class StandardMap implements Map {
         while (i < oldCap) {
             address up = oldU + i * 8
             address uv = up::value
-            int us = cast<int>(uv)
+            int us = int (uv)
             if (us == 1) {
                 address kp = oldK + i * 8
                 address vp = oldV + i * 8
@@ -114,21 +114,21 @@ class StandardMap implements Map {
         if (idx < 0) { return false }
         address up = self.used + idx * 8
         address uv = up::value
-        int us = cast<int>(uv)
+        int us = int (uv)
         return us == 1
     }
 
     function get(address key) address {
         int idx = self._probe(key)
         if (idx < 0) {
-            address z = cast<address>(0)
+            address z = address (0)
             return z
         }
         address up = self.used + idx * 8
         address uv = up::value
-        int us = cast<int>(uv)
+        int us = int (uv)
         if (us != 1) {
-            address z = cast<address>(0)
+            address z = address (0)
             return z
         }
         address vp = self.vals + idx * 8
@@ -143,13 +143,13 @@ class StandardMap implements Map {
         int idx = self._probe(key)
         address up = self.used + idx * 8
         address uv = up::value
-        int us = cast<int>(uv)
+        int us = int (uv)
         if (us != 1) { self.length = self.length + 1 }
         address kp = self.keys + idx * 8
         address vp = self.vals + idx * 8
         kp::value = key
         vp::value = val
-        address one = cast<address>(1)
+        address one = address (1)
         up::value = one
     }
 
@@ -158,9 +158,9 @@ class StandardMap implements Map {
         if (idx < 0) { return }
         address up = self.used + idx * 8
         address uv = up::value
-        int us = cast<int>(uv)
+        int us = int (uv)
         if (us != 1) { return }
-        address two = cast<address>(2)
+        address two = address (2)
         up::value = two
         self.length = self.length - 1
     }

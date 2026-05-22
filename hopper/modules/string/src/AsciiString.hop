@@ -54,8 +54,8 @@ class AsciiString implements IString {
             address op = other + i
             byte sb = sp::value
             byte ob = op::value
-            int sv = cast<int>(sb)
-            int ov = cast<int>(ob)
+            int sv = int (sb)
+            int ov = int (ob)
             if (sv != ov) { return false }
             if (sv == 0)  { return true }
             i = i + 1
@@ -71,11 +71,11 @@ class AsciiString implements IString {
             while (true) {
                 address sp = sub + j
                 byte sb = sp::value
-                int sv = cast<int>(sb)
+                int sv = int (sb)
                 if (sv == 0) { break }
                 address dp = self.data + i + j
                 byte db = dp::value
-                int dv = cast<int>(db)
+                int dv = int (db)
                 if (sv != dv) {
                     match = false
                     break
@@ -95,12 +95,12 @@ class AsciiString implements IString {
         while (true) {
             address pp = prefix + i
             byte pb = pp::value
-            int pv = cast<int>(pb)
+            int pv = int (pb)
             if (pv == 0) { return true }
             if (i >= self.length) { return false }
             address dp = self.data + i
             byte db = dp::value
-            int dv = cast<int>(db)
+            int dv = int (db)
             if (pv != dv) { return false }
             i = i + 1
         }
@@ -112,7 +112,7 @@ class AsciiString implements IString {
         while (true) {
             address p = suffix + slen
             byte b = p::value
-            int v = cast<int>(b)
+            int v = int (b)
             if (v == 0) { break }
             slen = slen + 1
         }
@@ -124,8 +124,8 @@ class AsciiString implements IString {
             address dp = self.data + offset + i
             byte sb = sp::value
             byte db = dp::value
-            int sv = cast<int>(sb)
-            int dv = cast<int>(db)
+            int sv = int (sb)
+            int dv = int (db)
             if (sv != dv) { return false }
             i = i + 1
         }
@@ -159,7 +159,7 @@ class AsciiString implements IString {
         while (true) {
             address p = src + i
             byte b = p::value
-            int v = cast<int>(b)
+            int v = int (b)
             if (v == 0) { break }
             self.appendChar(b)
             i = i + 1
@@ -182,7 +182,7 @@ class AsciiString implements IString {
         while (n > 0) {
             int digit = n - (n / 10) * 10
             int dch = digit + 48
-            byte db = cast<byte>(dch)
+            byte db = byte (dch)
             address p = tmp + count
             p::value = db
             count = count + 1
@@ -218,7 +218,7 @@ class AsciiString implements IString {
         while (i < self.length) {
             address p = self.data + i
             byte b = p::value
-            int v = cast<int>(b)
+            int v = int (b)
             if (v != 32) {
                 if (v != 9) {
                     if (v != 10) {
@@ -247,7 +247,7 @@ class AsciiString implements IString {
         while (self.length > 0) {
             address p = self.data + self.length - 1
             byte b = p::value
-            int v = cast<int>(b)
+            int v = int (b)
             if (v != 32) {
                 if (v != 9) {
                     if (v != 10) {

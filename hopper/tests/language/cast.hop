@@ -8,17 +8,17 @@ extern function printf(String fmt, ...) int
 entry main {
     // float → int truncation (fptosi): 3.14 → 3
     float pi = 3.14
-    int int_val = cast<int>(pi)
+    int int_val = int (pi)
     printf("pi_truncated: %ld\n", int_val)
 
     // int → float (sitofp): 7 → 7.0
     int seven = 7
-    float float_val = cast<float>(seven)
+    float float_val = float (seven)
     printf("float_val: %f\n", float_val)
 
     // float → int truncation (fptosi): 7.9 → 7
     float f2 = 7.9
-    int back_to_int = cast<int>(f2)
+    int back_to_int = int (f2)
     printf("back_to_int: %ld\n", back_to_int)
 
 }

@@ -317,8 +317,7 @@ castType
     | 'unsigned' 'byte'
     ;
 primary
-    : 'cast' '<' castType '>' '(' expression ')'
-    | IntegerLiteral
+    : IntegerLiteral
     | HexLiteral
     | CharLiteral
     | UnicodeLiteral
