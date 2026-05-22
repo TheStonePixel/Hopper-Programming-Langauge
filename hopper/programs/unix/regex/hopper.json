@@ -1,7 +1,7 @@
 {
   "name": "regex",
   "version": "0.1.0",
-  "description": "grep-like line search — regex flags, recursive, stdin, case-insensitive",
+  "description": "grep-like line search \u2014 regex flags, recursive, stdin, case-insensitive",
   "license": "MIT",
   "type": "executable",
   "entry": "src/main.hop",
@@ -18,12 +18,14 @@
       "IO": {
         "from": "linux",
         "interface": "../../modules/linux/interfaces/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "FileSystem": {
         "from": "linux",
         "interface": "../../modules/linux/interfaces/FileSystem.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "SIMD": {
         "from": "x86_64",

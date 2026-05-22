@@ -14,12 +14,14 @@
       "IO": {
         "from": "linux",
         "interface": "modules/linux/interfaces/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "FileSystem": {
         "from": "linux",
         "interface": "modules/linux/interfaces/FileSystem.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       }
     }
   }
