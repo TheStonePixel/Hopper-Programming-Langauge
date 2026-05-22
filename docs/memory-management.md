@@ -119,41 +119,49 @@ This is Hopper's RAII. The destructor is not implicit — it is a named, inspect
 
 Memory allocation is not globally fixed. It is composable through explicit strategy injection.
 
-Allocators are passed as typed function pointers — callbacks:
+Allocators are passed as callbacks — explicitly typed function references. A callback is declared by binding a name to a function signature:
 
 ```hopper
-callback(int) address    // allocator: takes size, returns address
-callback(address)        // deallocator: takes address, returns nothing
+callback alloc = allocate(int) address       // takes size, returns address
+callback free  = deallocate(address)         // takes address, returns nothing
 ```
 
-This enables allocator substitution without altering program logic:
+The format is `callback name = functionName(paramTypes) returnType`. The type includes the full signature — parameter types and return type — not just a generic function pointer. A function can also be passed directly by name as a callback argument without declaring a named variable first.
+
+This enables allocator substitution without altering pool logic:
 
 ```hopper
-Pool heap  = Pool(65536, allocate, deallocate)
-Pool debug = Pool(65536, trackedAlloc, trackedFree)
+callback heapAlloc = allocate(int) address
+callback heapFree  = deallocate(address)
+Pool heap = Pool(65536, heapAlloc, heapFree)
+
+callback mmapAlloc = mmapRegion(int) address
+callback mmapFree  = unmapRegion(address)
 Pool mapped = Pool(65536, mmapAlloc, mmapFree)
 ```
 
-Memory policy becomes a parameter, not a hidden runtime behavior. The `Pool` class stores its `alloc` and `free` callbacks and calls them in the constructor and destructor respectively — the same ownership structure, with the backing strategy externalised:
+Memory policy becomes a parameter, not a hidden runtime behavior. The `Pool` class accepts its allocation strategy in the constructor and stores the raw function addresses, casting them back to callback types when called:
 
 ```hopper
 class Pool {
     address region
     int capacity
     int used
-    callback(int) address alloc
-    callback(address) free
+    address allocFn
+    address freeFn
 
     constructor(int size, callback(int) address alloc, callback(address) free) {
-        self.alloc    = alloc
-        self.free     = free
+        self.allocFn  = alloc::address
+        self.freeFn   = free::address
         self.capacity = size
         self.used     = 0
-        self.region   = self.alloc(size)
+        callback(int) address doAlloc = cast self.allocFn
+        self.region = doAlloc(size)
     }
 
     destructor() {
-        self.free(self.region)
+        callback(address) doFree = cast self.freeFn
+        doFree(self.region)
     }
 
     function push(int size) address {
@@ -161,14 +169,14 @@ class Pool {
         if (self.used + aligned > self.capacity) {
             return cast 0
         }
-        address ptr   = self.region + self.used
-        self.used     = self.used + aligned
+        address ptr = self.region + self.used
+        self.used   = self.used + aligned
         return ptr
     }
 }
 ```
 
-The callback type is not a generic function pointer — it is the full signature. Passing a `callback(address)` where a `callback(int) address` is expected is a compile-time type error.
+`alloc::address` extracts the raw function address from the callback — the same `::address` qualifier used on variables. Storing it as `address` and casting back at the call site is how callbacks survive beyond the immediate call when held in a struct.
 
 ---
 
