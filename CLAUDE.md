@@ -265,10 +265,29 @@ deallocate ptr                  // free
 ```
 
 ### Casting
+
+Use `cast<T>(x)` — defined in `hopper/modules/cast/src/Cast.hop`, not baked into the compiler.
+
 ```hopper
-address p = cast someInt        // int → address
-int n = cast someAddress        // address → int
+int n     = cast<int>(3.9)        // float → int (truncates to 3)
+float f   = cast<float>(7)        // int → float
+address p = cast<address>(42)     // int → address
+byte b    = cast<byte>(300)       // int → byte (truncates to 44)
+bool flag = cast<bool>(1)         // int → bool
 ```
+
+All supported primitive conversions and their LLVM opcodes:
+
+| From \ To     | `int`      | `byte`     | `float`    | `bool`     | `address`  | `string`  |
+|---------------|------------|------------|------------|------------|------------|-----------|
+| `int`         | —          | `trunc`    | `sitofp`   | `icmp ne`  | `inttoptr` | —         |
+| `byte`        | `sext`     | —          | `sitofp`   | `icmp ne`  | —          | —         |
+| `float`       | `fptosi`   | `fptosi`   | —          | `fcmp une` | —          | —         |
+| `bool`        | `zext`     | `zext`     | `uitofp`   | —          | —          | —         |
+| `address`     | `ptrtoint` | —          | —          | —          | —          | `bitcast` |
+| `string`      | —          | —          | —          | —          | `bitcast`  | —         |
+
+Also available: `cast<unsigned int>`, `cast<unsigned byte>`, `cast<char>`, `cast<string>`.
 
 ---
 
