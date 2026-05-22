@@ -1,7 +1,7 @@
 import {
     classTypes, structTypes, enumTypes, mmioBindings,
     functionReturnTypes, overloadGroups, templateInstances, bitfieldTypes,
-    addStringConstant, wordBits, releaseMode,
+    addStringConstant, wordBits, releaseMode, templateFuncRegistry,
 } from "./codegenState.js";
 import {
     llvmType, normalizeType, isFloatType, isUnsigned,
@@ -906,6 +906,40 @@ export function genExpr(ir, expr) {
         case "CastExpr": {
             const inner = genExpr(ir, expr.expr);
             return emitCast(ir, inner.value, inner.type, expr.targetType);
+        }
+
+        case "TemplateFuncCall": {
+            const { name, typeArg, args } = expr;
+            const normT = normalizeType(typeArg);
+            const specs = templateFuncRegistry.get(name);
+            if (!specs) throw new Error(`No template function '${name}' defined`);
+
+            const evaled = args.map(a => genExpr(ir, a));
+
+            let spec = null;
+            for (const s of specs) {
+                if (s.typeParam !== normT) continue;
+                if (s.paramTypes.length !== evaled.length) continue;
+                const match = s.paramTypes.every((pt, i) => {
+                    const at = normalizeType(evaled[i].type);
+                    if (pt === at) return true;
+                    if ((pt === "byte" || pt === "char") && (at === "byte" || at === "char")) return true;
+                    if ((pt === "address" || pt === "string") && (at === "address" || at === "string")) return true;
+                    if ((pt === "int" || pt === "unsignedint") && (at === "int" || at === "unsignedint")) return true;
+                    return false;
+                });
+                if (match) { spec = s; break; }
+            }
+            if (!spec) throw new Error(`No cast<${typeArg}> specialization for argument type '${evaled[0]?.type}'`);
+
+            const argStr = evaled.map((e, i) => `${llvmType(normalizeType(spec.params[i].type))} ${e.value}`).join(", ");
+            if (!spec.returnType) {
+                ir.emit(`call void @${spec.mangledName}(${argStr})`);
+                return { value: "0", type: "int" };
+            }
+            const tmp = ir.newTmp();
+            ir.emit(`${tmp} = call ${llvmType(spec.returnType)} @${spec.mangledName}(${argStr})`);
+            return { value: tmp, type: spec.returnType };
         }
 
         case "AllocateExpr": {

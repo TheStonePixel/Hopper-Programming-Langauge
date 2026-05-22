@@ -4,7 +4,7 @@ import {
     stringConstants,
     classTypes, structTypes, interfaceDefs, typeAliases,
     functionReturnTypes, overloadGroups, templateDefs, instantiatedClasses,
-    mmioBindings, bitfieldTypes, enumTypes,
+    mmioBindings, bitfieldTypes, enumTypes, templateFuncRegistry,
     resetAll, registerStruct, registerClass,
     setWordBits, setReleaseMode,
     pushInstantiatedClass,
@@ -198,6 +198,27 @@ export function genModule(ast, opts = {}) {
         } else if (!fn._skip) {
             fnCode.push(genFunction(fn) + "\n\n");
         }
+    }
+
+    // Register and emit template function specializations
+    for (const tf of ast.templateFunctions || []) {
+        const paramTypes = (tf.params || []).map(p => normalizeType(p.type));
+        const mangledName = `__tmpl_${tf.name}__${normalizeType(tf.typeParam)}__${paramTypes.join('__')}`;
+        tf._mangledName = mangledName;
+        functionReturnTypes.set(mangledName, { returnType: tf.returnType, isVariadic: false, params: tf.params || [] });
+        if (!templateFuncRegistry.has(tf.name)) templateFuncRegistry.set(tf.name, []);
+        templateFuncRegistry.get(tf.name).push({
+            typeParam: normalizeType(tf.typeParam),
+            paramTypes,
+            mangledName,
+            returnType: tf.returnType,
+            params: tf.params || [],
+        });
+        // Emit as a regular function under the mangled name
+        const saved = tf.name;
+        tf.name = mangledName;
+        fnCode.push(genFunction(tf) + "\n\n");
+        tf.name = saved;
     }
 
     // Generate entry before emitting string constants so it contributes to the pool

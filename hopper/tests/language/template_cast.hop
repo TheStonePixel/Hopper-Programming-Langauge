@@ -1,0 +1,52 @@
+// TEST: template function cast — compile-time dispatch by type parameter
+// EXPECT: int from address: 42
+// EXPECT: address roundtrip: 1
+// EXPECT: int from byte: 100
+// EXPECT: byte from int: 44
+// EXPECT: int from float: 3
+// EXPECT: float from int: 7.000000
+// EXPECT: int from bool: 1
+// EXPECT: bool from int: 1
+
+extern function printf(string fmt, ...) int
+
+template function cast<int>(address src) int     { return int src      }
+template function cast<int>(byte src) int        { return int src      }
+template function cast<int>(float src) int       { return int src      }
+template function cast<int>(bool src) int        { return int src      }
+template function cast<address>(int src) address { return address src  }
+template function cast<byte>(int src) byte       { return byte src     }
+template function cast<float>(int src) float     { return float src    }
+template function cast<bool>(int src) bool       { return bool src     }
+
+entry main {
+    address p = cast<address>(42)
+    int n     = cast<int>(p)
+    printf("int from address: %lld\n", n)
+
+    address q  = cast<address>(1)
+    int qback  = cast<int>(q)
+    printf("address roundtrip: %lld\n", qback)
+
+    byte b  = 100
+    int bi  = cast<int>(b)
+    printf("int from byte: %lld\n", bi)
+
+    int big  = 300
+    byte sm  = cast<byte>(big)
+    printf("byte from int: %lld\n", cast<int>(sm))
+
+    float f  = 3.9
+    int fi   = cast<int>(f)
+    printf("int from float: %lld\n", fi)
+
+    float f2 = cast<float>(7)
+    printf("float from int: %f\n", f2)
+
+    bool t   = true
+    int ti   = cast<int>(t)
+    printf("int from bool: %lld\n", ti)
+
+    bool b2  = cast<bool>(5)
+    printf("bool from int: %lld\n", cast<int>(b2))
+}

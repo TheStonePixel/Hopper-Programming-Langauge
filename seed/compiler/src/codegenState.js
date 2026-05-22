@@ -12,6 +12,7 @@ export const templateInstances  = new Set();   // mangled names from monomorphiz
 export const mmioBindings       = new Map();   // name → { hType, llType, address (decimal) }
 export const bitfieldTypes      = new Map();   // name → BitfieldDecl
 export const enumTypes          = new Map();   // enum name → Map(variantName → int value)
+export const templateFuncRegistry = new Map(); // funcName → [{typeParam, paramTypes, mangledName, returnType, params}]
 export let   instantiatedClasses = [];         // concrete ClassDecl nodes produced by monomorphization
 export let   stringCounter = 0;
 export let   wordBits = 64;                    // native integer width: 64 for x86-64, 32 for ARM32
@@ -28,6 +29,7 @@ export function resetAll() {
     overloadGroups.clear();
     templateDefs.clear();
     templateInstances.clear();
+    templateFuncRegistry.clear();
     mmioBindings.clear();
     bitfieldTypes.clear();
     enumTypes.clear();
