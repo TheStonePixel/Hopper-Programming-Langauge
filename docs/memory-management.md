@@ -172,6 +172,98 @@ class Arena {
 }
 ```
 
+---
+
+## Callbacks: Function Pointers as First-Class Memory
+
+A callback in Hopper is an explicitly typed function pointer. The syntax names the parameter types and return type directly:
+
+```hopper
+callback(int) address       // takes int, returns address
+callback(address)           // takes address, returns nothing
+callback(int, int) int      // takes two ints, returns int
+```
+
+This is how Hopper resolves function pointer usage — no `void*` function pointers, no implicit casting between function signatures. The type of a callback is its full signature, visible at the declaration site.
+
+Callbacks are themselves addresses — the location of a function in memory. A callback stored in a struct field is simply an address that the program knows how to call. `myFn::address` gives you the raw address of the function if you need it.
+
+### Pluggable Allocators
+
+The most direct intersection of callbacks and memory management is the pluggable allocator. Rather than hardcoding `allocate` and `deallocate`, a class can accept its allocation strategy as callbacks:
+
+```hopper
+class Pool {
+    address region
+    int capacity
+    int used
+    callback(int) address alloc
+    callback(address) free
+
+    constructor(int size, callback(int) address alloc, callback(address) free) {
+        self.alloc = alloc
+        self.free  = free
+        self.capacity = size
+        self.used = 0
+        self.region = self.alloc(size)
+    }
+
+    destructor() {
+        self.free(self.region)
+    }
+
+    function push(int size) address {
+        int aligned = (size + 7) & -8
+        if (self.used + aligned > self.capacity) {
+            return cast 0
+        }
+        address ptr = self.region + self.used
+        self.used = self.used + aligned
+        return ptr
+    }
+}
+```
+
+The constructor takes `alloc` and `free` as callbacks and stores them. The destructor calls `self.free` — whichever function was passed in. The pool itself is agnostic about where the backing memory comes from:
+
+```hopper
+// system heap
+Pool heap = Pool(65536, allocate, deallocate)
+
+// mmap-backed — swap the strategy, same pool logic
+Pool mapped = Pool(65536, mmapAlloc, mmapFree)
+```
+
+The allocation strategy is a parameter, not a compile-time assumption. Testing with a fixed buffer, switching to a custom arena, or using a debug allocator that tracks every call — all of these become callback swaps, not rewrites.
+
+### Cleanup Callbacks
+
+Callbacks also express deferred or conditional cleanup — useful when the release point is not the same scope as the acquisition:
+
+```hopper
+class Deferred {
+    address resource
+    callback(address) cleanup
+
+    constructor(address resource, callback(address) cleanup) {
+        self.resource = resource
+        self.cleanup  = cleanup
+    }
+
+    destructor() {
+        self.cleanup(self.resource)
+    }
+}
+```
+
+`Deferred` holds any resource — a file descriptor, a mapped region, a heap allocation — and calls the provided cleanup function when it goes out of scope. The destructor is the same regardless of what the resource is. The callback carries the knowledge of how to release it.
+
+### Callbacks Are Typed and Explicit
+
+In C, function pointers decay to `void*` and can be cast between incompatible signatures silently. Hopper's callback type is not a generic pointer — it is the full function signature. Assigning a `callback(int) address` where a `callback(address)` is expected is a type error, caught at compile time.
+
+The callback type also participates in the `::size` model — a callback has a known size (it is an address-sized value), and its signature is part of its type identity rather than something inferred at the call site.
+
 `Arena` acquires one large region in its constructor and suballocates from it with a cursor. `reset()` rewinds without touching the OS. The single `deallocate` in the destructor releases everything. Programs using `Arena` never call `deallocate` on individual items — they reset or destroy the arena.
 
 ---
