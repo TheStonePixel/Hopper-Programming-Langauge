@@ -53,7 +53,7 @@ The intended endpoint of Hopper's compilation model is:
 
 All architecture-specific behavior — instructions, calling conventions, ABI rules, encoding, cost models — is defined externally in modules that are inspectable, replaceable, composable, and verifiable at build time.
 
-The compiler consumes these definitions rather than implementing them. Its role shifts from "machine model" to "optimization engine over declared machines."
+Instruction selection is not eliminated — it is relocated into ISA modules as declarative mappings consumed by the backend. The compiler consumes these definitions rather than implementing them. Its role shifts from "machine model" to "optimization engine over declared machines."
 
 ---
 
@@ -108,6 +108,8 @@ In the forward model, the backend is explicitly constrained to be ISA-agnostic. 
 - legality checking of transformations
 
 It does not contain instruction selection tables, architecture-specific lowering logic, ABI rules, or syscall encoding. Those are in ISA modules. The backend operates over declared machine descriptions — it does not contain them.
+
+Today, LLVM acts as the instruction emission layer — a legacy backend that currently holds the ISA knowledge this model intends to externalize. The path forward is progressive: LLVM's role is progressively isolated behind a defined ISA interface until what it provides can be described in modules rather than in a C++ compiler backend.
 
 ---
 
