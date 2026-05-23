@@ -42,4 +42,8 @@ entry main {
     // Error: TypeError — const cannot be reassigned
     const int limit = 100
     limit = 200
+
+    // Cascade — bad fails to declare, then cascade uses bad
+    int bad = notDeclared * 2
+    int cascade = bad + 1
 }

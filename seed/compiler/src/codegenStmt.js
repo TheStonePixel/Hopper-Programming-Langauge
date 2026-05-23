@@ -17,6 +17,7 @@ import {
 } from "./codegenExpr.js";
 import { HopperError, HopperWarning, ErrorType, WarnType } from "./errors.js";
 import { emitWarning, emitError } from "./codegenState.js";
+import { throwUndeclared } from "./codegenExpr.js";
 import {
     isReg, isSIMDReg, regLLVMType, regConstraint, simdClobbers, SYSCALL_CLOBBERS,
 } from "./x86.js";
@@ -160,8 +161,7 @@ export function genStmt(ir, stmt, retType) {
             }
 
             const v   = ir.vars.get(stmt.name);
-            if (!v) throw new HopperError(stmt.loc, ErrorType.UndeclaredVariable,
-                `'${stmt.name}' was used before being declared`,
+            if (!v) throwUndeclared(stmt.loc, stmt.name, ir,
                 `add 'int ${stmt.name} = ...' before this line`);
             if (v.isConst) throw new HopperError(stmt.loc, ErrorType.TypeError,
                 `'${stmt.name}' is declared const and cannot be reassigned`);
@@ -234,7 +234,7 @@ export function genStmt(ir, stmt, retType) {
             }
 
             const v = ir.vars.get(stmt.object);
-            if (!v) throw new HopperError(stmt.loc, ErrorType.UndeclaredVariable, `'${stmt.object}' is not declared`, `declare it with a type before use, e.g. 'int ${stmt.object} = ...'`);
+            if (!v) throwUndeclared(stmt.loc, stmt.object, ir, `declare it with a type before use, e.g. 'int ${stmt.object} = ...'`);
 
             // Bitfield write: read-modify-write on the container integer
             if (bitfieldTypes.has(v.hType)) {
@@ -309,7 +309,7 @@ export function genStmt(ir, stmt, retType) {
             // obj.outerField.innerField = expr
             // Resolves to: GEP into outer, GEP into inner, store.
             const v = ir.vars.get(stmt.object);
-            if (!v) throw new HopperError(stmt.loc, ErrorType.UndeclaredVariable, `'${stmt.object}' is not declared`, `declare it with a type before use, e.g. 'int ${stmt.object} = ...'`);
+            if (!v) throwUndeclared(stmt.loc, stmt.object, ir, `declare it with a type before use, e.g. 'int ${stmt.object} = ...'`);
             if (!classTypes.has(v.hType))
                 throw new Error(`NestedFieldAssign: '${stmt.object}' is not a class type`);
             const outerIdx    = getFieldIndex(v.hType, stmt.outerField);
@@ -331,7 +331,7 @@ export function genStmt(ir, stmt, retType) {
 
         case "DerefAssign": {
             const v = ir.vars.get(stmt.name);
-            if (!v) throw new HopperError(stmt.loc, ErrorType.UndeclaredVariable, `'${stmt.name}' is not declared`, `declare it with a type before use, e.g. 'int ${stmt.name} = ...'`);
+            if (!v) throwUndeclared(stmt.loc, stmt.name, ir, `declare it with a type before use, e.g. 'int ${stmt.name} = ...'`);
             const val = genExpr(ir, stmt.expr);
             let pointedTo;
             if (v.hType.startsWith("address:")) {
@@ -444,7 +444,7 @@ export function genStmt(ir, stmt, retType) {
 
         case "ArrayAssign": {
             const v = ir.vars.get(stmt.name);
-            if (!v) throw new HopperError(stmt.loc, ErrorType.UndeclaredVariable, `'${stmt.name}' is not declared`, `declare it with a type before use, e.g. 'int ${stmt.name} = ...'`);
+            if (!v) throwUndeclared(stmt.loc, stmt.name, ir, `declare it with a type before use, e.g. 'int ${stmt.name} = ...'`);
 
             if (classTypes.has(v.hType)) {
                 const cls      = classTypes.get(v.hType);
@@ -621,6 +621,7 @@ export function genBlock(ir, block, retType) {
             genStmt(ir, s, retType);
         } catch (e) {
             if (e instanceof HopperError) {
+                if (s.kind === "VarDecl") ir.poison(s.name);
                 emitError(e);
                 continue;
             }

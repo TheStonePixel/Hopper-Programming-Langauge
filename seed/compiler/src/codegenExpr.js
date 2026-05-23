@@ -19,12 +19,13 @@ import { HopperError, ErrorType } from "./errors.js";
 
 export class IRBuilder {
     constructor() {
-        this.lines      = [];
-        this.tmp        = 0;
-        this.label      = 0;
-        this.vars       = new Map();
-        this.loopStack  = [];
-        this.deferStack = [];
+        this.lines        = [];
+        this.tmp          = 0;
+        this.label        = 0;
+        this.vars         = new Map();
+        this.loopStack    = [];
+        this.deferStack   = [];
+        this.poisonedVars = new Set();
     }
 
     emit(line)              { this.lines.push(line); }
@@ -42,6 +43,16 @@ export class IRBuilder {
         if (!this.loopStack.length) throw new Error("break/continue outside loop");
         return this.loopStack[this.loopStack.length - 1];
     }
+    poison(name)    { this.poisonedVars.add(name); }
+}
+
+// Throw an UndeclaredVariable error, marking it as a cascade if the name
+// was previously poisoned by a failed declaration.
+export function throwUndeclared(loc, name, ir, hint) {
+    const err = new HopperError(loc, ErrorType.UndeclaredVariable,
+        `'${name}' was used before being declared`, hint);
+    if (ir.poisonedVars.has(name)) err.isCascade = true;
+    throw err;
 }
 
 // ── bool coercion ──────────────────────────────────────────────────────────
@@ -273,8 +284,7 @@ export function genExpr(ir, expr) {
                     ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
                     return { value: tmp, type: "address" };
                 }
-                throw new HopperError(expr.loc, ErrorType.UndeclaredVariable,
-                    `'${expr.name}' was used before being declared`,
+                throwUndeclared(expr.loc, expr.name, ir,
                     `add 'int ${expr.name} = ...' before this line`);
             }
             const tmp = ir.newTmp();
@@ -323,7 +333,7 @@ export function genExpr(ir, expr) {
             }
 
             const v = ir.vars.get(expr.object);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.object, ir, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
 
             // Bitfield read: load container integer, shift right by field offset, mask to width
             if (bitfieldTypes.has(v.hType)) {
@@ -382,7 +392,7 @@ export function genExpr(ir, expr) {
                     ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
                     return { value: tmp, type: "address" };
                 }
-                throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
+                throwUndeclared(expr.loc, expr.name, ir, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             }
             if (v.hType.startsWith("array:")) {
                 const elemType = v.hType.split(":")[1];
@@ -401,7 +411,7 @@ export function genExpr(ir, expr) {
 
         case "ArrayAccess": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.name, ir, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
 
             // Dispatch to class [] operator if defined
             if (classTypes.has(v.hType)) {
@@ -445,7 +455,7 @@ export function genExpr(ir, expr) {
 
         case "ArrayElementAddress": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.name, ir, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot get element address of non-array type: ${v.hType}`);
             const elemType   = v.hType.split(":")[1];
@@ -460,7 +470,7 @@ export function genExpr(ir, expr) {
 
         case "Deref": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.name, ir, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             // Plain address: infer pointedTo from the address:T tag if present, else from return type
             let pointedTo;
             if (v.hType.startsWith("address:")) {
@@ -785,7 +795,7 @@ export function genExpr(ir, expr) {
         case "ChainedMethodCall": {
             // obj.field.method(args) — get pointer to the field, call method on it
             const v = ir.vars.get(expr.object);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.object, ir, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
             if (!classTypes.has(v.hType))
                 throw new Error(`ChainedMethodCall: '${expr.object}' is not a class`);
             const outerIdx   = getFieldIndex(v.hType, expr.field);
@@ -844,7 +854,7 @@ export function genExpr(ir, expr) {
         case "FieldIndexAccess": {
             // obj.field[i] — get pointer to field, call its [] operator
             const v = ir.vars.get(expr.object);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.object, ir, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
             if (!classTypes.has(v.hType))
                 throw new Error(`FieldIndexAccess: '${expr.object}' is not a class`);
             const outerIdx  = getFieldIndex(v.hType, expr.field);
@@ -867,7 +877,7 @@ export function genExpr(ir, expr) {
 
         case "MethodCall": {
             const v = ir.vars.get(expr.object);
-            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
+            if (!v) throwUndeclared(expr.loc, expr.object, ir, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
             const typeName   = v.hType;
             const isClass    = classTypes.has(typeName);
             if (!isClass && !structTypes.has(typeName))

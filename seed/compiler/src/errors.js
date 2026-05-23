@@ -33,8 +33,10 @@ const off = (code) => useColor ? code : "";
 const THEME = {
     errorBar:    off(ANSI.red),           // │ left bar on error blocks
     warningBar:  off(ANSI.brightBlue),   // │ left bar on warning blocks
+    cascadeBar:  off(ANSI.yellow),       // │ left bar on cascade (note) blocks
     errorWord:   off(ANSI.red),          // "Error:" label
     warningWord: off(ANSI.brightBlue),   // "Warning:" label
+    cascadeWord: off(ANSI.yellow),       // "Note:" label
     tagLabel:    off(ANSI.dim),          // Module:  File:  Line:
     dataValue:   off(ANSI.brightWhite),  // hello  main.hop  14
     message:     off(ANSI.white),        // indented message text
@@ -114,10 +116,11 @@ function wrap(text, indent = "  ") {
 // bright-blue for warnings.
 export function formatError(err) {
     const T         = THEME;
-    const isWarning = err.severity === Severity.Warning;
-    const barColor  = isWarning ? T.warningBar : T.errorBar;
-    const wordColor = isWarning ? T.warningWord : T.errorWord;
-    const label     = isWarning ? "Warning" : "Error";
+    const isCascade = err.isCascade === true;
+    const isWarning = !isCascade && err.severity === Severity.Warning;
+    const barColor  = isCascade ? T.cascadeBar  : isWarning ? T.warningBar : T.errorBar;
+    const wordColor = isCascade ? T.cascadeWord : isWarning ? T.warningWord : T.errorWord;
+    const label     = isCascade ? "Note"        : isWarning ? "Warning"    : "Error";
 
     const bar    = `${barColor}│${T.reset} `;
     const closer = `${barColor}└${"─".repeat(BOX_WIDTH - 1)}${T.reset}`;
