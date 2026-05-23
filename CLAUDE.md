@@ -1,5 +1,19 @@
 # Hopper Programming Language — Claude Working Context
 
+## Language Specification
+
+The authoritative language reference is the spec at `hopper-spec/`. Key sections:
+- `00-foundations/` — design goals, philosophy, anti-goals
+- `01-language/` — syntax, types, semantics, memory model, modules
+- `03-build/` — build system, project manifests, targets
+- `04-packages/` — versioning, dependencies, registries
+- `08-tooling/` — CLI, test runner, diagnostics (`15.8-diagnostics.md`)
+
+Consult the spec before inventing syntax. The sections below cover compiler implementation
+details and toolchain conventions that are NOT in the spec.
+
+---
+
 ## Critical Rules
 
 1. **Always use `hopper init` to create new projects** — never hand-craft directories.
@@ -7,8 +21,8 @@
 3. **Always use `hopper install <name>` to add dependencies** — never copy module files manually. This is how the build tool is tested — use it constantly.
 4. **After `hopper install`, always run `hopper build` and verify the output** — the build tool and compiler are tested together. Every change to either must be proven with a real build.
 5. **No global mutable variables** — the grammar has no top-level `var`/`let`/`int x = 5`. State lives in classes or is passed as parameters.
-6. **Top-level `const` is being removed** — the grammar supports it and tui.hop uses 48 of them, but the design intent is to eliminate module-level constants. Use `enum` for named integer sets, or scope constants inside classes/interfaces once the grammar supports it.
-7. **Write syntax that the compiler actually accepts** — check the grammar and codegen before inventing syntax.
+6. **`const` is an immutability modifier** — `const int x = 5` inside a function declares an immutable local; reassignment is a compile-time TypeError. There is no top-level `const`; use `enum` for module-level named integers.
+7. **Write syntax that the compiler actually accepts** — check the grammar (`seed/compiler/grammar/Hopper.g4`) and codegen before inventing syntax.
 8. **libc is for diagnostics only** — `extern` declarations to C library functions (`memchr`, `strstr`, `memcpy`, etc.) are acceptable temporarily to confirm a performance bottleneck exists and to measure the ceiling. Once the bottleneck is confirmed, implement the equivalent mechanism in Hopper and remove the extern. Never ship a module that delegates its core work to libc.
 
 ---
@@ -23,10 +37,12 @@ Hopper-Programming-Langauge/
     nonconform/        # legacy modules not yet updated to new standard
     build/             # compiler output (gitignored)
     tests/             # toolchain-level tests
+      diagnostics/     # compiler warning/error regression tests (hopper test)
   seed/
     compiler/          # JS bootstrap compiler (hopperc.js, grammar/, src/)
     build_system/      # hopper CLI (hopper script, tools/)
     extensions/        # VS Code syntax highlighting
+  hopper-spec/         # language specification (authoritative)
   website/
 ```
 
@@ -54,6 +70,7 @@ hopper install <name>                # install a specific module + its transitiv
 
 hopper build                         # compile entry → build/<name>
 hopper run                           # run build/<name>
+hopper test                          # run tests in current project's tests/ directory
 hopper ir <file.hop>                 # print LLVM IR (debug)
 hopper ast <file.hop>                # print AST as JSON (debug)
 ```
@@ -75,6 +92,30 @@ Dependencies must be declared in `hopper.json` before installing:
 
 The CLI lives at `seed/build_system/hopper`. It is NOT globally installed right now — run it as
 `node seed/build_system/hopper` or reinstall with `cd seed/build_system && npm install -g --force .`.
+
+---
+
+## Compiler Diagnostics
+
+All errors and warnings use the same bordered box format on stderr (see `seed/compiler/src/errors.js`
+and `hopper-spec/08-tooling/15.8-diagnostics.md` for full details):
+
+```
+│ Module: hello  File: main.hop  Line: 14
+│ Error: Unknown enum variant
+│        'Purpl' is not a variant of enum 'Color'
+│ Hint: valid variants: Red, Green, Blue
+└───────────────────────────────────────────────────────────
+```
+
+**Warnings are fatal** — any warning exits with code 1, same as an error.
+
+**`_` prefix suppresses UnusedVariable** — name a variable `_x` to opt out.
+
+Colors by kind: red (Error), bright-blue (Warning), orange (Constraint warning),
+bright-red (cascade Note), magenta (Syntax error), green (Success).
+
+Diagnostic tests live in `hopper/tests/diagnostics/` — run with `hopper test` from that directory.
 
 ---
 
@@ -134,22 +175,23 @@ callback(int, bool) int   — function pointer
 ClassName                 — user-defined class/struct
 ```
 
-### Constants (top-level — currently works, being removed)
+### Immutable locals
 ```hopper
-const STDIN  = 0
-const STDOUT = 1
-const NAME   = "hello"
-const NEG    = -1
+const int limit = 100       // cannot be reassigned — TypeError on any attempt
+const string tag = "v1"
 ```
-Grammar: `const Identifier = [-] literal`. No type annotation. Inlined at compile time.
-**Design intent: remove these. Use enums instead.**
+`const` is a statement-level modifier. No top-level `const` exists — use `enum`.
 
-### Enums (preferred over const blocks)
+### Enums (module-level named integer sets)
 ```hopper
-enum Color { Red = 0  Green  Blue }
-enum Key { NONE = -1  CHAR = 0  ENTER  BACKSPACE }
+enum Color {
+    Red   = 0
+    Green = 1
+    Blue  = 2
+}
 ```
 Access as `Color.Red`. Integer-valued only (or string-valued with `= "..."` literals).
+Enum variants must each be on their own line.
 
 ### Functions
 ```hopper
@@ -198,7 +240,6 @@ interface IO {
 }
 ```
 - Only function/procedure signatures inside the body.
-- No constants inside interfaces yet (grammar limitation — `constDecl` is not in `interfaceDecl`).
 - Conformance checked at compile time.
 
 ### Classes implementing interfaces
@@ -294,6 +335,7 @@ Also available: `cast<unsigned int>`, `cast<unsigned byte>`, `cast<char>`, `cast
 ## What Does NOT Exist
 
 - No global mutable variables (`int x = 5` at top level)
+- No top-level `const` — use `enum` for named integer constants
 - No `var` / `let` keywords
 - No null safety / optional types
 - No closures / lambda expressions
@@ -428,15 +470,10 @@ The `exports` field on libraries is documentation/tooling only for now — consu
 
 ---
 
-## Open Design Questions
+## Known Gaps / Open Items
 
-1. **Remove top-level `const`?** User intent: yes, remove it. Use `enum` for named integer groups. Constants inside interface/class scope not yet in grammar.
-
-2. **Grammar change needed**: Add `constDecl` to `interfaceDecl` body so interfaces can carry their own constants (e.g. `STDIN = 0` inside `interface IO`).
-
-3. **`hopper init` is interactive** — a `--yes` flag was added to support scripted/non-interactive use.
-
-4. **`exports` in library hopper.json** — declared but not yet consumed by the build system. Build system currently relies on consumer declaring full binding paths.
+- **`exports` in library hopper.json** — declared but not yet consumed by the build system. Build system currently relies on consumer declaring full binding paths.
+- **Constants inside interfaces** — `constDecl` is not in `interfaceDecl` grammar, so interfaces cannot carry named constants. Use `enum` inside the interface body instead (which IS supported).
 
 ---
 
