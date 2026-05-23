@@ -73,27 +73,30 @@ function wrap(text, indent = "  ") {
 
 // Formats a HopperError into the 4-line diagnostic format:
 //
-//   Module: hello  File: main.hop  Line: 14   ← bold
-//   Error: TypeError                           ← bold red  (Warning → bold yellow)
-//   'count' is not declared                    ← normal
-//   Hint: declare it before use                ← cyan
+//   Module: hello  File: main.hop  Line: 14      ← bold
+//   Error: Undeclared variable                   ← bold red  (Warning → bold yellow)
+//          'count' was used before being declared ← indented under the label
+//   Hint: add 'int count = ...' before this line ← cyan
 export function formatError(err) {
     const isWarning  = err.severity === Severity.Warning;
     const labelColor = isWarning ? C.yellow : C.red;
     const label      = isWarning ? "Warning" : "Error";
 
+    // Indent message to clear past "Error: " / "Warning: "
+    const msgIndent  = " ".repeat(label.length + 2);   // "Error: " = 7, "Warning: " = 9
+
     const lines = [];
 
     if (err.loc) {
-        const file     = err.loc.file.split(/[\\/]/).pop();
-        const modPart  = err.loc.module ? `Module: ${err.loc.module}  ` : "";
+        const file    = err.loc.file.split(/[\\/]/).pop();
+        const modPart = err.loc.module ? `Module: ${err.loc.module}  ` : "";
         lines.push(`${C.bold}${modPart}File: ${file}  Line: ${err.loc.line}${C.reset}`);
     } else {
         lines.push(`${C.dim}(unknown location)${C.reset}`);
     }
 
     lines.push(`${labelColor}${label}: ${err.errType || label}${C.reset}`);
-    lines.push(wrap(err.message));
+    lines.push(wrap(msgIndent + err.message, msgIndent));
     if (err.hint) lines.push(`${C.cyan}${wrap(`Hint: ${err.hint}`)}${C.reset}`);
 
     return lines.join("\n");
