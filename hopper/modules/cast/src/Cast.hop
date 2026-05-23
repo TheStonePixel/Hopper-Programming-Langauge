@@ -24,7 +24,7 @@ template function cast<bool>(float src) bool            { return bool src       
 
 template function cast<string>(address src) string      { return string src       }
 
-template function cast<unsigned int>(byte src) int      { return unsigned int src }
-template function cast<unsigned int>(address src) int   { return unsigned int src }
+template function cast<unsigned int>(byte src) unsigned int      { return unsigned int src }
+template function cast<unsigned int>(address src) unsigned int   { return unsigned int src }
 
 template function cast<unsigned byte>(int src) byte     { return byte src         }

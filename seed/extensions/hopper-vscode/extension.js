@@ -10,13 +10,13 @@ const fs          = require('fs')
 
 // Resolve the hopper binary:
 // 1. User setting  hopper.executablePath
-// 2. Sibling location when installed as a dev symlink (../../../kindling/hopper)
+// 2. Dev monorepo location: seed/build_system/hopper (sibling of seed/extensions/)
 // 3. Anything named "hopper" on PATH
 function resolveHopper() {
     const cfg = vscode.workspace.getConfiguration('hopper').get('executablePath')
     if (cfg) return cfg
 
-    const devBin = path.resolve(__dirname, '..', '..', 'kindling', 'hopper')
+    const devBin = path.resolve(__dirname, '..', '..', 'build_system', 'hopper')
     if (fs.existsSync(devBin)) return devBin
 
     return 'hopper'

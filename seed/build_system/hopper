@@ -439,14 +439,14 @@ function cmdRun(args) {
         return;
     }
 
-    // hopper run — find and execute the dev build from the project's build/dev/
+    // hopper run — find and execute the dev build from the project's build/
     const projectRoot = findProjectRoot(process.cwd());
     const mf = path.join(projectRoot, "hopper.json");
     let name = "main";
     if (fs.existsSync(mf)) {
         try { name = JSON.parse(fs.readFileSync(mf, "utf8")).name || name; } catch {}
     }
-    const bin = path.join(projectRoot, "build", "dev", name);
+    const bin = path.join(projectRoot, "build", name);
     if (!fs.existsSync(bin)) {
         console.error(`hopper: no binary at ${bin} — run 'hopper build' first`);
         process.exit(1);
@@ -577,7 +577,7 @@ async function cmdInit(args) {
         const previewManifest = isLibPreview ? {
             name, version, description, license,
             type: "library",
-            main: `src/${name}.hop`,
+            exports: {},
         } : {
             name, version, description, license,
             type: "executable",
@@ -599,7 +599,7 @@ async function cmdInit(args) {
     const manifest = isLib ? {
         name, version, description, license,
         type: "library",
-        main: `src/${name}.hop`,
+        exports: {},
     } : {
         name, version, description, license,
         type: "executable",
@@ -1164,7 +1164,7 @@ function cmdFlash(args) {
     const flashCfg = boardCfg.flash;
 
     // ── locate built binary ───────────────────────────────────────────────
-    const buildDir  = path.join(projectRoot, "build", profile);
+    const buildDir  = path.join(projectRoot, "build");
     const imgPath   = path.join(buildDir, flashCfg.outputFile);
     const name      = manifest.name || "project";
     const metaPath  = path.join(buildDir, `${name}.meta.json`);
