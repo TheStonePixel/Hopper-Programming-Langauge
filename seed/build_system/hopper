@@ -8,7 +8,7 @@ import { execSync, spawn } from "node:child_process";
 import { buildAstFromSource } from "../compiler/src/astBuilder.js";
 import { genModule } from "../compiler/src/codegenLLVM.js";
 import { parseSource } from "../compiler/src/parse.js";
-import { HopperError, formatError } from "../compiler/src/errors.js";
+import { HopperError, formatError, formatSuccess } from "../compiler/src/errors.js";
 import { getWarnings, getErrors } from "../compiler/src/codegenState.js";
 import { formatAst } from "../compiler/src/formatter.js";
 
@@ -405,14 +405,20 @@ function cmdBuild(args) {
         const outELF = path.join(buildDir, `${binaryName}.elf`);
         const outImg = output || path.join(buildDir, "kernel.img");
         linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg);
-        console.log(`built [bare-metal/${boardName}]: ${outImg}`);
+        const manifest1  = readManifestAt(projectRoot);
+        const projName1  = manifest1.name || binaryName;
+        const relImg     = path.relative(projectRoot, outImg);
+        process.stderr.write(formatSuccess(projName1, `bare-metal/${boardName}`, relImg));
     } else {
         // ── hosted build ──────────────────────────────────────────────────
         const flags   = clangFlags(profile);
         const results = files.map(f => toObject(f, llDir, oDir, flags));
         const outFile = output || path.join(buildDir, projectBinaryName(files[0], projectRoot));
         link(results, outFile);
-        console.log(`built [${profile}]: ${outFile}`);
+        const manifest  = readManifestAt(projectRoot);
+        const projName  = manifest.name || path.basename(outFile);
+        const relOut    = path.relative(projectRoot, outFile);
+        process.stderr.write(formatSuccess(projName, profile, relOut));
     }
 }
 

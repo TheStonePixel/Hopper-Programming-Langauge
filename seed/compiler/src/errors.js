@@ -34,6 +34,7 @@ const THEME = {
     errorBar:    off(ANSI.red),           // │ left bar on error blocks
     warningBar:  off(ANSI.brightBlue),   // │ left bar on warning blocks
     cascadeBar:  off(ANSI.yellow),       // │ left bar on cascade (note) blocks
+    successBar:  off(ANSI.green),        // │ left bar on success blocks
     errorWord:   off(ANSI.red),          // "Error:" label
     warningWord: off(ANSI.brightBlue),   // "Warning:" label
     cascadeWord: off(ANSI.yellow),       // "Note:" label
@@ -149,4 +150,24 @@ export function formatError(err) {
 
     const allLines = content.flatMap(c => c.split("\n"));
     return allLines.map(line => bar + line).join("\n") + "\n" + closer + "\n";
+}
+
+// Formats a build-success block:
+//
+//   │ Built: hello  Profile: dev
+//   │ Output: build/hello
+//   └──────────────────────────────────────────────────────────
+//
+// outputPath should be relative to the project root for readability.
+export function formatSuccess(projectName, profile, outputPath) {
+    const T      = THEME;
+    const bar    = `${T.successBar}│${T.reset} `;
+    const closer = `${T.successBar}└${"─".repeat(BOX_WIDTH - 1)}${T.reset}`;
+    const tag    = t => `${T.tagLabel}${t}:${T.reset}`;
+    const val    = v => `${T.dataValue}${v}${T.reset}`;
+    const lines  = [
+        `${tag("Built")} ${val(projectName)}  ${tag("Profile")} ${val(profile)}`,
+        `${tag("Output")} ${val(outputPath)}`,
+    ];
+    return lines.map(l => bar + l).join("\n") + "\n" + closer + "\n";
 }
