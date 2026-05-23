@@ -556,35 +556,6 @@ function cmdRun(args) {
     // hopper run test [module]
     if (args[0] === "test") { cmdTest(args.slice(1)); return; }
 
-    // hopper run --qemu  — launch QEMU for a bare-metal qemu-virt project
-    if (args[0] === "--qemu") {
-        const projectRoot = findProjectRoot(process.cwd());
-        const manifest    = readManifestAt(projectRoot);
-        const boardName   = manifest.board;
-        if (!boardName) {
-            console.error("hopper: 'board' is not set in hopper.json — --qemu only works for bare-metal targets");
-            process.exit(1);
-        }
-        const boardCfg = BOARD_CONFIGS[boardName];
-        if (!boardCfg?.qemu) {
-            console.error(`hopper: board '${boardName}' does not have a QEMU configuration`);
-            process.exit(1);
-        }
-        const name    = manifest.name || "project";
-        const elfPath = path.join(projectRoot, "build", `${name}.elf`);
-        if (!fs.existsSync(elfPath)) {
-            console.error(`hopper: ${name}.elf not found — run 'hopper build' first`);
-            process.exit(1);
-        }
-        const q      = boardCfg.qemu;
-        const extra  = (q.args || []).join(" ");
-        const cmd    = `${q.binary} -M ${q.machine} -cpu ${q.cpu} -kernel "${elfPath}" ${extra}`.trim();
-        console.error(`hopper: launching QEMU  [${boardName}]`);
-        console.error(`  ${cmd}`);
-        execSync(cmd, { stdio: "inherit" });
-        return;
-    }
-
     // hopper run <binary>  — execute a specific binary
     if (args[0]) {
         const bin = path.resolve(args[0]);
@@ -1320,9 +1291,22 @@ function cmdFlash(args) {
 
     const flashCfg = boardCfg.flash;
 
+    // ── QEMU: launch emulator directly ────────────────────────────────────
     if (flashCfg.method === "qemu") {
-        console.error(`hopper: '${boardName}' is a QEMU target — use 'hopper run --qemu' to launch the emulator`);
-        process.exit(1);
+        const qemuCfg  = boardCfg.qemu;
+        const name     = manifest.name || "project";
+        const buildDir = path.join(projectRoot, "build");
+        const elfPath  = path.join(buildDir, `${name}.elf`);
+        if (!fs.existsSync(elfPath)) {
+            console.error(`hopper: ${name}.elf not found — run 'hopper build' first`);
+            process.exit(1);
+        }
+        const extraArgs = (qemuCfg.args || []).join(" ");
+        const cmd = `${qemuCfg.binary} -M ${qemuCfg.machine} -cpu ${qemuCfg.cpu} -kernel "${elfPath}" ${extraArgs}`.trim();
+        console.error(`hopper: launching QEMU  [${boardName}]`);
+        console.error(`  ${cmd}`);
+        if (!dryRun) execSync(cmd, { stdio: "inherit" });
+        return;
     }
 
     // ── locate built binary ───────────────────────────────────────────────
