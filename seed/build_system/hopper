@@ -118,15 +118,114 @@ const BOARD_CONFIGS = {
 
         // ── flash configuration ───────────────────────────────────────────
         flash: {
-            method:          "sd-card",      // how to deliver the image
-            outputFile:      "kernel.img",   // filename written to the SD card
-            // firmware blobs that must already exist on the card
+            method:          "sd-card",
+            outputFile:      "kernel.img",
             requiredFirmware: ["bootcode.bin", "start.elf"],
-            // lines the flash command ensures are present in config.txt
             configLines: [
                 "init_uart_clock=3000000",
                 "dtparam=act_led_trigger=none",
             ],
+        },
+    },
+
+    "pi-zero-2w": {
+        // ── compile / link ────────────────────────────────────────────────
+        llvmTarget:    "aarch64-bare",
+        clangTarget:   "aarch64-none-elf",
+        mcpu:          "cortex-a53",
+        textBase:      0x80000,
+        linkerEntry:   "_start",
+        bootStub:      path.join(__dirname, "boards", "pi-zero-2w", "boot.s"),
+
+        // ── binary metadata ───────────────────────────────────────────────
+        meta: {
+            arch:        "aarch64",
+            endian:      "little",
+            bits:        64,
+            loadAddress: "0x80000",
+            entrySymbol: "_start",
+        },
+
+        // ── flash configuration ───────────────────────────────────────────
+        // QEMU: qemu-system-aarch64 -M raspi3b -cpu cortex-a53 -kernel build/<name>.elf -nographic
+        flash: {
+            method:          "sd-card",
+            outputFile:      "kernel8.img",   // 64-bit Pi kernels use kernel8.img
+            requiredFirmware: ["bootcode.bin", "start4.elf", "fixup4.dat"],
+            configLines: [
+                "arm_64bit=1",
+                "init_uart_clock=48000000",
+            ],
+        },
+
+        // ── QEMU emulation ────────────────────────────────────────────────
+        qemu: {
+            binary:  "qemu-system-aarch64",
+            machine: "raspi3b",
+            cpu:     "cortex-a53",
+        },
+    },
+
+    "qemu-virt": {
+        // ── compile / link ────────────────────────────────────────────────
+        // Generic Cortex-A53 virtual machine — no board-specific MMIO.
+        // UART (PL011) @ 0x09000000  — use in @ declarations for output.
+        llvmTarget:    "aarch64-bare",
+        clangTarget:   "aarch64-none-elf",
+        mcpu:          "cortex-a53",
+        textBase:      0x40000000,
+        linkerEntry:   "_start",
+        bootStub:      path.join(__dirname, "boards", "qemu-virt", "boot.s"),
+
+        // ── binary metadata ───────────────────────────────────────────────
+        meta: {
+            arch:        "aarch64",
+            endian:      "little",
+            bits:        64,
+            loadAddress: "0x40000000",
+            entrySymbol: "_start",
+        },
+
+        // ── flash = run in QEMU directly ──────────────────────────────────
+        flash: {
+            method: "qemu",
+        },
+
+        // ── QEMU emulation ────────────────────────────────────────────────
+        qemu: {
+            binary:  "qemu-system-aarch64",
+            machine: "virt",
+            cpu:     "cortex-a53",
+            args:    ["-nographic"],
+        },
+    },
+
+    "pico": {
+        // ── compile / link ────────────────────────────────────────────────
+        // RP2040 — dual Cortex-M0+, ARMv6-M, Thumb-2 only
+        llvmTarget:    "armv6m-bare",
+        clangTarget:   "thumbv6m-none-eabi",
+        mcpu:          "cortex-m0plus",
+        floatAbi:      "soft",
+        textBase:      0x10000000,   // RP2040 flash mapped at 0x10000000
+        linkerEntry:   "_start",
+        bootStub:      path.join(__dirname, "boards", "pico", "boot.s"),
+
+        // ── binary metadata ───────────────────────────────────────────────
+        meta: {
+            arch:        "armv6-m",
+            endian:      "little",
+            bits:        32,
+            loadAddress: "0x10000000",
+            entrySymbol: "_start",
+        },
+
+        // ── flash configuration ───────────────────────────────────────────
+        // Hold BOOTSEL, plug USB — Pi Pico mounts as USB drive, copy the UF2.
+        flash: {
+            method:     "uf2",
+            outputFile: "firmware.uf2",
+            familyId:   0xe48bff56,   // RP2040 UF2 family ID
         },
     },
 };
@@ -188,7 +287,8 @@ function toObjectBare(file, llDir, oDir, cfg) {
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
-    const flags = `-target ${cfg.clangTarget} -mcpu=${cfg.mcpu} -mfloat-abi=${cfg.floatAbi} -ffreestanding -nostdlib -O2 -c -Wno-override-module`;
+    const floatFlag = cfg.floatAbi ? `-mfloat-abi=${cfg.floatAbi}` : "";
+    const flags = `-target ${cfg.clangTarget} -mcpu=${cfg.mcpu} ${floatFlag} -ffreestanding -nostdlib -O2 -c -Wno-override-module`.replace(/\s+/g, " ").trim();
     execSync(`clang ${flags} "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
     return { objFile, entryName: ast.entry?.name ?? "main" };
 }
@@ -198,16 +298,19 @@ function toObjectBare(file, llDir, oDir, cfg) {
 function linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg) {
     const objs = [`"${bootObj}"`, ...results.map(r => `"${r.objFile}"`)].join(" ");
     execSync(`ld.lld -T "${ldScript}" ${objs} -o "${outELF}"`, { stdio: "inherit" });
-    execSync(`llvm-objcopy -O binary "${outELF}" "${outImg}"`, { stdio: "inherit" });
+    const isQemu = boardCfg.flash.method === "qemu";
+    if (!isQemu) {
+        execSync(`llvm-objcopy -O binary "${outELF}" "${outImg}"`, { stdio: "inherit" });
+    }
 
     // Build metadata — consumed by `hopper flash`
-    const metaPath = path.join(path.dirname(outImg), `${binaryName}.meta.json`);
+    const metaPath = path.join(path.dirname(outELF), `${binaryName}.meta.json`);
     const meta = {
         name:       binaryName,
         board:      boardName,
-        outputFile: boardCfg.flash.outputFile,
+        outputFile: boardCfg.flash.outputFile ?? null,
         ...boardCfg.meta,
-        size:       fs.statSync(outImg).size,
+        ...(isQemu ? {} : { size: fs.statSync(outImg).size }),
         builtAt:    new Date().toISOString(),
     };
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2) + "\n");
@@ -393,7 +496,8 @@ function cmdBuild(args) {
 
         // Compile the board boot stub
         const bootObj = path.join(oDir, "boot.o");
-        const asmFlags = `-target ${boardCfg.clangTarget} -mcpu=${boardCfg.mcpu} -mfloat-abi=${boardCfg.floatAbi} -ffreestanding -nostdlib -c`;
+        const asmFloatFlag = boardCfg.floatAbi ? `-mfloat-abi=${boardCfg.floatAbi}` : "";
+        const asmFlags = `-target ${boardCfg.clangTarget} -mcpu=${boardCfg.mcpu} ${asmFloatFlag} -ffreestanding -nostdlib -c`.replace(/\s+/g, " ").trim();
         execSync(`clang ${asmFlags} "${boardCfg.bootStub}" -o "${bootObj}"`, { stdio: "inherit" });
 
         // Write auto-generated linker script
@@ -403,12 +507,14 @@ function cmdBuild(args) {
         // Link and convert to raw kernel.img
         const binaryName = output ? path.basename(output, ".img") : projectBinaryName(files[0], projectRoot);
         const outELF = path.join(buildDir, `${binaryName}.elf`);
-        const outImg = output || path.join(buildDir, "kernel.img");
+        const defaultImg = boardCfg.flash.outputFile || "kernel.img";
+        const outImg = output || path.join(buildDir, defaultImg);
         linkBare(bootObj, results, ldScript, outELF, outImg, binaryName, boardName, boardCfg);
         const manifest1  = readManifestAt(projectRoot);
         const projName1  = manifest1.name || binaryName;
-        const relImg     = path.relative(projectRoot, outImg);
-        process.stderr.write(formatSuccess(projName1, `bare-metal/${boardName}`, relImg));
+        const isQemuBd   = boardCfg.flash.method === "qemu";
+        const artifact   = isQemuBd ? path.relative(projectRoot, outELF) : path.relative(projectRoot, outImg);
+        process.stderr.write(formatSuccess(projName1, `bare-metal/${boardName}`, artifact));
     } else {
         // ── hosted build ──────────────────────────────────────────────────
         const flags   = clangFlags(profile);
@@ -1184,6 +1290,24 @@ function cmdFlash(args) {
     }
 
     const flashCfg = boardCfg.flash;
+
+    // ── QEMU: launch emulator directly ────────────────────────────────────
+    if (flashCfg.method === "qemu") {
+        const qemuCfg  = boardCfg.qemu;
+        const name     = manifest.name || "project";
+        const buildDir = path.join(projectRoot, "build");
+        const elfPath  = path.join(buildDir, `${name}.elf`);
+        if (!fs.existsSync(elfPath)) {
+            console.error(`hopper: ${name}.elf not found — run 'hopper build' first`);
+            process.exit(1);
+        }
+        const extraArgs = (qemuCfg.args || []).join(" ");
+        const cmd = `${qemuCfg.binary} -M ${qemuCfg.machine} -cpu ${qemuCfg.cpu} -kernel "${elfPath}" ${extraArgs}`;
+        console.error(`hopper: launching QEMU  [${boardName}]`);
+        console.error(`  ${cmd}`);
+        if (!dryRun) execSync(cmd, { stdio: "inherit" });
+        return;
+    }
 
     // ── locate built binary ───────────────────────────────────────────────
     const buildDir  = path.join(projectRoot, "build");
