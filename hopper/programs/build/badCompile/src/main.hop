@@ -4,17 +4,42 @@ enum Color {
     Blue  = 2
 }
 
+// Warning: MissingReturn — non-void function with no return statement
+function computeScore(int x) int {
+    int doubled = x * 2
+}
+
+// Warning: UnreachableCode — statements after return are never reached
+function clamp(int v, int max) int {
+    if (v > max) {
+        return max
+    }
+    return v
+    int dead = 0
+}
+
+// Warning: MissingReturn — only one branch returns, end of function is reachable
+function classify(int n) int {
+    if (n > 0) {
+        return 1
+    }
+}
+
 entry main {
-    // EnumError — typo in variant name
+    int score   = computeScore(10)
+    int clamped = clamp(score, 100)
+    int cls     = classify(clamped)
+
+    // Error: EnumError — typo in variant name
     int x = Color.Purpl
 
-    // UndeclaredVariable — never declared
+    // Error: UndeclaredVariable — count was never declared
     int y = count + 1
 
-    // UndeclaredFunction — doesn't exist
+    // Error: UndeclaredFunction — explode does not exist
     explode(42)
 
-    // TypeError — const reassignment
+    // Error: TypeError — const cannot be reassigned
     const int limit = 100
     limit = 200
 }

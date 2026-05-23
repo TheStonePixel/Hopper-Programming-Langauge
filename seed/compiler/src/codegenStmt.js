@@ -16,7 +16,7 @@ import {
     genExpr, ensureBool, emitCast, emitDeferred,
 } from "./codegenExpr.js";
 import { HopperError, HopperWarning, ErrorType, WarnType } from "./errors.js";
-import { emitWarning } from "./codegenState.js";
+import { emitWarning, emitError } from "./codegenState.js";
 import {
     isReg, isSIMDReg, regLLVMType, regConstraint, simdClobbers, SYSCALL_CLOBBERS,
 } from "./x86.js";
@@ -617,7 +617,15 @@ export function genBlock(ir, block, retType) {
     const stmts = block.statements;
     for (let i = 0; i < stmts.length; i++) {
         const s = stmts[i];
-        genStmt(ir, s, retType);
+        try {
+            genStmt(ir, s, retType);
+        } catch (e) {
+            if (e instanceof HopperError) {
+                emitError(e);
+                continue;
+            }
+            throw e;
+        }
         const isTerminator = s.kind === "ReturnStmt" || s.kind === "BreakStmt" || s.kind === "ContinueStmt";
         if (isTerminator && i + 1 < stmts.length) {
             const keyword = s.kind === "ReturnStmt" ? "return" : s.kind === "BreakStmt" ? "break" : "continue";

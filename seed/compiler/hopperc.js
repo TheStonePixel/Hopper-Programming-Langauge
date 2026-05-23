@@ -12,7 +12,7 @@ import { resolve, dirname, join }                  from "node:path";
 import { buildAstFromSource }                      from "./src/astBuilder.js";
 import { genModule }                               from "./src/codegenLLVM.js";
 import { HopperError, HopperWarning, formatError } from "./src/errors.js";
-import { getWarnings }                             from "./src/codegenState.js";
+import { getWarnings, getErrors }                  from "./src/codegenState.js";
 
 const args    = process.argv.slice(2);
 const oIdx    = args.indexOf("-o");
@@ -67,9 +67,10 @@ try {
     const ast      = buildAstFromSource(src, { baseDir: dirname(resolve(file)), bindings, sourceFile: file });
     const ir       = genModule(ast, { target, release, strict });
 
-    const ws = getWarnings();
-    for (const w of ws) process.stderr.write(formatError(w));
-    if (ws.length > 0) process.exit(1);
+    const ws   = getWarnings();
+    const errs = getErrors();
+    for (const d of [...ws, ...errs]) process.stderr.write(formatError(d));
+    if (ws.length > 0 || errs.length > 0) process.exit(1);
 
     if (outFile) {
         writeFileSync(outFile, ir, "utf8");
@@ -78,6 +79,7 @@ try {
     }
 } catch (e) {
     if (e instanceof HopperError) {
+        for (const d of [...getWarnings(), ...getErrors()]) process.stderr.write(formatError(d));
         process.stderr.write(formatError(e));
     } else {
         process.stderr.write(`hopperc: ${e.message}\n`);

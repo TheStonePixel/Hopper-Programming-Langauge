@@ -693,7 +693,7 @@ export class AstBuilder extends HopperVisitor {
         const cond      = this.visit(ctx.expression());
         const thenBlock = this.visit(ctx.block());
         const elseBlock = ctx.elseClause() ? this.visit(ctx.elseClause()) : null;
-        return IfStmt(cond, thenBlock, elseBlock);
+        return this.withLoc(ctx, IfStmt(cond, thenBlock, elseBlock));
     }
 
     // 'else' block  → return the block as-is
@@ -711,7 +711,7 @@ export class AstBuilder extends HopperVisitor {
 
     visitWhileStmt(ctx) {
         const invariants = (ctx.invariantClause() || []).map(c => this.visit(c));
-        return WhileStmt(this.visit(ctx.expression()), this.visit(ctx.block()), invariants);
+        return this.withLoc(ctx, WhileStmt(this.visit(ctx.expression()), this.visit(ctx.block()), invariants));
     }
 
     visitForStmt(ctx) {
@@ -722,7 +722,7 @@ export class AstBuilder extends HopperVisitor {
             const u = ctx.forUpdate();
             update = Assign(u.Identifier().getText(), this.visit(u.expression()));
         }
-        return ForStmt(init, cond, update, this.visit(ctx.block()));
+        return this.withLoc(ctx, ForStmt(init, cond, update, this.visit(ctx.block())));
     }
 
     visitForInitDecl(ctx) {
