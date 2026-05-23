@@ -25,21 +25,24 @@ const ANSI = {
     brightBlue:   "\x1b[94m",
     brightCyan:   "\x1b[96m",
     gray:         "\x1b[90m",
+    orange:       "\x1b[38;5;208m",
 };
 
 const off = (code) => useColor ? code : "";
 
 // ── theme — change these to restyle all diagnostics ───────────────────────
 const THEME = {
-    errorBar:    off(ANSI.red),           // │ left bar on error blocks
-    warningBar:  off(ANSI.brightBlue),   // │ left bar on warning blocks
-    cascadeBar:  off(ANSI.yellow),       // │ left bar on cascade (note) blocks
-    parseBar:    off(ANSI.magenta),      // │ left bar on parse error blocks
-    successBar:  off(ANSI.green),        // │ left bar on success blocks
-    errorWord:   off(ANSI.red),          // "Error:" label
-    warningWord: off(ANSI.brightBlue),   // "Warning:" label
-    cascadeWord: off(ANSI.yellow),       // "Note:" label
-    parseWord:   off(ANSI.magenta),      // "Syntax error:" label
+    errorBar:      off(ANSI.red),          // │ left bar on error blocks
+    warningBar:    off(ANSI.brightBlue),  // │ left bar on warning blocks
+    constraintBar: off(ANSI.orange),      // │ left bar on constraint warning blocks
+    cascadeBar:    off(ANSI.brightRed),   // │ left bar on cascade (note) blocks
+    parseBar:      off(ANSI.magenta),     // │ left bar on parse error blocks
+    successBar:    off(ANSI.green),       // │ left bar on success blocks
+    errorWord:     off(ANSI.red),         // "Error:" label
+    warningWord:   off(ANSI.brightBlue),  // "Warning:" label
+    constraintWord:off(ANSI.orange),      // "Warning:" label on constraint blocks
+    cascadeWord:   off(ANSI.brightRed),   // "Note:" label
+    parseWord:     off(ANSI.magenta),     // "Syntax error:" label
     tagLabel:    off(ANSI.dim),          // Module:  File:  Line:
     dataValue:   off(ANSI.brightWhite),  // hello  main.hop  14
     message:     off(ANSI.white),        // indented message text
@@ -119,12 +122,13 @@ function wrap(text, indent = "  ") {
 // bright-blue for warnings.
 export function formatError(err) {
     const T         = THEME;
-    const isCascade = err.isCascade === true;
-    const isParse   = !isCascade && err.errType === ErrorType.ParseError;
-    const isWarning = !isCascade && !isParse && err.severity === Severity.Warning;
-    const barColor  = isCascade ? T.cascadeBar  : isParse ? T.parseBar  : isWarning ? T.warningBar : T.errorBar;
-    const wordColor = isCascade ? T.cascadeWord : isParse ? T.parseWord : isWarning ? T.warningWord : T.errorWord;
-    const label     = isCascade ? "Note"        : isParse ? "Syntax"   : isWarning ? "Warning"     : "Error";
+    const isCascade    = err.isCascade === true;
+    const isParse      = !isCascade && err.errType === ErrorType.ParseError;
+    const isWarning    = !isCascade && !isParse && err.severity === Severity.Warning;
+    const isConstraint = isWarning && err.errType === WarnType.TautologicalConstraint;
+    const barColor  = isCascade ? T.cascadeBar    : isParse ? T.parseBar  : isConstraint ? T.constraintBar  : isWarning ? T.warningBar : T.errorBar;
+    const wordColor = isCascade ? T.cascadeWord   : isParse ? T.parseWord : isConstraint ? T.constraintWord : isWarning ? T.warningWord : T.errorWord;
+    const label     = isCascade ? "Note"          : isParse ? "Syntax"   : isWarning ? "Warning" : "Error";
 
     const bar    = `${barColor}│${T.reset} `;
     const closer = `${barColor}└${"─".repeat(BOX_WIDTH - 1)}${T.reset}`;
