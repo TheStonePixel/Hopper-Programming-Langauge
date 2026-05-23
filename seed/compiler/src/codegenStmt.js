@@ -160,8 +160,8 @@ export function genStmt(ir, stmt, retType) {
 
             const v   = ir.vars.get(stmt.name);
             if (!v) throw new HopperError(stmt.loc, ErrorType.UndeclaredVariable,
-                `'${stmt.name}' is not declared`,
-                `declare it with a type before use, e.g. 'int ${stmt.name} = ...'`);
+                `'${stmt.name}' was used before being declared`,
+                `add 'int ${stmt.name} = ...' before this line`);
             if (v.isConst) throw new HopperError(stmt.loc, ErrorType.TypeError,
                 `'${stmt.name}' is declared const and cannot be reassigned`);
 

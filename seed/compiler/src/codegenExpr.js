@@ -274,8 +274,8 @@ export function genExpr(ir, expr) {
                     return { value: tmp, type: "address" };
                 }
                 throw new HopperError(expr.loc, ErrorType.UndeclaredVariable,
-                    `'${expr.name}' is not declared`,
-                    `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
+                    `'${expr.name}' was used before being declared`,
+                    `add 'int ${expr.name} = ...' before this line`);
             }
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${v.type}, ${v.type}* ${v.ptr}`);

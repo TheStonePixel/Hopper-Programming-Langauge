@@ -20,21 +20,21 @@ export const Severity = {
 };
 
 export const ErrorType = {
-    UndeclaredVariable:  "UndeclaredVariable",
-    UndeclaredFunction:  "UndeclaredFunction",
-    TypeError:           "TypeError",
-    ArityError:          "ArityError",
-    EncapsulationError:  "EncapsulationError",
-    EnumError:           "EnumError",
-    ConstraintError:     "ConstraintError",
-    ParseError:          "ParseError",
-    InternalError:       "InternalError",
+    UndeclaredVariable:  "Undeclared variable",
+    UndeclaredFunction:  "Undeclared function",
+    TypeError:           "Type mismatch",
+    ArityError:          "Argument count mismatch",
+    EncapsulationError:  "Private field access",
+    EnumError:           "Unknown enum variant",
+    ConstraintError:     "Constraint violation",
+    ParseError:          "Syntax error",
+    InternalError:       "Internal compiler error",
 };
 
 export const WarnType = {
-    TautologicalConstraint: "TautologicalConstraint",
-    UnreachableCode:        "UnreachableCode",
-    MissingReturn:          "MissingReturn",
+    TautologicalConstraint: "Redundant constraint",
+    UnreachableCode:        "Unreachable code",
+    MissingReturn:          "Missing return",
 };
 
 export class HopperError extends Error {
