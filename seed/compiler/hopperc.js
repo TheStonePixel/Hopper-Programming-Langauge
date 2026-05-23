@@ -80,7 +80,7 @@ try {
 } catch (e) {
     if (e instanceof HopperError) {
         for (const d of [...getWarnings(), ...getErrors()]) process.stderr.write(formatError(d));
-        process.stderr.write(formatError(e));
+        if (!e.isSentinel) process.stderr.write(formatError(e));
     } else {
         process.stderr.write(`hopperc: ${e.message}\n`);
     }

@@ -1,0 +1,16 @@
+// badParse — intentional syntax errors for testing the diagnostic formatter.
+// None of these should ever be "fixed"; the point is to verify that parse
+// errors appear as purple Syntax: blocks instead of raw ANTLR output.
+
+entry main {
+    // Missing right-hand side expression
+    int x =
+
+    // Invalid token in expression
+    int y = 10 @ 5
+
+    // Missing closing parenthesis on if condition
+    if (x > 0 {
+        int z = x + y
+    }
+}

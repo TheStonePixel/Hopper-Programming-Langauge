@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename);
 import HopperLexer from "./generated/grammar/HopperLexer.js";
 import HopperParser from "./generated/grammar/HopperParser.js";
 import HopperVisitor from "./generated/grammar/HopperVisitor.js";
+import { HopperError, ErrorType } from "./errors.js";
+import { emitError } from "./codegenState.js";
 import {
     Program,
     FunctionDecl,
@@ -1035,6 +1037,38 @@ function filesToLoad(moduleDir, names, moduleName, importingFile) {
     }
 }
 
+// Custom ANTLR error listener — routes syntax errors through the Hopper
+// diagnostic formatter instead of printing raw ANTLR messages to stderr.
+class HopperParseErrorListener extends antlr4.error.ErrorListener {
+    constructor(sourceFile, moduleName) {
+        super();
+        this.parseErrors = [];
+        this.sourceFile  = sourceFile || "(unknown)";
+        this.moduleName  = moduleName || null;
+    }
+
+    syntaxError(_recognizer, _offendingSymbol, line, _column, msg) {
+        const loc = { module: this.moduleName, file: this.sourceFile, line };
+        this.parseErrors.push(new HopperError(loc, ErrorType.ParseError,
+            cleanParseMessage(msg)));
+    }
+}
+
+// Strip ANTLR internals from parse error messages to make them readable.
+function cleanParseMessage(msg) {
+    // Normalize the raw message: collapse literal and escaped newlines inside token text
+    const norm = msg.replace(/\\[nrt]/g, " ").replace(/[\n\r\t]/g, " ");
+    return norm
+        .replace(/token recognition error at:\s*'(.+?)'\s*/,       "unexpected character '$1'")
+        .replace(/mismatched input\s+'(.+?)'\s+expecting\s+.*/s,   "unexpected token '$1'")
+        .replace(/extraneous input\s+'(.+?)'\s+expecting\s+.*/s,   "unexpected token '$1'")
+        .replace(/no viable alternative at input\s+'(.+?)'.*/s,    "unexpected '$1'")
+        .replace(/missing\s+(.+?)\s+at\s+'(.+?)'.*/s,              "missing $1 before '$2'")
+        .replace(/<EOF>/g, "end of file")
+        // Trim excess whitespace left inside token quotes after normalization
+        .replace(/'([^']*)'/g, (_, s) => `'${s.trim()}'`);
+}
+
 export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false, bindings = null, sourceFile = null } = {}) {
     // Strip import lines before ANTLR sees them, collect import requests
     const imports = [];
@@ -1050,12 +1084,25 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         }
     );
 
-    const chars  = new antlr4.InputStream(strippedSource);
-    const lexer  = new HopperLexer(chars);
-    const tokens = new antlr4.CommonTokenStream(lexer);
-    const parser = new HopperParser(tokens);
+    const chars    = new antlr4.InputStream(strippedSource);
+    const lexer    = new HopperLexer(chars);
+    const tokens   = new antlr4.CommonTokenStream(lexer);
+    const parser   = new HopperParser(tokens);
+    const listener = new HopperParseErrorListener(sourceFile, resolveModuleName(sourceFile));
+    lexer.removeErrorListeners();
+    lexer.addErrorListener(listener);
+    parser.removeErrorListeners();
+    parser.addErrorListener(listener);
     parser.buildParseTrees = true;
     const tree = parser.program();
+
+    if (listener.parseErrors.length > 0) {
+        for (const e of listener.parseErrors) emitError(e);
+        const sentinel = new HopperError(null, ErrorType.ParseError, "");
+        sentinel.isSentinel = true;
+        throw sentinel;
+    }
+
     const ast  = new AstBuilder(sourceFile).visit(tree);
 
     if (noImports) return ast;

@@ -1,0 +1,8 @@
+{
+  "name": "badParse",
+  "version": "0.1.0",
+  "description": "Intentional parse errors for testing the diagnostic formatter",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop"
+}

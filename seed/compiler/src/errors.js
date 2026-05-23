@@ -34,10 +34,12 @@ const THEME = {
     errorBar:    off(ANSI.red),           // │ left bar on error blocks
     warningBar:  off(ANSI.brightBlue),   // │ left bar on warning blocks
     cascadeBar:  off(ANSI.yellow),       // │ left bar on cascade (note) blocks
+    parseBar:    off(ANSI.magenta),      // │ left bar on parse error blocks
     successBar:  off(ANSI.green),        // │ left bar on success blocks
     errorWord:   off(ANSI.red),          // "Error:" label
     warningWord: off(ANSI.brightBlue),   // "Warning:" label
     cascadeWord: off(ANSI.yellow),       // "Note:" label
+    parseWord:   off(ANSI.magenta),      // "Syntax error:" label
     tagLabel:    off(ANSI.dim),          // Module:  File:  Line:
     dataValue:   off(ANSI.brightWhite),  // hello  main.hop  14
     message:     off(ANSI.white),        // indented message text
@@ -118,10 +120,11 @@ function wrap(text, indent = "  ") {
 export function formatError(err) {
     const T         = THEME;
     const isCascade = err.isCascade === true;
-    const isWarning = !isCascade && err.severity === Severity.Warning;
-    const barColor  = isCascade ? T.cascadeBar  : isWarning ? T.warningBar : T.errorBar;
-    const wordColor = isCascade ? T.cascadeWord : isWarning ? T.warningWord : T.errorWord;
-    const label     = isCascade ? "Note"        : isWarning ? "Warning"    : "Error";
+    const isParse   = !isCascade && err.errType === ErrorType.ParseError;
+    const isWarning = !isCascade && !isParse && err.severity === Severity.Warning;
+    const barColor  = isCascade ? T.cascadeBar  : isParse ? T.parseBar  : isWarning ? T.warningBar : T.errorBar;
+    const wordColor = isCascade ? T.cascadeWord : isParse ? T.parseWord : isWarning ? T.warningWord : T.errorWord;
+    const label     = isCascade ? "Note"        : isParse ? "Syntax"   : isWarning ? "Warning"     : "Error";
 
     const bar    = `${barColor}│${T.reset} `;
     const closer = `${barColor}└${"─".repeat(BOX_WIDTH - 1)}${T.reset}`;
@@ -144,8 +147,13 @@ export function formatError(err) {
         content.push(`${T.unknown}(unknown location)${T.reset}`);
     }
 
-    content.push(`${wordColor}${label}:${T.reset} ${err.errType || label}`);
-    content.push(wrap(msgIndent + err.message, msgIndent));
+    if (isParse) {
+        // Parse errors: combine label + message on one line — no separate errType
+        content.push(wrap(`${wordColor}Syntax error:${T.reset} ${err.message}`, "              "));
+    } else {
+        content.push(`${wordColor}${label}:${T.reset} ${err.errType || label}`);
+        content.push(wrap(msgIndent + err.message, msgIndent));
+    }
     if (err.hint) content.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
 
     const allLines = content.flatMap(c => c.split("\n"));

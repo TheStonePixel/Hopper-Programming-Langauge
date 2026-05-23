@@ -239,7 +239,7 @@ function toObject(file, llDir, oDir, flags) {
     } catch (e) {
         if (e instanceof HopperError) {
             for (const d of [...getWarnings(), ...getErrors()]) process.stderr.write(formatError(d));
-            process.stderr.write(formatError(e));
+            if (!e.isSentinel) process.stderr.write(formatError(e));
             process.exit(1);
         }
         throw e;
