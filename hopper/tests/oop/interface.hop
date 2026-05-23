@@ -1,5 +1,5 @@
-// Test compile-time interface conformance checking.
-// The ascii String class implements IString — verified at compile time.
+// Test compile-time contract conformance checking.
+// The ascii String class satisfies IString — verified at compile time.
 // EXPECT: ok
 import ascii from string
 import io from linux

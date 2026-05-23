@@ -58,7 +58,7 @@ function _coreWriteInt(int fd, int n) {
     deallocate rev
 }
 
-class StandardCore implements Core {
+class StandardCore satisfies Core {
     constructor() { }
     destructor()  { }
 
@@ -168,7 +168,7 @@ class StandardCore implements Core {
     }
 }
 
-// TestSuite — lightweight test runner; not behind an interface
+// TestSuite — lightweight test runner; not behind an contract
 class TestSuite {
     int     pass
     int     fail

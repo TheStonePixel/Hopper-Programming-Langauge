@@ -1,4 +1,4 @@
-interface Map {
+contract Map {
     function len() int
     function contains(address key) bool
     function get(address key) address

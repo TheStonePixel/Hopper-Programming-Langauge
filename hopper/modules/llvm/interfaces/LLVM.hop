@@ -1,4 +1,4 @@
-interface LLVM {
+contract LLVM {
     function contextCreate() address
     function contextDispose(address ctx)
     function moduleCreate(address ctx, address name) address

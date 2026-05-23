@@ -23,7 +23,7 @@ the `hopper` CLI, located at `seed/build_system/hopper`.
 
 **Single CLI surface.** Every supported toolchain operation MUST be performed through the
 `hopper` CLI. Implementations MUST NOT invoke `hopperc.js`, `clang`, or `ld.lld` directly
-from user code or project scripts. The CLI is the only stable interface between user code
+from user code or project scripts. The CLI is the only stable contract between user code
 and the underlying compiler infrastructure.
 
 **One project shape.** Every Hopper project — whether an executable program or a library —

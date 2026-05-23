@@ -9,22 +9,22 @@
     "host": {
       "Regex": {
         "from":           "regex",
-        "interface":      "../../modules/regex/interfaces/Regex.hop",
+        "contract":      "../../modules/regex/interfaces/Regex.hop",
         "implementation": "../../modules/regex/src/Regex.hop"
       },
       "Concurrent": {
         "from":           "concurrent",
-        "interface":      "../../modules/concurrent/interfaces/Concurrent.hop",
+        "contract":      "../../modules/concurrent/interfaces/Concurrent.hop",
         "implementation": "../../modules/concurrent/src/Concurrent.hop"
       },
       "IO": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/IO.hop",
+        "contract":      "../../modules/linux/interfaces/IO.hop",
         "implementation": "../../modules/linux/src/IO.hop"
       },
       "FileSystem": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/FileSystem.hop",
+        "contract":      "../../modules/linux/interfaces/FileSystem.hop",
         "implementation": "../../modules/linux/src/FileSystem.hop"
       }
     }

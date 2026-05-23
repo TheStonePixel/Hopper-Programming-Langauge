@@ -40,7 +40,7 @@ function loadBindings(sourceFile, target = "host") {
                 for (const [name, b] of Object.entries(targetBindings)) {
                     bindings.set(name, {
                         from:           b.from || null,
-                        interface:      path.resolve(dir, b.interface),
+                        contract:       path.resolve(dir, b.contract),
                         implementation: path.resolve(dir, b.implementation),
                         inline:         b.inline === true,
                     });
@@ -737,7 +737,7 @@ function localizeBindings(projectRoot, installedNames) {
         for (const b of Object.values(bindings)) {
             if (!b.from || !installedNames.has(b.from)) continue;
             const mod = b.from;
-            for (const key of ["interface", "implementation"]) {
+            for (const key of ["contract", "implementation"]) {
                 if (!b[key]) continue;
                 const idx = b[key].indexOf(`/${mod}/`);
                 if (idx !== -1) {
@@ -1345,7 +1345,7 @@ function cmdFix(args) {
     // ── 3. Export files for libraries ────────────────────────────────────
     for (const [exportName, exp] of Object.entries(manifest.exports || {})) {
         const pairs = [
-            ["interface",      exp.interface],
+            ["contract",      exp.contract],
             ["implementation", exp.implementation],
         ];
         for (const [field, relPath] of pairs) {
@@ -1354,7 +1354,7 @@ function cmdFix(args) {
             if (!fs.existsSync(absPath)) {
                 if (!dryRun) {
                     fs.mkdirSync(path.dirname(absPath), { recursive: true });
-                    const stub = field === "interface"
+                    const stub = field === "contract"
                         ? `interface ${exportName} {\n}\n`
                         : `class Standard${exportName} implements ${exportName} {\n    constructor() { }\n    destructor() { }\n}\n`;
                     fs.writeFileSync(absPath, stub, "utf8");
@@ -1387,7 +1387,7 @@ function cmdFix(args) {
     }
     // Also scan files referenced explicitly in exports and entry
     for (const exp of Object.values(manifest.exports || {})) {
-        for (const relPath of [exp.interface, exp.implementation]) {
+        for (const relPath of [exp.contract, exp.implementation]) {
             if (!relPath) continue;
             const abs = path.join(projectRoot, relPath);
             if (fs.existsSync(abs)) toScan.add(abs);

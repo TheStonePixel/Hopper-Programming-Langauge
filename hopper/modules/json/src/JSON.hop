@@ -39,7 +39,7 @@ function _jsonMakeNode(int kind, int numVal, address strVal, address children, a
     return node
 }
 
-class JsonReader implements JSON {
+class JsonReader satisfies JSON {
     address stream
     address data
     int     dataLen

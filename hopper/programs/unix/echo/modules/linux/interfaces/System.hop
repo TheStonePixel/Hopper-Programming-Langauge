@@ -35,7 +35,7 @@ enum PrioWhich {
     PRIO_USER    = 2
 }
 
-interface System {
+contract System {
     function uname(address buf) int
     function sysinfo(address buf) int
     function getrusage(int who, address rusage) int

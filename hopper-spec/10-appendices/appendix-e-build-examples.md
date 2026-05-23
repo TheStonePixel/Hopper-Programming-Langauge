@@ -8,7 +8,7 @@ For all examples, `hopper` refers to the CLI at `seed/build_system/hopper`. If i
 
 ## Example 1: Minimal Hello World Executable
 
-A program that writes `"hello, world\n"` to stdout using the Linux IO interface.
+A program that writes `"hello, world\n"` to stdout using the Linux IO contract.
 
 ### Directory structure
 
@@ -26,7 +26,7 @@ hello/
 {
   "name": "hello",
   "version": "0.1.0",
-  "description": "Hello world using the linux IO interface",
+  "description": "Hello world using the linux IO contract",
   "license": "MIT",
   "type": "executable",
   "entry": "src/main.hop",
@@ -38,7 +38,7 @@ hello/
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -106,7 +106,7 @@ Same as Example 1. `string[]` is the type of `argv` (maps to `i8**`).
 
 ## Example 3: Minimal Library
 
-A library that exports one interface.
+A library that exports one contract.
 
 ### Directory structure
 
@@ -130,7 +130,7 @@ mymath/
   "type": "library",
   "exports": {
     "IMath": {
-      "interface":      "interfaces/IMath.hop",
+      "contract":      "interfaces/IMath.hop",
       "implementation": "src/Math.hop"
     }
   }
@@ -140,7 +140,7 @@ mymath/
 ### interfaces/IMath.hop
 
 ```hopper
-interface IMath {
+contract IMath {
     function abs(int x) int
     function max(int a, int b) int
     function min(int a, int b) int
@@ -151,7 +151,7 @@ interface IMath {
 ### src/Math.hop
 
 ```hopper
-class Math implements IMath {
+class Math satisfies IMath {
     function abs(int x) int {
         if (x < 0) {
             return -x
@@ -217,13 +217,13 @@ A program that depends on `mymath` from Example 3.
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "IMath": {
         "from":           "mymath",
-        "interface":      "modules/mymath/interfaces/IMath.hop",
+        "contract":      "modules/mymath/interfaces/IMath.hop",
         "implementation": "modules/mymath/src/Math.hop"
       }
     }
@@ -274,7 +274,7 @@ The `cast` module provides the `cast<T>(expr)` template function for explicit ty
       "IO": { ... },
       "Cast": {
         "from":           "cast",
-        "interface":      "modules/cast/interfaces/Cast.hop",
+        "contract":      "modules/cast/interfaces/Cast.hop",
         "implementation": "modules/cast/src/Cast.hop"
       }
     }
@@ -365,7 +365,7 @@ entry main {
 
 ## Example 7: SIMD-Enabled Executable
 
-A program using the x86_64 SIMD interface for vectorized byte scanning.
+A program using the x86_64 SIMD contract for vectorized byte scanning.
 
 ### hopper.json
 
@@ -385,19 +385,19 @@ A program using the x86_64 SIMD interface for vectorized byte scanning.
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/interfaces/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "SIMD": {
         "from":           "x86_64",
-        "interface":      "modules/x86_64/interfaces/SIMD.hop",
+        "contract":      "modules/x86_64/interfaces/SIMD.hop",
         "implementation": "modules/x86_64/src/SIMD.hop"
       }
     }
@@ -436,4 +436,4 @@ entry main {
 }
 ```
 
-`X86SIMD` is the class defined in `modules/x86_64/src/SIMD.hop` that implements the `SIMD` interface. Programs instantiate it directly and call methods on the instance. No `asm {}` blocks appear in program source.
+`X86SIMD` is the class defined in `modules/x86_64/src/SIMD.hop` that satisfies the `SIMD` contract. Programs instantiate it directly and call methods on the instance. No `asm {}` blocks appear in program source.

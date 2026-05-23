@@ -1,13 +1,13 @@
-// Linux x86-64 syscall interface and implementation.
+// Linux x86-64 syscall contract and implementation.
 //
-// This file is self-contained: the interface declaration (LinuxSyscalls) and
+// This file is self-contained: the contract declaration (LinuxSyscalls) and
 // the concrete class (X86LinuxSyscalls) live together so that regular module
 // imports resolve both in one load, without requiring a separate binding.
 //
 // Syscall ABI: number → rax, args → rdi rsi rdx r10 r8 r9, return ← rax.
 // No libc. No arch passthrough. No external dependencies.
 
-interface LinuxSyscalls {
+contract LinuxSyscalls {
 
     // ── I/O ──────────────────────────────────────────────────────────────────
 

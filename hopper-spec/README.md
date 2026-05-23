@@ -6,7 +6,7 @@
 
 ---
 
-The Hopper programming language specification defines the language, build system, module ecosystem, standard library, and application binary interface for conforming implementations.
+The Hopper programming language specification defines the language, build system, module ecosystem, standard library, and application binary contract for conforming implementations.
 
 Hopper is a compiled, statically typed, manually memory-managed systems programming language. It targets bare metal, embedded systems, and hosted operating system environments. It compiles to LLVM IR and from there to native machine code.
 

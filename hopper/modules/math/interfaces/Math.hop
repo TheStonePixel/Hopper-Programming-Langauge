@@ -1,4 +1,4 @@
-interface Math {
+contract Math {
     function abs(int x) int
     function min(int a, int b) int
     function max(int a, int b) int

@@ -3,9 +3,9 @@
 // ArrayIter walks an explicit sequence of pushed values.
 // RangeIter generates consecutive integers from a start to an end with
 // a configurable step — no backing allocation needed.
-// Both implement the Iterator interface so helpers are written once.
+// Both implement the Iterator contract so helpers are written once.
 //
-// Demonstrates: interface, multiple implementors, reset(), higher-order
+// Demonstrates: contract, multiple implementors, reset(), higher-order
 //               helpers over an abstract cursor.
 //
 // Build: hopper build iterator.hop
@@ -14,9 +14,9 @@ import Array from ds
 
 extern function printf(string fmt, ...) int
 
-// ── interface ─────────────────────────────────────────────────────────────────
+// ── contract ─────────────────────────────────────────────────────────────────
 
-interface Iterator {
+contract Iterator {
     function hasNext() bool
     function next() int
     function reset()
@@ -24,7 +24,7 @@ interface Iterator {
 
 // ── ArrayIter ─────────────────────────────────────────────────────────────────
 
-class ArrayIter implements Iterator {
+class ArrayIter satisfies Iterator {
     StandardArray data
     int cursor
 
@@ -56,7 +56,7 @@ class ArrayIter implements Iterator {
 
 // ── RangeIter ─────────────────────────────────────────────────────────────────
 
-class RangeIter implements Iterator {
+class RangeIter satisfies Iterator {
     int start
     int current
     int end

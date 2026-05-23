@@ -5,12 +5,12 @@
   "license": "Apache-2.0",
   "type": "library",
   "exports": {
-    "IO":         { "interface": "interfaces/IO.hop"         },
-    "FileSystem": { "interface": "interfaces/FileSystem.hop" },
-    "System":     { "interface": "interfaces/System.hop"     },
-    "Process":    { "interface": "interfaces/Process.hop"    },
-    "Socket":     { "interface": "interfaces/Socket.hop"     },
-    "Network":    { "interface": "interfaces/Network.hop"    },
-    "Memory":     { "interface": "interfaces/Memory.hop"     }
+    "IO":         { "contract": "interfaces/IO.hop"         },
+    "FileSystem": { "contract": "interfaces/FileSystem.hop" },
+    "System":     { "contract": "interfaces/System.hop"     },
+    "Process":    { "contract": "interfaces/Process.hop"    },
+    "Socket":     { "contract": "interfaces/Socket.hop"     },
+    "Network":    { "contract": "interfaces/Network.hop"    },
+    "Memory":     { "contract": "interfaces/Memory.hop"     }
   }
 }

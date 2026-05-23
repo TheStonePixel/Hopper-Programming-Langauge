@@ -1,4 +1,4 @@
-class StandardMath implements Math {
+class StandardMath satisfies Math {
     function abs(int x) int {
         if (x < 0) { return 0 - x }
         return x

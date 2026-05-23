@@ -1,14 +1,14 @@
-// Linux x86-64 syscall interface.
+// Linux x86-64 syscall contract.
 //
-// This interface captures the joint constraint of Linux OS ABI + x86-64 ISA.
+// This contract captures the joint constraint of Linux OS ABI + x86-64 ISA.
 // Syscall numbers here are specific to Linux on x86-64 — they differ on every
 // other OS and on every other CPU architecture. Naming it LinuxSyscalls makes
 // that constraint explicit; it is not portable to macOS x86-64 or ARM64 Linux.
 //
-// The linux module depends on this interface to implement its OS abstractions.
+// The linux module depends on this contract to implement its OS abstractions.
 // Programs depend on linux, never on LinuxSyscalls directly.
 
-interface LinuxSyscalls {
+contract LinuxSyscalls {
 
     // ── I/O ──────────────────────────────────────────────────────────────────
 

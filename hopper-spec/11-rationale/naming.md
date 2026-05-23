@@ -38,7 +38,7 @@ There is no technical reason `self` could not have been `this`. The choice is ab
 
 ## PascalCase for Types and Interfaces
 
-Type names (`MyClass`, `LinuxIO`, `X86SIMD`) and interface names (`IO`, `FileSystem`, `SIMD`) use PascalCase. Free functions and methods use camelCase. Constants defined via `const` use SCREAMING_SNAKE_CASE. Enum values use PascalCase.
+Type names (`MyClass`, `LinuxIO`, `X86SIMD`) and contract names (`IO`, `FileSystem`, `SIMD`) use PascalCase. Free functions and methods use camelCase. Constants defined via `const` use SCREAMING_SNAKE_CASE. Enum values use PascalCase.
 
 This follows the conventions of Go and Rust — two languages that systems programmers frequently read. A programmer familiar with either will immediately recognize that `Buffer` is a type and `buffer` is a variable without needing to look up the definition.
 
@@ -55,15 +55,15 @@ The visual distinction between `Buffer` and `buf` prevents a class of confusion 
 
 ## Module and Interface Naming
 
-Interfaces exported from OS modules use noun phrases that describe what the interface provides: `IO`, `FileSystem`, `Process`, `Socket`, `Network`, `Memory`, `System`. They are capitalized because they are types.
+Interfaces exported from OS modules use noun phrases that describe what the contract provides: `IO`, `FileSystem`, `Process`, `Socket`, `Network`, `Memory`, `System`. They are capitalized because they are types.
 
 ISA module names use the architecture identifier as it appears in the Linux architecture string: `x86_64`, `arm64`. These are lowercase because they are module names, not type names.
 
 The import syntax makes the category clear:
 
 ```hopper
-import IO from linux        // IO is an interface name; linux is a module name
-import SIMD from x86_64    // SIMD is an interface name; x86_64 is a module name
+import IO from linux        // IO is an contract name; linux is a module name
+import SIMD from x86_64    // SIMD is an contract name; x86_64 is a module name
 ```
 
 Lowercase module identifiers follow the same convention as package names in Go and crate names in Rust — they are identifiers, not proper names.

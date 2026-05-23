@@ -1,4 +1,4 @@
-interface Cast {
+contract Cast {
     function ptrToInt(address ptr) int
     function intToPtr(int n) address
     function byteToInt(byte b) int

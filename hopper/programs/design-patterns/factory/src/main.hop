@@ -1,10 +1,10 @@
 // factory.hop — Factory pattern: object construction by enum tag
 //
 // Factory functions select the right constructor based on a ShapeKind tag.
-// All shapes share the same interface (area, perimeter, print) regardless of
+// All shapes share the same contract (area, perimeter, print) regardless of
 // which factory created them — callers never construct shapes directly.
 //
-// Demonstrates: enum dispatch, tagged union via class, uniform interface,
+// Demonstrates: enum dispatch, tagged union via class, uniform contract,
 //               encapsulating construction logic in named factory functions.
 //
 // Build: hopper build factory.hop

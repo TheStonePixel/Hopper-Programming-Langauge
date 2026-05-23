@@ -1,6 +1,6 @@
 import fs from arch
 
-class LinuxFileSystem implements FileSystem {
+class LinuxFileSystem satisfies FileSystem {
     function open(string path, int flags, int mode) int {
         return open(path, flags, mode)
     }

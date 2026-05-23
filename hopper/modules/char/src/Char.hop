@@ -1,4 +1,4 @@
-class StandardChar implements Char {
+class StandardChar satisfies Char {
     function isAlpha(byte c) bool {
         int n = int (c)
         if (n >= 65) {

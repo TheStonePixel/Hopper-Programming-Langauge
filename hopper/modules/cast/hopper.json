@@ -6,7 +6,7 @@
   "type": "library",
   "exports": {
     "Cast": {
-      "interface":      "interfaces/Cast.hop",
+      "contract":      "interfaces/Cast.hop",
       "implementation": "src/Cast.hop"
     }
   }

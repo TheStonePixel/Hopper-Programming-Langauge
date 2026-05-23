@@ -1,4 +1,4 @@
-class StandardArray implements Array {
+class StandardArray satisfies Array {
     address data
     int length
     int capacity

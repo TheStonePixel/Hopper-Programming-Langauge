@@ -1,4 +1,4 @@
-class StandardStack implements Stack {
+class StandardStack satisfies Stack {
     address data
     int length
     int capacity

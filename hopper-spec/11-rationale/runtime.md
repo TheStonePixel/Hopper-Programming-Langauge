@@ -55,7 +55,7 @@ The cost of not having a runtime is that the programmer must manage resources ex
 
 **Explicit allocation** means the programmer decides when and whether to use heap memory at all. A program that uses only stack allocation and static data needs no allocator and no runtime.
 
-**Module imports** bring in exactly the functionality the program needs. If the program does not import the `Process` interface, no signal handler infrastructure is linked in.
+**Module imports** bring in exactly the functionality the program needs. If the program does not import the `Process` contract, no signal handler infrastructure is linked in.
 
 ---
 

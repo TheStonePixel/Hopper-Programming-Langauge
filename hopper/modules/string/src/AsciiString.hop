@@ -1,4 +1,4 @@
-class AsciiString implements IString {
+class AsciiString satisfies IString {
     address data
     int length
     int capacity

@@ -1,4 +1,4 @@
-class OwnedBuffer implements Buffer {
+class OwnedBuffer satisfies Buffer {
     address data
     int length
 

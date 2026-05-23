@@ -43,7 +43,7 @@ enum CloneFlag {
     CLONE_THREAD  =  65536
 }
 
-interface Process {
+contract Process {
     function exit(int code)
     function exit_group(int code)
     function fork() int

@@ -1,4 +1,4 @@
-interface StringBuilder {
+contract StringBuilder {
     function length() int
     function empty() bool
     function str() address

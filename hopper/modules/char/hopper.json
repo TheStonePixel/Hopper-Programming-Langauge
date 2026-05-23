@@ -7,7 +7,7 @@
   "dependencies": {},
   "exports": {
     "Char": {
-      "interface":      "interfaces/Char.hop",
+      "contract":      "interfaces/Char.hop",
       "implementation": "src/Char.hop"
     }
   },
@@ -15,12 +15,12 @@
     "host": {
       "Char": {
         "from":           "char",
-        "interface":      "interfaces/Char.hop",
+        "contract":      "interfaces/Char.hop",
         "implementation": "src/Char.hop"
       },
       "Core": {
         "from":           "core",
-        "interface":      "../core/interfaces/Core.hop",
+        "contract":      "../core/interfaces/Core.hop",
         "implementation": "../core/src/Core.hop"
       }
     }

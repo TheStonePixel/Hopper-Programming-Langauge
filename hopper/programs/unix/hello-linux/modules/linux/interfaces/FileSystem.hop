@@ -21,7 +21,7 @@ enum AtFlag {
     AT_FDCWD = -100
 }
 
-interface FileSystem {
+contract FileSystem {
     function open(string path, int flags, int mode) int
     function close(int fd) int
     function creat(string path, int mode) int

@@ -5,7 +5,7 @@
     "host": {
       "Text": {
         "from": "ascii",
-        "interface": "./interfaces/Text.hop",
+        "contract": "./interfaces/Text.hop",
         "implementation": "./modules/ascii/String.hop"
       }
     }

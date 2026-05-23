@@ -8,12 +8,12 @@
     "arch": "0.1.0"
   },
   "exports": {
-    "IO":         { "interface": "interfaces/IO.hop",         "implementation": "src/IO.hop"         },
-    "FileSystem": { "interface": "interfaces/FileSystem.hop", "implementation": "src/FileSystem.hop" },
-    "System":     { "interface": "interfaces/System.hop",     "implementation": "src/System.hop"     },
-    "Process":    { "interface": "interfaces/Process.hop",    "implementation": "src/Process.hop"    },
-    "Socket":     { "interface": "interfaces/Socket.hop",     "implementation": "src/Socket.hop"     },
-    "Network":    { "interface": "interfaces/Network.hop",    "implementation": "src/Network.hop"    },
-    "Memory":     { "interface": "interfaces/Memory.hop",     "implementation": "src/Memory.hop"     }
+    "IO":         { "contract": "interfaces/IO.hop",         "implementation": "src/IO.hop"         },
+    "FileSystem": { "contract": "interfaces/FileSystem.hop", "implementation": "src/FileSystem.hop" },
+    "System":     { "contract": "interfaces/System.hop",     "implementation": "src/System.hop"     },
+    "Process":    { "contract": "interfaces/Process.hop",    "implementation": "src/Process.hop"    },
+    "Socket":     { "contract": "interfaces/Socket.hop",     "implementation": "src/Socket.hop"     },
+    "Network":    { "contract": "interfaces/Network.hop",    "implementation": "src/Network.hop"    },
+    "Memory":     { "contract": "interfaces/Memory.hop",     "implementation": "src/Memory.hop"     }
   }
 }

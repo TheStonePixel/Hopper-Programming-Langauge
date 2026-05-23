@@ -14,13 +14,13 @@ import Array from ds
 
 extern function printf(string fmt, ...) int
 
-interface Iterator {
+contract Iterator {
     function hasNext() bool
     function next() int
     function reset()
 }
 
-class ArrayIter implements Iterator {
+class ArrayIter satisfies Iterator {
     StandardArray data
     int cursor
 
@@ -46,7 +46,7 @@ class ArrayIter implements Iterator {
     function reset() { self.cursor = 0 }
 }
 
-class RangeIter implements Iterator {
+class RangeIter satisfies Iterator {
     int start
     int current
     int end

@@ -9,27 +9,27 @@
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/IO.hop",
+        "contract":      "../../modules/linux/interfaces/IO.hop",
         "implementation": "../../modules/linux/src/IO.hop"
       },
       "FileSystem": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/FileSystem.hop",
+        "contract":      "../../modules/linux/interfaces/FileSystem.hop",
         "implementation": "../../modules/linux/src/FileSystem.hop"
       },
       "System": {
         "from":           "linux",
-        "interface":      "../../modules/linux/interfaces/System.hop",
+        "contract":      "../../modules/linux/interfaces/System.hop",
         "implementation": "../../modules/linux/src/System.hop"
       },
       "Array": {
         "from":           "ds",
-        "interface":      "../../modules/ds/interfaces/Array.hop",
+        "contract":      "../../modules/ds/interfaces/Array.hop",
         "implementation": "../../modules/ds/src/Array.hop"
       },
       "Map": {
         "from":           "ds",
-        "interface":      "../../modules/ds/interfaces/Map.hop",
+        "contract":      "../../modules/ds/interfaces/Map.hop",
         "implementation": "../../modules/ds/src/Map.hop"
       }
     }

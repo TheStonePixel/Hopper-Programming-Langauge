@@ -4,7 +4,7 @@
 
 Most compilers accumulate hardware knowledge over time. An x86-64 backend grows instruction selection tables, ABI lowering rules, calling convention logic, and syscall encoding. An ARM64 backend grows a parallel set. Adding a new architecture means modifying the compiler. Removing an architecture means more modification. The hardware model is embedded inside the tool.
 
-Hopper's module system already challenges this assumption at the OS interface layer. Syscall numbers for Linux on x86-64 live in `x86_64/src/LinuxSyscalls.hop` — not in the compiler. SIMD capabilities live in `x86_64/interfaces/SIMD.hop` — not in the compiler. The build file selects which hardware module satisfies which interface. The compiler has no syscall knowledge and no SIMD tables. That is not an accident; it is the first step of a longer design.
+Hopper's module system already challenges this assumption at the OS contract layer. Syscall numbers for Linux on x86-64 live in `x86_64/src/LinuxSyscalls.hop` — not in the compiler. SIMD capabilities live in `x86_64/interfaces/SIMD.hop` — not in the compiler. The build file selects which hardware module satisfies which contract. The compiler has no syscall knowledge and no SIMD tables. That is not an accident; it is the first step of a longer design.
 
 This document describes where that design leads.
 
@@ -16,7 +16,7 @@ That is the long-term goal. What follows is what it means and why it matters.
 
 ## The Current Foundation
 
-Hopper's module system already implements the structural separation described in this document at the OS interface and capability layer:
+Hopper's module system already satisfies the structural separation described in this document at the OS contract and capability layer:
 
 - Hardware assumptions live in explicitly named modules (`x86_64/`, `arm64/`)
 - OS interfaces live in a separate layer (`linux/`) with no ISA knowledge
@@ -41,7 +41,7 @@ When ISA logic lives inside the compiler, several things become true simultaneou
 
 **Adding a target is invasive.** Supporting RISC-V or a custom research ISA requires modifying the compiler itself — contributing to a monolith, coordinating with backend maintainers, understanding internal abstractions.
 
-Hopper's module system already solves this at the interface layer. The forward model extends the solution to the compiler layer.
+Hopper's module system already solves this at the contract layer. The forward model extends the solution to the compiler layer.
 
 ---
 
@@ -93,7 +93,7 @@ Crucially: the compiler does not define what instructions exist. The ISA modules
 
 ### OS Interface Modules — The Contract Layer
 
-Programs are written against OS-level interfaces, not hardware. The `linux` module is already a pure interface module — it contains no implementation code, no ISA references, no calling convention knowledge. It declares what a Linux program needs; it makes no claim about how those needs are satisfied.
+Programs are written against OS-level interfaces, not hardware. The `linux` module is already a pure contract module — it contains no implementation code, no ISA references, no calling convention knowledge. It declares what a Linux program needs; it makes no claim about how those needs are satisfied.
 
 This layer is already complete. It does not need to change as the backend evolves.
 
@@ -109,7 +109,7 @@ In the forward model, the backend is explicitly constrained to be ISA-agnostic. 
 
 It does not contain instruction selection tables, architecture-specific lowering logic, ABI rules, or syscall encoding. Those are in ISA modules. The backend operates over declared machine descriptions — it does not contain them.
 
-Today, LLVM acts as the instruction emission layer — a legacy backend that currently holds the ISA knowledge this model intends to externalize. The path forward is progressive: LLVM's role is progressively isolated behind a defined ISA interface until what it provides can be described in modules rather than in a C++ compiler backend.
+Today, LLVM acts as the instruction emission layer — a legacy backend that currently holds the ISA knowledge this model intends to externalize. The path forward is progressive: LLVM's role is progressively isolated behind a defined ISA contract until what it provides can be described in modules rather than in a C++ compiler backend.
 
 ---
 
@@ -173,9 +173,9 @@ X86SIMD simd = X86SIMD()
 int mask = simd.scanByte16(buf + offset, 10)
 ```
 
-The program names the capability (`SIMD`) and the ISA context (`x86_64`). The interface defines the contract. The implementation uses SSE2 on x86-64 and NEON on ARM64. The interface is identical across both.
+The program names the capability (`SIMD`) and the ISA context (`x86_64`). The contract defines the contract. The implementation uses SSE2 on x86-64 and NEON on ARM64. The contract is identical across both.
 
-This pattern — capability as interface, ISA module as implementation, build file as selector — is how all hardware-specific functionality is intended to work.
+This pattern — capability as contract, ISA module as implementation, build file as selector — is how all hardware-specific functionality is intended to work.
 
 ---
 
@@ -214,7 +214,7 @@ The current state and the forward model are not discontinuous. They are points o
 
 **Near term:** The arm64 module is implemented. Cross-compilation between x86-64 and ARM64 is demonstrated by changing build file targets with zero source changes.
 
-**Further out:** Instruction semantic descriptions begin moving into ISA modules. The compiler's LLVM dependency is progressively isolated behind a declared interface, so that the ISA knowledge LLVM holds today could eventually be described in Hopper modules rather than C++ compiler internals.
+**Further out:** Instruction semantic descriptions begin moving into ISA modules. The compiler's LLVM dependency is progressively isolated behind a declared contract, so that the ISA knowledge LLVM holds today could eventually be described in Hopper modules rather than C++ compiler internals.
 
 **Long term:** The backend contains no ISA-specific logic. New architectures are added by adding modules. Hardware is composed into programs at build time, not embedded in tools.
 
@@ -234,4 +234,4 @@ The structural insight is simple:
 
 > Hardware is not a compiler concern. It is a module.
 
-The module system already enforces this at the interface layer. The forward model extends the same principle — the same mechanism, the same naming discipline, the same build-time composition — down through the compiler itself.
+The module system already enforces this at the contract layer. The forward model extends the same principle — the same mechanism, the same naming discipline, the same build-time composition — down through the compiler itself.

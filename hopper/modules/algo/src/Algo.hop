@@ -89,7 +89,7 @@ function _mergeSortRange(address arr, int lo, int hi, address scratch, callback(
     _mergeParts(arr, lo, mid, hi, scratch, cmp)
 }
 
-class StandardAlgo implements Algo {
+class StandardAlgo satisfies Algo {
     function insertionSort(address arr, int len, callback(address, address) int cmp) {
         int i = 1
         while (i < len) {

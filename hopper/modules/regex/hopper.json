@@ -7,7 +7,7 @@
   "dependencies": {},
   "exports": {
     "Regex": {
-      "interface":      "interfaces/Regex.hop",
+      "contract":      "interfaces/Regex.hop",
       "implementation": "src/Regex.hop"
     }
   },
@@ -15,7 +15,7 @@
     "host": {
       "Regex": {
         "from":           "regex",
-        "interface":      "interfaces/Regex.hop",
+        "contract":      "interfaces/Regex.hop",
         "implementation": "src/Regex.hop"
       }
     }

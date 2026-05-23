@@ -1,4 +1,4 @@
-interface Path {
+contract Path {
     function ptr() address
     function length() int
     function isAbsolute() bool

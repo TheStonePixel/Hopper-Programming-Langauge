@@ -1,10 +1,10 @@
-// Terminal — interface contract for a full-featured text terminal.
+// Terminal — contract contract for a full-featured text terminal.
 //
 // Implementations must provide raw-mode setup on construction and restore
 // the original terminal state in close().  All output is buffered; flush()
 // pushes the accumulated bytes to the display.
 
-interface Terminal {
+contract Terminal {
     function width()  int
     function height() int
 

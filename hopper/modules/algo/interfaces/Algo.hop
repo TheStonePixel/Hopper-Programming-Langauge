@@ -1,4 +1,4 @@
-interface Algo {
+contract Algo {
     function insertionSort(address arr, int len, callback(address, address) int cmp)
     function quickSort(address arr, int len, callback(address, address) int cmp)
     function mergeSort(address arr, int len, callback(address, address) int cmp)

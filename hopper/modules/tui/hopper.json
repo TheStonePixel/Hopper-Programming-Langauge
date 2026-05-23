@@ -9,7 +9,7 @@
   },
   "exports": {
     "TUI": {
-      "interface":      "interfaces/TUI.hop",
+      "contract":      "interfaces/TUI.hop",
       "implementation": "src/TUI.hop"
     }
   },
@@ -17,7 +17,7 @@
     "host": {
       "TUI": {
         "from":           "tui",
-        "interface":      "interfaces/TUI.hop",
+        "contract":      "interfaces/TUI.hop",
         "implementation": "src/TUI.hop"
       }
     }

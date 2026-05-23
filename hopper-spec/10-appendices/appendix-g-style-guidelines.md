@@ -65,7 +65,7 @@ Use **PascalCase**. Each word begins with an uppercase letter.
 
 ```hopper
 class LinkedList { ... }
-interface FileSystem { ... }
+contract FileSystem { ... }
 class X86SIMD { ... }      // acronyms: all-caps is acceptable
 ```
 
@@ -273,7 +273,7 @@ import FileSystem from linux
 import SIMD       from x86_64
 ```
 
-Within the interface import group, list OS interfaces (linux) before hardware interfaces (x86_64, compute).
+Within the contract import group, list OS interfaces (linux) before hardware interfaces (x86_64, compute).
 
 ---
 
@@ -358,7 +358,7 @@ Use 2-space indentation inside JSON. Keep each binding on its own set of lines:
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -367,4 +367,4 @@ Use 2-space indentation inside JSON. Keep each binding on its own set of lines:
 }
 ```
 
-Align the `"from"`, `"interface"`, `"implementation"`, and `"inline"` values within each binding for readability.
+Align the `"from"`, `"contract"`, `"implementation"`, and `"inline"` values within each binding for readability.

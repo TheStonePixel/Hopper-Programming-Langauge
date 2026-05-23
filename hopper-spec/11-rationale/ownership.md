@@ -63,6 +63,6 @@ Any ownership system added to Hopper must:
 1. Be expressible without modifying existing code that works correctly
 2. Be ignorable — a program with no ownership annotations must still compile
 3. Be useful on real systems code, not just toy examples
-4. Not require lifetime annotations to propagate across module boundaries in ways that break the interface system
+4. Not require lifetime annotations to propagate across module boundaries in ways that break the contract system
 
 This is recorded here as a design constraint so that proposals for ownership features can be evaluated against it.

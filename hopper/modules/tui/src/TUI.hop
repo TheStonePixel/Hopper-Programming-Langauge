@@ -75,7 +75,7 @@ function _tuiStrLen(address s) int {
     return n
 }
 
-class StandardTUI implements TUI {
+class StandardTUI satisfies TUI {
     address savedTermios
     int     rows
     int     cols

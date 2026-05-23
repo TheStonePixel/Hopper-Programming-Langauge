@@ -1,4 +1,4 @@
-interface FileWriter {
+contract FileWriter {
     function valid() bool
     function writeBytes(address buf, int n) int
     function writeStr(address s) int

@@ -9,11 +9,11 @@
   },
   "exports": {
     "FileReader": {
-      "interface":      "interfaces/FileReader.hop",
+      "contract":      "interfaces/FileReader.hop",
       "implementation": "src/File.hop"
     },
     "FileWriter": {
-      "interface":      "interfaces/FileWriter.hop",
+      "contract":      "interfaces/FileWriter.hop",
       "implementation": "src/File.hop"
     }
   },
@@ -21,12 +21,12 @@
     "host": {
       "FileReader": {
         "from":           "io",
-        "interface":      "interfaces/FileReader.hop",
+        "contract":      "interfaces/FileReader.hop",
         "implementation": "src/File.hop"
       },
       "FileWriter": {
         "from":           "io",
-        "interface":      "interfaces/FileWriter.hop",
+        "contract":      "interfaces/FileWriter.hop",
         "implementation": "src/File.hop"
       }
     }

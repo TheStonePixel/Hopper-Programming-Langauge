@@ -7,7 +7,7 @@
   "dependencies": {},
   "exports": {
     "LLVM": {
-      "interface":      "interfaces/LLVM.hop",
+      "contract":      "interfaces/LLVM.hop",
       "implementation": "src/LLVM.hop"
     }
   },
@@ -15,7 +15,7 @@
     "host": {
       "LLVM": {
         "from":           "llvm",
-        "interface":      "interfaces/LLVM.hop",
+        "contract":      "interfaces/LLVM.hop",
         "implementation": "src/LLVM.hop"
       }
     }

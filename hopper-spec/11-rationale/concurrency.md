@@ -6,7 +6,7 @@
 
 ## The Decision
 
-Hopper provides no language-level concurrency model: no goroutines, no async/await, no actors, no built-in thread type, no channel primitives. Concurrency is expressed entirely through OS system calls — `fork`, `clone`, `futex`, `pthread_create` via `execve`, and similar — accessed through the module system exactly as any other system interface is accessed.
+Hopper provides no language-level concurrency model: no goroutines, no async/await, no actors, no built-in thread type, no channel primitives. Concurrency is expressed entirely through OS system calls — `fork`, `clone`, `futex`, `pthread_create` via `execve`, and similar — accessed through the module system exactly as any other system contract is accessed.
 
 ---
 
@@ -18,7 +18,7 @@ Every high-level concurrency model — green threads, coroutines, work-stealing 
 
 ### OS concurrency is sufficient
 
-A Hopper program that needs concurrency can call `fork` or `clone` via the `Process` interface, create POSIX threads via the `x86_64` ISA module, or use `epoll` via the `Network` interface for I/O-driven concurrency. These mechanisms are mature, well-understood, and available on every Linux target. Wrapping them in language primitives does not add capability — it adds abstraction overhead and hides what is actually happening.
+A Hopper program that needs concurrency can call `fork` or `clone` via the `Process` contract, create POSIX threads via the `x86_64` ISA module, or use `epoll` via the `Network` contract for I/O-driven concurrency. These mechanisms are mature, well-understood, and available on every Linux target. Wrapping them in language primitives does not add capability — it adds abstraction overhead and hides what is actually happening.
 
 ### Explicit synchronization is auditable
 
@@ -64,7 +64,7 @@ Programs that need concurrency choose their model explicitly:
 - **Process-based:** `fork` + IPC via pipes or shared memory
 - **Thread-based:** `clone` with shared address space + futex synchronization
 - **Event-driven:** `epoll`/`poll` for I/O multiplexing without threads
-- **Async I/O:** `io_uring` via the `IO` interface (when implemented)
+- **Async I/O:** `io_uring` via the `IO` contract (when implemented)
 
 Each of these is available through the existing module system. None requires a language change.
 

@@ -30,4 +30,4 @@ Rationale documents are useful for:
 
 **topology.md** — Why `bitfield`, `strict`, and `bind`. Hardware registers have structure that is lost when treated as plain integers. These keywords let the compiler and programmer reason about memory regions with typed layouts, volatile MMIO semantics, and interrupt vector placement respectively.
 
-**visibility.md** — Why Hopper has no access modifiers. The interface-file mechanism provides the right level of encapsulation for library code. For application code in a trusted codebase, access modifiers add boilerplate without benefit.
+**visibility.md** — Why Hopper has no access modifiers. The contract-file mechanism provides the right level of encapsulation for library code. For application code in a trusted codebase, access modifiers add boilerplate without benefit.

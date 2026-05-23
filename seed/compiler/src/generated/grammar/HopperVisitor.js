@@ -192,26 +192,26 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
-	// Visit a parse tree produced by HopperParser#interfaceDecl.
-	visitInterfaceDecl(ctx) {
+	// Visit a parse tree produced by HopperParser#contractDecl.
+	visitContractDecl(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
-	// Visit a parse tree produced by HopperParser#InterfaceFunc.
-	visitInterfaceFunc(ctx) {
+	// Visit a parse tree produced by HopperParser#ContractFunc.
+	visitContractFunc(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
-	// Visit a parse tree produced by HopperParser#InterfaceProc.
-	visitInterfaceProc(ctx) {
+	// Visit a parse tree produced by HopperParser#ContractProc.
+	visitContractProc(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
-	// Visit a parse tree produced by HopperParser#InterfaceEnum.
-	visitInterfaceEnum(ctx) {
+	// Visit a parse tree produced by HopperParser#ContractEnum.
+	visitContractEnum(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
@@ -228,8 +228,8 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
-	// Visit a parse tree produced by HopperParser#implementsList.
-	visitImplementsList(ctx) {
+	// Visit a parse tree produced by HopperParser#satisfiesList.
+	visitSatisfiesList(ctx) {
 	  return this.visitChildren(ctx);
 	}
 

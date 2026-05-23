@@ -1,4 +1,4 @@
-interface Buffer {
+contract Buffer {
     function ptr() address
     function len() int
     function get(int i) byte

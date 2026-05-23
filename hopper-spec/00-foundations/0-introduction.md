@@ -27,7 +27,7 @@ Hopper is designed for software that runs close to the hardware: operating syste
 
 **Compiled.** Programs are compiled to native machine code via LLVM. There is no interpreter and no virtual machine.
 
-**Hardware explicit.** Hardware capabilities — system calls, SIMD, memory-mapped I/O, interrupt vectors — are expressed in the module system as named interfaces with typed implementations. Programs are written against hardware-independent interface names; the build configuration (`hopper.json`) selects the concrete implementation for each target.
+**Hardware explicit.** Hardware capabilities — system calls, SIMD, memory-mapped I/O, interrupt vectors — are expressed in the module system as named interfaces with typed implementations. Programs are written against hardware-independent contract names; the build configuration (`hopper.json`) selects the concrete implementation for each target.
 
 **Explicit over implicit.** If something happens at runtime — an allocation, a cast, a system call — it appears in the source code. There are no hidden operations, no implicit coercions, and no invisible runtime behaviors.
 

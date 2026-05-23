@@ -133,17 +133,17 @@ function checkUnusedVars(body, params) {
     }
 }
 
-// ── interface conformance check ───────────────────────────────────────────
+// ── contract conformance check ────────────────────────────────────────────
 
 export function checkImplements(cls) {
     for (const ifaceName of cls.interfaces || []) {
         const iface = interfaceDefs.get(ifaceName);
-        if (!iface) throw new Error(`Interface '${ifaceName}' not found (required by class '${cls.name}')`);
+        if (!iface) throw new Error(`Contract '${ifaceName}' not found (required by class '${cls.name}')`);
         for (const req of iface.methods) {
             const found = (cls.methods || []).find(m => m.name === req.name);
             if (!found) {
                 throw new Error(
-                    `Class '${cls.name}' does not implement '${ifaceName}.${req.name}' — add a '${req.name}' method`
+                    `Class '${cls.name}' does not satisfy '${ifaceName}.${req.name}' — add a '${req.name}' method`
                 );
             }
             // Check parameter count matches
@@ -151,7 +151,7 @@ export function checkImplements(cls) {
             const gotCount = found.params ? found.params.length : 0;
             if (reqCount !== gotCount) {
                 throw new Error(
-                    `Class '${cls.name}' method '${req.name}' has ${gotCount} parameter(s) but interface '${ifaceName}' requires ${reqCount}`
+                    `Class '${cls.name}' method '${req.name}' has ${gotCount} parameter(s) but contract '${ifaceName}' requires ${reqCount}`
                 );
             }
             // Check return type matches (both null means procedure/void)
@@ -161,7 +161,7 @@ export function checkImplements(cls) {
                 const reqStr = reqRet ?? "void";
                 const gotStr = gotRet ?? "void";
                 throw new Error(
-                    `Class '${cls.name}' method '${req.name}' returns '${gotStr}' but interface '${ifaceName}' declares '${reqStr}'`
+                    `Class '${cls.name}' method '${req.name}' returns '${gotStr}' but contract '${ifaceName}' declares '${reqStr}'`
                 );
             }
         }

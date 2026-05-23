@@ -2,10 +2,10 @@
 
 A Hopper package is a directory that contains a `hopper.json` manifest file. The manifest declares
 the package's identity, type, dependencies, and — for executables — the hardware target bindings
-that connect OS interface names to concrete implementations.
+that connect OS contract names to concrete implementations.
 
 The package system solves the problem of naming external functionality without coupling source code
-to file paths, platform specifics, or implementation choices. Source files import interface names.
+to file paths, platform specifics, or implementation choices. Source files import contract names.
 The manifest is the only place where paths and hardware names appear.
 
 ---
@@ -16,7 +16,7 @@ Every package MUST declare one of two types in its manifest:
 
 **Executable** — a program with an entry point. An executable MUST declare an `entry` field
 pointing to the `.hop` file that contains the `entry main` block. Executables MUST declare a
-`targets` section that maps interface names to interface and implementation file paths. Executables
+`targets` section that maps contract names to contract and implementation file paths. Executables
 SHOULD declare a `dependencies` section listing every module they import.
 
 **Library** — a reusable module that exports one or more interfaces. A library MUST declare an
@@ -72,7 +72,7 @@ yet implemented**.
 ### Interface Bindings
 
 An executable resolves its imports through the `targets` section of `hopper.json`. Each binding
-maps an interface name (matching the `from` clause of an `import` statement) to the interface
+maps an contract name (matching the `from` clause of an `import` statement) to the contract
 contract file and the implementation file:
 
 ```json
@@ -81,7 +81,7 @@ contract file and the implementation file:
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
@@ -89,13 +89,13 @@ contract file and the implementation file:
 }
 ```
 
-The `interface` field MUST point to a `.hop` file declaring an `interface` block. The
+The `contract` field MUST point to a `.hop` file declaring an `contract` block. The
 `implementation` field MUST point to a `.hop` file that provides the free functions or class
-implementation satisfying that interface. The `from` field identifies which module the binding
+implementation satisfying that contract. The `from` field identifies which module the binding
 comes from and MUST match the module name used in the source `import` statement.
 
-The compiler checks at compile time that the implementation satisfies the interface contract. If
-any function declared in the interface is absent or has a mismatched signature in the
+The compiler checks at compile time that the implementation satisfies the contract contract. If
+any function declared in the contract is absent or has a mismatched signature in the
 implementation, the build fails with a precise error before any code is generated.
 
 ---
@@ -110,7 +110,7 @@ implementation, the build fails with a precise error before any code is generate
   src/                 # source files
   modules/             # installed dependencies (mirrors dependency graph)
   tests/               # test source files
-  interfaces/          # exported interface contracts (executables only)
+  interfaces/          # exported contract contracts (executables only)
 ```
 
 Every package — whether program or library — uses the same recursive shape. A module installed
@@ -125,7 +125,7 @@ names, fetch modules, or know what a `hopper.json` is. Before the compiler runs,
 
 1. Reads the manifest to find the entry file and target bindings.
 2. Installs any missing dependencies.
-3. Passes the compiler a set of resolved file paths: entry source, interface files, implementation
+3. Passes the compiler a set of resolved file paths: entry source, contract files, implementation
    files.
 
 The compiler receives paths. The build system owns names.

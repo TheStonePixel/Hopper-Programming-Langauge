@@ -19,7 +19,7 @@ enum EpollEvent {
     EPOLLONESHOT = 1073741824
 }
 
-interface Network {
+contract Network {
     function select(int nfds, address readfds, address writefds, address exceptfds, address timeout) int
     function pselect6(int nfds, address readfds, address writefds, address exceptfds, address timeout, address sigmask) int
     function poll(address fds, int nfds, int timeout) int

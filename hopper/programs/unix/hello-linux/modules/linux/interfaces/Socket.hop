@@ -42,7 +42,7 @@ enum MsgFlag {
     MSG_NOSIGNAL = 16384
 }
 
-interface Socket {
+contract Socket {
     function socket(int domain, int type, int protocol) int
     function bind(int fd, address addr, int addrlen) int
     function listen(int fd, int backlog) int

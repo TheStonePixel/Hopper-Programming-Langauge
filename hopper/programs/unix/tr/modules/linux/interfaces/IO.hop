@@ -4,7 +4,7 @@ enum StdFd {
     STDERR = 2
 }
 
-interface IO {
+contract IO {
     function read(int fd, address buf, int count) int
     function write(int fd, address buf, int count) int
     function pread64(int fd, address buf, int count, int offset) int

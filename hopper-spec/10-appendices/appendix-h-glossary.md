@@ -66,9 +66,9 @@ By convention, `asm {}` blocks MUST NOT appear in application program source fil
 
 ## binding
 
-An entry in the `targets.<target>` section of `hopper.json` that connects an interface name to its interface file and implementation file. A binding has three required fields: `"from"` (the module name), `"interface"` (path to the `.hop` file declaring the interface), and `"implementation"` (path to the `.hop` file implementing it). The binding is the sole place where hardware is named in a project — changing the `"implementation"` path is the entire porting change when retargeting.
+An entry in the `targets.<target>` section of `hopper.json` that connects an contract name to its contract file and implementation file. A binding has three required fields: `"from"` (the module name), `"contract"` (path to the `.hop` file declaring the contract), and `"implementation"` (path to the `.hop` file implementing it). The binding is the sole place where hardware is named in a project — changing the `"implementation"` path is the entire porting change when retargeting.
 
-See also: **interface**, **module**.
+See also: **contract**, **module**.
 
 ---
 
@@ -104,15 +104,15 @@ See also: **template function**.
 
 ## class
 
-A top-level declaration combining data fields with behavior (methods). Classes are the primary abstraction unit in Hopper. A class MAY declare `implements InterfaceName` to assert conformance to one or more **interface** contracts — conformance is verified at compile time. Classes support `constructor`, `destructor`, and `operator` members in addition to fields and methods.
+A top-level declaration combining data fields with behavior (methods). Classes are the primary abstraction unit in Hopper. A class MAY declare `satisfies InterfaceName` to assert conformance to one or more **contract** contracts — conformance is verified at compile time. Classes support `constructor`, `destructor`, and `operator` members in addition to fields and methods.
 
-See also: **interface**, **struct**, **self**.
+See also: **contract**, **struct**, **self**.
 
 ---
 
 ## conforming module
 
-A module located in `hopper/modules/` that follows the current interface standard: it declares at least one **interface** in an `interfaces/` directory, provides an implementation class that `implements` that interface in a `src/` directory, and has a `hopper.json` with a valid `exports` section. Modules in `hopper/nonconform/` do not yet meet this standard.
+A module located in `hopper/modules/` that follows the current contract standard: it declares at least one **contract** in an `interfaces/` directory, provides an implementation class that `satisfies` that contract in a `src/` directory, and has a `hopper.json` with a valid `exports` section. Modules in `hopper/nonconform/` do not yet meet this standard.
 
 ---
 
@@ -194,15 +194,15 @@ See also: **contextual keyword**, **paramName**.
 
 ## free function
 
-A function defined at module scope, not inside a class or struct. Free functions come into scope in programs that import the module via an interface binding — when the `implementation` file in a `hopper.json` binding contains free functions, those functions are callable directly from the program without a receiver. The `LinuxSyscalls.hop` file is the canonical example: its free functions (`read`, `write`, `open`, `close`, etc.) come into scope when any linux interface binding resolves to it.
+A function defined at module scope, not inside a class or struct. Free functions come into scope in programs that import the module via an contract binding — when the `implementation` file in a `hopper.json` binding contains free functions, those functions are callable directly from the program without a receiver. The `LinuxSyscalls.hop` file is the canonical example: its free functions (`read`, `write`, `open`, `close`, etc.) come into scope when any linux contract binding resolves to it.
 
 Unqualified function calls in Hopper always resolve to free functions (or constructor calls). Method calls ALWAYS require an explicit receiver (`obj.method()`).
 
 ---
 
-## implements
+## satisfies
 
-A keyword in a class declaration that asserts conformance to one or more interfaces: `class Foo implements Bar, Baz { ... }`. The compiler verifies at compile time that the class provides all method signatures declared by each named interface. Conformance failure is a compile-time error.
+A keyword in a class declaration that asserts conformance to one or more interfaces: `class Foo satisfies Bar, Baz { ... }`. The compiler verifies at compile time that the class provides all method signatures declared by each named contract. Conformance failure is a compile-time error.
 
 ---
 
@@ -214,13 +214,13 @@ By convention, inline assembly MUST NOT appear in application code.
 
 ---
 
-## interface
+## contract
 
-A top-level declaration of a named set of function signatures that a class may implement: `interface IO { function read(...) int ... }`. Interfaces carry no data, no default implementations, and (in the current grammar) no constants. They are compile-time contracts. A class asserts conformance with `implements InterfaceName`; the compiler verifies every signature matches.
+A top-level declaration of a named set of function signatures that a class may implement: `contract IO { function read(...) int ... }`. Interfaces carry no data, no default implementations, and (in the current grammar) no constants. They are compile-time contracts. A class asserts conformance with `satisfies InterfaceName`; the compiler verifies every signature matches.
 
-Interfaces are the mechanism by which Hopper decouples OS-level names from hardware-level implementations. Program source imports interface names; `hopper.json` bindings connect those names to hardware-specific implementation files.
+Interfaces are the mechanism by which Hopper decouples OS-level names from hardware-level implementations. Program source imports contract names; `hopper.json` bindings connect those names to hardware-specific implementation files.
 
-See also: **binding**, **implements**, **conforming module**.
+See also: **binding**, **satisfies**, **conforming module**.
 
 ---
 
@@ -311,7 +311,7 @@ See also: **class**, **bitfield**, **pad**.
 
 ## target
 
-A named build configuration in `hopper.json` under the `targets` field. The conventional target name is `"host"` for native Linux builds. A target maps interface names to their interface and implementation files (**binding**). Changing targets (e.g., from `"host"` to `"pi-zero"`) changes the hardware implementations without touching source code.
+A named build configuration in `hopper.json` under the `targets` field. The conventional target name is `"host"` for native Linux builds. A target maps contract names to their contract and implementation files (**binding**). Changing targets (e.g., from `"host"` to `"pi-zero"`) changes the hardware implementations without touching source code.
 
 ---
 

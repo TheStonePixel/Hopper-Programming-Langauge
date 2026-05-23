@@ -65,7 +65,7 @@ class Key {
     function getVal()  int { return self.val  }
 }
 
-interface TUI {
+contract TUI {
     function width() int
     function height() int
     function flush()

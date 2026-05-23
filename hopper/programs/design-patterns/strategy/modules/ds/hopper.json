@@ -7,23 +7,23 @@
   "dependencies": {},
   "exports": {
     "Array": {
-      "interface":      "interfaces/Array.hop",
+      "contract":      "interfaces/Array.hop",
       "implementation": "src/Array.hop"
     },
     "Stack": {
-      "interface":      "interfaces/Stack.hop",
+      "contract":      "interfaces/Stack.hop",
       "implementation": "src/Stack.hop"
     },
     "Queue": {
-      "interface":      "interfaces/Queue.hop",
+      "contract":      "interfaces/Queue.hop",
       "implementation": "src/Queue.hop"
     },
     "Map": {
-      "interface":      "interfaces/Map.hop",
+      "contract":      "interfaces/Map.hop",
       "implementation": "src/Map.hop"
     },
     "StringBuilder": {
-      "interface":      "interfaces/StringBuilder.hop",
+      "contract":      "interfaces/StringBuilder.hop",
       "implementation": "src/StringBuilder.hop"
     }
   },
@@ -31,12 +31,12 @@
     "host": {
       "Array": {
         "from":           "ds",
-        "interface":      "interfaces/Array.hop",
+        "contract":      "interfaces/Array.hop",
         "implementation": "src/Array.hop"
       },
       "Core": {
         "from":           "core",
-        "interface":      "../core/interfaces/Core.hop",
+        "contract":      "../core/interfaces/Core.hop",
         "implementation": "../core/src/Core.hop"
       }
     }

@@ -34,11 +34,11 @@ topLevelDecl
 
 ```
 importDecl
-    : 'import' Identifier (',' Identifier)* 'from' Identifier   // interface import (preferred)
+    : 'import' Identifier (',' Identifier)* 'from' Identifier   // contract import (preferred)
     | 'import' Identifier                                         // module import (legacy)
 ```
 
-The interface import form (`from`) requires a binding entry in `hopper.json`. The bare module import form is for legacy use only and resolves to `modules/<name>/src/<module>.hop`.
+The contract import form (`from`) requires a binding entry in `hopper.json`. The bare module import form is for legacy use only and resolves to `modules/<name>/src/<module>.hop`.
 
 ### Entry Point
 
@@ -90,7 +90,7 @@ className
     : Identifier | 'String'
 
 implementsList
-    : 'implements' Identifier (',' Identifier)*
+    : 'satisfies' Identifier (',' Identifier)*
 
 classMember
     : type fieldName                                              // field declaration
@@ -115,15 +115,15 @@ fieldName
 
 ```
 interfaceDecl
-    : 'interface' Identifier '{' interfaceMember* '}'
+    : 'contract' Identifier '{' interfaceMember* '}'
 
 interfaceMember
     : 'function' fieldName '(' paramList? ')' type   // function signature
     | 'function' fieldName '(' paramList? ')'        // procedure signature
-    | enumDecl                                        // enum nested inside interface
+    | enumDecl                                        // enum nested inside contract
 ```
 
-Note: `constDecl` is NOT a valid `interfaceMember`. Constants cannot appear inside an interface body in the current grammar. This is a known limitation planned for a future revision.
+Note: `constDecl` is NOT a valid `interfaceMember`. Constants cannot appear inside an contract body in the current grammar. This is a known limitation planned for a future revision.
 
 ### Structs
 

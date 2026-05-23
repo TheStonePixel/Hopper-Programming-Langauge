@@ -1,4 +1,4 @@
-interface Array {
+contract Array {
     function len() int
     function cap() int
     function get(int i) address

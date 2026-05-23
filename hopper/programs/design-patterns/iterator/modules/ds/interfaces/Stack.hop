@@ -1,4 +1,4 @@
-interface Stack {
+contract Stack {
     function len() int
     function empty() bool
     function push(address val)

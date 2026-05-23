@@ -1,4 +1,4 @@
-class X86SIMD implements SIMD {
+class X86SIMD satisfies SIMD {
 
     function scanByte16(address ptr, int b) int {
         int bc = b | (b << 8) | (b << 16) | (b << 24)

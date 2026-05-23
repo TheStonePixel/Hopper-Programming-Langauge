@@ -1,4 +1,4 @@
-interface Uart {
+contract Uart {
     function init()
     function putc(int c)
     function getc() int

@@ -1,6 +1,6 @@
 import sys from arch
 
-class LinuxSystem implements System {
+class LinuxSystem satisfies System {
     function uname(address buf) int {
         return uname(buf)
     }

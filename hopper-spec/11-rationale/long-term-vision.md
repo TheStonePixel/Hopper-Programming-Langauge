@@ -14,7 +14,7 @@ This document describes four threads of that direction.
 
 ## 1. Progressive Externalization of Hardware Knowledge
 
-The current module system already externalizes hardware at the interface and ISA level: syscall numbers live in `x86_64/src/LinuxSyscalls.hop`, SIMD operations live in `x86_64/src/SIMD.hop`, and the build file (`hopper.json` targets) is the only place where hardware is named. Programs are ISA-unaware at the source level.
+The current module system already externalizes hardware at the contract and ISA level: syscall numbers live in `x86_64/src/LinuxSyscalls.hop`, SIMD operations live in `x86_64/src/SIMD.hop`, and the build file (`hopper.json` targets) is the only place where hardware is named. Programs are ISA-unaware at the source level.
 
 The forward direction extends this principle into the compiler itself. Today, LLVM holds instruction selection logic, ABI rules, and encoding knowledge in its C++ backend. The long-term goal is that these too become Hopper modules — ISA modules that declare instruction semantics, calling conventions, and register constraints in Hopper source rather than compiler internals.
 
@@ -24,7 +24,7 @@ The path is incremental and is described in full in `build-system.md`. The coher
 
 **Near-term:** The `arm64` ISA module is implemented, demonstrating cross-platform portability by changing only `hopper.json` target paths with zero source changes.
 
-**Further out:** Instruction semantic descriptions begin moving into ISA modules. The compiler's LLVM dependency is progressively isolated behind a declared interface.
+**Further out:** Instruction semantic descriptions begin moving into ISA modules. The compiler's LLVM dependency is progressively isolated behind a declared contract.
 
 **Long-term:** The compiler backend contains no ISA-specific logic. New architectures are added by adding modules, not by modifying the compiler.
 
@@ -48,12 +48,12 @@ This is a potential future direction, not a committed feature. It will not be ad
 
 ## 3. Formal Verification via the Contract System
 
-Hopper's interface system is already a weak form of contract verification: the compiler checks that an implementing class provides all methods declared in the interface with the correct signatures. This is compile-time conformance checking.
+Hopper's contract system is already a weak form of contract verification: the compiler checks that an implementing class provides all methods declared in the contract with the correct signatures. This is compile-time conformance checking.
 
-The forward direction extends contracts to behavioral specifications. An interface function could carry a precondition, postcondition, and invariant expressed in Hopper source:
+The forward direction extends contracts to behavioral specifications. An contract function could carry a precondition, postcondition, and invariant expressed in Hopper source:
 
 ```hopper
-interface Allocator {
+contract Allocator {
     // requires: size > 0
     // ensures: result != null
     function alloc(int size) address
@@ -85,7 +85,7 @@ The forward direction introduces board modules: packages that describe a complet
 - Interrupt vector table structure via `bind`
 - Clock configuration defaults
 
-A program targeting this board imports `UART from stm32f4` and `GPIO from stm32f4` — not `UART from arm64`. The board module is the implementation. Porting to a different microcontroller means providing a new board module that satisfies the same interface contracts. Zero source changes in the application.
+A program targeting this board imports `UART from stm32f4` and `GPIO from stm32f4` — not `UART from arm64`. The board module is the implementation. Porting to a different microcontroller means providing a new board module that satisfies the same contract contracts. Zero source changes in the application.
 
 This is the correct endpoint of the hardware-as-module principle applied to embedded systems.
 

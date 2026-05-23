@@ -296,13 +296,13 @@ export class AstBuilder extends HopperVisitor {
         return BitfieldPad(bits);
     }
 
-    // ── interface ──────────────────────────────────────────────────────────
+    // ── contract ──────────────────────────────────────────────────────────
 
-    visitInterfaceDecl(ctx) {
+    visitContractDecl(ctx) {
         const name = ctx.Identifier().getText();
         const methods = [];
         const enums = [];
-        for (const m of (ctx.interfaceMember ? ctx.interfaceMember() : [])) {
+        for (const m of (ctx.contractMember ? ctx.contractMember() : [])) {
             const node = this.visit(m);
             if (!node) continue;
             if (node.kind === "InterfaceMethod") methods.push(node);
@@ -311,11 +311,11 @@ export class AstBuilder extends HopperVisitor {
         return InterfaceDecl(name, methods, enums);
     }
 
-    visitInterfaceEnum(ctx) {
+    visitContractEnum(ctx) {
         return this.visitEnumDecl(ctx.enumDecl());
     }
 
-    visitInterfaceFunc(ctx) {
+    visitContractFunc(ctx) {
         const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
@@ -323,7 +323,7 @@ export class AstBuilder extends HopperVisitor {
         return InterfaceMethod(name, params, ctx.type().getText());
     }
 
-    visitInterfaceProc(ctx) {
+    visitContractProc(ctx) {
         const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
@@ -335,8 +335,8 @@ export class AstBuilder extends HopperVisitor {
 
     visitClassDecl(ctx) {
         const name = ctx.className().getText();
-        const interfaces = ctx.implementsList()
-            ? ctx.implementsList().Identifier().map(id => id.getText())
+        const interfaces = ctx.satisfiesList()
+            ? ctx.satisfiesList().Identifier().map(id => id.getText())
             : [];
         const fields = [];
         const methods = [];
@@ -1121,9 +1121,9 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             }
 
             // Validate binding files exist before trying to load them.
-            if (!fs.existsSync(binding.interface)) {
+            if (!fs.existsSync(binding.contract)) {
                 const sf = sourceFile ? ` (declared in hopper.json, imported from ${path.basename(sourceFile)})` : "";
-                throw new Error(`Interface file not found for '${bindingName}'${sf}\n  Expected: ${binding.interface}`);
+                throw new Error(`Interface file not found for '${bindingName}'${sf}\n  Expected: ${binding.contract}`);
             }
             if (!fs.existsSync(binding.implementation)) {
                 const sf = sourceFile ? ` (declared in hopper.json, imported from ${path.basename(sourceFile)})` : "";
@@ -1131,10 +1131,10 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
             }
 
             // Load interface file
-            if (!visited.has(binding.interface)) {
-                visited.add(binding.interface);
-                const ifaceAst = buildAstFromSource(fs.readFileSync(binding.interface, "utf8"), {
-                    baseDir: path.dirname(binding.interface), visited, bindings, sourceFile: binding.interface,
+            if (!visited.has(binding.contract)) {
+                visited.add(binding.contract);
+                const ifaceAst = buildAstFromSource(fs.readFileSync(binding.contract, "utf8"), {
+                    baseDir: path.dirname(binding.contract), visited, bindings, sourceFile: binding.contract,
                 });
                 ast.interfaces.unshift(...ifaceAst.interfaces);
                 ast.functions.unshift(...ifaceAst.functions);

@@ -1,4 +1,4 @@
-interface Queue {
+contract Queue {
     function len() int
     function empty() bool
     function push(address val)

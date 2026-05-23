@@ -108,7 +108,7 @@ function _uartPutHex(int n) {
     }
 }
 
-class StandardUart implements Uart {
+class StandardUart satisfies Uart {
     constructor() {
         _uartInit()
     }

@@ -6,7 +6,7 @@
   "type": "library",
   "dependencies": {},
   "exports": {
-    "SIMD":          { "interface": "interfaces/SIMD.hop",          "implementation": "src/SIMD.hop"          },
-    "LinuxSyscalls": { "interface": "interfaces/LinuxSyscalls.hop", "implementation": "src/LinuxSyscalls.hop" }
+    "SIMD":          { "contract": "interfaces/SIMD.hop",          "implementation": "src/SIMD.hop"          },
+    "LinuxSyscalls": { "contract": "interfaces/LinuxSyscalls.hop", "implementation": "src/LinuxSyscalls.hop" }
   }
 }

@@ -7,12 +7,12 @@
     "host": {
       "Array": {
         "from": "ds",
-        "interface": "../../modules/ds/interfaces/Array.hop",
+        "contract": "../../modules/ds/interfaces/Array.hop",
         "implementation": "../../modules/ds/src/Array.hop"
       },
       "Math": {
         "from": "math",
-        "interface": "../../modules/math/interfaces/Math.hop",
+        "contract": "../../modules/math/interfaces/Math.hop",
         "implementation": "../../modules/math/src/Math.hop"
       }
     }

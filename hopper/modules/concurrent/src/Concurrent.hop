@@ -44,7 +44,7 @@ function _writeSembuf(address p, int semNum, int semOp, int semFlg) {
 // semget(IPC_PRIVATE=0, 1, IPC_CREAT=512|0600=384) = 896
 // semctl(semid, 0, SETVAL=16, 1) initializes value to 1.
 // lock: semop -1 (blocks when 0), unlock: semop +1.
-class StandardMutex implements Mutex {
+class StandardMutex satisfies Mutex {
     address handle   // 8-byte heap block holding the semid
 
     constructor() {
@@ -94,7 +94,7 @@ class StandardMutex implements Mutex {
 // broadcast: increments condvar sem by current waiter count (wakes all).
 // Note: there is a narrow race between mutex unlock and semop -1 in wait.
 // Callers should use a boolean predicate loop (while not ready: wait).
-class StandardCondvar implements Condvar {
+class StandardCondvar satisfies Condvar {
     address handle   // 8-byte heap block holding the condvar semid
 
     constructor() {

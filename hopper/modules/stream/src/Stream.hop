@@ -1,4 +1,4 @@
-class ByteStream implements Stream {
+class ByteStream satisfies Stream {
     address data
     int position
     int length

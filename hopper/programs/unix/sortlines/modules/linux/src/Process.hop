@@ -1,6 +1,6 @@
 import sys from arch
 
-class LinuxProcess implements Process {
+class LinuxProcess satisfies Process {
     function exit(int code) {
         exit(code)
     }

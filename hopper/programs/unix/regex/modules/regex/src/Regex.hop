@@ -333,7 +333,7 @@ function _litSearch(address pat, int plen, address text) int {
     return -1
 }
 
-class StandardRegex implements Regex {
+class StandardRegex satisfies Regex {
     function matchAt(address pattern, address text) bool {
         if (_isLitPat(pattern)) {
             int plen = _litLen(pattern)

@@ -1,4 +1,4 @@
-interface Text {
+contract Text {
     function greet()
     function describe() int
 }

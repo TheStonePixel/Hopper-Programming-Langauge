@@ -1,6 +1,6 @@
 import poll from arch
 
-class LinuxNetwork implements Network {
+class LinuxNetwork satisfies Network {
     function select(int nfds, address readfds, address writefds, address exceptfds, address timeout) int {
         return select(nfds, readfds, writefds, exceptfds, timeout)
     }

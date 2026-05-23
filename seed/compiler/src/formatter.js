@@ -94,7 +94,7 @@ function fmtStruct(d) {
 }
 
 function fmtInterface(d) {
-    const lines = [`interface ${d.name} {`]
+    const lines = [`contract ${d.name} {`]
     for (const m of d.methods || []) {
         const params = (m.params || []).map(p => `${p.type} ${p.name}`).join(', ')
         const ret    = m.returnType ? ` ${m.returnType}` : ''
@@ -134,7 +134,7 @@ function fmtClassBody(d, depth) {
 
 function fmtClass(d) {
     if (d.isBuiltin || d.isImported) return ''
-    const impl = (d.interfaces || []).length ? ` implements ${d.interfaces.join(', ')}` : ''
+    const impl = (d.interfaces || []).length ? ` satisfies ${d.interfaces.join(', ')}` : ''
     return `class ${d.name}${impl} {\n${fmtClassBody(d, 1)}\n}`
 }
 

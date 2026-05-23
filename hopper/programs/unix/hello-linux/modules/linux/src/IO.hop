@@ -1,6 +1,6 @@
 import io from arch
 
-class LinuxIO implements IO {
+class LinuxIO satisfies IO {
     function read(int fd, address buf, int count) int {
         return read(fd, buf, count)
     }

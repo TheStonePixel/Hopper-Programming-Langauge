@@ -10,7 +10,7 @@ function _pathStrLen(address s) int {
     return n
 }
 
-class StandardPath implements Path {
+class StandardPath satisfies Path {
     address data
     int     len
     int     cap

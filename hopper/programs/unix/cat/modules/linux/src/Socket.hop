@@ -1,6 +1,6 @@
 import net from arch
 
-class LinuxSocket implements Socket {
+class LinuxSocket satisfies Socket {
     function socket(int domain, int type, int protocol) int {
         return socket(domain, type, protocol)
     }

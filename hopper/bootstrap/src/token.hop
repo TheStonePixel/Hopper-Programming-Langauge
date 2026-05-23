@@ -159,7 +159,7 @@ function keywordKind(address text, int len) int {
     if (kwMatch(text, len, "struct",      6)) { return TK_STRUCT      }
     if (kwMatch(text, len, "class",       5)) { return TK_CLASS       }
     if (kwMatch(text, len, "template",    8)) { return TK_TEMPLATE    }
-    if (kwMatch(text, len, "interface",   9)) { return TK_INTERFACE   }
+    if (kwMatch(text, len, "contract",   9)) { return TK_INTERFACE   }
     if (kwMatch(text, len, "enum",        4)) { return TK_ENUM        }
     if (kwMatch(text, len, "const",       5)) { return TK_CONST       }
     if (kwMatch(text, len, "alias",       5)) { return TK_ALIAS       }
@@ -170,7 +170,7 @@ function keywordKind(address text, int len) int {
     if (kwMatch(text, len, "operator",    8)) { return TK_OPERATOR    }
     if (kwMatch(text, len, "constructor", 11)) { return TK_CONSTRUCTOR }
     if (kwMatch(text, len, "destructor",  10)) { return TK_DESTRUCTOR  }
-    if (kwMatch(text, len, "implements",  10)) { return TK_IMPLEMENTS  }
+    if (kwMatch(text, len, "satisfies",  10)) { return TK_IMPLEMENTS  }
     if (kwMatch(text, len, "allocate",    8)) { return TK_ALLOCATE    }
     if (kwMatch(text, len, "deallocate",  10)) { return TK_DEALLOCATE  }
     if (kwMatch(text, len, "defer",       5)) { return TK_DEFER       }
@@ -305,7 +305,7 @@ function tokenKindName(int k) address {
     if (k == TK_STRUCT)      { return "struct"      }
     if (k == TK_CLASS)       { return "class"       }
     if (k == TK_TEMPLATE)    { return "template"    }
-    if (k == TK_INTERFACE)   { return "interface"   }
+    if (k == TK_INTERFACE)   { return "contract"   }
     if (k == TK_ENUM)        { return "enum"        }
     if (k == TK_CONST)       { return "const"       }
     if (k == TK_ALIAS)       { return "alias"       }

@@ -1,6 +1,6 @@
 ## Appendix F: Package (hopper.json) Examples
 
-Complete `hopper.json` files for each project type. The manifest is the authoritative project identity document — it controls the build system, dependency resolution, and interface binding.
+Complete `hopper.json` files for each project type. The manifest is the authoritative project identity document — it controls the build system, dependency resolution, and contract binding.
 
 ---
 
@@ -17,7 +17,7 @@ Complete `hopper.json` files for each project type. The manifest is the authorit
 | `main` | string | Bare-metal | Path to entry file for bare-metal `"program"` type. |
 | `board` | string | Bare-metal | Target board identifier (e.g., `"pi-zero"`). |
 | `dependencies` | object | When needed | Map of module name → version string. |
-| `targets` | object | Executables | Maps target name → interface bindings. Usually one target: `"host"`. |
+| `targets` | object | Executables | Maps target name → contract bindings. Usually one target: `"host"`. |
 | `exports` | object | Libraries | Documents which interfaces the library provides (tooling/documentation only; not consumed by the build system). |
 
 ---
@@ -42,13 +42,13 @@ The standard shape for a Linux userspace program.
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/interfaces/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -81,19 +81,19 @@ A program that additionally uses x86_64 SIMD vector operations.
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/interfaces/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "SIMD": {
         "from":           "x86_64",
-        "interface":      "modules/x86_64/interfaces/SIMD.hop",
+        "contract":      "modules/x86_64/interfaces/SIMD.hop",
         "implementation": "modules/x86_64/src/SIMD.hop"
       }
     }
@@ -125,43 +125,43 @@ A program that uses IO, FileSystem, System, Process, Socket, Network, and Memory
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/interfaces/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "System": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/System.hop",
+        "contract":      "modules/linux/interfaces/System.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Process": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/Process.hop",
+        "contract":      "modules/linux/interfaces/Process.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Socket": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/Socket.hop",
+        "contract":      "modules/linux/interfaces/Socket.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Network": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/Network.hop",
+        "contract":      "modules/linux/interfaces/Network.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Memory": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/Memory.hop",
+        "contract":      "modules/linux/interfaces/Memory.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -185,7 +185,7 @@ A library is consumed by other projects. The `exports` field documents what it p
   "type": "library",
   "exports": {
     "Algo": {
-      "interface":      "interfaces/Algo.hop",
+      "contract":      "interfaces/Algo.hop",
       "implementation": "src/Algo.hop"
     }
   }
@@ -206,18 +206,18 @@ A library with no `dependencies` and no `targets` is the minimal form. It declar
   "license": "Apache-2.0",
   "type": "library",
   "exports": {
-    "IO":         { "interface": "interfaces/IO.hop"         },
-    "FileSystem": { "interface": "interfaces/FileSystem.hop" },
-    "System":     { "interface": "interfaces/System.hop"     },
-    "Process":    { "interface": "interfaces/Process.hop"    },
-    "Socket":     { "interface": "interfaces/Socket.hop"     },
-    "Network":    { "interface": "interfaces/Network.hop"    },
-    "Memory":     { "interface": "interfaces/Memory.hop"     }
+    "IO":         { "contract": "interfaces/IO.hop"         },
+    "FileSystem": { "contract": "interfaces/FileSystem.hop" },
+    "System":     { "contract": "interfaces/System.hop"     },
+    "Process":    { "contract": "interfaces/Process.hop"    },
+    "Socket":     { "contract": "interfaces/Socket.hop"     },
+    "Network":    { "contract": "interfaces/Network.hop"    },
+    "Memory":     { "contract": "interfaces/Memory.hop"     }
   }
 }
 ```
 
-The `linux` module is a pure interface library — no `implementation` paths in `exports`, because the implementation is hardware-specific and provided by the consuming project's `targets` binding (e.g., pointing to `x86_64/src/LinuxSyscalls.hop`).
+The `linux` module is a pure contract library — no `implementation` paths in `exports`, because the implementation is hardware-specific and provided by the consuming project's `targets` binding (e.g., pointing to `x86_64/src/LinuxSyscalls.hop`).
 
 ---
 
@@ -235,7 +235,7 @@ A library that itself depends on another module. The `targets` field in a librar
   "dependencies": {},
   "exports": {
     "JSON": {
-      "interface":      "interfaces/JSON.hop",
+      "contract":      "interfaces/JSON.hop",
       "implementation": "src/JSON.hop"
     }
   },
@@ -243,12 +243,12 @@ A library that itself depends on another module. The `targets` field in a librar
     "host": {
       "JSON": {
         "from":           "json",
-        "interface":      "interfaces/JSON.hop",
+        "contract":      "interfaces/JSON.hop",
         "implementation": "src/JSON.hop"
       },
       "Core": {
         "from":           "core",
-        "interface":      "../core/interfaces/Core.hop",
+        "contract":      "../core/interfaces/Core.hop",
         "implementation": "../core/src/Core.hop"
       }
     }
@@ -262,7 +262,7 @@ The `targets.host` section in a library manifest is used by the build tool when 
 
 ## Example 7: Library Exporting with Interface and Implementation
 
-A library that includes both interface and implementation in its `exports` (the full form used when there is a concrete default implementation):
+A library that includes both contract and implementation in its `exports` (the full form used when there is a concrete default implementation):
 
 ```json
 {
@@ -273,7 +273,7 @@ A library that includes both interface and implementation in its `exports` (the 
   "type": "library",
   "exports": {
     "IString": {
-      "interface":      "interfaces/IString.hop",
+      "contract":      "interfaces/IString.hop",
       "implementation": "src/AsciiString.hop"
     }
   }
@@ -285,7 +285,7 @@ A consuming executable would add to its `targets.host`:
 ```json
 "IString": {
   "from":           "string",
-  "interface":      "modules/string/interfaces/IString.hop",
+  "contract":      "modules/string/interfaces/IString.hop",
   "implementation": "modules/string/src/AsciiString.hop"
 }
 ```
@@ -321,7 +321,7 @@ Each binding in `targets.<target>.<InterfaceName>` has these fields:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `"from"` | Yes | The module name that provides this interface (matches the `from` clause in `import X from Y`). |
-| `"interface"` | Yes | Path to the `.hop` file declaring the interface (relative to the project root). |
-| `"implementation"` | Yes | Path to the `.hop` file implementing the interface (relative to the project root). |
+| `"from"` | Yes | The module name that provides this contract (matches the `from` clause in `import X from Y`). |
+| `"contract"` | Yes | Path to the `.hop` file declaring the contract (relative to the project root). |
+| `"implementation"` | Yes | Path to the `.hop` file implementing the contract (relative to the project root). |
 | `"inline"` | No | If `true`, instruct the compiler to inline implementations. Default: `false`. |

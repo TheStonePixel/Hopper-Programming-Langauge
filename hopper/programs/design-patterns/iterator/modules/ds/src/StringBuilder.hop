@@ -1,4 +1,4 @@
-class StandardStringBuilder implements StringBuilder {
+class StandardStringBuilder satisfies StringBuilder {
     address buf
     int len
     int cap

@@ -7,7 +7,7 @@
   "dependencies": {},
   "exports": {
     "Math": {
-      "interface":      "interfaces/Math.hop",
+      "contract":      "interfaces/Math.hop",
       "implementation": "src/Math.hop"
     }
   },
@@ -15,12 +15,12 @@
     "host": {
       "Math": {
         "from":           "math",
-        "interface":      "interfaces/Math.hop",
+        "contract":      "interfaces/Math.hop",
         "implementation": "src/Math.hop"
       },
       "Core": {
         "from":           "core",
-        "interface":      "../core/interfaces/Core.hop",
+        "contract":      "../core/interfaces/Core.hop",
         "implementation": "../core/src/Core.hop"
       }
     }

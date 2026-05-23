@@ -3,7 +3,7 @@
 //
 // Imported functions: io_uring_setup io_uring_enter io_uring_register
 //
-// io_uring is the highest-performance async I/O interface on Linux 5.1+.
+// io_uring is the highest-performance async I/O contract on Linux 5.1+.
 // Kernel and userspace communicate through mmap'd ring buffers; after setup,
 // most operations need zero syscalls when kernel polling mode is enabled.
 //

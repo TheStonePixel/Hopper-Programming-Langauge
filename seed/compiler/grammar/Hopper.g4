@@ -19,7 +19,7 @@ topLevelDecl
     | bindDecl
     | strictDecl
     | bitfieldDecl
-    | interfaceDecl
+    | contractDecl
     ;
 
 importDecl
@@ -136,21 +136,21 @@ templateParam
     | 'unsigned' 'byte' # FixedParam
     ;
 
-// interface = compile-time contract: a set of method signatures a class must implement
-interfaceDecl
-    : 'interface' Identifier '{' NEWLINE* (interfaceMember (NEWLINE+ interfaceMember)* NEWLINE*)? '}'
+// contract = compile-time contract: a set of method signatures a class must satisfy
+contractDecl
+    : 'contract' Identifier '{' NEWLINE* (contractMember (NEWLINE+ contractMember)* NEWLINE*)? '}'
     ;
 
-interfaceMember
-    : 'function' fieldName '(' paramList? ')' type   # InterfaceFunc
-    | 'function' fieldName '(' paramList? ')'        # InterfaceProc
-    | enumDecl                                        # InterfaceEnum
+contractMember
+    : 'function' fieldName '(' paramList? ')' type   # ContractFunc
+    | 'function' fieldName '(' paramList? ')'        # ContractProc
+    | enumDecl                                        # ContractEnum
     ;
 
 // class = data + behavior, compiler-optimized layout
-// Optional 'implements' list for compile-time interface conformance checking
+// Optional 'satisfies' list for compile-time contract conformance checking
 classDecl
-    : 'class' className implementsList? '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
+    : 'class' className satisfiesList? '{' NEWLINE* (classMember (NEWLINE+ classMember)* NEWLINE*)? '}'
     ;
 
 // className allows 'String' as a class name in addition to plain identifiers
@@ -159,9 +159,9 @@ className
     | 'String'
     ;
 
-// implements — list of interfaces the class must conform to
-implementsList
-    : 'implements' Identifier (',' Identifier)*
+// satisfies — list of contracts the class must conform to
+satisfiesList
+    : 'satisfies' Identifier (',' Identifier)*
     ;
 
 classMember

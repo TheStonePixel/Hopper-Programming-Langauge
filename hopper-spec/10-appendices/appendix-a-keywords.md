@@ -38,12 +38,12 @@ Every reserved keyword in Hopper is a quoted string literal in `Hopper.g4`. The 
 | `float` | Type | Double-precision floating-point type (`double` in LLVM IR) | |
 | `for` | Control Flow | Counted loop with init, condition, and update | |
 | `from` | Import | Separates the imported name from the module name in an import declaration | |
-| `function` | Declaration | Declares a function, method, or interface signature | |
+| `function` | Declaration | Declares a function, method, or contract signature | |
 | `if` | Control Flow | Conditional branch | |
-| `implements` | Declaration | Specifies interface conformance in a class declaration | Triggers compile-time conformance checking |
+| `satisfies` | Declaration | Specifies contract conformance in a class declaration | Triggers compile-time conformance checking |
 | `import` | Import | Begins an import declaration | Two forms: `import X from Y` and `import X` |
 | `int` | Type | 64-bit signed integer type (`i64` in LLVM IR) | |
-| `interface` | Declaration | Declares a named set of function signatures (compile-time contract) | |
+| `contract` | Declaration | Declares a named set of function signatures (compile-time contract) | |
 | `invariant` | Contract | Introduces a loop invariant checked at every loop-head evaluation | |
 | `null` | Literal | Null pointer literal (`address` value 0) | Using null as an address is UB upon dereference |
 | `operator` | Declaration | Declares an operator overload on a class | |
@@ -72,7 +72,7 @@ Every reserved keyword in Hopper is a quoted string literal in `Hopper.g4`. The 
 
 ### Declaration Keywords
 
-`alias`, `bind`, `bitfield`, `class`, `const`, `constructor`, `destructor`, `enum`, `entry`, `extern`, `function`, `implements`, `interface`, `operator`, `pad`, `strict`, `struct`, `template`
+`alias`, `bind`, `bitfield`, `class`, `const`, `constructor`, `destructor`, `enum`, `entry`, `extern`, `function`, `satisfies`, `contract`, `operator`, `pad`, `strict`, `struct`, `template`
 
 ### Import Keywords
 
@@ -135,7 +135,7 @@ char       class      const      constrain  constructor
 continue   deallocate defer      destructor else
 ensures    entry      enum       extern     false
 float      for        from       function   if
-implements import     int        interface  invariant
+satisfies import     int        contract  invariant
 null       operator   pad        requires   return
 size       strict     string     String     struct
 template   true       unsigned   value      void

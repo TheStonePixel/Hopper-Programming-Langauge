@@ -191,7 +191,7 @@ extern function LLVMPrintValueToString(address val) address
 extern function LLVMWriteBitcodeToFile(address module, address path) int
 extern function LLVMDisposeMessage(address msg)
 
-class StandardLLVM implements LLVM {
+class StandardLLVM satisfies LLVM {
     constructor() { }
     destructor()  { }
 

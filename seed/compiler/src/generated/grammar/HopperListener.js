@@ -284,39 +284,39 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#interfaceDecl.
-	enterInterfaceDecl(ctx) {
+	// Enter a parse tree produced by HopperParser#contractDecl.
+	enterContractDecl(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#interfaceDecl.
-	exitInterfaceDecl(ctx) {
-	}
-
-
-	// Enter a parse tree produced by HopperParser#InterfaceFunc.
-	enterInterfaceFunc(ctx) {
-	}
-
-	// Exit a parse tree produced by HopperParser#InterfaceFunc.
-	exitInterfaceFunc(ctx) {
+	// Exit a parse tree produced by HopperParser#contractDecl.
+	exitContractDecl(ctx) {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#InterfaceProc.
-	enterInterfaceProc(ctx) {
+	// Enter a parse tree produced by HopperParser#ContractFunc.
+	enterContractFunc(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#InterfaceProc.
-	exitInterfaceProc(ctx) {
+	// Exit a parse tree produced by HopperParser#ContractFunc.
+	exitContractFunc(ctx) {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#InterfaceEnum.
-	enterInterfaceEnum(ctx) {
+	// Enter a parse tree produced by HopperParser#ContractProc.
+	enterContractProc(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#InterfaceEnum.
-	exitInterfaceEnum(ctx) {
+	// Exit a parse tree produced by HopperParser#ContractProc.
+	exitContractProc(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#ContractEnum.
+	enterContractEnum(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#ContractEnum.
+	exitContractEnum(ctx) {
 	}
 
 
@@ -338,12 +338,12 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#implementsList.
-	enterImplementsList(ctx) {
+	// Enter a parse tree produced by HopperParser#satisfiesList.
+	enterSatisfiesList(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#implementsList.
-	exitImplementsList(ctx) {
+	// Exit a parse tree produced by HopperParser#satisfiesList.
+	exitSatisfiesList(ctx) {
 	}
 
 

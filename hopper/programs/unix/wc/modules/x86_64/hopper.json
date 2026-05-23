@@ -6,6 +6,6 @@
   "type": "library",
   "dependencies": {},
   "exports": {
-    "SIMD": { "interface": "interfaces/SIMD.hop", "implementation": "src/SIMD.hop" }
+    "SIMD": { "contract": "interfaces/SIMD.hop", "implementation": "src/SIMD.hop" }
   }
 }

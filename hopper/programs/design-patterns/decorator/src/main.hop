@@ -3,7 +3,7 @@
 // LogDecorator adds before/after logging to any (int)->int function.
 // MemoDecorator caches the last result — repeated calls with the same
 // argument skip the computation entirely.
-// Both decorators use the same call(int)->int interface so they compose.
+// Both decorators use the same call(int)->int contract so they compose.
 //
 // Demonstrates: wrapping callbacks, augmenting behaviour without
 //               modifying the original function.

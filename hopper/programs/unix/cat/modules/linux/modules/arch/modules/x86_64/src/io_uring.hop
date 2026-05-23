@@ -1,6 +1,6 @@
 // x86-64 io_uring syscalls (Linux 5.1+)
 //
-// io_uring is a high-performance async I/O interface that avoids syscall overhead
+// io_uring is a high-performance async I/O contract that avoids syscall overhead
 // by communicating through shared ring buffers between userspace and the kernel.
 //
 // Usage pattern:

@@ -30,7 +30,7 @@ The standard library is organized into three tiers:
 
 #### Tier 1 — OS Interface Modules (`linux/`)
 
-The `linux/` module is a pure interface module. It contains no source code, no implementation
+The `linux/` module is a pure contract module. It contains no source code, no implementation
 files, and no classes. It declares seven interfaces that describe what a Linux program needs
 from the operating system:
 
@@ -53,14 +53,14 @@ These interfaces are satisfied at build time by the implementation declared in
 The `x86_64/` module provides two categories of functionality:
 
 **LinuxSyscalls** (`x86_64/src/LinuxSyscalls.hop`) — the joint Linux/x86-64 implementation of
-all seven OS interfaces. This file contains both the `interface LinuxSyscalls` declaration and
+all seven OS interfaces. This file contains both the `contract LinuxSyscalls` declaration and
 the concrete free-function implementations using inline assembly. It is self-contained so that
-importing it resolves both the interface and the implementation in one step.
+importing it resolves both the contract and the implementation in one step.
 
 **SIMD** (`x86_64/interfaces/SIMD.hop` + `x86_64/src/SIMD.hop`) — SSE2 vector operations for
 byte scanning and manipulation. Unlike LinuxSyscalls, SIMD is an ISA capability, not an OS
-interface, so it is exposed as a class (`X86SIMD implements SIMD`) that programs instantiate
-directly. See §13.9 for the SIMD interface reference.
+contract, so it is exposed as a class (`X86SIMD satisfies SIMD`) that programs instantiate
+directly. See §13.9 for the SIMD contract reference.
 
 Additionally, `x86_64/` and `arch/` contain hardware-specific helpers that can be used
 directly:
@@ -85,7 +85,7 @@ available but unguarded.
 ### Non-Conforming Modules
 
 The following modules exist in the repository but are **not** part of the standard library.
-They were written before the current interface standard and have not been updated. Programs
+They were written before the current contract standard and have not been updated. Programs
 MUST NOT import from these modules until they are migrated and placed in `hopper/modules/`:
 
 `algo`, `ascii`, `char`, `cli`, `concurrent`, `core`, `ds`, `fs`, `io`, `json`, `llvm`,
@@ -112,7 +112,7 @@ To use any standard library module:
 
 2. Run `hopper install` to copy the module into `modules/` with full transitive dependency nesting.
 
-3. Declare each interface binding in the `targets` section:
+3. Declare each contract binding in the `targets` section:
 
 ```json
 {
@@ -120,7 +120,7 @@ To use any standard library module:
     "host": {
       "IO": {
         "from":           "linux",
-        "interface":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/interfaces/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
@@ -134,5 +134,5 @@ To use any standard library module:
 import IO from linux
 ```
 
-The build system resolves the interface and implementation, compiles both, and makes the free
+The build system resolves the contract and implementation, compiles both, and makes the free
 functions from the implementation file available in the importing translation unit.

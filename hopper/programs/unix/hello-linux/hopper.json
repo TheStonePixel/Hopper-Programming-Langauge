@@ -12,13 +12,13 @@
     "host": {
       "IO": {
         "from": "linux",
-        "interface": "modules/linux/interfaces/IO.hop",
+        "contract": "modules/linux/interfaces/IO.hop",
         "implementation": "modules/linux/src/IO.hop",
         "inline": true
       },
       "Process": {
         "from": "linux",
-        "interface": "modules/linux/interfaces/Process.hop",
+        "contract": "modules/linux/interfaces/Process.hop",
         "implementation": "modules/linux/src/Process.hop",
         "inline": true
       }

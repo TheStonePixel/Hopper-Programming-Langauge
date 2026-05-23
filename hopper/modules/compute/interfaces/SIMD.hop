@@ -1,8 +1,8 @@
-// Hardware-independent SIMD interface.
+// Hardware-independent SIMD contract.
 // Programs import this from compute; the build file resolves to the ISA implementation.
 // On x86_64: backed by X86SIMD (SSE2). On arm64: backed by ARM64SIMD (NEON).
 
-interface SIMD {
+contract SIMD {
     // Scan 16 bytes at ptr for byte value b. Returns 16-bit mask (bit i set if byte[i] == b).
     function scanByte16(address ptr, int b) int
 

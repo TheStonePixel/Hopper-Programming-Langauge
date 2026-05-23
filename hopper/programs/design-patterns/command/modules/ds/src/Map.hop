@@ -1,4 +1,4 @@
-class StandardMap implements Map {
+class StandardMap satisfies Map {
     address keys
     address vals
     address used
