@@ -73,20 +73,21 @@ function wrap(text, indent = "  ") {
 
 // Formats a HopperError into the 4-line diagnostic format:
 //
-//   main.hop  Line: 14  Position: 5       ← bold
-//   Error: TypeError                      ← bold red  (or bold yellow for Warning)
-//   'count' is not declared               ← normal
-//   Hint: declare it before use           ← cyan
+//   Module: hello  File: main.hop  Line: 14   ← bold
+//   Error: TypeError                           ← bold red  (Warning → bold yellow)
+//   'count' is not declared                    ← normal
+//   Hint: declare it before use                ← cyan
 export function formatError(err) {
-    const isWarning = err.severity === Severity.Warning;
+    const isWarning  = err.severity === Severity.Warning;
     const labelColor = isWarning ? C.yellow : C.red;
     const label      = isWarning ? "Warning" : "Error";
 
     const lines = [];
 
     if (err.loc) {
-        const file = err.loc.file.split(/[\\/]/).pop();
-        lines.push(`${C.bold}${file}  Line: ${err.loc.line}  Position: ${err.loc.col}${C.reset}`);
+        const file     = err.loc.file.split(/[\\/]/).pop();
+        const modPart  = err.loc.module ? `Module: ${err.loc.module}  ` : "";
+        lines.push(`${C.bold}${modPart}File: ${file}  Line: ${err.loc.line}${C.reset}`);
     } else {
         lines.push(`${C.dim}(unknown location)${C.reset}`);
     }

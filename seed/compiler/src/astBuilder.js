@@ -109,18 +109,39 @@ function charLiteralValue(text) {
     }
 }
 
+// Walk up from a source file's directory to find the nearest hopper.json
+// and return its "name" field. Returns null if not found.
+function resolveModuleName(sourceFile) {
+    if (!sourceFile || sourceFile === "(unknown)") return null;
+    let dir = path.dirname(path.resolve(sourceFile));
+    while (true) {
+        const candidate = path.join(dir, "hopper.json");
+        if (fs.existsSync(candidate)) {
+            try {
+                const cfg = JSON.parse(fs.readFileSync(candidate, "utf8"));
+                return cfg.name || null;
+            } catch { /* malformed — keep walking */ }
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return null;
+}
+
 export class AstBuilder extends HopperVisitor {
     constructor(sourceFile = null) {
         super();
-        this.sourceFile = sourceFile || "(unknown)";
+        this.sourceFile   = sourceFile || "(unknown)";
+        this.moduleName   = resolveModuleName(sourceFile);
     }
 
-    // Stamps { file, line, col } onto a freshly-built AST node and returns it.
+    // Stamps { module, file, line } onto a freshly-built AST node and returns it.
     withLoc(ctx, node) {
         node.loc = {
-            file: this.sourceFile,
-            line: ctx.start.line,
-            col:  ctx.start.column + 1,  // ANTLR columns are 0-indexed
+            module: this.moduleName,
+            file:   this.sourceFile,
+            line:   ctx.start.line,
         };
         return node;
     }
