@@ -29,16 +29,16 @@ const off = (code) => useColor ? code : "";
 
 // ── theme — change these to restyle all diagnostics ───────────────────────
 const THEME = {
-    errorFlag:    off(ANSI.red),          // × character on error lines
-    errorWord:    off(ANSI.red),          // "Error:" label
-    warningFlag:  off(ANSI.blue),         // ◆ character on warning lines
-    warningWord:  off(ANSI.blue),         // "Warning:" label
-    tagLabel:     off(ANSI.dim),          // Module:  File:  Line:
-    dataValue:    off(ANSI.brightWhite),  // hello  main.hop  14
-    message:      off(ANSI.white),        // indented message text
-    hint:         off(ANSI.cyan),         // Hint: ...
-    unknown:      off(ANSI.dim),          // (unknown location)
-    reset:        off(ANSI.reset),
+    errorBar:    off(ANSI.red),          // │ left bar on error blocks
+    warningBar:  off(ANSI.blue),         // │ left bar on warning blocks
+    errorWord:   off(ANSI.red),          // "Error:" label
+    warningWord: off(ANSI.blue),         // "Warning:" label
+    tagLabel:    off(ANSI.dim),          // Module:  File:  Line:
+    dataValue:   off(ANSI.brightWhite),  // hello  main.hop  14
+    message:     off(ANSI.white),        // indented message text
+    hint:        off(ANSI.cyan),         // Hint: ...
+    unknown:     off(ANSI.dim),          // (unknown location)
+    reset:       off(ANSI.reset),
 };
 
 export const Severity = {
@@ -99,52 +99,45 @@ function wrap(text, indent = "  ") {
     return result.join("\n");
 }
 
-// Renders a location line with dim tag labels and bright-white data values:
-//   × Module: hello  File: main.hop  Line: 14
-//   ◆ File: main.hop  Line: 14           (no module)
-//   ◆ (unknown location)
-function locLine(loc, flagColor, flag) {
-    const T = THEME;
-    if (!loc) return `${flagColor}${flag}${T.reset} ${T.unknown}(unknown location)${T.reset}`;
-
-    const file = loc.file.split(/[\\/]/).pop();
-
-    const tag = t => `${T.tagLabel}${t}:${T.reset}`;
-    const val = v => `${T.dataValue}${v}${T.reset}`;
-
-    const parts = [];
-    if (loc.module) parts.push(`${tag("Module")} ${val(loc.module)}`);
-    parts.push(`${tag("File")} ${val(file)}`);
-    parts.push(`${tag("Line")} ${val(loc.line)}`);
-
-    return `${flagColor}${flag}${T.reset} ${parts.join("  ")}`;
-}
-
 // Formats a HopperError into the 4-line diagnostic format:
 //
-//   × Module: hello  File: main.hop  Line: 14    ← flag + dim tags + bright values
-//   Error: Undeclared variable                   ← "Error" in red,  rest white
-//          'count' was used before being declared ← white, indented under label
-//   Hint: add 'int count = ...' before this line ← cyan
+//   │ Module: hello  File: main.hop  Line: 14
+//   │ Error: Unknown enum variant
+//   │        'Purpl' is not a variant of enum 'Color'
+//   │ Hint: valid variants: Red, Green, Blue
 //
-// For warnings the flag is ◆ and "Warning" is blue.
+// The │ bar is red for errors, blue for warnings — the only colored element.
 export function formatError(err) {
     const T         = THEME;
     const isWarning = err.severity === Severity.Warning;
-    const flagColor = isWarning ? T.warningFlag : T.errorFlag;
+    const barColor  = isWarning ? T.warningBar : T.errorBar;
     const wordColor = isWarning ? T.warningWord : T.errorWord;
-    const flag      = isWarning ? "◆"           : "×";
-    const label     = isWarning ? "Warning"      : "Error";
+    const label     = isWarning ? "Warning" : "Error";
+
+    // Prefix every line with the colored bar
+    const bar = `${barColor}│${T.reset} `;
 
     // Message indented to clear past "Error: " / "Warning: "
     const msgIndent = " ".repeat(label.length + 2);
 
-    const lines = [];
+    const content = [];
 
-    lines.push(locLine(err.loc, flagColor, flag));
-    lines.push(`${wordColor}${label}:${T.reset} ${T.dataValue}${err.errType || label}${T.reset}`);
-    lines.push(`${T.message}${wrap(msgIndent + err.message, msgIndent)}${T.reset}`);
-    if (err.hint) lines.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
+    if (err.loc) {
+        const file = err.loc.file.split(/[\\/]/).pop();
+        const tag  = t => `${T.tagLabel}${t}:${T.reset}`;
+        const val  = v => `${T.dataValue}${v}${T.reset}`;
+        const parts = [];
+        if (err.loc.module) parts.push(`${tag("Module")} ${val(err.loc.module)}`);
+        parts.push(`${tag("File")} ${val(file)}`);
+        parts.push(`${tag("Line")} ${val(err.loc.line)}`);
+        content.push(parts.join("  "));
+    } else {
+        content.push(`${T.unknown}(unknown location)${T.reset}`);
+    }
 
-    return lines.join("\n");
+    content.push(`${wordColor}${label}:${T.reset} ${err.errType || label}`);
+    content.push(wrap(msgIndent + err.message, msgIndent));
+    if (err.hint) content.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
+
+    return content.map(line => bar + line).join("\n");
 }
