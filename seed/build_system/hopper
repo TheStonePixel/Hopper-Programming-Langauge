@@ -8,6 +8,7 @@ import { execSync, spawn } from "node:child_process";
 import { buildAstFromSource } from "../compiler/src/astBuilder.js";
 import { genModule } from "../compiler/src/codegenLLVM.js";
 import { parseSource } from "../compiler/src/parse.js";
+import { HopperError, formatError } from "../compiler/src/errors.js";
 import { formatAst } from "../compiler/src/formatter.js";
 
 const __filename  = fileURLToPath(import.meta.url);
@@ -230,8 +231,17 @@ function toObject(file, llDir, oDir, flags) {
     const abs      = path.resolve(file);
     const src      = fs.readFileSync(abs, "utf8");
     const bindings = loadBindings(abs, "host");
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
-    const ir       = dedupeDeclarations(genModule(ast));
+    let ast, ir;
+    try {
+        ast = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+        ir  = dedupeDeclarations(genModule(ast));
+    } catch (e) {
+        if (e instanceof HopperError) {
+            process.stderr.write(formatError(e) + "\n");
+            process.exit(1);
+        }
+        throw e;
+    }
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
