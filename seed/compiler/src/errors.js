@@ -66,6 +66,7 @@ export const ErrorType = {
     ConstraintError:     "Constraint violation",
     ParseError:          "Syntax error",
     InternalError:       "Internal compiler error",
+    MmioSafetyError:     "MMIO safety violation",
 };
 
 export const WarnType = {

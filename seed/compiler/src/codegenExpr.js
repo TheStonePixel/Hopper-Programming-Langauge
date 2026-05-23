@@ -382,6 +382,17 @@ export function genExpr(ir, expr) {
         case "AddressOf": {
             const v = ir.vars.get(expr.name);
             if (!v) {
+                // MMIO variables are fixed hardware addresses — not addressable
+                if (mmioBindings.has(expr.name)) {
+                    const mmio = mmioBindings.get(expr.name);
+                    throw new HopperError(
+                        expr.loc,
+                        ErrorType.MmioSafetyError,
+                        `cannot take the address of MMIO variable '${expr.name}'`,
+                        `'${expr.name}' is a hardware register bound to ${mmio.hexAddr} via @. ` +
+                        `MMIO variables have no stack representation — read and write '${expr.name}' directly.`
+                    );
+                }
                 // Function name used as address: fnName::address
                 if (functionReturnTypes.has(expr.name)) {
                     const fnInfo   = functionReturnTypes.get(expr.name);

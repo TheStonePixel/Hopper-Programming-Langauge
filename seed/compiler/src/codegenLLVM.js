@@ -169,8 +169,9 @@ export function genModule(ast, opts = {}) {
     for (const v of ast.stricts || []) {
         const hType  = normalizeType(v.type);
         const llType = llvmType(hType);
-        const addr   = String(parseInt(v.hardwareAddress, 16));
-        mmioBindings.set(v.name, { hType, llType, addr });
+        const addr    = String(parseInt(v.hardwareAddress, 16));
+        const hexAddr = v.hardwareAddress;
+        mmioBindings.set(v.name, { hType, llType, addr, hexAddr });
     }
 
     // Emit vector bind globals (function-pointer globals for vector table placement)
