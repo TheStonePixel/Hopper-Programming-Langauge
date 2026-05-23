@@ -93,8 +93,19 @@ int lineStart = 0
 Enum type names use **PascalCase**.
 
 ```hopper
-enum Color { Red = 0  Green  Blue }
-enum JsonKind { NONE = 0  BOOL  INT  STRING  ARRAY  OBJECT }
+enum Color {
+    Red     = 0
+    Green   = 1
+    Blue    = 2
+}
+enum JsonKind {
+    NONE    = 0
+    BOOL    = 1
+    INT     = 2
+    STRING  = 3
+    ARRAY   = 4
+    OBJECT  = 5
+}
 ```
 
 ### Enum Variants
@@ -102,9 +113,23 @@ enum JsonKind { NONE = 0  BOOL  INT  STRING  ARRAY  OBJECT }
 Enum variants whose names represent flag-like constants or protocol values use **SCREAMING_SNAKE_CASE** (all uppercase with underscores). Variants that read as natural words in context may use PascalCase:
 
 ```hopper
-enum StdFd { STDIN = 0  STDOUT  STDERR }
-enum OpenFlag { O_RDONLY = 0  O_WRONLY = 1  O_RDWR = 2  O_CREAT = 64  O_TRUNC = 512 }
-enum Color { Red = 0  Green  Blue }
+enum StdFd {
+    STDIN  = 0
+    STDOUT = 1
+    STDERR = 2
+}
+enum OpenFlag {
+    O_RDONLY = 0
+    O_WRONLY = 1
+    O_RDWR   = 2
+    O_CREAT  = 64
+    O_TRUNC  = 512
+}
+enum Color {
+    Red   = 0
+    Green = 1
+    Blue  = 2
+}
 ```
 
 Use SCREAMING_SNAKE when variants are bit flags or system constants. Use PascalCase when variants are domain values (directions, states, categories).

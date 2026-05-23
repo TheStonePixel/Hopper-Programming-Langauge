@@ -158,7 +158,17 @@ The program entry point. Declared with the `entry` keyword: `entry main { ... }`
 
 ## enum
 
-A top-level declaration that defines a set of named integer (or string) constants: `enum Color { Red = 0  Green  Blue }`. Variants are accessed as `Color.Red`. Enums are the preferred replacement for top-level `const` declarations, which are deprecated. Integer variants increment from the previous variant if no explicit value is given.
+A top-level declaration that defines a set of named integer (or string) constants. Variants are declared one per line inside braces and accessed as `EnumName.VariantName`:
+
+```hopper
+enum Color {
+    Red   = 0
+    Green = 1
+    Blue  = 2
+}
+```
+
+Enums are the preferred form for named integer constant sets. Integer variants without an explicit value increment from the previous variant's value. String-valued variants are also supported (`= "..."`). See §2.3 for the full grammar.
 
 ---
 
