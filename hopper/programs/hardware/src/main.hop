@@ -1,66 +1,77 @@
 // Bare-metal UART demo — QEMU virt (Cortex-A53, AArch64)
 //
-// Demonstrates bitfield + @ MMIO syntax:
-//   - PL011FR bitfield gives named access to the flag register
-//   - uart_dr and uart_fr are placed at their real hardware addresses
-//   - putc polls txff by name before writing — no manual bit shifting
+// This program runs directly on virtual hardware with no operating system.
+// It talks to the PL011 UART chip using bitfield + @ MMIO syntax:
+//
+//   - bitfield PL011FR  names every bit in the flag register
+//   - uart_dr @ 0x09000000  places the data register at its hardware address
+//   - uart_fr @ 0x09000018  places the flag register at its hardware address
+//
+// Reading/writing those variables goes straight to the chip — no syscalls,
+// no kernel, no drivers. The hardware is the only thing running below us.
+//
+// Type anything — it comes back in UPPERCASE to prove RX and TX both work.
+// Ctrl-A X to exit QEMU.
 //
 // Build and run:
 //   hopper build
 //   hopper flash
-//
-// Ctrl-A X to exit QEMU
 
+// PL011 flag register — one bit per field, no manual shifting needed.
+// The compiler turns uart_fr.txff into a volatile read + mask + shift.
 bitfield PL011FR {
     bit cts     // bit 0: clear to send
     bit dsr     // bit 1: data set ready
     bit dcd     // bit 2: data carrier detect
     bit busy    // bit 3: UART busy
-    bit rxfe    // bit 4: receive FIFO empty
-    bit txff    // bit 5: transmit FIFO full — wait when set
+    bit rxfe    // bit 4: receive FIFO empty (1 = nothing to read yet)
+    bit txff    // bit 5: transmit FIFO full (1 = not safe to write yet)
     bit rxff    // bit 6: receive FIFO full
     bit txfe    // bit 7: transmit FIFO empty
-    pad 24
+    pad 24      // bits 8-31 unused
 }
 
-int     uart_dr @ 0x09000000
-PL011FR uart_fr @ 0x09000018
+// Place the two UART registers at their real hardware addresses.
+// Writing to uart_dr sends a byte. Reading uart_fr checks chip status.
+int     uart_dr @ 0x09000000   // data register  — write = TX byte, read = RX byte
+PL011FR uart_fr @ 0x09000018   // flag register  — tells us if the chip is ready
 
+// Send one byte over UART.
+// Spin on txff (transmit FIFO full) so we never overrun the hardware buffer.
 function putc(int c) {
     while (uart_fr.txff == 1) {}
     uart_dr = c
 }
 
-function putline(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) {
-    putc(a)
-    putc(b)
-    putc(c)
-    putc(d)
-    putc(e)
-    putc(f)
-    putc(g)
-    putc(h)
-    putc(i)
-    putc(j)
-    putc(k)
-    putc(l)
-    putc(m)
-    putc(n)
-    putc(o)
-    putc(p)
+// Receive one byte over UART.
+// Spin on rxfe (receive FIFO empty) so we only read when data has arrived.
+function getc() int {
+    while (uart_fr.rxfe == 1) {}
+    return uart_dr
+}
+
+// Convert a lowercase ASCII letter (a-z) to uppercase (A-Z).
+// ASCII 'a' = 97, 'A' = 65 — the difference is always 32.
+function to_upper(int c) int {
+    if (c >= 97) {
+        if (c <= 122) {
+            return c - 32
+        }
+    }
+    return c
 }
 
 entry main {
-    // "Hopper\n"
+    // Banner — each number is an ASCII code for one character.
+    // There is no string library on bare metal, so we send bytes directly.
+    // "Hopper bare-metal\r\n"
     putc(72)    // H
     putc(111)   // o
     putc(112)   // p
     putc(112)   // p
     putc(101)   // e
     putc(114)   // r
-    putc(10)    // \n
-
-    // "bare-metal\n"
+    putc(32)    // (space)
     putc(98)    // b
     putc(97)    // a
     putc(114)   // r
@@ -71,14 +82,56 @@ entry main {
     putc(116)   // t
     putc(97)    // a
     putc(108)   // l
+    putc(13)    // \r
     putc(10)    // \n
 
-    // count 0-9 to prove the loop runs on hardware
-    int i = 0
-    while (i < 10) {
-        int digit = 48 + i
-        putc(digit)
-        i = i + 1
-    }
+    // "Type anything -> echoes in UPPERCASE\r\n\r\n"
+    putc(84)    // T
+    putc(121)   // y
+    putc(112)   // p
+    putc(101)   // e
+    putc(32)    // (space)
+    putc(97)    // a
+    putc(110)   // n
+    putc(121)   // y
+    putc(116)   // t
+    putc(104)   // h
+    putc(105)   // i
+    putc(110)   // n
+    putc(103)   // g
+    putc(32)    // (space)
+    putc(45)    // -
+    putc(62)    // >
+    putc(32)    // (space)
+    putc(101)   // e
+    putc(99)    // c
+    putc(104)   // h
+    putc(111)   // o
+    putc(101)   // e
+    putc(115)   // s
+    putc(32)    // (space)
+    putc(105)   // i
+    putc(110)   // n
+    putc(32)    // (space)
+    putc(85)    // U
+    putc(80)    // P
+    putc(80)    // P
+    putc(69)    // E
+    putc(82)    // R
+    putc(67)    // C
+    putc(65)    // A
+    putc(83)    // S
+    putc(69)    // E
+    putc(13)    // \r
     putc(10)    // \n
+    putc(13)    // \r
+    putc(10)    // \n
+
+    // Main loop — read one byte, convert it, send it back.
+    // Runs forever; this is normal for bare-metal firmware.
+    while (1 == 1) {
+        int c     = getc()       // block until a key is pressed
+        int upper = to_upper(c)  // shift a-z to A-Z if needed
+        putc(upper)              // send it back to the terminal
+    }
 }
