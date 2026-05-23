@@ -15,7 +15,8 @@ import {
 import {
     genExpr, ensureBool, emitCast, emitDeferred,
 } from "./codegenExpr.js";
-import { HopperError, ErrorType } from "./errors.js";
+import { HopperError, HopperWarning, ErrorType, WarnType } from "./errors.js";
+import { emitWarning } from "./codegenState.js";
 import {
     isReg, isSIMDReg, regLLVMType, regConstraint, simdClobbers, SYSCALL_CLOBBERS,
 } from "./x86.js";
@@ -613,7 +614,20 @@ export function genStmt(ir, stmt, retType) {
 }
 
 export function genBlock(ir, block, retType) {
-    for (const s of block.statements) genStmt(ir, s, retType);
+    const stmts = block.statements;
+    for (let i = 0; i < stmts.length; i++) {
+        const s = stmts[i];
+        genStmt(ir, s, retType);
+        const isTerminator = s.kind === "ReturnStmt" || s.kind === "BreakStmt" || s.kind === "ContinueStmt";
+        if (isTerminator && i + 1 < stmts.length) {
+            const keyword = s.kind === "ReturnStmt" ? "return" : s.kind === "BreakStmt" ? "break" : "continue";
+            const nextLoc = stmts[i + 1].loc ?? null;
+            emitWarning(new HopperWarning(nextLoc, WarnType.UnreachableCode,
+                `code after '${keyword}' will never execute`,
+                `remove the unreachable statements`));
+            break;
+        }
+    }
 }
 
 // Hoist all alloca instructions to the function entry block.

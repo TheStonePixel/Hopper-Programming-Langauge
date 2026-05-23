@@ -1,7 +1,9 @@
 import {
     classTypes, interfaceDefs, functionReturnTypes,
     releaseMode, contractsUsed, setContractsUsed,
+    emitWarning,
 } from "./codegenState.js";
+import { HopperWarning, WarnType } from "./errors.js";
 import {
     llvmType, normalizeType, llvmZeroValue, operatorNameSafe,
 } from "./codegenTypes.js";
@@ -93,6 +95,18 @@ export function genFunction(fn) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
+        const stmts = fn.body.statements;
+        const last  = stmts[stmts.length - 1];
+        if (!last || last.kind !== "ReturnStmt") {
+            const hasEarlierReturn = stmts.slice(0, -1).some(s => s.kind === "ReturnStmt");
+            const isInfiniteLoop   = last?.kind === "WhileStmt"
+                && last.cond?.kind === "BoolLiteral" && last.cond.value === true;
+            if (!hasEarlierReturn && !isInfiniteLoop) {
+                emitWarning(new HopperWarning(last?.loc ?? null, WarnType.MissingReturn,
+                    `'${fn.name}' may reach end of function without returning a value`,
+                    `add a return statement at the end`));
+            }
+        }
         ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");
@@ -150,6 +164,18 @@ export function genMethod(typeName, method, isClass = true) {
     if (isVoid) {
         ir.emit(`ret void`);
     } else {
+        const stmts = method.body.statements;
+        const last  = stmts[stmts.length - 1];
+        if (!last || last.kind !== "ReturnStmt") {
+            const hasEarlierReturn = stmts.slice(0, -1).some(s => s.kind === "ReturnStmt");
+            const isInfiniteLoop   = last?.kind === "WhileStmt"
+                && last.cond?.kind === "BoolLiteral" && last.cond.value === true;
+            if (!hasEarlierReturn && !isInfiniteLoop) {
+                emitWarning(new HopperWarning(last?.loc ?? null, WarnType.MissingReturn,
+                    `'${typeName}.${method.name}' may reach end of method without returning a value`,
+                    `add a return statement at the end`));
+            }
+        }
         ir.emit(`ret ${retLlType} ${llvmZeroValue(retLlType)}`);
     }
     ir.emit("}");

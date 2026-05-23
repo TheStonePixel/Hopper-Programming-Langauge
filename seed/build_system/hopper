@@ -9,6 +9,7 @@ import { buildAstFromSource } from "../compiler/src/astBuilder.js";
 import { genModule } from "../compiler/src/codegenLLVM.js";
 import { parseSource } from "../compiler/src/parse.js";
 import { HopperError, formatError } from "../compiler/src/errors.js";
+import { getWarnings } from "../compiler/src/codegenState.js";
 import { formatAst } from "../compiler/src/formatter.js";
 
 const __filename  = fileURLToPath(import.meta.url);
@@ -242,6 +243,9 @@ function toObject(file, llDir, oDir, flags) {
         }
         throw e;
     }
+    const ws = getWarnings();
+    for (const w of ws) process.stderr.write(formatError(w));
+    if (ws.length > 0) process.exit(1);
     const llFile  = path.join(llDir, `${baseName(file)}.ll`);
     const objFile = path.join(oDir,  `${baseName(file)}.o`);
     fs.writeFileSync(llFile, ir, "utf8");

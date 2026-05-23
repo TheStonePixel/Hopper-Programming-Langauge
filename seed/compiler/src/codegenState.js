@@ -18,6 +18,7 @@ export let   stringCounter = 0;
 export let   wordBits = 64;                    // native integer width: 64 for x86-64, 32 for ARM32
 export let   contractsUsed = false;            // true when any requires/ensures/invariant/constrain is present
 export let   releaseMode   = false;            // --release: skip all contract IR emission
+export let   warnings = [];                    // HopperWarning instances collected during compilation
 
 export function resetAll() {
     stringConstants.clear();
@@ -38,6 +39,7 @@ export function resetAll() {
     wordBits = 64;
     contractsUsed = false;
     releaseMode   = false;
+    warnings      = [];
 }
 
 export function setInstantiatedClasses(arr) { instantiatedClasses = arr; }
@@ -46,6 +48,8 @@ export function setWordBits(n)              { wordBits = n; }
 export function setReleaseMode(v)           { releaseMode = v; }
 export function setContractsUsed(v)         { contractsUsed = v; }
 export function incStringCounter()          { return stringCounter++; }
+export function emitWarning(w)              { warnings.push(w); }
+export function getWarnings()               { return [...warnings]; }
 
 export function addStringConstant(value) {
     if (!stringConstants.has(value)) stringConstants.set(value, `@.str.${stringCounter++}`);

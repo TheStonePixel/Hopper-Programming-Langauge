@@ -12,6 +12,7 @@ import { resolve, dirname, join }                  from "node:path";
 import { buildAstFromSource }                      from "./src/astBuilder.js";
 import { genModule }                               from "./src/codegenLLVM.js";
 import { HopperError, HopperWarning, formatError } from "./src/errors.js";
+import { getWarnings }                             from "./src/codegenState.js";
 
 const args    = process.argv.slice(2);
 const oIdx    = args.indexOf("-o");
@@ -65,6 +66,10 @@ try {
     const bindings = loadBindings(file, target);
     const ast      = buildAstFromSource(src, { baseDir: dirname(resolve(file)), bindings, sourceFile: file });
     const ir       = genModule(ast, { target, release, strict });
+
+    const ws = getWarnings();
+    for (const w of ws) process.stderr.write(formatError(w));
+    if (ws.length > 0) process.exit(1);
 
     if (outFile) {
         writeFileSync(outFile, ir, "utf8");
