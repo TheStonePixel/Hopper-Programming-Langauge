@@ -29,10 +29,10 @@ const off = (code) => useColor ? code : "";
 
 // ── theme — change these to restyle all diagnostics ───────────────────────
 const THEME = {
-    errorBar:    off(ANSI.red),          // │ left bar on error blocks
-    warningBar:  off(ANSI.blue),         // │ left bar on warning blocks
+    errorBar:    off(ANSI.red),           // │ left bar on error blocks
+    warningBar:  off(ANSI.brightBlue),   // │ left bar on warning blocks
     errorWord:   off(ANSI.red),          // "Error:" label
-    warningWord: off(ANSI.blue),         // "Warning:" label
+    warningWord: off(ANSI.brightBlue),   // "Warning:" label
     tagLabel:    off(ANSI.dim),          // Module:  File:  Line:
     dataValue:   off(ANSI.brightWhite),  // hello  main.hop  14
     message:     off(ANSI.white),        // indented message text
@@ -99,14 +99,16 @@ function wrap(text, indent = "  ") {
     return result.join("\n");
 }
 
-// Formats a HopperError into the 4-line diagnostic format:
+// Formats a HopperError into the diagnostic block format:
 //
 //   │ Module: hello  File: main.hop  Line: 14
 //   │ Error: Unknown enum variant
 //   │        'Purpl' is not a variant of enum 'Color'
 //   │ Hint: valid variants: Red, Green, Blue
+//   └──────────────────────────────────────────────
 //
-// The │ bar is red for errors, blue for warnings — the only colored element.
+// The │ bar and └── closer are the only colored elements: red for errors,
+// bright-blue for warnings.
 export function formatError(err) {
     const T         = THEME;
     const isWarning = err.severity === Severity.Warning;
@@ -114,8 +116,8 @@ export function formatError(err) {
     const wordColor = isWarning ? T.warningWord : T.errorWord;
     const label     = isWarning ? "Warning" : "Error";
 
-    // Prefix every line with the colored bar
-    const bar = `${barColor}│${T.reset} `;
+    const bar    = `${barColor}│${T.reset} `;
+    const closer = `${barColor}└${"─".repeat(46)}${T.reset}`;
 
     // Message indented to clear past "Error: " / "Warning: "
     const msgIndent = " ".repeat(label.length + 2);
@@ -139,5 +141,5 @@ export function formatError(err) {
     content.push(wrap(msgIndent + err.message, msgIndent));
     if (err.hint) content.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
 
-    return content.map(line => bar + line).join("\n") + "\n";
+    return content.map(line => bar + line).join("\n") + "\n" + closer + "\n";
 }
