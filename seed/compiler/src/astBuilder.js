@@ -110,6 +110,21 @@ function charLiteralValue(text) {
 }
 
 export class AstBuilder extends HopperVisitor {
+    constructor(sourceFile = null) {
+        super();
+        this.sourceFile = sourceFile || "(unknown)";
+    }
+
+    // Stamps { file, line, col } onto a freshly-built AST node and returns it.
+    withLoc(ctx, node) {
+        node.loc = {
+            file: this.sourceFile,
+            line: ctx.start.line,
+            col:  ctx.start.column + 1,  // ANTLR columns are 0-indexed
+        };
+        return node;
+    }
+
     visitProgram(ctx) {
         const functions = [];
         const structs = [];
@@ -544,43 +559,43 @@ export class AstBuilder extends HopperVisitor {
         const type      = ctx.type().getText();
         const initExpr  = this.visit(ctx.expression());
         const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
-        return VarDecl(name, type, initExpr, constrain);
+        return this.withLoc(ctx, VarDecl(name, type, initExpr, constrain));
     }
 
     visitAllocateVarDecl(ctx) {
         const name      = ctx.Identifier().getText();
         const type      = ctx.type().getText();
         const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
-        return VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())), constrain);
+        return this.withLoc(ctx, VarDecl(name, type, AllocateExpr(this.visit(ctx.expression())), constrain));
     }
 
     visitVarDeclNoInit(ctx) {
         const name      = ctx.Identifier().getText();
         const type      = ctx.type().getText();
         const constrain = ctx.constrainClause() ? this.visit(ctx.constrainClause()) : null;
-        return VarDecl(name, type, null, constrain);
+        return this.withLoc(ctx, VarDecl(name, type, null, constrain));
     }
 
     visitConstVarDecl(ctx) {
         const type     = ctx.type().getText();
         const name     = ctx.Identifier().getText();
         const initExpr = this.visit(ctx.expression());
-        return VarDecl(name, type, initExpr, null, true);
+        return this.withLoc(ctx, VarDecl(name, type, initExpr, null, true));
     }
 
     visitAssign(ctx) {
-        return Assign(ctx.Identifier().getText(), this.visit(ctx.expression()));
+        return this.withLoc(ctx, Assign(ctx.Identifier().getText(), this.visit(ctx.expression())));
     }
 
     visitAllocateAssign(ctx) {
-        return Assign(ctx.Identifier().getText(), AllocateExpr(this.visit(ctx.expression())));
+        return this.withLoc(ctx, Assign(ctx.Identifier().getText(), AllocateExpr(this.visit(ctx.expression()))));
     }
 
     visitFieldAssign(ctx) {
         const object = ctx.Identifier(0).getText();
         const field  = ctx.fieldName().getText();
         const expr   = this.visit(ctx.expression());
-        return FieldAssign(object, field, expr);
+        return this.withLoc(ctx, FieldAssign(object, field, expr));
     }
 
     visitNestedFieldAssign(ctx) {
@@ -588,17 +603,17 @@ export class AstBuilder extends HopperVisitor {
         const outerField = ctx.fieldName(0).getText();
         const innerField = ctx.fieldName(1).getText();
         const expr       = this.visit(ctx.expression());
-        return NestedFieldAssign(object, outerField, innerField, expr);
+        return this.withLoc(ctx, NestedFieldAssign(object, outerField, innerField, expr));
     }
 
     visitAllocateFieldAssign(ctx) {
         const object = ctx.Identifier(0).getText();
         const field  = ctx.fieldName().getText();
-        return FieldAssign(object, field, AllocateExpr(this.visit(ctx.expression())));
+        return this.withLoc(ctx, FieldAssign(object, field, AllocateExpr(this.visit(ctx.expression()))));
     }
 
     visitDerefAssign(ctx) {
-        return DerefAssign(ctx.Identifier().getText(), this.visit(ctx.expression()));
+        return this.withLoc(ctx, DerefAssign(ctx.Identifier().getText(), this.visit(ctx.expression())));
     }
 
     visitArrayDeclInit(ctx) {
@@ -711,11 +726,11 @@ export class AstBuilder extends HopperVisitor {
     visitConstrainClause(ctx){ return ctx.type().getText(); }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
-        return ReturnStmt(expr);
+        return this.withLoc(ctx, ReturnStmt(expr));
     }
-    visitDeferStmt(ctx)      { return DeferStmt(this.visit(ctx.expression())); }
-    visitDeallocateStmt(ctx) { return DeallocateStmt(this.visit(ctx.expression())); }
-    visitExprStmt(ctx)       { return ExprStmt(this.visit(ctx.expression())); }
+    visitDeferStmt(ctx)      { return this.withLoc(ctx, DeferStmt(this.visit(ctx.expression()))); }
+    visitDeallocateStmt(ctx) { return this.withLoc(ctx, DeallocateStmt(this.visit(ctx.expression()))); }
+    visitExprStmt(ctx)       { return this.withLoc(ctx, ExprStmt(this.visit(ctx.expression()))); }
 
     // ── expressions ────────────────────────────────────────────────────────
 
@@ -908,12 +923,12 @@ export class AstBuilder extends HopperVisitor {
                 const args = ctx.argList && ctx.argList()
                     ? ctx.argList().expression().map(e => this.visit(e))
                     : [];
-                return MethodCall(idName, fnsArr[0].getText(), args);
+                return this.withLoc(ctx, MethodCall(idName, fnsArr[0].getText(), args));
             }
 
             // field access: obj.field — 1 fieldName (no '(' or '[')
             if (fnsArr.length === 1) {
-                return FieldAccess(idName, fnsArr[0].getText());
+                return this.withLoc(ctx, FieldAccess(idName, fnsArr[0].getText()));
             }
         }
 
@@ -926,7 +941,7 @@ export class AstBuilder extends HopperVisitor {
                 const args = ctx.argList && ctx.argList()
                     ? ctx.argList().expression().map(e => this.visit(e))
                     : [];
-                return TemplateFuncCall(idName, typeArg, args);
+                return this.withLoc(ctx, TemplateFuncCall(idName, typeArg, args));
             }
         }
 
@@ -935,11 +950,11 @@ export class AstBuilder extends HopperVisitor {
             const args = ctx.argList && ctx.argList()
                 ? ctx.argList().expression().map(e => this.visit(e))
                 : [];
-            return Call(idName, args);
+            return this.withLoc(ctx, Call(idName, args));
         }
 
         // plain variable
-        if (idName) return Var(idName);
+        if (idName) return this.withLoc(ctx, Var(idName));
 
         // String template constructor call: String(cap)
         if (childTexts[0] === 'String' && childTexts.includes('(')) {
@@ -1020,7 +1035,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     const parser = new HopperParser(tokens);
     parser.buildParseTrees = true;
     const tree = parser.program();
-    const ast  = new AstBuilder().visit(tree);
+    const ast  = new AstBuilder(sourceFile).visit(tree);
 
     if (noImports) return ast;
 

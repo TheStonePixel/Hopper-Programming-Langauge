@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join }                  from "node:path";
 import { buildAstFromSource }                      from "./src/astBuilder.js";
 import { genModule }                               from "./src/codegenLLVM.js";
+import { HopperError, formatError }                from "./src/errors.js";
 
 const args    = process.argv.slice(2);
 const oIdx    = args.indexOf("-o");
@@ -62,7 +63,7 @@ try {
     const file     = files[0];
     const src      = readFileSync(file, "utf8");
     const bindings = loadBindings(file, target);
-    const ast      = buildAstFromSource(src, { baseDir: dirname(resolve(file)), bindings });
+    const ast      = buildAstFromSource(src, { baseDir: dirname(resolve(file)), bindings, sourceFile: file });
     const ir       = genModule(ast, { target, release, strict });
 
     if (outFile) {
@@ -71,6 +72,10 @@ try {
         process.stdout.write(ir);
     }
 } catch (e) {
-    process.stderr.write(`hopperc: ${e.message}\n`);
+    if (e instanceof HopperError) {
+        process.stderr.write(formatError(e) + "\n");
+    } else {
+        process.stderr.write(`hopperc: ${e.message}\n`);
+    }
     process.exit(1);
 }

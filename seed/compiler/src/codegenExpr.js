@@ -13,6 +13,7 @@ import {
 import {
     emitRequiresChecks, emitEnsuresChecks, emitInvariantChecks, emitConstrainCheck,
 } from "./codegenConstraints.js";
+import { HopperError, ErrorType } from "./errors.js";
 
 // ── IRBuilder ──────────────────────────────────────────────────────────────
 
@@ -132,7 +133,9 @@ export function emitCast(ir, srcVal, srcType, targetType) {
         return { value: tmp, type: "bool" };
     }
 
-    throw new Error(`Cannot cast from '${srcType}' to '${targetType}'`);
+    throw new HopperError(null, ErrorType.TypeError,
+        `cannot cast from '${srcType}' to '${targetType}'`,
+        `check the cast table in the spec — not all type pairs are supported`);
 }
 
 // ── deferred expression emitter ────────────────────────────────────────────
@@ -270,7 +273,9 @@ export function genExpr(ir, expr) {
                     ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
                     return { value: tmp, type: "address" };
                 }
-                throw new Error(`Unknown variable: ${expr.name}`);
+                throw new HopperError(expr.loc, ErrorType.UndeclaredVariable,
+                    `'${expr.name}' is not declared`,
+                    `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             }
             const tmp = ir.newTmp();
             ir.emit(`${tmp} = load ${v.type}, ${v.type}* ${v.ptr}`);
@@ -282,7 +287,9 @@ export function genExpr(ir, expr) {
             if (enumTypes.has(expr.object)) {
                 const en = enumTypes.get(expr.object);
                 if (!en.variants.has(expr.field))
-                    throw new Error(`Unknown enum variant: ${expr.object}.${expr.field}`);
+                    throw new HopperError(expr.loc, ErrorType.EnumError,
+                        `'${expr.field}' is not a variant of enum '${expr.object}'`,
+                        `valid variants: ${[...en.variants.keys()].join(", ")}`);
                 const v = en.variants.get(expr.field);
                 if (v.kind === "string") {
                     const strName = addStringConstant(v.value);
@@ -316,7 +323,7 @@ export function genExpr(ir, expr) {
             }
 
             const v = ir.vars.get(expr.object);
-            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
 
             // Bitfield read: load container integer, shift right by field offset, mask to width
             if (bitfieldTypes.has(v.hType)) {
@@ -344,9 +351,9 @@ export function genExpr(ir, expr) {
             }
 
             if (classTypes.has(v.hType) && !templateInstances.has(v.hType) && !v.isSelf && ir.currentClass !== v.hType) {
-                throw new Error(
-                    `Access failure: cannot access field '${expr.field}' of class '${v.hType}' directly. Use an accessor method.`
-                );
+                throw new HopperError(expr.loc, ErrorType.EncapsulationError,
+                    `cannot access field '${expr.field}' of class '${v.hType}' directly`,
+                    `add a getter method to '${v.hType}' and call it as ${expr.object}.get${expr.field.charAt(0).toUpperCase() + expr.field.slice(1)}()`);
             }
 
             const typeName    = v.hType;
@@ -375,7 +382,7 @@ export function genExpr(ir, expr) {
                     ir.emit(`${tmp} = bitcast ${fnSig}* @${expr.name} to i8*`);
                     return { value: tmp, type: "address" };
                 }
-                throw new Error(`Unknown variable: ${expr.name}`);
+                throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             }
             if (v.hType.startsWith("array:")) {
                 const elemType = v.hType.split(":")[1];
@@ -394,7 +401,7 @@ export function genExpr(ir, expr) {
 
         case "ArrayAccess": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
 
             // Dispatch to class [] operator if defined
             if (classTypes.has(v.hType)) {
@@ -438,7 +445,7 @@ export function genExpr(ir, expr) {
 
         case "ArrayElementAddress": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             if (!v.hType.startsWith("array:"))
                 throw new Error(`Cannot get element address of non-array type: ${v.hType}`);
             const elemType   = v.hType.split(":")[1];
@@ -453,7 +460,7 @@ export function genExpr(ir, expr) {
 
         case "Deref": {
             const v = ir.vars.get(expr.name);
-            if (!v) throw new Error(`Unknown variable: ${expr.name}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.name}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.name} = ...'`);
             // Plain address: infer pointedTo from the address:T tag if present, else from return type
             let pointedTo;
             if (v.hType.startsWith("address:")) {
@@ -731,13 +738,16 @@ export function genExpr(ir, expr) {
 
             const fnInfo   = functionReturnTypes.get(expr.callee);
             if (!fnInfo && !ir.vars.has(expr.callee)) {
-                throw new Error(`Call to undefined function '${expr.callee}' — declare it or import the module that provides it`);
+                throw new HopperError(expr.loc, ErrorType.UndeclaredFunction,
+                    `'${expr.callee}' is not defined`,
+                    `declare the function or add the module that provides it to your hopper.json dependencies`);
             }
             if (fnInfo && !fnInfo.isVariadic) {
                 const expected = fnInfo.params ? fnInfo.params.length : 0;
                 const got      = expr.args ? expr.args.length : 0;
                 if (expected !== got) {
-                    throw new Error(`Function '${expr.callee}' expects ${expected} argument(s) but got ${got}`);
+                    throw new HopperError(expr.loc, ErrorType.ArityError,
+                        `'${expr.callee}' expects ${expected} argument(s) but got ${got}`);
                 }
             }
             const args     = (expr.args || []).map((a, i) => {
@@ -775,7 +785,7 @@ export function genExpr(ir, expr) {
         case "ChainedMethodCall": {
             // obj.field.method(args) — get pointer to the field, call method on it
             const v = ir.vars.get(expr.object);
-            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
             if (!classTypes.has(v.hType))
                 throw new Error(`ChainedMethodCall: '${expr.object}' is not a class`);
             const outerIdx   = getFieldIndex(v.hType, expr.field);
@@ -834,7 +844,7 @@ export function genExpr(ir, expr) {
         case "FieldIndexAccess": {
             // obj.field[i] — get pointer to field, call its [] operator
             const v = ir.vars.get(expr.object);
-            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
             if (!classTypes.has(v.hType))
                 throw new Error(`FieldIndexAccess: '${expr.object}' is not a class`);
             const outerIdx  = getFieldIndex(v.hType, expr.field);
@@ -857,7 +867,7 @@ export function genExpr(ir, expr) {
 
         case "MethodCall": {
             const v = ir.vars.get(expr.object);
-            if (!v) throw new Error(`Unknown variable: ${expr.object}`);
+            if (!v) throw new HopperError(expr.loc, ErrorType.UndeclaredVariable, `'${expr.object}' is not declared`, `declare it with a type before use, e.g. 'int ${expr.object} = ...'`);
             const typeName   = v.hType;
             const isClass    = classTypes.has(typeName);
             if (!isClass && !structTypes.has(typeName))
