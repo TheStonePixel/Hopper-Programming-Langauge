@@ -160,17 +160,20 @@ export class AstBuilder extends HopperVisitor {
         const name = ctx.Identifier().getText();
         const variants = [];
         let next = 0;
-        let kind = "int";   // inferred from first variant that has an explicit value
+        let kind = null;   // determined by first variant with an explicit value
         for (const v of ctx.enumVariant()) {
             const varName = v.Identifier().getText();
             const strLit  = v.StringLiteral ? v.StringLiteral() : null;
             const intLit  = v.IntegerLiteral ? v.IntegerLiteral() : null;
             const hexLit  = v.HexLiteral ? v.HexLiteral() : null;
             if (strLit) {
+                if (kind === "int") throw new Error(`enum ${name}: cannot mix integer and string variants`);
                 kind = "string";
                 const raw = unescapeHopperString(strLit.getText().slice(1, -1));
                 variants.push({ name: varName, value: raw, kind: "string" });
             } else {
+                if (kind === "string") throw new Error(`enum ${name}: cannot mix integer and string variants`);
+                if (kind === null) kind = "int";
                 const negative = v.children.some(c => c.getText && c.getText() === '-');
                 if (hexLit) {
                     next = parseInt(hexLit.getText(), 16);
@@ -183,6 +186,7 @@ export class AstBuilder extends HopperVisitor {
                 next += 1;
             }
         }
+        if (kind === null) kind = "int";   // empty enum defaults to int
         return EnumDecl(name, variants, kind);
     }
 
