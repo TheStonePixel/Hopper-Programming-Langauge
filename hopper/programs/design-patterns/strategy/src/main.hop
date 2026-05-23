@@ -50,7 +50,7 @@ class Validator {
     }
 
     function check(int value) int {
-        callback(int) int fn = address (self.strategy)
+        callback(int) int fn  = address (self.strategy)
         return fn(value)
     }
 
@@ -58,7 +58,7 @@ class Validator {
         int passed = 0
         int i = 0
         while (i < values.len()) {
-            callback(int) int fn = address (self.strategy)
+            callback(int) int fn  = address (self.strategy)
             address _a = values.get(i)
             int val = int (_a)
             passed = passed + fn(val)

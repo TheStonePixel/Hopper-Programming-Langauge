@@ -17,13 +17,13 @@
       },
       "IO": {
         "from": "linux",
-        "contract": "../../modules/linux/contracts/IO.hop",
+        "contract": "../../../modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from": "linux",
-        "contract": "../../modules/linux/contracts/FileSystem.hop",
+        "contract": "../../../modules/linux/contracts/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },

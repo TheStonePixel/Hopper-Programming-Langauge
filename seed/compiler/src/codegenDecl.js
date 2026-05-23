@@ -87,8 +87,12 @@ function walkForUnused(node, decls, refs) {
         case "DeferStmt":     walkForUnused(node.expr, decls, refs); return;
         case "DeallocateStmt":walkForUnused(node.expr, decls, refs); return;
 
-        // Calls
+        // Calls — add callee name to refs so callback-typed locals are not
+        // falsely flagged as unused when they are invoked via fn(args) syntax.
         case "Call":
+            if (node.callee) refs.add(node.callee);
+            for (const a of node.args || []) walkForUnused(a, decls, refs);
+            return;
         case "TemplateFuncCall":
             for (const a of node.args || []) walkForUnused(a, decls, refs);
             return;
