@@ -9,9 +9,10 @@ const C = {
     reset:   useColor ? "\x1b[0m"    : "",
     bold:    useColor ? "\x1b[1m"    : "",
     dim:     useColor ? "\x1b[2m"    : "",
-    red:     useColor ? "\x1b[1;31m" : "",  // bold red   — errors
-    yellow:  useColor ? "\x1b[1;33m" : "",  // bold yellow — warnings
-    cyan:    useColor ? "\x1b[36m"   : "",  // cyan        — hints
+    red:     useColor ? "\x1b[1;31m" : "",  // bold red    — Error label
+    yellow:  useColor ? "\x1b[33m"   : "",  // yellow      — error message (cascading detail)
+    blue:    useColor ? "\x1b[1;34m" : "",  // bold blue   — Warning label
+    cyan:    useColor ? "\x1b[36m"   : "",  // cyan        — Hint line
 };
 
 export const Severity = {
@@ -73,17 +74,18 @@ function wrap(text, indent = "  ") {
 
 // Formats a HopperError into the 4-line diagnostic format:
 //
-//   Module: hello  File: main.hop  Line: 14      ← bold
-//   Error: Undeclared variable                   ← bold red  (Warning → bold yellow)
-//          'count' was used before being declared ← indented under the label
+//   Module: hello  File: main.hop  Line: 14      ← bold white
+//   Error: Undeclared variable                   ← bold red  │ Warning → bold blue
+//          'count' was used before being declared ← yellow    │ Warning → dim
 //   Hint: add 'int count = ...' before this line ← cyan
 export function formatError(err) {
-    const isWarning  = err.severity === Severity.Warning;
-    const labelColor = isWarning ? C.yellow : C.red;
-    const label      = isWarning ? "Warning" : "Error";
+    const isWarning   = err.severity === Severity.Warning;
+    const labelColor  = isWarning ? C.blue   : C.red;
+    const msgColor    = isWarning ? C.dim    : C.yellow;
+    const label       = isWarning ? "Warning" : "Error";
 
     // Indent message to clear past "Error: " / "Warning: "
-    const msgIndent  = " ".repeat(label.length + 2);   // "Error: " = 7, "Warning: " = 9
+    const msgIndent = " ".repeat(label.length + 2);   // "Error: " = 7, "Warning: " = 9
 
     const lines = [];
 
@@ -96,7 +98,7 @@ export function formatError(err) {
     }
 
     lines.push(`${labelColor}${label}: ${err.errType || label}${C.reset}`);
-    lines.push(wrap(msgIndent + err.message, msgIndent));
+    lines.push(`${msgColor}${wrap(msgIndent + err.message, msgIndent)}${C.reset}`);
     if (err.hint) lines.push(`${C.cyan}${wrap(`Hint: ${err.hint}`)}${C.reset}`);
 
     return lines.join("\n");
