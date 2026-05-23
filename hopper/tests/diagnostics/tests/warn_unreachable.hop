@@ -1,0 +1,9 @@
+// EXPECT_ERROR: Unreachable code
+
+function early(int x) int {
+    return x
+    int dead = 0
+}
+
+entry main {
+}

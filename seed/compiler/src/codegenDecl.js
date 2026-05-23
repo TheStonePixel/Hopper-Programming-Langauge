@@ -17,6 +17,122 @@ import {
     genBlock, hoistAllocas,
 } from "./codegenStmt.js";
 
+// ── Unused variable analysis ──────────────────────────────────────────────
+//
+// AST-level pre-pass: collect every VarDecl/ArrayDecl in a function body,
+// collect every name that appears in an expression (read) position, then
+// warn for any declared name that is never read.
+//
+// Excluded from warnings:
+//   - Function parameters (caller-provided; suppress separately if desired)
+//   - Names starting with '_' (opt-out convention)
+
+function walkForUnused(node, decls, refs) {
+    if (!node) return;
+    switch (node.kind) {
+        // Declarations — add to decls; recurse into initialiser
+        case "VarDecl":
+            decls.set(node.name, node.loc ?? null);
+            walkForUnused(node.init, decls, refs);
+            return;
+        case "ArrayDecl":
+            decls.set(node.name, node.loc ?? null);
+            return;
+        case "ArrayDeclInit":
+            decls.set(node.name, node.loc ?? null);
+            for (const el of node.elements || []) walkForUnused(el, decls, refs);
+            return;
+
+        // Expression references — add name to refs
+        case "Var":                 refs.add(node.name); return;
+        case "AddressOf":           refs.add(node.name); return;
+        case "Deref":               refs.add(node.name); return;
+        case "SizeOf":              return; // compile-time type size, no runtime ref
+        case "ArrayAccess":         refs.add(node.name); walkForUnused(node.index, decls, refs); return;
+        case "ArrayElementAddress": refs.add(node.name); walkForUnused(node.index, decls, refs); return;
+
+        // Object-receiver references (object is a string name, not a Var node)
+        case "MethodCall":         refs.add(node.object); for (const a of node.args || []) walkForUnused(a, decls, refs); return;
+        case "ChainedMethodCall":  refs.add(node.object); for (const a of node.args || []) walkForUnused(a, decls, refs); return;
+        case "FieldAccess":        refs.add(node.object); return;
+        case "FieldIndexAccess":   refs.add(node.object); walkForUnused(node.index, decls, refs); return;
+        case "FieldAssign":        refs.add(node.object); walkForUnused(node.expr, decls, refs); return;
+        case "NestedFieldAssign":  refs.add(node.object); walkForUnused(node.expr, decls, refs); return;
+
+        // Assignments — LHS name is a write target (not a read); RHS/index are reads
+        case "Assign":      walkForUnused(node.expr, decls, refs); return;
+        case "DerefAssign": refs.add(node.name); walkForUnused(node.expr, decls, refs); return;
+        case "ArrayAssign": refs.add(node.name); walkForUnused(node.index, decls, refs); walkForUnused(node.expr, decls, refs); return;
+
+        // Asm — walk src expressions; suppress warnings for asm-assigned vars
+        case "AsmStmt":
+            for (const line of node.lines || []) {
+                if (line.kind !== "AsmLineAssign") continue;
+                // dest is either a register name or a local variable being written.
+                // Mark it as a ref to avoid spurious unused warnings on asm output vars.
+                if (typeof line.dest === "string") refs.add(line.dest);
+                walkForUnused(line.src, decls, refs);
+            }
+            return;
+
+        // Unary / compound expressions
+        case "Binary":       walkForUnused(node.left, decls, refs); walkForUnused(node.right, decls, refs); return;
+        case "Unary":        walkForUnused(node.expr, decls, refs); return;
+        case "CastExpr":     walkForUnused(node.expr, decls, refs); return;
+        case "AllocateExpr": walkForUnused(node.sizeExpr, decls, refs); return;
+
+        // Statement wrappers
+        case "ExprStmt":      walkForUnused(node.expr, decls, refs); return;
+        case "ReturnStmt":    walkForUnused(node.expr, decls, refs); return;
+        case "DeferStmt":     walkForUnused(node.expr, decls, refs); return;
+        case "DeallocateStmt":walkForUnused(node.expr, decls, refs); return;
+
+        // Calls
+        case "Call":
+        case "TemplateFuncCall":
+            for (const a of node.args || []) walkForUnused(a, decls, refs);
+            return;
+
+        // Control flow
+        case "IfStmt":
+            walkForUnused(node.cond,      decls, refs);
+            walkForUnused(node.thenBlock, decls, refs);
+            walkForUnused(node.elseBlock, decls, refs);
+            return;
+        case "WhileStmt":
+            walkForUnused(node.cond, decls, refs);
+            for (const inv of node.invariants || []) walkForUnused(inv, decls, refs);
+            walkForUnused(node.body, decls, refs);
+            return;
+        case "ForStmt":
+            walkForUnused(node.init,   decls, refs);
+            walkForUnused(node.cond,   decls, refs);
+            walkForUnused(node.update, decls, refs);
+            walkForUnused(node.body,   decls, refs);
+            return;
+
+        // Block (kind may be "Block" or absent)
+        default:
+            if (node.statements) for (const s of node.statements) walkForUnused(s, decls, refs);
+    }
+}
+
+function checkUnusedVars(body, params) {
+    if (!body) return;
+    const decls = new Map();
+    const refs  = new Set();
+    for (const p of params || []) refs.add(p.name);
+    walkForUnused(body, decls, refs);
+    for (const [name, loc] of decls) {
+        if (name.startsWith("_")) continue;
+        if (!refs.has(name)) {
+            emitWarning(new HopperWarning(loc, WarnType.UnusedVariable,
+                `'${name}' is declared but never used`,
+                `prefix with '_' to suppress: _${name}`));
+        }
+    }
+}
+
 // ── interface conformance check ───────────────────────────────────────────
 
 export function checkImplements(cls) {
@@ -82,6 +198,8 @@ export function genFunction(fn) {
             ir.vars.set(p.name, { ptr, type: lt, hType: normT });
         }
     });
+
+    checkUnusedVars(fn.body, fn.params);
 
     if (!releaseMode && fn.requires && fn.requires.length > 0) {
         setContractsUsed(true);
@@ -158,6 +276,8 @@ export function genMethod(typeName, method, isClass = true) {
             ir.vars.set(p.name, { ptr, type: lt, hType: normT });
         }
     });
+
+    checkUnusedVars(method.body, method.params);
 
     genBlock(ir, method.body, method.returnType);
     emitDeferred(ir);
@@ -238,6 +358,8 @@ export function genEntry(entry) {
             ir.emit(`define i64 @${entry.name}() {`);
             ir.emit("entry:");
         }
+        checkUnusedVars(entry.body, entry.params || []);
+
         genBlock(ir, entry.body, "int");
         emitDeferred(ir);
         if (!ir.isTerminated()) ir.emit("ret i64 0");

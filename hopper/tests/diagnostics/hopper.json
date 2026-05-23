@@ -1,0 +1,7 @@
+{
+  "name": "diagnostics",
+  "version": "0.1.0",
+  "description": "Compiler diagnostic tests — errors, warnings, and constraint checks",
+  "license": "MIT",
+  "type": "library"
+}

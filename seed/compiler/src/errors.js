@@ -72,6 +72,7 @@ export const WarnType = {
     TautologicalConstraint: "Redundant constraint",
     UnreachableCode:        "Unreachable code",
     MissingReturn:          "Missing return",
+    UnusedVariable:         "Unused variable",
 };
 
 export class HopperError extends Error {

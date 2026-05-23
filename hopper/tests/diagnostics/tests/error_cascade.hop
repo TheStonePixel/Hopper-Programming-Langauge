@@ -1,0 +1,6 @@
+// EXPECT_ERROR: Undeclared variable
+
+entry main {
+    int bad = notDeclared * 2
+    int _cascade = bad + 1
+}

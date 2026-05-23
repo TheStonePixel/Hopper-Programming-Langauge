@@ -1,0 +1,10 @@
+// COMPILE_ONLY
+// Verify that '_'-prefixed names suppress the unused variable warning.
+
+function compute(int x) int {
+    int _ignored = x * 2
+    return x
+}
+
+entry main {
+}
