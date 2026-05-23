@@ -1,0 +1,41 @@
+// PL011 UART driver — hardware layer
+//
+// This file owns everything hardware-specific:
+//   - bitfield describes the flag register layout from the datasheet
+//   - @ places each register at its physical address
+//   - PL011 class satisfies IO — swap this file for a different UART
+//     and main.hop never changes
+//
+// QEMU virt machine: PL011 base address 0x09000000
+
+bitfield PL011FR {
+    bit cts     // bit 0: clear to send
+    bit dsr     // bit 1: data set ready
+    bit dcd     // bit 2: data carrier detect
+    bit busy    // bit 3: UART busy
+    bit rxfe    // bit 4: receive FIFO empty — spin when set before read
+    bit txff    // bit 5: transmit FIFO full — spin when set before write
+    bit rxff    // bit 6: receive FIFO full
+    bit txfe    // bit 7: transmit FIFO empty
+    pad 24
+}
+
+int     uart_dr @ 0x09000000   // data register: write=TX, read=RX
+PL011FR uart_fr @ 0x09000018   // flag register: chip status bits
+
+class PL011 satisfies IO {
+
+    constructor() {}
+
+    // Send one byte — block until the transmit FIFO has space
+    function putc(int c) {
+        while (uart_fr.txff == 1) {}
+        uart_dr = c
+    }
+
+    // Receive one byte — block until a byte has arrived
+    function getc() int {
+        while (uart_fr.rxfe == 1) {}
+        return uart_dr
+    }
+}

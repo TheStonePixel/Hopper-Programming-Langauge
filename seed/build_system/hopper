@@ -258,6 +258,12 @@ SECTIONS
         . = ALIGN(4);
         __bss_end = .;
     }
+    .heap       : {
+        . = ALIGN(8);
+        __heap_start = .;
+        . += ${cfg.heapSize ?? 0x80000};
+        __heap_end = .;
+    }
     /DISCARD/ : {
         *(.ARM.exidx*)
         *(.ARM.extab*)
@@ -278,19 +284,34 @@ function dedupeDeclarations(ir) {
     }).join("\n");
 }
 
-function toObjectBare(file, llDir, oDir, cfg) {
-    const abs      = path.resolve(file);
-    const src      = fs.readFileSync(abs, "utf8");
-    const bindings = loadBindings(abs, cfg.llvmTarget);
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
-    const ir       = dedupeDeclarations(genModule(ast, { target: cfg.llvmTarget }));
-    const llFile  = path.join(llDir, `${baseName(file)}.ll`);
-    const objFile = path.join(oDir,  `${baseName(file)}.o`);
+// Merge multiple bare-metal source files into one compilation unit.
+// Templates and contracts defined in any file are visible to all others.
+function toObjectBare(files, llDir, oDir, cfg) {
+    const mergedAst = {
+        kind: "Module", functions: [], structs: [], classes: [], consts: [],
+        aliases: [], templates: [], entry: null, binds: [], stricts: [],
+        bitfields: [], interfaces: [], enums: [], templateFunctions: [],
+    };
+    for (const file of files) {
+        const abs      = path.resolve(file);
+        const src      = fs.readFileSync(abs, "utf8");
+        const bindings = loadBindings(abs, cfg.llvmTarget);
+        const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+        for (const key of ["functions","structs","classes","consts","aliases","templates",
+                           "binds","stricts","bitfields","interfaces","enums","templateFunctions"]) {
+            if (ast[key]) mergedAst[key].push(...ast[key]);
+        }
+        if (ast.entry) mergedAst.entry = ast.entry;
+    }
+    const ir      = dedupeDeclarations(genModule(mergedAst, { target: cfg.llvmTarget }));
+    const label   = baseName(files[files.length - 1]);
+    const llFile  = path.join(llDir, `${label}.ll`);
+    const objFile = path.join(oDir,  `${label}.o`);
     fs.writeFileSync(llFile, ir, "utf8");
     const floatFlag = cfg.floatAbi ? `-mfloat-abi=${cfg.floatAbi}` : "";
     const flags = `-target ${cfg.clangTarget} -mcpu=${cfg.mcpu} ${floatFlag} -ffreestanding -nostdlib -O2 -c -Wno-override-module`.replace(/\s+/g, " ").trim();
     execSync(`clang ${flags} "${llFile}" -o "${objFile}"`, { stdio: "inherit" });
-    return { objFile, entryName: ast.entry?.name ?? "main" };
+    return { objFile, entryName: mergedAst.entry?.name ?? "main" };
 }
 
 // Link bare-metal objects into an ELF then strip to a raw kernel.img.
@@ -460,6 +481,7 @@ function cmdBuild(args) {
     }
 
     let files;
+    let manifestRoot = null;  // set when files come from a hopper.json manifest
     if (args.length) {
         files = args;
     } else {
@@ -468,7 +490,8 @@ function cmdBuild(args) {
         if (fs.existsSync(mf)) {
             try {
                 const m = JSON.parse(fs.readFileSync(mf, "utf8"));
-                files = [m.entry || "src/main.hop"];
+                files = m.sources || [m.entry || "src/main.hop"];
+                manifestRoot = process.cwd();  // project root is always cwd when driven by manifest
             } catch { files = ["src/main.hop"]; }
         } else {
             files = ["src/main.hop"];
@@ -480,7 +503,19 @@ function cmdBuild(args) {
         process.exit(1);
     }
 
-    const { projectRoot, buildDir, llDir, oDir } = profileDirs(files[0], profile);
+    // When files come from a manifest, use cwd as the project root so that
+    // sources listed under modules/ don't confuse findProjectRoot into returning
+    // a nested module directory instead of the top-level project.
+    const { projectRoot, buildDir, llDir, oDir } = manifestRoot
+        ? (() => {
+            const buildDir = path.join(manifestRoot, "build");
+            const llDir    = path.join(buildDir, "ll");
+            const oDir     = path.join(buildDir, "o");
+            fs.mkdirSync(llDir, { recursive: true });
+            fs.mkdirSync(oDir,  { recursive: true });
+            return { projectRoot: manifestRoot, buildDir, llDir, oDir };
+          })()
+        : profileDirs(files[0], profile);
     const boardName = readBoard(projectRoot);
     const boardCfg  = boardName ? BOARD_CONFIGS[boardName] : null;
 
@@ -491,8 +526,9 @@ function cmdBuild(args) {
             process.exit(1);
         }
 
-        // Compile all .hop files for the target
-        const results = files.map(f => toObjectBare(f, llDir, oDir, boardCfg));
+        // Compile all source files as one merged unit so templates/contracts
+        // defined in any file are visible across the whole bare-metal project.
+        const results = [toObjectBare(files, llDir, oDir, boardCfg)];
 
         // Compile the board boot stub
         const bootObj = path.join(oDir, "boot.o");

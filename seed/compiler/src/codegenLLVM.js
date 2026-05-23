@@ -48,17 +48,19 @@ export function genModule(ast, opts = {}) {
     for (const a of ast.aliases || []) typeAliases.set(a.name, a.targetType);
 
     // Register template definitions.
-    // Fixed templates (all params are concrete types) are monomorphized immediately —
-    // their name becomes a standalone class type with no <> required at use sites.
+    // Fixed templates (all params are concrete types) are monomorphized immediately
+    // using the mangled name (e.g. Array<int> → Array_int) so that usage sites that
+    // write Array<int> normalize to the same mangled key and find the class type.
     for (const t of ast.templates || []) {
         if (t.isFixed) {
             const concreteClass = monomorphize(t, t.fixedParams);
-            registerClass(t.name, concreteClass.fields, concreteClass.methods, concreteClass.operators);
-            pushInstantiatedClass({ ...concreteClass, name: t.name });
-            if (t.constructor) functionReturnTypes.set(`${t.name}_constructor`, { returnType: null, isVariadic: false, params: concreteClass.constructor?.params || [] });
-            if (t.destructor)  functionReturnTypes.set(`${t.name}_destructor`,  { returnType: null, isVariadic: false, params: [] });
+            const cName = concreteClass.name;  // mangled: e.g. "Array_int"
+            registerClass(cName, concreteClass.fields, concreteClass.methods, concreteClass.operators);
+            pushInstantiatedClass(concreteClass);
+            if (concreteClass.constructor) functionReturnTypes.set(`${cName}_constructor`, { returnType: null, isVariadic: false, params: concreteClass.constructor.params || [] });
+            if (concreteClass.destructor)  functionReturnTypes.set(`${cName}_destructor`,  { returnType: null, isVariadic: false, params: [] });
             for (const m of concreteClass.methods || [])
-                functionReturnTypes.set(`${t.name}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
+                functionReturnTypes.set(`${cName}_${m.name}`, { returnType: m.returnType, isVariadic: false, params: m.params });
         } else {
             templateDefs.set(t.name, t);
         }
@@ -137,6 +139,16 @@ export function genModule(ast, opts = {}) {
     const typeDefs = [];
     const fnCode   = [];
 
+    // Register strict MMIO bindings BEFORE any class or function bodies are emitted —
+    // methods may reference MMIO variables, so bindings must exist when codegen runs.
+    for (const v of ast.stricts || []) {
+        const hType  = normalizeType(v.type);
+        const llType = llvmType(hType);
+        const addr    = String(parseInt(v.hardwareAddress, 16));
+        const hexAddr = v.hardwareAddress;
+        mmioBindings.set(v.name, { hType, llType, addr, hexAddr });
+    }
+
     // Emit struct type definitions
     for (const s of ast.structs || []) {
         const fieldTypes = s.fields.map(f =>
@@ -163,15 +175,6 @@ export function genModule(ast, opts = {}) {
         out += `declare void @free(i8*)\n`;
         if (!release) out += `declare void @abort()\n`;
         out += `\n`;
-    }
-
-    // Register strict MMIO bindings for load/store codegen
-    for (const v of ast.stricts || []) {
-        const hType  = normalizeType(v.type);
-        const llType = llvmType(hType);
-        const addr    = String(parseInt(v.hardwareAddress, 16));
-        const hexAddr = v.hardwareAddress;
-        mmioBindings.set(v.name, { hType, llType, addr, hexAddr });
     }
 
     // Emit vector bind globals (function-pointer globals for vector table placement)

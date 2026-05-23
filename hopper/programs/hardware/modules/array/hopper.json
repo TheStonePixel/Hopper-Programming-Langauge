@@ -1,0 +1,7 @@
+{
+  "name": "array",
+  "version": "0.1.0",
+  "description": "Generic growable array — template Array<T> for any primitive type",
+  "license": "MIT",
+  "type": "library"
+}

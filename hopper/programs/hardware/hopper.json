@@ -1,9 +1,17 @@
 {
   "name": "hardware",
   "version": "0.1.0",
-  "description": "Bare-metal UART demo — bitfield and @ syntax on QEMU virt",
+  "description": "Bare-metal UART demo — bitfield @ contract Array<T> from floor to ceiling",
   "license": "MIT",
   "type": "executable",
   "board": "qemu-virt",
-  "entry": "src/main.hop"
+  "sources": [
+    "interfaces/IO.hop",
+    "modules/array/src/Array.hop",
+    "src/pl011.hop",
+    "src/main.hop"
+  ],
+  "dependencies": {
+    "array": "0.1.0"
+  }
 }

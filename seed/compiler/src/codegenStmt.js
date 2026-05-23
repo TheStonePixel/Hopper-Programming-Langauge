@@ -69,11 +69,13 @@ export function genStmt(ir, stmt, retType) {
             }
 
             // Class-returning expr: MyClass x = obj.method() / obj.field.method() / a + b (operator)
+            // Also: Array<int> x = Array<int>(128) — TemplateFuncCall constructor returns isClassPtr.
             // genExpr for these returns { isClassPtr: true, value: allocaPtr } — reuse that alloca.
             if (classTypes.has(normType) && stmt.init
                 && (stmt.init.kind === "MethodCall"
                     || stmt.init.kind === "ChainedMethodCall"
-                    || stmt.init.kind === "Binary")) {
+                    || stmt.init.kind === "Binary"
+                    || stmt.init.kind === "TemplateFuncCall")) {
                 const result = genExpr(ir, stmt.init);
                 if (result.isClassPtr) {
                     ir.vars.set(stmt.name, { ptr: result.value, type: `%class.${normType}`, hType: normType, isConst: stmt.isConst || false });

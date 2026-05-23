@@ -1,0 +1,7 @@
+// IO contract — any hardware or virtual device that can send and receive bytes.
+// Implement this contract to plug a different UART, USB-CDC, or mock into main.
+
+contract IO {
+    function putc(int c)       // send one byte
+    function getc() int        // receive one byte (blocks until available)
+}

@@ -1,133 +1,148 @@
-// Bare-metal UART demo — QEMU virt (Cortex-A53, AArch64)
+// main.hop — application layer
 //
-// This program runs directly on virtual hardware with no operating system.
-// It talks to the PL011 UART chip using bitfield + @ MMIO syntax:
+// This file knows nothing about hardware. It only sees:
+//   - PL011 (a class that satisfies IO — defined in pl011.hop)
+//   - Array<int> (a generic buffer — defined in modules/array)
 //
-//   - bitfield PL011FR  names every bit in the flag register
-//   - uart_dr @ 0x09000000  places the data register at its hardware address
-//   - uart_fr @ 0x09000018  places the flag register at its hardware address
+// Abstraction stack visible in this file alone:
+//   floor  →  uart.putc / uart.getc     (IO contract method calls)
+//   middle →  linebuf.push / .get / .clear  (Array<int> operations)
+//   ceiling → application logic: read a line, save it, replay it
 //
-// Reading/writing those variables goes straight to the chip — no syscalls,
-// no kernel, no drivers. The hardware is the only thing running below us.
-//
-// Type anything — it comes back in UPPERCASE to prove RX and TX both work.
-// Ctrl-A X to exit QEMU.
+// The hardware specifics — bitfield PL011FR, uart_dr @ 0x09000000 — live
+// entirely in pl011.hop. Swap that file for a different UART and this file
+// does not change at all.
 //
 // Build and run:
 //   hopper build
-//   hopper flash
-
-// PL011 flag register — one bit per field, no manual shifting needed.
-// The compiler turns uart_fr.txff into a volatile read + mask + shift.
-bitfield PL011FR {
-    bit cts     // bit 0: clear to send
-    bit dsr     // bit 1: data set ready
-    bit dcd     // bit 2: data carrier detect
-    bit busy    // bit 3: UART busy
-    bit rxfe    // bit 4: receive FIFO empty (1 = nothing to read yet)
-    bit txff    // bit 5: transmit FIFO full (1 = not safe to write yet)
-    bit rxff    // bit 6: receive FIFO full
-    bit txfe    // bit 7: transmit FIFO empty
-    pad 24      // bits 8-31 unused
-}
-
-// Place the two UART registers at their real hardware addresses.
-// Writing to uart_dr sends a byte. Reading uart_fr checks chip status.
-int     uart_dr @ 0x09000000   // data register  — write = TX byte, read = RX byte
-PL011FR uart_fr @ 0x09000018   // flag register  — tells us if the chip is ready
-
-// Send one byte over UART.
-// Spin on txff (transmit FIFO full) so we never overrun the hardware buffer.
-function putc(int c) {
-    while (uart_fr.txff == 1) {}
-    uart_dr = c
-}
-
-// Receive one byte over UART.
-// Spin on rxfe (receive FIFO empty) so we only read when data has arrived.
-function getc() int {
-    while (uart_fr.rxfe == 1) {}
-    return uart_dr
-}
-
-// Convert a lowercase ASCII letter (a-z) to uppercase (A-Z).
-// ASCII 'a' = 97, 'A' = 65 — the difference is always 32.
-function to_upper(int c) int {
-    if (c >= 'a') {
-        if (c <= 'z') {
-            return c - 32
-        }
-    }
-    return c
-}
+//   hopper flash        (launches QEMU for board: qemu-virt)
+//   Ctrl-A X to exit QEMU
 
 entry main {
-    // Banner
-    putc('H')
-    putc('o')
-    putc('p')
-    putc('p')
-    putc('e')
-    putc('r')
-    putc(' ')
-    putc('b')
-    putc('a')
-    putc('r')
-    putc('e')
-    putc('-')
-    putc('m')
-    putc('e')
-    putc('t')
-    putc('a')
-    putc('l')
-    putc('\r')
-    putc('\n')
+    // Instantiate the UART driver — one object wraps all MMIO detail
+    PL011 uart = PL011()
 
-    putc('T')
-    putc('y')
-    putc('p')
-    putc('e')
-    putc(' ')
-    putc('a')
-    putc('n')
-    putc('y')
-    putc('t')
-    putc('h')
-    putc('i')
-    putc('n')
-    putc('g')
-    putc(' ')
-    putc('-')
-    putc('>')
-    putc(' ')
-    putc('e')
-    putc('c')
-    putc('h')
-    putc('o')
-    putc('e')
-    putc('s')
-    putc(' ')
-    putc('i')
-    putc('n')
-    putc(' ')
-    putc('U')
-    putc('P')
-    putc('P')
-    putc('E')
-    putc('R')
-    putc('C')
-    putc('A')
-    putc('S')
-    putc('E')
-    putc('\r')
-    putc('\n')
-    putc('\r')
-    putc('\n')
+    // Fixed-capacity line buffer backed by the bare-metal bump allocator
+    // (128 ints = 128 bytes, since each element is 8 bytes in the Array layout)
+    Array<int> linebuf = Array<int>(128)
 
-    // Main loop — read a key, convert it, send it back.
+    // ── Banner ────────────────────────────────────────────────────────────
+    // Prove TX works before entering the interactive loop.
+    // One putc per character: char literals compile to their ASCII int value.
+
+    uart.putc('H')
+    uart.putc('o')
+    uart.putc('p')
+    uart.putc('p')
+    uart.putc('e')
+    uart.putc('r')
+    uart.putc(' ')
+    uart.putc('b')
+    uart.putc('a')
+    uart.putc('r')
+    uart.putc('e')
+    uart.putc('-')
+    uart.putc('m')
+    uart.putc('e')
+    uart.putc('t')
+    uart.putc('a')
+    uart.putc('l')
+    uart.putc('\r')
+    uart.putc('\n')
+
+    uart.putc('T')
+    uart.putc('y')
+    uart.putc('p')
+    uart.putc('e')
+    uart.putc(' ')
+    uart.putc('a')
+    uart.putc(' ')
+    uart.putc('l')
+    uart.putc('i')
+    uart.putc('n')
+    uart.putc('e')
+    uart.putc(',')
+    uart.putc(' ')
+    uart.putc('p')
+    uart.putc('r')
+    uart.putc('e')
+    uart.putc('s')
+    uart.putc('s')
+    uart.putc(' ')
+    uart.putc('E')
+    uart.putc('n')
+    uart.putc('t')
+    uart.putc('e')
+    uart.putc('r')
+    uart.putc('\r')
+    uart.putc('\n')
+    uart.putc('\r')
+    uart.putc('\n')
+
+    // ── Main loop ─────────────────────────────────────────────────────────
+    // Read one character at a time from the UART.
+    // Accumulate into linebuf until Enter (carriage return) arrives.
+    // On Enter: report how many chars were saved, then replay the whole line.
+
     while (1 == 1) {
-        int c     = getc()
-        int upper = to_upper(c)
-        putc(upper)
+        int c = uart.getc()     // block until a byte arrives
+        uart.putc(c)            // echo it back so the user sees what they typed
+
+        if (c == '\r') {
+            // Complete the line ending
+            uart.putc('\n')
+
+            // Print "[Saved N chars]" — N is linebuf.length()
+            // Integer printing without a runtime: long divide to extract each digit.
+            int n = linebuf.length()
+
+            uart.putc('[')
+            uart.putc('S')
+            uart.putc('a')
+            uart.putc('v')
+            uart.putc('e')
+            uart.putc('d')
+            uart.putc(' ')
+
+            if (n >= 100) {
+                uart.putc(48 + n / 100)
+                uart.putc(48 + n / 10 - n / 100 * 10)
+                uart.putc(48 + n - n / 10 * 10)
+            } else {
+                if (n >= 10) {
+                    uart.putc(48 + n / 10)
+                    uart.putc(48 + n - n / 10 * 10)
+                } else {
+                    uart.putc(48 + n)
+                }
+            }
+
+            uart.putc(' ')
+            uart.putc('c')
+            uart.putc('h')
+            uart.putc('a')
+            uart.putc('r')
+            uart.putc('s')
+            uart.putc(']')
+            uart.putc('\r')
+            uart.putc('\n')
+
+            // Replay every char we stored — using Array<int>.get(i)
+            // This proves that linebuf held the data correctly across the loop.
+            int i = 0
+            while (i < linebuf.length()) {
+                uart.putc(linebuf.get(i))
+                i = i + 1
+            }
+            uart.putc('\r')
+            uart.putc('\n')
+            uart.putc('\r')
+            uart.putc('\n')
+
+            // Reset the buffer for the next line (keeps the allocated memory)
+            linebuf.clear()
+        } else {
+            linebuf.push(c)     // accumulate into the buffer
+        }
     }
 }

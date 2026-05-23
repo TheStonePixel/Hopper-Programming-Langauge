@@ -8,7 +8,7 @@ import {
     bitfieldLayout, bitfieldFieldInfo, bitsToLLType,
     getFieldIndex, getFieldType,
     operatorNameSafe, parseCallbackType, callbackFnTypeSig,
-    overloadTypeMatch,
+    overloadTypeMatch, mangleTemplate,
 } from "./codegenTypes.js";
 import {
     emitRequiresChecks, emitEnsuresChecks, emitInvariantChecks, emitConstrainCheck,
@@ -957,6 +957,38 @@ export function genExpr(ir, expr) {
 
         case "TemplateFuncCall": {
             const { name, typeArg, args } = expr;
+
+            // Constructor call for a monomorphized template class: Array<int>(128)
+            // Mangles to the concrete class name, then follows the same alloca+call pattern
+            // as regular class constructors in the "Call" case above.
+            const mangledClass = mangleTemplate(`${name}<${typeArg}>`);
+            if (classTypes.has(mangledClass)) {
+                const ctorName = `${mangledClass}_constructor`;
+                const llType   = llvmType(mangledClass);
+                const ptr      = ir.newTmp();
+                ir.emit(`${ptr} = alloca ${llType}`);
+                if (functionReturnTypes.has(ctorName)) {
+                    const ctorInfo  = functionReturnTypes.get(ctorName);
+                    const evaled    = (args || []).map((a, i) => {
+                        const paramNormT = ctorInfo.params && ctorInfo.params[i]
+                            ? normalizeType(ctorInfo.params[i].type) : null;
+                        if (paramNormT && classTypes.has(paramNormT) && a.kind === "Var") {
+                            const argVar = ir.vars.get(a.name);
+                            if (argVar) return { value: argVar.ptr, type: paramNormT, isClassPtr: true };
+                        }
+                        return genExpr(ir, a);
+                    });
+                    const selfArg   = `${llType}* ${ptr}`;
+                    const otherArgs = evaled.map(a =>
+                        a.isClassPtr ? `${llvmType(a.type)}* ${a.value}`
+                                     : `${a.type.startsWith("address:") ? "i8*" : llvmType(a.type)} ${a.value}`
+                    ).join(", ");
+                    const argStr = otherArgs ? `${selfArg}, ${otherArgs}` : selfArg;
+                    ir.emit(`call void @${ctorName}(${argStr})`);
+                }
+                return { value: ptr, type: mangledClass, isClassPtr: true };
+            }
+
             const normT = normalizeType(typeArg);
             const specs = templateFuncRegistry.get(name);
             if (!specs) throw new Error(`No template function '${name}' defined`);

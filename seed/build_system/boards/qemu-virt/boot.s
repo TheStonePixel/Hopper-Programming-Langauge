@@ -32,8 +32,49 @@ _start:
     b    .bss_zero
 .bss_done:
 
+    // Initialize heap bump pointer to __heap_start
+    ldr  x0, =__heap_start
+    ldr  x1, =_heap_next
+    str  x0, [x1]
+
     bl   main
 
 .park:
     wfe
     b    .park
+
+// ── bump allocator ────────────────────────────────────────────────────────────
+// malloc(size) — rounds size up to 8-byte alignment, bumps the heap pointer.
+// free(ptr)    — no-op; bump allocator does not reclaim memory.
+// These satisfy the `allocate` / `deallocate` keywords in Hopper source.
+
+.section .bss
+.align 8
+_heap_next:
+    .quad 0
+
+.section .text
+.global malloc
+.global free
+
+malloc:
+    // x0 = requested size
+    ldr  x1, =_heap_next
+    ldr  x2, [x1]          // current bump pointer
+    add  x3, x2, x0        // next = current + size
+    add  x3, x3, #7        // round up to 8-byte alignment
+    and  x3, x3, #~7
+    ldr  x4, =__heap_end
+    cmp  x3, x4
+    bgt  .oom              // out of heap — hang
+    str  x3, [x1]          // store new bump pointer
+    mov  x0, x2            // return old pointer
+    ret
+
+.oom:
+    wfe
+    b    .oom
+
+free:
+    // bump allocator — free is a no-op
+    ret
