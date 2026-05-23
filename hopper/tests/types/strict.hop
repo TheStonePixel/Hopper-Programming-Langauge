@@ -1,6 +1,7 @@
 // Tests MMIO declaration — hardware register placed at physical address
-// Cannot run on host (address 0x40021000 is not mapped), verify IR only.
-// COMPILE_ONLY
+// On Linux: SIGSEGV proves the volatile store actually targeted the address.
+// On bare metal: writes reach the hardware register.
+// EXPECT_SEGFAULT
 
 int uart_dr @ 0x40021000
 int uart_sr @ 0x40021004

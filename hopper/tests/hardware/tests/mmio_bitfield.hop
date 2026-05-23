@@ -1,0 +1,22 @@
+// MMIO bitfield — place a typed register layout at a physical address.
+// Writing a field emits volatile read-modify-write at the hardware address.
+// On Linux userspace: SIGSEGV — proves the RMW targeted the real address.
+// On bare metal: enables UART transmitter and receiver.
+// EXPECT_SEGFAULT
+
+bitfield UartCR1 {
+    pad 2
+    bit re      // bit 2: receiver enable
+    bit te      // bit 3: transmitter enable
+    pad 9
+    bit ue      // bit 13: USART enable
+    pad 18
+}
+
+UartCR1 uart_cr1 @ 0x40013800
+
+entry main {
+    uart_cr1.ue = 1
+    uart_cr1.te = 1
+    uart_cr1.re = 1
+}

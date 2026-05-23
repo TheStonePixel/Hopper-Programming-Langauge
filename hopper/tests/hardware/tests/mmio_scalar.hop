@@ -1,0 +1,10 @@
+// MMIO scalar write — place an int register at a physical address and write to it.
+// On Linux userspace: SIGSEGV — the CPU attempted the volatile store, Linux said no.
+// On bare metal: the value reaches the hardware register.
+// EXPECT_SEGFAULT
+
+int uart_dr @ 0x40021000
+
+entry main {
+    uart_dr = 65
+}

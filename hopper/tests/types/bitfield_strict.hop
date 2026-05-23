@@ -1,6 +1,7 @@
 // Tests MMIO bitfield — memory-mapped hardware register access
 // Field reads/writes generate volatile load/store + shift/mask automatically
-// Compile only — no hardware to run against in tests
+// On Linux: SIGSEGV proves the volatile RMW actually targeted the hardware address.
+// EXPECT_SEGFAULT
 
 bitfield UartCR1 {
     pad 3

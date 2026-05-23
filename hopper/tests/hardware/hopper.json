@@ -1,0 +1,7 @@
+{
+  "name": "hardware",
+  "version": "0.1.0",
+  "description": "MMIO and hardware placement tests — expected to SIGSEGV on Linux (proves addressing is correct)",
+  "license": "Apache-2.0",
+  "type": "library"
+}

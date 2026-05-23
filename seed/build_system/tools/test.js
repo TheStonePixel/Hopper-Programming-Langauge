@@ -9,6 +9,7 @@
  *   // EXPECT: <line>      — expected stdout line
  *   // COMPILE_ONLY        — verify the file compiles; don't run it
  *   // EXPECT_ERROR: <msg> — compilation must fail with a message containing <msg>
+ *   // EXPECT_SEGFAULT      — program must terminate with SIGSEGV (proves MMIO address was accessed)
  *   // TEST: name          — start a named section (groups following assertions)
  *   // XFAIL               — test is expected to fail (shown but not counted against total)
  *
@@ -146,14 +147,16 @@ function discoverGroups() {
 function parseMeta(source) {
     const sections    = [{ name: null, expected: [] }];
     let cur           = sections[0];
-    let compileOnly   = false;
-    let expectedError = null;
-    let xfail         = false;
+    let compileOnly    = false;
+    let expectedError  = null;
+    let xfail          = false;
+    let expectSegfault = false;
 
     for (const line of source.split("\n")) {
         const t = line.trim();
         if      (t === "// COMPILE_ONLY")          compileOnly = true;
         else if (t === "// XFAIL")                 xfail = true;
+        else if (t === "// EXPECT_SEGFAULT")        expectSegfault = true;
         else if (t.startsWith("// EXPECT_ERROR:")) expectedError = t.slice("// EXPECT_ERROR:".length).trim();
         else if (t.startsWith("// TEST:")) {
             cur = { name: t.slice("// TEST:".length).trim(), expected: [] };
@@ -164,7 +167,7 @@ function parseMeta(source) {
         }
     }
 
-    return { sections, compileOnly, expectedError, xfail };
+    return { sections, compileOnly, expectedError, xfail, expectSegfault };
 }
 
 // ── Run a single test ──────────────────────────────────────────────────────────
@@ -172,7 +175,7 @@ function parseMeta(source) {
 function runTest(testFile, group) {
     const name   = path.basename(testFile, ".hop");
     const source = readFileSync(testFile, "utf8");
-    const { sections, compileOnly, expectedError, xfail } = parseMeta(source);
+    const { sections, compileOnly, expectedError, xfail, expectSegfault } = parseMeta(source);
     const exePath = path.join(BUILD_DIR, `${group}__${name}`);
 
     const build = spawnSync(
@@ -216,6 +219,18 @@ function runTest(testFile, group) {
         };
 
     const run         = spawnSync(exePath, [], { encoding: "utf8", cwd: REPO_ROOT });
+
+    if (expectSegfault) {
+        const gotSegfault = run.signal === "SIGSEGV" || run.status === 139;
+        return { name, xfail, status: gotSegfault ? "PASS" : "FAIL",
+            note: gotSegfault ? "SIGSEGV (MMIO address accessed)" : null,
+            sections: [{ name: null, assertions: [{
+                label: "SIGSEGV on MMIO access",
+                status: gotSegfault ? "PASS" : "FAIL",
+                received: gotSegfault ? null : `signal=${run.signal} status=${run.status}`,
+            }]}],
+        };
+    }
     const actualLines = (run.stdout || "").trimEnd().split("\n");
     if (actualLines.length === 1 && actualLines[0] === "") actualLines.length = 0;
 
