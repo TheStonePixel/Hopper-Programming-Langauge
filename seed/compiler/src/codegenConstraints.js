@@ -18,6 +18,9 @@
 //   generation.  Any provably-violated contract is a hard compile error.
 //   Non-provable contracts still emit runtime checks.
 
+import { HopperWarning, WarnType } from "./errors.js";
+import { emitWarning }            from "./codegenState.js";
+
 // ── violation site ────────────────────────────────────────────────────────
 
 // Emit the standard violation sequence: abort() + unreachable.
@@ -38,6 +41,13 @@ function emitContractAssert(ir, condReg, prefix) {
 // Call this after all parameters have been stored into their allocas.
 export function emitRequiresChecks(ir, requires, genExpr, ensureBool) {
     for (const expr of requires) {
+        const ct = constEval(expr, new Map());
+        if (ct.known && ct.value) {
+            emitWarning(new HopperWarning(expr.loc ?? null, WarnType.TautologicalConstraint,
+                `'requires' constraint is always true`,
+                `remove it — a constraint that is always true does nothing`));
+            continue;
+        }
         const val  = genExpr(ir, expr);
         const cond = ensureBool(ir, val);
         emitContractAssert(ir, cond, "requires");
@@ -64,6 +74,13 @@ export function emitEnsuresChecks(ir, ensures, resultReg, retLlType, retHType, g
     ir.vars.set("result", { ptr: resultPtr, type: retLlType, hType: retHType });
 
     for (const expr of ensures) {
+        const ct = constEval(expr, new Map());
+        if (ct.known && ct.value) {
+            emitWarning(new HopperWarning(expr.loc ?? null, WarnType.TautologicalConstraint,
+                `'ensures' constraint is always true`,
+                `remove it — a constraint that is always true does nothing`));
+            continue;
+        }
         const val  = genExpr(ir, expr);
         const cond = ensureBool(ir, val);
         emitContractAssert(ir, cond, "ensures");
@@ -79,6 +96,13 @@ export function emitEnsuresChecks(ir, ensures, resultReg, retLlType, retHType, g
 // emitting the condLbl label.
 export function emitInvariantChecks(ir, invariants, genExpr, ensureBool) {
     for (const expr of invariants) {
+        const ct = constEval(expr, new Map());
+        if (ct.known && ct.value) {
+            emitWarning(new HopperWarning(expr.loc ?? null, WarnType.TautologicalConstraint,
+                `'invariant' constraint is always true`,
+                `remove it — a constraint that is always true does nothing`));
+            continue;
+        }
         const val  = genExpr(ir, expr);
         const cond = ensureBool(ir, val);
         emitContractAssert(ir, cond, "invariant");

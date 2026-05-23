@@ -4,6 +4,23 @@ enum Color {
     Blue  = 2
 }
 
+// Warning: TautologicalConstraint — requires clause is always true
+function clampToPositive(int x) int
+requires true
+{
+    if (x < 0) {
+        return 0
+    }
+    return x
+}
+
+// Warning: TautologicalConstraint — ensures clause is always true
+function identity(int x) int
+ensures 1 == 1
+{
+    return x
+}
+
 // Warning: MissingReturn — non-void function with no return statement
 function computeScore(int x) int {
     int doubled = x * 2

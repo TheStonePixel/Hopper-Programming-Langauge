@@ -743,9 +743,9 @@ export class AstBuilder extends HopperVisitor {
     visitFixedParam() { return null; }
 
     // ── compile-time contract clauses ─────────────────────────────────────
-    visitRequiresClause(ctx) { return { kind: "RequiresClause", expr: this.visit(ctx.expression()) }; }
-    visitEnsuresClause(ctx)  { return { kind: "EnsuresClause",  expr: this.visit(ctx.expression()) }; }
-    visitInvariantClause(ctx){ return this.visit(ctx.expression()); }
+    visitRequiresClause(ctx) { return { kind: "RequiresClause", expr: this.withLoc(ctx, this.visit(ctx.expression())) }; }
+    visitEnsuresClause(ctx)  { return { kind: "EnsuresClause",  expr: this.withLoc(ctx, this.visit(ctx.expression())) }; }
+    visitInvariantClause(ctx){ return this.withLoc(ctx, this.visit(ctx.expression())); }
     visitConstrainClause(ctx){ return ctx.type().getText(); }
     visitReturnStmt(ctx) {
         const expr = ctx.expression() ? this.visit(ctx.expression()) : null;
