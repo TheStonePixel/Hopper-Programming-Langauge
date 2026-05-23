@@ -8,7 +8,7 @@ For all examples, `hopper` refers to the CLI at `seed/build_system/hopper`. If i
 
 ## Example 1: Minimal Hello World Executable
 
-A program that writes "hello, world\n" to stdout using the Linux IO interface.
+A program that writes `"hello, world\n"` to stdout using the Linux IO interface.
 
 ### Directory structure
 
