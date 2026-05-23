@@ -1,0 +1,8 @@
+{
+  "name": "badCompile",
+  "version": "0.1.0",
+  "description": "Deliberately broken program for testing compiler error output",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop"
+}

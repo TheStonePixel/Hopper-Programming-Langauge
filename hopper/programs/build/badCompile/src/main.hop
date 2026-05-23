@@ -1,0 +1,20 @@
+enum Color {
+    Red   = 0
+    Green = 1
+    Blue  = 2
+}
+
+entry main {
+    // EnumError — typo in variant name
+    int x = Color.Purpl
+
+    // UndeclaredVariable — never declared
+    int y = count + 1
+
+    // UndeclaredFunction — doesn't exist
+    explode(42)
+
+    // TypeError — const reassignment
+    const int limit = 100
+    limit = 200
+}
