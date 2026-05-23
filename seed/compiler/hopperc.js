@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join }                  from "node:path";
 import { buildAstFromSource }                      from "./src/astBuilder.js";
 import { genModule }                               from "./src/codegenLLVM.js";
-import { HopperError, formatError }                from "./src/errors.js";
+import { HopperError, HopperWarning, formatError } from "./src/errors.js";
 
 const args    = process.argv.slice(2);
 const oIdx    = args.indexOf("-o");
