@@ -1,0 +1,9 @@
+{
+  "name": "hardware",
+  "version": "0.1.0",
+  "description": "Bare-metal UART demo — bitfield and @ syntax on QEMU virt",
+  "license": "MIT",
+  "type": "executable",
+  "board": "qemu-virt",
+  "entry": "src/main.hop"
+}

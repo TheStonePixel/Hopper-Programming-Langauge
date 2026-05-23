@@ -1,0 +1,84 @@
+// Bare-metal UART demo — QEMU virt (Cortex-A53, AArch64)
+//
+// Demonstrates bitfield + @ MMIO syntax:
+//   - PL011FR bitfield gives named access to the flag register
+//   - uart_dr and uart_fr are placed at their real hardware addresses
+//   - putc polls txff by name before writing — no manual bit shifting
+//
+// Build and run:
+//   hopper build
+//   hopper flash
+//
+// Ctrl-A X to exit QEMU
+
+bitfield PL011FR {
+    bit cts     // bit 0: clear to send
+    bit dsr     // bit 1: data set ready
+    bit dcd     // bit 2: data carrier detect
+    bit busy    // bit 3: UART busy
+    bit rxfe    // bit 4: receive FIFO empty
+    bit txff    // bit 5: transmit FIFO full — wait when set
+    bit rxff    // bit 6: receive FIFO full
+    bit txfe    // bit 7: transmit FIFO empty
+    pad 24
+}
+
+int     uart_dr @ 0x09000000
+PL011FR uart_fr @ 0x09000018
+
+function putc(int c) {
+    while (uart_fr.txff == 1) {}
+    uart_dr = c
+}
+
+function putline(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) {
+    putc(a)
+    putc(b)
+    putc(c)
+    putc(d)
+    putc(e)
+    putc(f)
+    putc(g)
+    putc(h)
+    putc(i)
+    putc(j)
+    putc(k)
+    putc(l)
+    putc(m)
+    putc(n)
+    putc(o)
+    putc(p)
+}
+
+entry main {
+    // "Hopper\n"
+    putc(72)    // H
+    putc(111)   // o
+    putc(112)   // p
+    putc(112)   // p
+    putc(101)   // e
+    putc(114)   // r
+    putc(10)    // \n
+
+    // "bare-metal\n"
+    putc(98)    // b
+    putc(97)    // a
+    putc(114)   // r
+    putc(101)   // e
+    putc(45)    // -
+    putc(109)   // m
+    putc(101)   // e
+    putc(116)   // t
+    putc(97)    // a
+    putc(108)   // l
+    putc(10)    // \n
+
+    // count 0-9 to prove the loop runs on hardware
+    int i = 0
+    while (i < 10) {
+        int digit = 48 + i
+        putc(digit)
+        i = i + 1
+    }
+    putc(10)    // \n
+}
