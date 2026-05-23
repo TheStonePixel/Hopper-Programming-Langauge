@@ -1,0 +1,96 @@
+enum Color {
+    BLACK          = 0
+    RED            = 1
+    GREEN          = 2
+    YELLOW         = 3
+    BLUE           = 4
+    MAGENTA        = 5
+    CYAN           = 6
+    WHITE          = 7
+    BRIGHT_BLACK   = 8
+    BRIGHT_RED     = 9
+    BRIGHT_GREEN   = 10
+    BRIGHT_YELLOW  = 11
+    BRIGHT_BLUE    = 12
+    BRIGHT_MAGENTA = 13
+    BRIGHT_CYAN    = 14
+    BRIGHT_WHITE   = 15
+}
+
+enum KeyCode {
+    NONE      = -1
+    CHAR      = 0
+    ENTER     = 1
+    BACKSPACE = 2
+    TAB       = 3
+    ESCAPE    = 4
+    UP        = 5
+    DOWN      = 6
+    LEFT      = 7
+    RIGHT     = 8
+    HOME      = 9
+    END       = 10
+    DELETE    = 11
+    PAGE_UP   = 12
+    PAGE_DOWN = 13
+    F1        = 14
+    F2        = 15
+    F3        = 16
+    F4        = 17
+    F5        = 18
+    F6        = 19
+    F7        = 20
+    F8        = 21
+    F9        = 22
+    F10       = 23
+    CTRL_C    = 24
+    CTRL_D    = 25
+    CTRL_L    = 26
+    CTRL_Z    = 27
+    UNKNOWN   = 255
+}
+
+class Key {
+    int code
+    int val
+
+    constructor(int c, int v) {
+        self.code = c
+        self.val  = v
+    }
+
+    destructor() { }
+
+    function getCode() int { return self.code }
+    function getVal()  int { return self.val  }
+}
+
+contract TUI {
+    function width() int
+    function height() int
+    function flush()
+    function clear()
+    function moveTo(int row, int col)
+    function hideCursor()
+    function showCursor()
+    function reset()
+    function bold()
+    function dim()
+    function italic()
+    function underline()
+    function blink()
+    function reverse()
+    function setFg(int color)
+    function setBg(int color)
+    function setFg256(int n)
+    function setBg256(int n)
+    function setFgRgb(int r, int g, int b)
+    function setBgRgb(int r, int g, int b)
+    function writeStr(address s)
+    function writeChar(byte c)
+    function writeInt(int n)
+    function drawBox(int row, int col, int w, int h)
+    function fillRect(int row, int col, int w, int h)
+    function readKey() Key
+    function close()
+}

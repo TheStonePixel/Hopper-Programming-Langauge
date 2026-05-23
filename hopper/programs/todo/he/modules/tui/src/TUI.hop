@@ -1,0 +1,496 @@
+import io  from arch
+import tty from arch
+
+// Box-drawing UTF-8 sequences (3 bytes each)
+enum Box {
+    TL = "\xe2\x94\x8c"
+    TR = "\xe2\x94\x90"
+    BL = "\xe2\x94\x94"
+    BR = "\xe2\x94\x98"
+    H  = "\xe2\x94\x80"
+    V  = "\xe2\x94\x82"
+}
+
+function _tuiZero(address dst, int n) {
+    byte z = 0
+    int i = 0
+    while (i < n) {
+        address p = dst + i
+        p::value = z
+        i = i + 1
+    }
+}
+
+function _tuiReadU32(address p) int {
+    byte b0 = p::value
+    address p1 = p + 1
+    byte b1 = p1::value
+    address p2 = p + 2
+    byte b2 = p2::value
+    address p3 = p + 3
+    byte b3 = p3::value
+    int i0 = int (b0)
+    int i1 = int (b1)
+    int i2 = int (b2)
+    int i3 = int (b3)
+    return i0 | (i1 << 8) | (i2 << 16) | (i3 << 24)
+}
+
+function _tuiWriteU32(address p, int val) {
+    int v0 = val & 255
+    int v1 = (val >> 8) & 255
+    int v2 = (val >> 16) & 255
+    int v3 = (val >> 24) & 255
+    byte b0 = byte (v0)
+    byte b1 = byte (v1)
+    byte b2 = byte (v2)
+    byte b3 = byte (v3)
+    address p1 = p + 1
+    address p2 = p + 2
+    address p3 = p + 3
+    p::value  = b0
+    p1::value = b1
+    p2::value = b2
+    p3::value = b3
+}
+
+function _tuiReadU16(address p) int {
+    byte lo = p::value
+    address ph = p + 1
+    byte hi = ph::value
+    int li = int (lo)
+    int hi2 = int (hi)
+    return li | (hi2 << 8)
+}
+
+function _tuiStrLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 0) { break }
+        n = n + 1
+    }
+    return n
+}
+
+class StandardTUI satisfies TUI {
+    address savedTermios
+    int     rows
+    int     cols
+    address outBuf
+    int     outLen
+    int     outCap
+
+    constructor() {
+        self.outCap = 8192
+        self.outLen = 0
+        self.outBuf = allocate 8192
+
+        self.savedTermios = allocate 64
+        _tuiZero(self.savedTermios, 64)
+        tcgetattr(0, self.savedTermios)
+
+        address raw = allocate 64
+        int ci = 0
+        while (ci < 64) {
+            address sp = self.savedTermios + ci
+            address dp = raw + ci
+            byte b = sp::value
+            dp::value = b
+            ci = ci + 1
+        }
+
+        address cif = raw
+        int iflag = _tuiReadU32(cif)
+        iflag = iflag & -1331
+        _tuiWriteU32(cif, iflag)
+
+        address cof = raw + 4
+        int oflag = _tuiReadU32(cof)
+        oflag = oflag & -2
+        _tuiWriteU32(cof, oflag)
+
+        address ccf = raw + 8
+        int cflag = _tuiReadU32(ccf)
+        cflag = cflag | 48
+        _tuiWriteU32(ccf, cflag)
+
+        address clf = raw + 12
+        int lflag = _tuiReadU32(clf)
+        lflag = lflag & -32780
+        _tuiWriteU32(clf, lflag)
+
+        address vtimeAddr = raw + 22
+        address vminAddr  = raw + 23
+        byte bOne  = 1
+        byte bZero = 0
+        vtimeAddr::value = bOne
+        vminAddr::value  = bZero
+
+        tcsetattr(0, 0x5402, raw)
+        deallocate raw
+
+        address ws = allocate 8
+        _tuiZero(ws, 8)
+        winsize(0, ws)
+        int wsRows = _tuiReadU16(ws)
+        int wsCols = _tuiReadU16(ws + 2)
+        if (wsRows == 0) { wsRows = 24 }
+        if (wsCols == 0) { wsCols = 80 }
+        self.rows = wsRows
+        self.cols = wsCols
+        deallocate ws
+
+        self._out("\x1b[?1049h\x1b[?25l")
+        self.flush()
+    }
+
+    destructor() {
+        self._out("\x1b[0m\x1b[?25h\x1b[?1049l")
+        self.flush()
+        tcsetattr(0, 0x5402, self.savedTermios)
+        deallocate self.savedTermios
+        deallocate self.outBuf
+    }
+
+    function _grow() {
+        int newCap = self.outCap * 2
+        address nb = allocate newCap
+        int i = 0
+        while (i < self.outLen) {
+            address s = self.outBuf + i
+            address d = nb + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        deallocate self.outBuf
+        self.outBuf = nb
+        self.outCap = newCap
+    }
+
+    function _outByte(byte c) {
+        if (self.outLen + 1 >= self.outCap) { self._grow() }
+        address p = self.outBuf + self.outLen
+        p::value = c
+        self.outLen = self.outLen + 1
+    }
+
+    function _out(address s) {
+        int i = 0
+        while (true) {
+            address p = s + i
+            byte b = p::value
+            int bi = int (b)
+            if (bi == 0) { break }
+            self._outByte(b)
+            i = i + 1
+        }
+    }
+
+    function _outInt(int n) {
+        if (n == 0) {
+            byte z = 48
+            self._outByte(z)
+            return
+        }
+        address tmp = allocate 24
+        int count = 0
+        while (n > 0) {
+            int d = n % 10
+            int dch = d + 48
+            byte db = byte (dch)
+            address p = tmp + count
+            p::value = db
+            count = count + 1
+            n = n / 10
+        }
+        int i = count - 1
+        while (i >= 0) {
+            address p = tmp + i
+            byte b = p::value
+            self._outByte(b)
+            i = i - 1
+        }
+        deallocate tmp
+    }
+
+    function width()  int { return self.cols }
+    function height() int { return self.rows }
+
+    function flush() {
+        write(1, self.outBuf, self.outLen)
+        self.outLen = 0
+    }
+
+    function close() {
+        self._out("\x1b[0m\x1b[?25h\x1b[?1049l")
+        self.flush()
+        tcsetattr(0, 0x5402, self.savedTermios)
+        deallocate self.savedTermios
+        deallocate self.outBuf
+        self.savedTermios = null
+        self.outBuf       = null
+    }
+
+    function clear()       { self._out("\x1b[2J\x1b[H") }
+    function hideCursor()  { self._out("\x1b[?25l")     }
+    function showCursor()  { self._out("\x1b[?25h")     }
+    function reset()       { self._out("\x1b[0m")       }
+    function bold()        { self._out("\x1b[1m")       }
+    function dim()         { self._out("\x1b[2m")       }
+    function italic()      { self._out("\x1b[3m")       }
+    function underline()   { self._out("\x1b[4m")       }
+    function blink()       { self._out("\x1b[5m")       }
+    function reverse()     { self._out("\x1b[7m")       }
+
+    function moveTo(int row, int col) {
+        self._out("\x1b[")
+        self._outInt(row)
+        byte semi = 59
+        self._outByte(semi)
+        self._outInt(col)
+        byte h = 72
+        self._outByte(h)
+    }
+
+    function setFg(int color) {
+        self._out("\x1b[")
+        if (color >= 8) {
+            self._outInt(color - 8 + 90)
+        } else {
+            self._outInt(color + 30)
+        }
+        byte m = 109
+        self._outByte(m)
+    }
+
+    function setBg(int color) {
+        self._out("\x1b[")
+        if (color >= 8) {
+            self._outInt(color - 8 + 100)
+        } else {
+            self._outInt(color + 40)
+        }
+        byte m = 109
+        self._outByte(m)
+    }
+
+    function setFg256(int n) {
+        self._out("\x1b[38;5;")
+        self._outInt(n)
+        byte m = 109
+        self._outByte(m)
+    }
+
+    function setBg256(int n) {
+        self._out("\x1b[48;5;")
+        self._outInt(n)
+        byte m = 109
+        self._outByte(m)
+    }
+
+    function setFgRgb(int r, int g, int b) {
+        self._out("\x1b[38;2;")
+        self._outInt(r)
+        byte semi = 59
+        self._outByte(semi)
+        self._outInt(g)
+        self._outByte(semi)
+        self._outInt(b)
+        byte m = 109
+        self._outByte(m)
+    }
+
+    function setBgRgb(int r, int g, int b) {
+        self._out("\x1b[48;2;")
+        self._outInt(r)
+        byte semi = 59
+        self._outByte(semi)
+        self._outInt(g)
+        self._outByte(semi)
+        self._outInt(b)
+        byte m = 109
+        self._outByte(m)
+    }
+
+    function writeStr(address s) { self._out(s) }
+    function writeInt(int n)     { self._outInt(n) }
+
+    function writeChar(byte c) { self._outByte(c) }
+
+    function drawBox(int row, int col, int w, int h) {
+        self.moveTo(row, col)
+        self._out(Box.TL)
+        int i = 1
+        while (i < w - 1) {
+            self._out(Box.H)
+            i = i + 1
+        }
+        self._out(Box.TR)
+        int r = 1
+        while (r < h - 1) {
+            self.moveTo(row + r, col)
+            self._out(Box.V)
+            self.moveTo(row + r, col + w - 1)
+            self._out(Box.V)
+            r = r + 1
+        }
+        self.moveTo(row + h - 1, col)
+        self._out(Box.BL)
+        i = 1
+        while (i < w - 1) {
+            self._out(Box.H)
+            i = i + 1
+        }
+        self._out(Box.BR)
+    }
+
+    function fillRect(int row, int col, int w, int h) {
+        int r = 0
+        while (r < h) {
+            self.moveTo(row + r, col)
+            int ci = 0
+            while (ci < w) {
+                byte sp = 32
+                self._outByte(sp)
+                ci = ci + 1
+            }
+            r = r + 1
+        }
+    }
+
+    // readKey reads one key event and returns a Key object with code and val fields.
+    function readKey() Key {
+        address buf = allocate 4
+        _tuiZero(buf, 4)
+        int n = read(0, buf, 1)
+        if (n <= 0) {
+            deallocate buf
+            return Key(-1, 0)
+        }
+
+        byte b = buf::value
+        int bi = int (b)
+
+        if (bi == 3) {
+            deallocate buf
+            return Key(24, 0)
+        }
+        if (bi == 4) {
+            deallocate buf
+            return Key(25, 0)
+        }
+        if (bi == 12) {
+            deallocate buf
+            return Key(26, 0)
+        }
+        if (bi == 26) {
+            deallocate buf
+            return Key(27, 0)
+        }
+        if (bi == 13) {
+            deallocate buf
+            return Key(1, 0)
+        }
+        if (bi == 127) {
+            deallocate buf
+            return Key(2, 0)
+        }
+        if (bi == 9) {
+            deallocate buf
+            return Key(3, 0)
+        }
+
+        if (bi != 27) {
+            deallocate buf
+            return Key(0, bi)
+        }
+
+        n = read(0, buf, 1)
+        if (n <= 0) {
+            deallocate buf
+            return Key(4, 0)
+        }
+        byte b2 = buf::value
+        int b2i = int (b2)
+        if (b2i != 91) {
+            deallocate buf
+            return Key(4, 0)
+        }
+
+        n = read(0, buf, 1)
+        if (n <= 0) {
+            deallocate buf
+            return Key(4, 0)
+        }
+        byte b3 = buf::value
+        int b3i = int (b3)
+
+        if (b3i == 65) {
+            deallocate buf
+            return Key(5, 0)
+        }
+        if (b3i == 66) {
+            deallocate buf
+            return Key(6, 0)
+        }
+        if (b3i == 67) {
+            deallocate buf
+            return Key(8, 0)
+        }
+        if (b3i == 68) {
+            deallocate buf
+            return Key(7, 0)
+        }
+        if (b3i == 72) {
+            deallocate buf
+            return Key(9, 0)
+        }
+        if (b3i == 70) {
+            deallocate buf
+            return Key(10, 0)
+        }
+        if (b3i == 80) {
+            deallocate buf
+            return Key(14, 0)
+        }
+        if (b3i == 81) {
+            deallocate buf
+            return Key(15, 0)
+        }
+        if (b3i == 82) {
+            deallocate buf
+            return Key(16, 0)
+        }
+        if (b3i == 83) {
+            deallocate buf
+            return Key(17, 0)
+        }
+        if (b3i == 51) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(11, 0)
+        }
+        if (b3i == 53) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(12, 0)
+        }
+        if (b3i == 54) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(13, 0)
+        }
+        if (b3i == 52) {
+            read(0, buf, 1)
+            deallocate buf
+            return Key(10, 0)
+        }
+
+        deallocate buf
+        return Key(255, 0)
+    }
+}

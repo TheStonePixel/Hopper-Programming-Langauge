@@ -1,0 +1,379 @@
+// One 16-byte load; compare against pbc (first-char broadcast) and 0 (null).
+// Returns fcMask in bits 0–15, nulMask in bits 16–31.
+function _simd16pair(address ptr, int pbc) int {
+    int result = 0
+    asm {
+        rdi = ptr
+        rsi = pbc
+        movd xmm2, esi
+        pshufd xmm2, xmm2, 0
+        pxor xmm3, xmm3
+        movdqu xmm0, [rdi]
+        movdqa xmm1, xmm0
+        pcmpeqb xmm0, xmm2
+        pcmpeqb xmm1, xmm3
+        pmovmskb rax, xmm0
+        pmovmskb rcx, xmm1
+        shl rcx, 16
+        or rax, rcx
+        result = rax
+    }
+    return result
+}
+
+function _atomLen(address pat) int {
+    address p0 = pat + 0
+    byte b0 = p0::value
+    int c0 = int (b0)
+    if (c0 == 91) {
+        int i = 1
+        if (true) {
+            address pi = pat + i
+            byte bi = pi::value
+            int ci = int (bi)
+            if (ci == 94) { i = i + 1 }
+        }
+        while (true) {
+            address pi = pat + i
+            byte bi = pi::value
+            int ci = int (bi)
+            if (ci == 0)  { return i }
+            if (ci == 93) { return i + 1 }
+            i = i + 1
+        }
+    }
+    if (c0 == 92) { return 2 }
+    return 1
+}
+
+function _matchClass(address pat, byte c) bool {
+    int cv = int (c)
+    address p0 = pat + 0
+    byte b0 = p0::value
+    int c0 = int (b0)
+    bool negate = false
+    int i = 0
+    if (c0 == 94) {
+        negate = true
+        i = 1
+    }
+    while (true) {
+        address pi = pat + i
+        byte bi = pi::value
+        int ci = int (bi)
+        if (ci == 0)  { return negate }
+        if (ci == 93) { return negate }
+        address pi1 = pat + i + 1
+        byte bi1 = pi1::value
+        int ci1 = int (bi1)
+        address pi2 = pat + i + 2
+        byte bi2 = pi2::value
+        int ci2 = int (bi2)
+        if (ci1 == 45) {
+            if (ci2 != 93) {
+                if (cv >= ci) {
+                    if (cv <= ci2) {
+                        if (negate) { return false }
+                        return true
+                    }
+                }
+                i = i + 3
+            } else {
+                if (cv == ci) {
+                    if (negate) { return false }
+                    return true
+                }
+                i = i + 1
+            }
+        } else {
+            if (cv == ci) {
+                if (negate) { return false }
+                return true
+            }
+            i = i + 1
+        }
+    }
+    return negate
+}
+
+function _matchOne(address pat, byte c) bool {
+    int cv = int (c)
+    address p0 = pat + 0
+    byte b0 = p0::value
+    int c0 = int (b0)
+    if (c0 == 46) { return cv != 10 }
+    if (c0 == 91) {
+        address inner = pat + 1
+        return _matchClass(inner, c)
+    }
+    if (c0 == 92) {
+        address p1 = pat + 1
+        byte b1 = p1::value
+        int c1 = int (b1)
+        if (c1 == 100) {
+            if (cv >= 48) { if (cv <= 57) { return true } }
+            return false
+        }
+        if (c1 == 68) {
+            if (cv >= 48) { if (cv <= 57) { return false } }
+            return true
+        }
+        if (c1 == 119) {
+            if (cv >= 48) { if (cv <= 57)  { return true } }
+            if (cv >= 65) { if (cv <= 90)  { return true } }
+            if (cv >= 97) { if (cv <= 122) { return true } }
+            if (cv == 95) { return true }
+            return false
+        }
+        if (c1 == 87) {
+            if (cv >= 48) { if (cv <= 57)  { return false } }
+            if (cv >= 65) { if (cv <= 90)  { return false } }
+            if (cv >= 97) { if (cv <= 122) { return false } }
+            if (cv == 95) { return false }
+            return true
+        }
+        if (c1 == 115) {
+            if (cv == 32) { return true }
+            if (cv == 9)  { return true }
+            if (cv == 10) { return true }
+            if (cv == 13) { return true }
+            return false
+        }
+        if (c1 == 83) {
+            if (cv == 32) { return false }
+            if (cv == 9)  { return false }
+            if (cv == 10) { return false }
+            if (cv == 13) { return false }
+            return true
+        }
+        return cv == c1
+    }
+    return cv == c0
+}
+
+extern function _matchHere(address pat, address text) bool
+
+function _matchStar(address pat, address text, bool plus) bool {
+    int i = 0
+    while (true) {
+        address tp = text + i
+        byte tb = tp::value
+        int tc = int (tb)
+        if (tc == 0) { break }
+        if (_matchOne(pat, tb) == false) { break }
+        i = i + 1
+    }
+    int alen = _atomLen(pat)
+    address next = pat + alen + 1
+    while (i >= 0) {
+        if (plus) {
+            if (i == 0) {
+                i = i - 1
+                continue
+            }
+        }
+        address tp = text + i
+        if (_matchHere(next, tp)) { return true }
+        i = i - 1
+    }
+    return false
+}
+
+function _matchHere(address pat, address text) bool {
+    address p0 = pat + 0
+    byte b0 = p0::value
+    int c0 = int (b0)
+    if (c0 == 0) { return true }
+    if (c0 == 36) {
+        address p1 = pat + 1
+        byte b1 = p1::value
+        int c1 = int (b1)
+        if (c1 == 0) {
+            address t0 = text + 0
+            byte tb = t0::value
+            int tc = int (tb)
+            return tc == 0
+        }
+    }
+    int alen = _atomLen(pat)
+    address quantifier = pat + alen
+    byte qb = quantifier::value
+    int qc = int (qb)
+    if (qc == 42) { return _matchStar(pat, text, false) }
+    if (qc == 43) { return _matchStar(pat, text, true)  }
+    if (qc == 63) {
+        address t0 = text + 0
+        byte tb = t0::value
+        int tc = int (tb)
+        address nextPat = pat + alen + 1
+        if (tc != 0) {
+            if (_matchOne(pat, tb)) {
+                address nextText = text + 1
+                if (_matchHere(nextPat, nextText)) { return true }
+            }
+        }
+        return _matchHere(nextPat, text)
+    }
+    address t0 = text + 0
+    byte tb = t0::value
+    int tc = int (tb)
+    if (tc == 0) { return false }
+    if (_matchOne(pat, tb) == false) { return false }
+    address nextPat  = pat  + alen
+    address nextText = text + 1
+    return _matchHere(nextPat, nextText)
+}
+
+// --- Fast path for literal patterns (no special regex chars: . * + ? [ ^ $ \) ---
+
+function _isLitPat(address pat) bool {
+    int i = 0
+    while (true) {
+        address p = pat + i
+        byte b = p::value
+        int c = int (b)
+        if (c == 0)  { return true }
+        if (c == 46) { return false }
+        if (c == 42) { return false }
+        if (c == 43) { return false }
+        if (c == 63) { return false }
+        if (c == 91) { return false }
+        if (c == 94) { return false }
+        if (c == 36) { return false }
+        if (c == 92) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function _litLen(address pat) int {
+    int n = 0
+    while (true) {
+        address p = pat + n
+        byte b = p::value
+        int c = int (b)
+        if (c == 0) { return n }
+        n = n + 1
+    }
+    return n
+}
+
+// Returns start offset of first match, or -1.
+// Scans 16 bytes at a time via SSE2: one load checks both first-char and null.
+function _litSearch(address pat, int plen, address text) int {
+    if (plen == 0) { return 0 }
+    address pp0 = pat
+    byte pfb = pp0::value
+    int pfs = int (pfb)
+    int pfu = pfs & 0xFF
+    int pbc = pfu * 0x01010101
+
+    int i = 0
+    while (true) {
+        address tp = text + i
+        int pair    = _simd16pair(tp, pbc)
+        int fcMask  = pair & 0xFFFF
+        int nulMask = (pair >> 16) & 0xFFFF
+
+        if (nulMask != 0) {
+            // Null byte in this window — byte-at-a-time to find exact stop
+            int j = 0
+            while (j < 16) {
+                address tp2 = text + i + j
+                byte tb = tp2::value
+                int tc = int (tb)
+                if (tc == 0) { return -1 }
+                if (tb == pfb) {
+                    bool ok = true
+                    int k = 1
+                    while (k < plen) {
+                        address pp = pat + k
+                        byte pb = pp::value
+                        address tp3 = text + i + j + k
+                        byte tb3 = tp3::value
+                        if (pb != tb3) {
+                        ok = false
+                        k = plen
+                    } else { k = k + 1 }
+                    }
+                    if (ok) { return i + j }
+                }
+                j = j + 1
+            }
+        } else if (fcMask != 0) {
+            // First-char hits: use BSF to jump to each candidate
+            int fm = fcMask
+            while (fm != 0) {
+                int j = 0
+                asm {
+                    rdi = fm
+                    bsf rax, rdi
+                    j = rax
+                }
+                bool ok = true
+                int k = 1
+                while (k < plen) {
+                    address pp = pat + k
+                    byte pb = pp::value
+                    address tp2 = text + i + j + k
+                    byte tb2 = tp2::value
+                    if (pb != tb2) {
+                        ok = false
+                        k = plen
+                    } else { k = k + 1 }
+                }
+                if (ok) { return i + j }
+                fm = fm & (fm - 1)
+            }
+            i = i + 16
+        } else {
+            i = i + 16
+        }
+    }
+    return -1
+}
+
+class StandardRegex satisfies Regex {
+    function matchAt(address pattern, address text) bool {
+        if (_isLitPat(pattern)) {
+            int plen = _litLen(pattern)
+            if (plen == 0) { return true }
+            int pos = _litSearch(pattern, plen, text)
+            return pos >= 0
+        }
+        address p0 = pattern + 0
+        byte b0 = p0::value
+        int c0 = int (b0)
+        if (c0 == 94) {
+            address inner = pattern + 1
+            return _matchHere(inner, text)
+        }
+        return _matchHere(pattern, text)
+    }
+
+    function match(address pattern, address text) int {
+        if (_isLitPat(pattern)) {
+            int plen = _litLen(pattern)
+            if (plen == 0) { return 0 }
+            return _litSearch(pattern, plen, text)
+        }
+        address p0 = pattern + 0
+        byte b0 = p0::value
+        int c0 = int (b0)
+        if (c0 == 94) {
+            address inner = pattern + 1
+            if (_matchHere(inner, text)) { return 0 }
+            return -1
+        }
+        int i = 0
+        while (true) {
+            address tp = text + i
+            byte tb = tp::value
+            int tc = int (tb)
+            if (_matchHere(pattern, tp)) { return i }
+            if (tc == 0) { break }
+            i = i + 1
+        }
+        return -1
+    }
+}

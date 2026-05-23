@@ -1,0 +1,19 @@
+enum JsonKind {
+    NONE   = 0
+    BOOL   = 1
+    INT    = 2
+    STRING = 3
+    ARRAY  = 4
+    OBJECT = 5
+}
+
+contract JSON {
+    function parse(address src, int len) address
+    function nodeKind(address node) int
+    function nodeInt(address node) int
+    function nodeStr(address node) address
+    function nodeChildren(address node) address
+    function nodeKeys(address node) address
+    function nodeLen(address node) int
+    function nodeBool(address node) bool
+}

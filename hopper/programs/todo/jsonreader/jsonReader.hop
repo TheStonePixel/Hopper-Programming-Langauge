@@ -46,8 +46,7 @@ function printNode(JSON r, address nodePtr, int depth) {
     if (kind == JsonKind.STRING) {
         indent(depth)
         address sv = r.nodeStr(nodePtr)
-        string ss = string (sv)
-        printf("string: \"%s\"\n", ss)
+        printf("string: \"%s\"\n", sv)
         return
     }
 
@@ -76,9 +75,8 @@ function printNode(JSON r, address nodePtr, int depth) {
         while (i < count) {
             address kslot = keyBuf + i * 8
             address kptr = kslot::value
-            string kstr = string (kptr)
             indent(depth + 1)
-            printf("\"%s\":\n", kstr)
+            printf("\"%s\":\n", kptr)
             address cslot = childBuf + i * 8
             address child = cslot::value
             printNode(r, child, depth + 2)

@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "description": "Parse any JSON string and print its structure",
   "license": "Apache-2.0",
-  "type": "program",
+  "type": "executable",
   "entry": "jsonReader.hop",
+  "dependencies": {
+    "json": "0.1.0"
+  },
   "targets": {
     "host": {
       "JSON": {
         "from": "json",
-        "contract": "../../modules/json/contracts/JSON.hop",
-        "implementation": "../../modules/json/src/JSON.hop"
+        "contract": "modules/json/contracts/JSON.hop",
+        "implementation": "modules/json/src/JSON.hop"
       }
     }
   }

@@ -1,19 +1,25 @@
 {
   "name": "calc",
   "version": "0.1.0",
-  "type": "program",
+  "description": "RPN stack calculator — callback dispatch and higher-order folds",
+  "license": "MIT",
+  "type": "executable",
   "entry": "calc.hop",
+  "dependencies": {
+    "ds": "0.1.0",
+    "math": "0.1.0"
+  },
   "targets": {
     "host": {
       "Array": {
         "from": "ds",
-        "contract": "../../modules/ds/contracts/Array.hop",
-        "implementation": "../../modules/ds/src/Array.hop"
+        "contract": "modules/ds/contracts/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
       },
       "Math": {
         "from": "math",
-        "contract": "../../modules/math/contracts/Math.hop",
-        "implementation": "../../modules/math/src/Math.hop"
+        "contract": "modules/math/contracts/Math.hop",
+        "implementation": "modules/math/src/Math.hop"
       }
     }
   }

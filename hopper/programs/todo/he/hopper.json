@@ -3,14 +3,41 @@
   "version": "0.1.0",
   "description": "Hopper Editor — modal TUI text editor showcasing the language",
   "license": "Apache-2.0",
-  "type": "program",
+  "type": "executable",
   "entry": "src/main.hop",
+  "dependencies": {
+    "tui": "0.1.0",
+    "linux": "0.1.0",
+    "x86_64": "0.1.0"
+  },
   "targets": {
     "host": {
       "TUI": {
-        "from":           "tui",
-        "contract":      "../../modules/tui/contracts/TUI.hop",
-        "implementation": "../../modules/tui/src/TUI.hop"
+        "from": "tui",
+        "contract": "modules/tui/contracts/TUI.hop",
+        "implementation": "modules/tui/src/TUI.hop"
+      },
+      "IO": {
+        "from": "linux",
+        "contract": "modules/linux/contracts/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
+      },
+      "FileSystem": {
+        "from": "linux",
+        "contract": "modules/linux/contracts/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
+      },
+      "Buffer": {
+        "from": "buffer",
+        "contract": "modules/buffer/contracts/Buffer.hop",
+        "implementation": "modules/buffer/src/Buffer.hop"
+      },
+      "Editor": {
+        "from": "editor",
+        "contract": "modules/editor/contracts/Editor.hop",
+        "implementation": "modules/editor/src/Editor.hop"
       }
     }
   }

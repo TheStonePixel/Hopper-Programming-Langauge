@@ -1,0 +1,7 @@
+contract Map {
+    function len() int
+    function contains(address key) bool
+    function get(address key) address
+    function set(address key, address val)
+    function remove(address key)
+}

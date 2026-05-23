@@ -1,0 +1,12 @@
+contract Math {
+    function abs(int x) int
+    function min(int a, int b) int
+    function max(int a, int b) int
+    function clamp(int x, int lo, int hi) int
+    function pow(int base, int exp) int
+    function factorial(int n) int
+    function gcd(int a, int b) int
+    function lcm(int a, int b) int
+    function fib(int n) int
+    function isqrt(int n) int
+}

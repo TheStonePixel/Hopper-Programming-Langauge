@@ -1,0 +1,38 @@
+{
+  "name": "concurrent",
+  "version": "0.1.0",
+  "description": "Concurrency primitives: Mutex and Condvar via SysV semaphores",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {
+    "arch": "0.1.0"
+  },
+  "exports": {
+    "Mutex": {
+      "contract":      "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    },
+    "Condvar": {
+      "contract":      "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    },
+    "Concurrent": {
+      "contract":      "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Concurrent": {
+        "from":           "concurrent",
+        "contract":      "interfaces/Concurrent.hop",
+        "implementation": "src/Concurrent.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "contract":      "../core/contracts/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
+  }
+}

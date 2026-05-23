@@ -242,8 +242,7 @@ function buildStatPath(int pid, address pathBuf) {
 
 // Open path, read into buf, close. Returns bytes read or -1.
 function readFile(address pathBuf, address buf, int maxLen) int {
-    string ps = string (pathBuf)
-    int fd = open(ps, 0, 0)
+    int fd = open(pathBuf, 0, 0)
     if (fd < 0) { return -1 }
     int n = read(fd, buf, maxLen)
     close(fd)
@@ -505,8 +504,7 @@ class Monitor {
     }
 
     function collectProcs(address readBuf, address pathBuf, address dirBuf) {
-        string procPath = string ("/proc")
-        int procFd = open(procPath, 0, 0)
+        int procFd = open("/proc", 0, 0)
         if (procFd < 0) { return }
         int dirN = getdents64(procFd, dirBuf, 65536)
         close(procFd)

@@ -1,0 +1,18 @@
+enum StdFd {
+    STDIN  = 0
+    STDOUT = 1
+    STDERR = 2
+}
+
+contract IO {
+    function read(int fd, address buf, int count) int
+    function write(int fd, address buf, int count) int
+    function pread64(int fd, address buf, int count, int offset) int
+    function pwrite64(int fd, address buf, int count, int offset) int
+    function readv(int fd, address iov, int iovcnt) int
+    function writev(int fd, address iov, int iovcnt) int
+    function sendfile(int out_fd, int in_fd, address offset, int count) int
+    function splice(int fd_in, address off_in, int fd_out, address off_out, int len, int flags) int
+    function tee(int fd_in, int fd_out, int len, int flags) int
+    function ioctl(int fd, int request, address arg) int
+}

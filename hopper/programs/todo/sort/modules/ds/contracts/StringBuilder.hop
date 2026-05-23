@@ -1,0 +1,11 @@
+contract StringBuilder {
+    function length() int
+    function empty() bool
+    function str() address
+    function reset()
+    function appendChar(byte c)
+    function appendStr(address s)
+    function appendBuf(address buf, int len)
+    function appendInt(int n)
+    function appendBool(bool b)
+}

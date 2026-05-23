@@ -1,31 +1,39 @@
 {
   "name": "pgrep",
   "version": "0.1.0",
-  "description": "Parallel grep — searches files concurrently using regex and spawn()",
+  "description": "Parallel grep — searches files using regex, serialised output via mutex",
   "license": "Apache-2.0",
   "type": "executable",
   "entry": "pgrep.hop",
+  "dependencies": {
+    "regex": "0.1.0",
+    "concurrent": "0.1.0",
+    "linux": "0.1.0",
+    "x86_64": "0.1.0"
+  },
   "targets": {
     "host": {
       "Regex": {
-        "from":           "regex",
-        "contract":      "../../modules/regex/contracts/Regex.hop",
-        "implementation": "../../modules/regex/src/Regex.hop"
+        "from": "regex",
+        "contract": "modules/regex/contracts/Regex.hop",
+        "implementation": "modules/regex/src/Regex.hop"
       },
       "Concurrent": {
-        "from":           "concurrent",
-        "contract":      "../../modules/concurrent/contracts/Concurrent.hop",
-        "implementation": "../../modules/concurrent/src/Concurrent.hop"
+        "from": "concurrent",
+        "contract": "modules/concurrent/contracts/Concurrent.hop",
+        "implementation": "modules/concurrent/src/Concurrent.hop"
       },
       "IO": {
-        "from":           "linux",
-        "contract":      "../../modules/linux/contracts/IO.hop",
-        "implementation": "../../modules/linux/src/IO.hop"
+        "from": "linux",
+        "contract": "modules/linux/contracts/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "FileSystem": {
-        "from":           "linux",
-        "contract":      "../../modules/linux/contracts/FileSystem.hop",
-        "implementation": "../../modules/linux/src/FileSystem.hop"
+        "from": "linux",
+        "contract": "modules/linux/contracts/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       }
     }
   }

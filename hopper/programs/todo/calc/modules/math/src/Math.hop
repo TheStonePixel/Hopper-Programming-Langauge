@@ -1,0 +1,82 @@
+class StandardMath satisfies Math {
+    function abs(int x) int {
+        if (x < 0) { return 0 - x }
+        return x
+    }
+
+    function min(int a, int b) int {
+        if (a < b) { return a }
+        return b
+    }
+
+    function max(int a, int b) int {
+        if (a > b) { return a }
+        return b
+    }
+
+    function clamp(int x, int lo, int hi) int {
+        if (x < lo) { return lo }
+        if (x > hi) { return hi }
+        return x
+    }
+
+    function pow(int base, int exp) int {
+        int result = 1
+        int i = 0
+        while (i < exp) {
+            result = result * base
+            i = i + 1
+        }
+        return result
+    }
+
+    function factorial(int n) int {
+        int result = 1
+        int i = 2
+        while (i <= n) {
+            result = result * i
+            i = i + 1
+        }
+        return result
+    }
+
+    function gcd(int a, int b) int {
+        while (b != 0) {
+            int t = b
+            b = a - (a / b) * b
+            a = t
+        }
+        return a
+    }
+
+    function lcm(int a, int b) int {
+        int g = self.gcd(a, b)
+        return (a / g) * b
+    }
+
+    function fib(int n) int {
+        if (n <= 1) { return n }
+        int a = 0
+        int b = 1
+        int i = 2
+        while (i <= n) {
+            int t = a + b
+            a = b
+            b = t
+            i = i + 1
+        }
+        return b
+    }
+
+    function isqrt(int n) int {
+        if (n < 0) { return 0 }
+        if (n == 0) { return 0 }
+        int x = n
+        int y = (x + 1) / 2
+        while (y < x) {
+            x = y
+            y = (x + n / x) / 2
+        }
+        return x
+    }
+}

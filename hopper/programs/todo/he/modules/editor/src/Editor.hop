@@ -1,0 +1,418 @@
+// Editor — modal text editor state machine
+// Free functions (open, read, close, write, lseek) come from the consuming
+// program's linux/x86_64 binding.  TUI types come from the tui binding.
+// StandardBuffer comes from the buffer binding.
+
+extern function open(string path, int flags, int mode) int
+extern function read(int fd, address buf, int count) int
+extern function write(int fd, address buf, int count) int
+extern function close(int fd) int
+extern function lseek(int fd, int offset, int whence) int
+extern function memcpy(address dst, address src, int n) address
+
+enum Mode {
+    NORMAL  = 0
+    INSERT  = 1
+    COMMAND = 2
+}
+
+class StandardEditor satisfies Editor {
+    StandardBuffer buf
+    int cx
+    int cy
+    int rowoff
+    int coloff
+    int mode
+    address fname
+    int fnlen
+    int running
+    address cmdbuf
+    int cmdlen
+
+    constructor() {
+        self.buf     = StandardBuffer()
+        self.cx      = 0
+        self.cy      = 0
+        self.rowoff  = 0
+        self.coloff  = 0
+        self.mode    = Mode.NORMAL
+        self.fname   = null
+        self.fnlen   = 0
+        self.running = 1
+        self.cmdbuf  = allocate 128
+        self.cmdlen  = 0
+    }
+
+    destructor() {
+        if (int (self.fname) != 0) { deallocate self.fname }
+        deallocate self.cmdbuf
+    }
+
+    function open_file(string path) {
+        address pathp = address (path)
+        int plen = 0
+        while (true) {
+            address cp = pathp + plen
+            byte b = cp::value
+            int bi = int (b)
+            if (bi == 0) { break }
+            plen = plen + 1
+        }
+        self.fname = allocate plen + 1
+        int pi = 0
+        while (pi < plen) {
+            address sp = pathp + pi
+            address dp = self.fname + pi
+            byte b = sp::value
+            dp::value = b
+            pi = pi + 1
+        }
+        address term = self.fname + plen
+        byte zero = 0
+        term::value = zero
+        self.fnlen = plen
+        int fd = open(path, 0, 0)
+        if (fd < 0) { return }
+        int filesize = lseek(fd, 0, 2)
+        lseek(fd, 0, 0)
+        address data = allocate filesize + 1
+        int n = read(fd, data, filesize)
+        close(fd)
+        if (n > 0) {
+            self.buf.load(data, n)
+        }
+        deallocate data
+        self.ensure_nonempty()
+    }
+
+    function _save_file() {
+        if (int (self.fname) == 0) { return }
+        address flenAddr = allocate 8
+        flenAddr::value = 0
+        address flat = self.buf.flatten(flenAddr)
+        int wlen = flenAddr::value
+        deallocate flenAddr
+        int fd = open(self.fname, 577, 420)
+        if (fd >= 0) {
+            write(fd, flat, wlen)
+            close(fd)
+        }
+        deallocate flat
+    }
+
+    function ensure_nonempty() {
+        self.buf.ensureNonempty()
+    }
+
+    function _clamp_cx() {
+        int llen = self.buf.lineLen(self.cy)
+        if (self.cx > llen) { self.cx = llen }
+        if (self.cx < 0)    { self.cx = 0    }
+    }
+
+    function _scroll(StandardTUI t) {
+        int rows = t.height() - 2
+        int cols = t.width()
+        if (self.cy < self.rowoff) { self.rowoff = self.cy }
+        if (self.cy >= self.rowoff + rows) { self.rowoff = self.cy - rows + 1 }
+        if (self.cx < self.coloff) { self.coloff = self.cx }
+        if (self.cx >= self.coloff + cols) { self.coloff = self.cx - cols + 1 }
+    }
+
+    function _draw_rows(StandardTUI t) {
+        int rows = t.height() - 2
+        int cols = t.width()
+        int i = 0
+        while (i < rows) {
+            int filerow = i + self.rowoff
+            t.moveTo(i + 1, 1)
+            if (filerow >= self.buf.lineCount()) {
+                t.writeStr("~")
+            } else {
+                address data = self.buf.lineData(filerow)
+                int len = self.buf.lineLen(filerow) - self.coloff
+                if (len < 0) { len = 0 }
+                if (len > cols) { len = cols }
+                if (len > 0 && int (data) != 0) {
+                    address start = data + self.coloff
+                    int j = 0
+                    while (j < len) {
+                        address cp = start + j
+                        byte ch = cp::value
+                        int chi = int (ch)
+                        if (chi >= 32) {
+                            t.writeChar(ch)
+                        } else {
+                            byte dot = 46
+                            t.writeChar(dot)
+                        }
+                        j = j + 1
+                    }
+                }
+            }
+            t.writeStr("\x1b[K")
+            i = i + 1
+        }
+    }
+
+    function _draw_status(StandardTUI t) {
+        int srow = t.height() - 1
+        t.moveTo(srow, 1)
+        t.reverse()
+        if (self.mode == Mode.NORMAL)  { t.writeStr(" NOR ") }
+        if (self.mode == Mode.INSERT)  { t.writeStr(" INS ") }
+        if (self.mode == Mode.COMMAND) { t.writeStr(" CMD ") }
+        t.writeStr(" ")
+        if (int (self.fname) != 0) {
+            int j = 0
+            while (j < self.fnlen) {
+                address cp = self.fname + j
+                byte ch = cp::value
+                t.writeChar(ch)
+                j = j + 1
+            }
+        } else {
+            t.writeStr("[no name]")
+        }
+        if (self.buf.getDirty() == 1) { t.writeStr(" [+]") }
+        t.writeStr("\x1b[K")
+        t.reset()
+    }
+
+    function _draw_cmdbar(StandardTUI t) {
+        int crow = t.height()
+        t.moveTo(crow, 1)
+        t.writeStr("\x1b[K")
+        if (self.mode == Mode.COMMAND) {
+            byte colon = 58
+            t.writeChar(colon)
+            int j = 0
+            while (j < self.cmdlen) {
+                address cp = self.cmdbuf + j
+                byte ch = cp::value
+                t.writeChar(ch)
+                j = j + 1
+            }
+        }
+    }
+
+    function _refresh(StandardTUI t) {
+        t.hideCursor()
+        self._scroll(t)
+        self._draw_rows(t)
+        self._draw_status(t)
+        self._draw_cmdbar(t)
+        if (self.mode == Mode.COMMAND) {
+            int crow = t.height()
+            t.moveTo(crow, self.cmdlen + 2)
+        } else {
+            int sr = self.cy - self.rowoff + 1
+            int sc = self.cx - self.coloff + 1
+            t.moveTo(sr, sc)
+        }
+        t.showCursor()
+        t.flush()
+    }
+
+    function _exec_command() {
+        address cp0 = self.cmdbuf
+        byte c0 = cp0::value
+        int c0i = int (c0)
+        if (self.cmdlen == 1 && c0i == 113) {
+            if (self.buf.getDirty() == 0) {
+                self.running = 0
+            }
+        }
+        if (self.cmdlen == 2 && c0i == 113) {
+            address cp1 = self.cmdbuf + 1
+            byte c1 = cp1::value
+            int c1i = int (c1)
+            if (c1i == 33) { self.running = 0 }
+        }
+        if (self.cmdlen == 1 && c0i == 119) {
+            self._save_file()
+        }
+        if (self.cmdlen == 2 && c0i == 119) {
+            address cp1 = self.cmdbuf + 1
+            byte c1 = cp1::value
+            int c1i = int (c1)
+            if (c1i == 113) {
+                self._save_file()
+                self.running = 0
+            }
+        }
+        self.mode = Mode.NORMAL
+        self.cmdlen = 0
+    }
+
+    function _handle_normal(int code, int val) {
+        if (code == KeyCode.CHAR && val == 104) {
+            if (self.cx > 0) { self.cx = self.cx - 1 }
+        }
+        if (code == KeyCode.LEFT) {
+            if (self.cx > 0) { self.cx = self.cx - 1 }
+        }
+        if (code == KeyCode.CHAR && val == 108) {
+            int llen = self.buf.lineLen(self.cy)
+            if (self.cx < llen) { self.cx = self.cx + 1 }
+        }
+        if (code == KeyCode.RIGHT) {
+            int llen = self.buf.lineLen(self.cy)
+            if (self.cx < llen) { self.cx = self.cx + 1 }
+        }
+        if (code == KeyCode.CHAR && val == 107) {
+            if (self.cy > 0) {
+                self.cy = self.cy - 1
+                self._clamp_cx()
+            }
+        }
+        if (code == KeyCode.UP) {
+            if (self.cy > 0) {
+                self.cy = self.cy - 1
+                self._clamp_cx()
+            }
+        }
+        if (code == KeyCode.CHAR && val == 106) {
+            if (self.cy < self.buf.lineCount() - 1) {
+                self.cy = self.cy + 1
+                self._clamp_cx()
+            }
+        }
+        if (code == KeyCode.DOWN) {
+            if (self.cy < self.buf.lineCount() - 1) {
+                self.cy = self.cy + 1
+                self._clamp_cx()
+            }
+        }
+        if (code == KeyCode.CHAR && val == 48) {
+            self.cx = 0
+        }
+        if (code == KeyCode.CHAR && val == 36) {
+            int llen = self.buf.lineLen(self.cy)
+            if (llen > 0) { self.cx = llen - 1 }
+        }
+        if (code == KeyCode.CHAR && val == 105) {
+            self.mode = Mode.INSERT
+        }
+        if (code == KeyCode.CHAR && val == 65) {
+            self.cx = self.buf.lineLen(self.cy)
+            self.mode = Mode.INSERT
+        }
+        if (code == KeyCode.CHAR && val == 111) {
+            int llen = self.buf.lineLen(self.cy)
+            self.buf.splitLine(self.cy, llen)
+            self.cy = self.cy + 1
+            self.cx = 0
+            self.mode = Mode.INSERT
+        }
+        if (code == KeyCode.CHAR && val == 120) {
+            self.buf.deleteChar(self.cy, self.cx)
+            self._clamp_cx()
+        }
+        if (code == KeyCode.CHAR && val == 58) {
+            self.mode = Mode.COMMAND
+            self.cmdlen = 0
+        }
+    }
+
+    function _handle_insert(int code, int val) {
+        if (code == KeyCode.ESCAPE) {
+            self.mode = Mode.NORMAL
+            if (self.cx > 0) { self.cx = self.cx - 1 }
+            return
+        }
+        if (code == KeyCode.ENTER) {
+            self.buf.splitLine(self.cy, self.cx)
+            self.cy = self.cy + 1
+            self.cx = 0
+            return
+        }
+        if (code == KeyCode.BACKSPACE) {
+            if (self.cx > 0) {
+                self.cx = self.cx - 1
+                self.buf.deleteChar(self.cy, self.cx)
+            } else {
+                if (self.cy > 0) {
+                    int prevlen = self.buf.lineLen(self.cy - 1)
+                    self.buf.joinLines(self.cy - 1)
+                    self.cy = self.cy - 1
+                    self.cx = prevlen
+                }
+            }
+            return
+        }
+        if (code == KeyCode.UP) {
+            if (self.cy > 0) { self.cy = self.cy - 1 }
+            return
+        }
+        if (code == KeyCode.DOWN) {
+            if (self.cy < self.buf.lineCount() - 1) { self.cy = self.cy + 1 }
+            return
+        }
+        if (code == KeyCode.LEFT) {
+            if (self.cx > 0) { self.cx = self.cx - 1 }
+            return
+        }
+        if (code == KeyCode.RIGHT) {
+            int llen = self.buf.lineLen(self.cy)
+            if (self.cx < llen) { self.cx = self.cx + 1 }
+            return
+        }
+        if (code == KeyCode.CHAR && val >= 32 && val < 127) {
+            byte bval = byte (val)
+            self.buf.insertChar(self.cy, self.cx, bval)
+            self.cx = self.cx + 1
+        }
+    }
+
+    function _handle_command(int code, int val) {
+        if (code == KeyCode.ESCAPE) {
+            self.mode = Mode.NORMAL
+            self.cmdlen = 0
+            return
+        }
+        if (code == KeyCode.ENTER) {
+            self._exec_command()
+            return
+        }
+        if (code == KeyCode.BACKSPACE) {
+            if (self.cmdlen > 0) {
+                self.cmdlen = self.cmdlen - 1
+            } else {
+                self.mode = Mode.NORMAL
+            }
+            return
+        }
+        if (code == KeyCode.CHAR && val >= 32 && val < 127 && self.cmdlen < 126) {
+            address cp = self.cmdbuf + self.cmdlen
+            byte bval = byte (val)
+            cp::value = bval
+            self.cmdlen = self.cmdlen + 1
+        }
+    }
+
+    function run() {
+        StandardTUI t = StandardTUI()
+        while (self.running == 1) {
+            self._refresh(t)
+            Key k = t.readKey()
+            int code = k.getCode()
+            int val  = k.getVal()
+            if (self.mode == Mode.NORMAL) {
+                self._handle_normal(code, val)
+            } else {
+                if (self.mode == Mode.INSERT) {
+                    self._handle_insert(code, val)
+                } else {
+                    if (self.mode == Mode.COMMAND) {
+                        self._handle_command(code, val)
+                    }
+                }
+            }
+            if (code == KeyCode.CTRL_C) { self.running = 0 }
+        }
+        t.clear()
+        t.flush()
+        t.close()
+    }
+}

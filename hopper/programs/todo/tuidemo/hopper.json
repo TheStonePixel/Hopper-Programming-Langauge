@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "description": "Interactive TUI showcase",
   "license": "Apache-2.0",
-  "type": "program",
+  "type": "executable",
   "entry": "tuidemo.hop",
+  "dependencies": {
+    "tui": "0.1.0"
+  },
   "targets": {
     "host": {
       "TUI": {
-        "from":           "tui",
-        "contract":      "../../modules/tui/contracts/TUI.hop",
-        "implementation": "../../modules/tui/src/TUI.hop"
+        "from": "tui",
+        "contract": "modules/tui/contracts/TUI.hop",
+        "implementation": "modules/tui/src/TUI.hop"
       }
     }
   }

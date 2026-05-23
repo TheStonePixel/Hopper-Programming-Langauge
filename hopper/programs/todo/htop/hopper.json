@@ -5,32 +5,40 @@
   "license": "MIT",
   "type": "executable",
   "entry": "htop.hop",
+  "dependencies": {
+    "linux": "0.1.0",
+    "x86_64": "0.1.0",
+    "ds": "0.1.0"
+  },
   "targets": {
     "host": {
       "IO": {
-        "from":           "linux",
-        "contract":      "../../modules/linux/contracts/IO.hop",
-        "implementation": "../../modules/linux/src/IO.hop"
+        "from": "linux",
+        "contract": "modules/linux/contracts/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "FileSystem": {
-        "from":           "linux",
-        "contract":      "../../modules/linux/contracts/FileSystem.hop",
-        "implementation": "../../modules/linux/src/FileSystem.hop"
+        "from": "linux",
+        "contract": "modules/linux/contracts/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "System": {
-        "from":           "linux",
-        "contract":      "../../modules/linux/contracts/System.hop",
-        "implementation": "../../modules/linux/src/System.hop"
+        "from": "linux",
+        "contract": "modules/linux/contracts/System.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
       },
       "Array": {
-        "from":           "ds",
-        "contract":      "../../modules/ds/contracts/Array.hop",
-        "implementation": "../../modules/ds/src/Array.hop"
+        "from": "ds",
+        "contract": "modules/ds/contracts/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
       },
       "Map": {
-        "from":           "ds",
-        "contract":      "../../modules/ds/contracts/Map.hop",
-        "implementation": "../../modules/ds/src/Map.hop"
+        "from": "ds",
+        "contract": "modules/ds/contracts/Map.hop",
+        "implementation": "modules/ds/src/Map.hop"
       }
     }
   }

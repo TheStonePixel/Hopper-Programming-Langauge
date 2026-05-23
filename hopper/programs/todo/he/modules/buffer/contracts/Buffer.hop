@@ -1,0 +1,22 @@
+contract Buffer {
+    function ensureNonempty()
+    function lineCount() int
+    function lineAt(int i) address
+    function insertChar(int row, int col, byte c)
+    function deleteChar(int row, int col)
+    function insertNewline(int row)
+    function deleteLine(int row)
+    function lineLen(int row) int
+    function setFilename(address name)
+    function filename() address
+    function isDirty() bool
+    function appendLine(address src)
+    function load(address data, int len)
+    function flatten(address outLen) address
+    function getDirty() int
+    function splitLine(int row, int col)
+    function joinLines(int row)
+    function insertCharAt(int row, int col, byte b)
+    function deleteCharAt(int row, int col)
+    function lineData(int row) address
+}
