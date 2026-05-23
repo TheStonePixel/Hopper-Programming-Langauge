@@ -1,77 +1,131 @@
-# The Import Problem — Statement of the Problem
+## Packages
 
-## What We Are Trying to Solve
+A Hopper package is a directory that contains a `hopper.json` manifest file. The manifest declares
+the package's identity, type, dependencies, and — for executables — the hardware target bindings
+that connect OS interface names to concrete implementations.
 
-Hopper source code should be able to reference external functionality without knowing where that functionality lives, how it is implemented, or what platform it runs on. The build system — not the source file — should own those decisions.
-
-At the same time, the programmer needs to know at compile time that everything they are calling actually exists and has the right shape. No runtime surprises. No link-time symbol errors.
-
-And none of this should require more ceremony than the problem actually demands.
-
----
-
-## The Issues
-
-### 1. Name collision
-
-Two libraries can export a function with the same name. If a program imports both, the compiler does not know which one a call refers to. Every solution to this either forces namespace prefixes on the programmer (verbose, coupled) or relies on implicit resolution rules (unpredictable).
-
-You cannot import two things that both have `print` and call `print()` without telling the compiler which one you mean. That statement is true regardless of how the import system is designed. It is a hard constraint.
-
-### 2. Binding source code to paths
-
-The moment a source file contains a path — `import print from "./modules/io"` or `implements IO from "./interfaces/io.hop"` — that file is coupled to a directory structure. Move the file, change the structure, target a different platform: the source breaks. The source should contain names, not locations.
-
-### 3. Platform specificity in source
-
-Systems programs need to run on Linux, bare-metal ARM, and custom hardware from the same source. If the source file decides which IO library to use, it has implicitly chosen a platform. Platform selection belongs in the build configuration. It has no business in a `.hop` file.
-
-### 4. Compliance — knowing a swap is safe
-
-If you replace one implementation with another, you need a guarantee that the replacement is complete and correct before you run anything. Without a formal contract, you find out about missing or mismatched functions one call at a time. With a contract, the build fails immediately with a precise error. The question is where that contract lives and who enforces it.
-
-### 5. The compiler/build system boundary
-
-The compiler's job is to read source and produce a binary. The build system's job is to decide what goes into that binary. These responsibilities are cleanly separated in principle but become tangled in practice. If the compiler handles name resolution, it needs to know about packages. If it handles linking, it needs to know about targets. Every responsibility added to the compiler makes it harder to bootstrap and harder to replace.
-
-### 6. What is a library
-
-This is not defined. A library could be a single `.hop` file, a directory of files, a compiled binary artifact, an interface plus an implementation, or some combination. Until this is settled, the import system has nothing concrete to import.
-
-### 7. The two-world problem
-
-An operating system is written at two layers simultaneously. The hardware layer uses something called IO to write to UART registers. The kernel layer uses something called IO to provide file descriptors. Both layers are written in Hopper. Both import IO. They mean completely different things by it. Any import system that does not account for compilation layers will produce a collision here that cannot be resolved at the source level.
-
-### 8. Libraries versus binaries
-
-The compiler today builds one binary from one set of sources. Real programs are composed of multiple compilation units linked together. The hardware library compiles first. The kernel links against it. The application links against the kernel. Who drives this sequence, who handles the linking, and how do the outputs of one compilation become inputs to the next — none of this is defined.
+The package system solves the problem of naming external functionality without coupling source code
+to file paths, platform specifics, or implementation choices. Source files import interface names.
+The manifest is the only place where paths and hardware names appear.
 
 ---
 
-## What Makes This Hard
+### Package Types
 
-These issues are not independent. They are tightly coupled.
+Every package MUST declare one of two types in its manifest:
 
-- Name collision cannot be solved without defining what a library is.
-- Library identity cannot be defined without deciding how the compiler finds things.
-- Compiler resolution cannot be defined without drawing the compiler/build system boundary.
-- The boundary cannot be drawn cleanly without knowing what linking looks like.
-- Linking cannot be designed without knowing how the two-world problem is handled.
-- The two-world problem cannot be handled without defining compilation layers.
+**Executable** — a program with an entry point. An executable MUST declare an `entry` field
+pointing to the `.hop` file that contains the `entry main` block. Executables MUST declare a
+`targets` section that maps interface names to interface and implementation file paths. Executables
+SHOULD declare a `dependencies` section listing every module they import.
 
-Every decision touches every other decision. This is why the problem resists a clean mathematical solution. The goal is not a perfect system. The goal is a system where the tradeoffs are explicit, the rules are clear, and the programmer is never surprised.
+**Library** — a reusable module that exports one or more interfaces. A library MUST declare an
+`exports` section. A library MUST NOT declare an `entry` field. Libraries do not need a `targets`
+section unless they have internal test binaries.
+
+A bare-metal program uses type `"program"` and MUST declare a `board` field. See §11.1 for the
+manifest specification and §11.1 for board support.
 
 ---
 
-## What a Good Solution Looks Like
+### The Global Module Store
 
-Not defined here. But a good solution would satisfy all of the following:
+The global module store is the directory `hopper/modules/` in the Hopper repository. Every package
+available for installation resides here as a subdirectory named after the package. The build tool
+installs packages by copying from the global store into the consuming project's own `modules/`
+directory.
 
-- Source files contain names, not paths
-- Platform selection lives only in build configuration
-- Name collisions are caught at compile time with a clear error
-- Compliance is checked before the program runs
-- The compiler does not grow new responsibilities to support it
-- A library is one clearly defined thing
-- The two-world problem is handled by structure, not convention
-- The linking story is explicit and driven by something other than the compiler
+When a project runs `hopper install`, the build tool:
+
+1. Reads the `dependencies` section of the project's `hopper.json`.
+2. For each declared dependency, locates the matching directory in the global store.
+3. Copies the module's `hopper.json`, `src/`, and `interfaces/` into the project's `modules/<name>/`.
+4. Recursively installs the module's own transitive dependencies into `modules/<name>/modules/`.
+5. Rewrites the project's `hopper.json` target binding paths to point at the locally installed
+   copies.
+
+The result is a fully self-contained `modules/` tree. Each module's dependencies nest inside it —
+the directory tree mirrors the dependency graph exactly. The compiler receives explicit file paths
+from the build system and has no knowledge of the module store.
+
+---
+
+### Dependency Declaration
+
+Dependencies are declared in `hopper.json` as a map from module name to version string:
+
+```json
+{
+  "dependencies": {
+    "linux": "0.1.0",
+    "x86_64": "0.1.0"
+  }
+}
+```
+
+The version string is currently informational. The build tool installs whatever version is present
+in the global store, regardless of the requested version. Version constraint enforcement is **not
+yet implemented**.
+
+---
+
+### Interface Bindings
+
+An executable resolves its imports through the `targets` section of `hopper.json`. Each binding
+maps an interface name (matching the `from` clause of an `import` statement) to the interface
+contract file and the implementation file:
+
+```json
+{
+  "targets": {
+    "host": {
+      "IO": {
+        "from":           "linux",
+        "interface":      "modules/linux/interfaces/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      }
+    }
+  }
+}
+```
+
+The `interface` field MUST point to a `.hop` file declaring an `interface` block. The
+`implementation` field MUST point to a `.hop` file that provides the free functions or class
+implementation satisfying that interface. The `from` field identifies which module the binding
+comes from and MUST match the module name used in the source `import` statement.
+
+The compiler checks at compile time that the implementation satisfies the interface contract. If
+any function declared in the interface is absent or has a mismatched signature in the
+implementation, the build fails with a precise error before any code is generated.
+
+---
+
+### Project Layout
+
+`hopper init` creates the canonical project layout:
+
+```
+<name>/
+  hopper.json          # manifest
+  src/                 # source files
+  modules/             # installed dependencies (mirrors dependency graph)
+  tests/               # test source files
+  interfaces/          # exported interface contracts (executables only)
+```
+
+Every package — whether program or library — uses the same recursive shape. A module installed
+into `modules/` has the same structure as the top-level project.
+
+---
+
+### Relationship to the Compiler
+
+The compiler's only job is to read source files and produce a binary. It does not resolve package
+names, fetch modules, or know what a `hopper.json` is. Before the compiler runs, the build system:
+
+1. Reads the manifest to find the entry file and target bindings.
+2. Installs any missing dependencies.
+3. Passes the compiler a set of resolved file paths: entry source, interface files, implementation
+   files.
+
+The compiler receives paths. The build system owns names.
