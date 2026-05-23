@@ -1,6 +1,8 @@
 // Hopper compiler diagnostics
 
-const WRAP_WIDTH = 80;
+// Total visual width of each diagnostic block (bar + space + content).
+// Content wraps at BOX_WIDTH - 2; the └─── closer fills to BOX_WIDTH.
+const BOX_WIDTH = 60;
 
 // ANSI colors — disabled when stderr is not a TTY or NO_COLOR is set.
 const useColor = process.stderr.isTTY && !process.env.NO_COLOR;
@@ -80,15 +82,16 @@ export class HopperWarning extends HopperError {
     }
 }
 
-// Word-wraps a string at WRAP_WIDTH, preserving the leading indent on each
-// continuation line.
+// Word-wraps a string at BOX_WIDTH - 2 (content column), preserving the
+// leading indent on each continuation line.
 function wrap(text, indent = "  ") {
-    if (text.length <= WRAP_WIDTH) return text;
+    const limit = BOX_WIDTH - 2;
+    if (text.length <= limit) return text;
     const words = text.split(" ");
     const result = [];
     let line = "";
     for (const word of words) {
-        if (line.length + word.length + 1 > WRAP_WIDTH && line.length > 0) {
+        if (line.length + word.length + 1 > limit && line.length > 0) {
             result.push(line);
             line = indent + word;
         } else {
@@ -117,7 +120,7 @@ export function formatError(err) {
     const label     = isWarning ? "Warning" : "Error";
 
     const bar    = `${barColor}│${T.reset} `;
-    const closer = `${barColor}└${"─".repeat(46)}${T.reset}`;
+    const closer = `${barColor}└${"─".repeat(BOX_WIDTH - 1)}${T.reset}`;
 
     // Message indented to clear past "Error: " / "Warning: "
     const msgIndent = " ".repeat(label.length + 2);
@@ -141,5 +144,6 @@ export function formatError(err) {
     content.push(wrap(msgIndent + err.message, msgIndent));
     if (err.hint) content.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
 
-    return content.map(line => bar + line).join("\n") + "\n" + closer + "\n";
+    const allLines = content.flatMap(c => c.split("\n"));
+    return allLines.map(line => bar + line).join("\n") + "\n" + closer + "\n";
 }
