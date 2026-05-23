@@ -237,7 +237,7 @@ function toObject(file, llDir, oDir, flags) {
         ir  = dedupeDeclarations(genModule(ast));
     } catch (e) {
         if (e instanceof HopperError) {
-            process.stderr.write(formatError(e) + "\n");
+            process.stderr.write(formatError(e));
             process.exit(1);
         }
         throw e;

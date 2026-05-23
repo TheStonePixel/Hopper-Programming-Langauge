@@ -139,5 +139,5 @@ export function formatError(err) {
     content.push(wrap(msgIndent + err.message, msgIndent));
     if (err.hint) content.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
 
-    return content.map(line => bar + line).join("\n");
+    return content.map(line => bar + line).join("\n") + "\n";
 }

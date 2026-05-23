@@ -73,7 +73,7 @@ try {
     }
 } catch (e) {
     if (e instanceof HopperError) {
-        process.stderr.write(formatError(e) + "\n");
+        process.stderr.write(formatError(e));
     } else {
         process.stderr.write(`hopperc: ${e.message}\n`);
     }
