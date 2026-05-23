@@ -2,17 +2,16 @@
 
 const WRAP_WIDTH = 80;
 
-// ANSI colors — disabled when stdout is not a TTY or NO_COLOR is set.
+// ANSI colors — disabled when stderr is not a TTY or NO_COLOR is set.
 const useColor = process.stderr.isTTY && !process.env.NO_COLOR;
 
 const C = {
-    reset:   useColor ? "\x1b[0m"    : "",
-    bold:    useColor ? "\x1b[1m"    : "",
-    dim:     useColor ? "\x1b[2m"    : "",
-    red:     useColor ? "\x1b[1;31m" : "",  // bold red    — Error label
-    yellow:  useColor ? "\x1b[33m"   : "",  // yellow      — error message (cascading detail)
-    blue:    useColor ? "\x1b[1;34m" : "",  // bold blue   — Warning label
-    cyan:    useColor ? "\x1b[36m"   : "",  // cyan        — Hint line
+    reset:  useColor ? "\x1b[0m"    : "",
+    white:  useColor ? "\x1b[97m"   : "",  // bright white — data values
+    muted:  useColor ? "\x1b[2m"    : "",  // dim          — tag labels (Module:, File:, Line:)
+    red:    useColor ? "\x1b[31m"   : "",  // red          — "Error" word + flag character
+    blue:   useColor ? "\x1b[34m"   : "",  // blue         — "Warning" word + flag character
+    cyan:   useColor ? "\x1b[36m"   : "",  // cyan         — Hint line
 };
 
 export const Severity = {
@@ -41,7 +40,7 @@ export const WarnType = {
 export class HopperError extends Error {
     constructor(loc, type, message, hint = null, severity = Severity.Error) {
         super(message);
-        this.loc      = loc;    // { file, line, col } or null
+        this.loc      = loc;    // { module, file, line } or null
         this.errType  = type;
         this.hint     = hint;
         this.severity = severity;
@@ -54,7 +53,8 @@ export class HopperWarning extends HopperError {
     }
 }
 
-// Word-wraps a string at WRAP_WIDTH, indenting continuation lines.
+// Word-wraps a string at WRAP_WIDTH, preserving the leading indent on each
+// continuation line.
 function wrap(text, indent = "  ") {
     if (text.length <= WRAP_WIDTH) return text;
     const words = text.split(" ");
@@ -72,33 +72,50 @@ function wrap(text, indent = "  ") {
     return result.join("\n");
 }
 
+// Renders a location line with dim tag labels and bright-white data values:
+//   × Module: hello  File: main.hop  Line: 14
+//   ◆ File: main.hop  Line: 14           (no module)
+//   ◆ (unknown location)
+function locLine(loc, flagColor, flag) {
+    if (!loc) return `${flagColor}${flag}${C.reset} ${C.muted}(unknown location)${C.reset}`;
+
+    const file = loc.file.split(/[\\/]/).pop();
+
+    // tag(label) returns dim label text; val(v) returns bright-white value text
+    const tag = t => `${C.muted}${t}:${C.reset}`;
+    const val = v => `${C.white}${v}${C.reset}`;
+
+    const parts = [];
+    if (loc.module) parts.push(`${tag("Module")} ${val(loc.module)}`);
+    parts.push(`${tag("File")} ${val(file)}`);
+    parts.push(`${tag("Line")} ${val(loc.line)}`);
+
+    return `${flagColor}${flag}${C.reset} ${parts.join("  ")}`;
+}
+
 // Formats a HopperError into the 4-line diagnostic format:
 //
-//   Module: hello  File: main.hop  Line: 14      ← bold white
-//   Error: Undeclared variable                   ← bold red  │ Warning → bold blue
-//          'count' was used before being declared ← yellow    │ Warning → dim
+//   × Module: hello  File: main.hop  Line: 14    ← flag + dim tags + bright values
+//   Error: Undeclared variable                   ← "Error" in red,  rest white
+//          'count' was used before being declared ← white, indented under label
 //   Hint: add 'int count = ...' before this line ← cyan
+//
+// For warnings the flag is ◆ and "Warning" is blue.
 export function formatError(err) {
-    const isWarning   = err.severity === Severity.Warning;
-    const labelColor  = isWarning ? C.blue   : C.red;
-    const msgColor    = isWarning ? C.dim    : C.yellow;
-    const label       = isWarning ? "Warning" : "Error";
+    const isWarning  = err.severity === Severity.Warning;
+    const flagColor  = isWarning ? C.blue  : C.red;
+    const wordColor  = isWarning ? C.blue  : C.red;
+    const flag       = isWarning ? "◆"     : "×";
+    const label      = isWarning ? "Warning" : "Error";
 
-    // Indent message to clear past "Error: " / "Warning: "
-    const msgIndent = " ".repeat(label.length + 2);   // "Error: " = 7, "Warning: " = 9
+    // Message indented to clear past "Error: " / "Warning: "
+    const msgIndent = " ".repeat(label.length + 2);
 
     const lines = [];
 
-    if (err.loc) {
-        const file    = err.loc.file.split(/[\\/]/).pop();
-        const modPart = err.loc.module ? `Module: ${err.loc.module}  ` : "";
-        lines.push(`${C.bold}${modPart}File: ${file}  Line: ${err.loc.line}${C.reset}`);
-    } else {
-        lines.push(`${C.dim}(unknown location)${C.reset}`);
-    }
-
-    lines.push(`${labelColor}${label}: ${err.errType || label}${C.reset}`);
-    lines.push(`${msgColor}${wrap(msgIndent + err.message, msgIndent)}${C.reset}`);
+    lines.push(locLine(err.loc, flagColor, flag));
+    lines.push(`${wordColor}${label}:${C.reset} ${C.white}${err.errType || label}${C.reset}`);
+    lines.push(`${C.white}${wrap(msgIndent + err.message, msgIndent)}${C.reset}`);
     if (err.hint) lines.push(`${C.cyan}${wrap(`Hint: ${err.hint}`)}${C.reset}`);
 
     return lines.join("\n");
