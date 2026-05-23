@@ -358,7 +358,7 @@ Use 2-space indentation inside JSON. Keep each binding on its own set of lines:
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }

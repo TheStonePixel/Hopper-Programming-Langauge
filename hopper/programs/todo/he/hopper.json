@@ -9,7 +9,7 @@
     "host": {
       "TUI": {
         "from":           "tui",
-        "contract":      "../../modules/tui/interfaces/TUI.hop",
+        "contract":      "../../modules/tui/contracts/TUI.hop",
         "implementation": "../../modules/tui/src/TUI.hop"
       }
     }

@@ -42,13 +42,13 @@ The standard shape for a Linux userspace program.
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/contracts/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -81,19 +81,19 @@ A program that additionally uses x86_64 SIMD vector operations.
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/contracts/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "SIMD": {
         "from":           "x86_64",
-        "contract":      "modules/x86_64/interfaces/SIMD.hop",
+        "contract":      "modules/x86_64/contracts/SIMD.hop",
         "implementation": "modules/x86_64/src/SIMD.hop"
       }
     }
@@ -125,43 +125,43 @@ A program that uses IO, FileSystem, System, Process, Socket, Network, and Memory
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/contracts/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "System": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/System.hop",
+        "contract":      "modules/linux/contracts/System.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Process": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/Process.hop",
+        "contract":      "modules/linux/contracts/Process.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Socket": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/Socket.hop",
+        "contract":      "modules/linux/contracts/Socket.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Network": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/Network.hop",
+        "contract":      "modules/linux/contracts/Network.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Memory": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/Memory.hop",
+        "contract":      "modules/linux/contracts/Memory.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -248,7 +248,7 @@ A library that itself depends on another module. The `targets` field in a librar
       },
       "Core": {
         "from":           "core",
-        "contract":      "../core/interfaces/Core.hop",
+        "contract":      "../core/contracts/Core.hop",
         "implementation": "../core/src/Core.hop"
       }
     }
@@ -285,7 +285,7 @@ A consuming executable would add to its `targets.host`:
 ```json
 "IString": {
   "from":           "string",
-  "contract":      "modules/string/interfaces/IString.hop",
+  "contract":      "modules/string/contracts/IString.hop",
   "implementation": "modules/string/src/AsciiString.hop"
 }
 ```

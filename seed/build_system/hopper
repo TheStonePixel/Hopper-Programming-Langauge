@@ -639,7 +639,7 @@ async function cmdInit(args) {
     fs.mkdirSync(path.join(projectDir, "modules"),     { recursive: true });
     fs.mkdirSync(path.join(projectDir, "tests"),       { recursive: true });
     if (!isLib) {
-        fs.mkdirSync(path.join(projectDir, "interfaces"), { recursive: true });
+        fs.mkdirSync(path.join(projectDir, "contracts"), { recursive: true });
     }
     fs.writeFileSync(path.join(projectDir, "modules", ".gitkeep"), "", "utf8");
     fs.writeFileSync(path.join(projectDir, "tests",   ".gitkeep"), "", "utf8");
@@ -655,7 +655,7 @@ async function cmdInit(args) {
     console.log(`\ncreated ${safeName}/`);
     console.log(`  ${safeName}/hopper.json`);
     console.log(`  ${safeName}/src/`);
-    if (!isLib) console.log(`  ${safeName}/interfaces/`);
+    if (!isLib) console.log(`  ${safeName}/contracts/`);
     console.log(`  ${safeName}/modules/`);
     console.log(`  ${safeName}/tests/`);
 }
@@ -710,7 +710,7 @@ function installModule(name, targetModulesDir, depth = 0) {
 
     fs.mkdirSync(dest, { recursive: true });
     fs.copyFileSync(path.join(src, "hopper.json"), path.join(dest, "hopper.json"));
-    for (const entry of ["src", "interfaces"]) {
+    for (const entry of ["src", "contracts"]) {
         const s = path.join(src, entry);
         if (fs.existsSync(s)) copyDir(s, path.join(dest, entry));
     }
@@ -1320,7 +1320,7 @@ function cmdFix(args) {
 
     // ── 1. Standard directories ──────────────────────────────────────────
     const standardDirs = ["src", "tests"];
-    if (isLib) standardDirs.push("interfaces");
+    if (isLib) standardDirs.push("contracts");
 
     for (const d of standardDirs) {
         const dirPath = path.join(projectRoot, d);
@@ -1378,7 +1378,7 @@ function cmdFix(args) {
 
     // All project source files to scan (skip modules/ subdirectory)
     const toScan = new Set();
-    for (const subdir of ["src", "interfaces"]) {
+    for (const subdir of ["src", "contracts"]) {
         const d = path.join(projectRoot, subdir);
         if (fs.existsSync(d)) {
             for (const f of fs.readdirSync(d).filter(x => x.endsWith(".hop")))

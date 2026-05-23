@@ -134,7 +134,7 @@ Resolves via the consuming project's `hopper.json` targets section:
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
@@ -370,7 +370,7 @@ the free functions come into scope when a build target's `implementation` resolv
 **SIMD** — SSE2 vector operations: `scanByte16`, `scanByte2x16`, `scanByteOR4x16`, `popcnt16`,
 `bsf16`. The class `X86SIMD satisfies SIMD` wraps SSE2 instructions. SIMD is an ISA capability,
 not an OS contract, so it uses a class and programs instantiate `X86SIMD` directly.
-Files: `x86_64/interfaces/SIMD.hop` + `x86_64/src/SIMD.hop`.
+Files: `x86_64/contracts/SIMD.hop` + `x86_64/src/SIMD.hop`.
 
 #### OS contract layer (`linux/`)
 A pure contract module — no implementation files, no classes, no source to edit when porting.
@@ -388,7 +388,7 @@ The build file connects the OS contract to the hardware implementation:
 ```json
 "IO": {
   "from":           "linux",
-  "contract":      "modules/linux/interfaces/IO.hop",
+  "contract":      "modules/linux/contracts/IO.hop",
   "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
 }
 ```
@@ -405,7 +405,7 @@ Do NOT import from any of these until they have been updated and moved to `hoppe
 ```
 program → import IO from linux
              ↓ hopper.json targets binding resolves to:
-          linux/interfaces/IO.hop       (contract contract)
+          linux/contracts/IO.hop       (contract contract)
           x86_64/src/LinuxSyscalls.hop  (contract LinuxSyscalls + free functions)
                                          → inline-ASM syscalls, no further dependencies
           free functions from LinuxSyscalls.hop come into scope → program calls open(), read()...
@@ -413,7 +413,7 @@ program → import IO from linux
 
 **Important — keyword collision**: `bind` is a grammar keyword (hardware address linker directive).
 The socket `bind` syscall is exposed as `socketBind` in both the `LinuxSyscalls` contract and
-the `linux/interfaces/Socket.hop` contract.
+the `linux/contracts/Socket.hop` contract.
 
 **Important — `LinuxSyscalls.hop` is self-contained**: the contract declaration and free
 function implementations live in the same `src/` file. This ensures the contract is in scope
@@ -436,12 +436,12 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/contracts/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
@@ -485,7 +485,7 @@ The `exports` field on libraries is documentation/tooling only for now — consu
 
 ### The SIMD Interface
 
-`x86_64/interfaces/SIMD.hop` — `x86_64/src/SIMD.hop` (class `X86SIMD satisfies SIMD`):
+`x86_64/contracts/SIMD.hop` — `x86_64/src/SIMD.hop` (class `X86SIMD satisfies SIMD`):
 
 ```hopper
 contract SIMD {
@@ -524,7 +524,7 @@ Add to `hopper.json` targets:
 ```json
 "SIMD": {
   "from": "x86_64",
-  "contract": "modules/x86_64/interfaces/SIMD.hop",
+  "contract": "modules/x86_64/contracts/SIMD.hop",
   "implementation": "modules/x86_64/src/SIMD.hop"
 }
 ```

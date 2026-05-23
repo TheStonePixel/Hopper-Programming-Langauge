@@ -30,7 +30,7 @@
       },
       "Core": {
         "from":           "core",
-        "contract":      "../core/interfaces/Core.hop",
+        "contract":      "../core/contracts/Core.hop",
         "implementation": "../core/src/Core.hop"
       }
     }

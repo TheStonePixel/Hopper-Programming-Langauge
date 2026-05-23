@@ -36,13 +36,13 @@ from the operating system:
 
 | Interface | File | Responsibilities |
 |-----------|------|-----------------|
-| `IO` | `linux/interfaces/IO.hop` | `read`, `write`, scatter-gather I/O, `sendfile`, `splice`, `tee`, `ioctl` |
-| `FileSystem` | `linux/interfaces/FileSystem.hop` | `open`, `close`, `stat`, `mkdir`, `rename`, directory traversal, inotify |
-| `Process` | `linux/interfaces/Process.hop` | `fork`, `clone`, `execve`, `waitpid`, signals, credentials, `ptrace` |
-| `Socket` | `linux/interfaces/Socket.hop` | `socket`, `socketBind`, `listen`, `accept`, `connect`, `send`, `recv`, options |
-| `Network` | `linux/interfaces/Network.hop` | `select`, `poll`, `epoll_create1`, `epoll_ctl`, `epoll_wait` |
-| `Memory` | `linux/interfaces/Memory.hop` | `mmap`, `munmap`, `mprotect`, `mremap`, `madvise`, `mlock`, `memfd_create` |
-| `System` | `linux/interfaces/System.hop` | `uname`, `sysinfo`, clocks, scheduling, resource limits, `brk` |
+| `IO` | `linux/contracts/IO.hop` | `read`, `write`, scatter-gather I/O, `sendfile`, `splice`, `tee`, `ioctl` |
+| `FileSystem` | `linux/contracts/FileSystem.hop` | `open`, `close`, `stat`, `mkdir`, `rename`, directory traversal, inotify |
+| `Process` | `linux/contracts/Process.hop` | `fork`, `clone`, `execve`, `waitpid`, signals, credentials, `ptrace` |
+| `Socket` | `linux/contracts/Socket.hop` | `socket`, `socketBind`, `listen`, `accept`, `connect`, `send`, `recv`, options |
+| `Network` | `linux/contracts/Network.hop` | `select`, `poll`, `epoll_create1`, `epoll_ctl`, `epoll_wait` |
+| `Memory` | `linux/contracts/Memory.hop` | `mmap`, `munmap`, `mprotect`, `mremap`, `madvise`, `mlock`, `memfd_create` |
+| `System` | `linux/contracts/System.hop` | `uname`, `sysinfo`, clocks, scheduling, resource limits, `brk` |
 
 These interfaces are satisfied at build time by the implementation declared in
 `hopper.json` targets. On x86-64 Linux the implementation is always
@@ -57,7 +57,7 @@ all seven OS interfaces. This file contains both the `contract LinuxSyscalls` de
 the concrete free-function implementations using inline assembly. It is self-contained so that
 importing it resolves both the contract and the implementation in one step.
 
-**SIMD** (`x86_64/interfaces/SIMD.hop` + `x86_64/src/SIMD.hop`) — SSE2 vector operations for
+**SIMD** (`x86_64/contracts/SIMD.hop` + `x86_64/src/SIMD.hop`) — SSE2 vector operations for
 byte scanning and manipulation. Unlike LinuxSyscalls, SIMD is an ISA capability, not an OS
 contract, so it is exposed as a class (`X86SIMD satisfies SIMD`) that programs instantiate
 directly. See §13.9 for the SIMD contract reference.
@@ -120,7 +120,7 @@ To use any standard library module:
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }

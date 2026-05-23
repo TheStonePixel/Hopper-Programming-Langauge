@@ -7,7 +7,7 @@
     "host": {
       "Array": {
         "from": "ds",
-        "contract": "../../modules/ds/interfaces/Array.hop",
+        "contract": "../../modules/ds/contracts/Array.hop",
         "implementation": "../../modules/ds/src/Array.hop"
       }
     }

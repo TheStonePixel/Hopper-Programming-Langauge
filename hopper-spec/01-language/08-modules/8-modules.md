@@ -52,7 +52,7 @@ An contract import resolves through a two-file binding declared in `hopper.json`
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }

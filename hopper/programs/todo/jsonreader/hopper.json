@@ -9,7 +9,7 @@
     "host": {
       "JSON": {
         "from": "json",
-        "contract": "../../modules/json/interfaces/JSON.hop",
+        "contract": "../../modules/json/contracts/JSON.hop",
         "implementation": "../../modules/json/src/JSON.hop"
       }
     }

@@ -4,7 +4,7 @@
 
 Most compilers accumulate hardware knowledge over time. An x86-64 backend grows instruction selection tables, ABI lowering rules, calling convention logic, and syscall encoding. An ARM64 backend grows a parallel set. Adding a new architecture means modifying the compiler. Removing an architecture means more modification. The hardware model is embedded inside the tool.
 
-Hopper's module system already challenges this assumption at the OS contract layer. Syscall numbers for Linux on x86-64 live in `x86_64/src/LinuxSyscalls.hop` — not in the compiler. SIMD capabilities live in `x86_64/interfaces/SIMD.hop` — not in the compiler. The build file selects which hardware module satisfies which contract. The compiler has no syscall knowledge and no SIMD tables. That is not an accident; it is the first step of a longer design.
+Hopper's module system already challenges this assumption at the OS contract layer. Syscall numbers for Linux on x86-64 live in `x86_64/src/LinuxSyscalls.hop` — not in the compiler. SIMD capabilities live in `x86_64/contracts/SIMD.hop` — not in the compiler. The build file selects which hardware module satisfies which contract. The compiler has no syscall knowledge and no SIMD tables. That is not an accident; it is the first step of a longer design.
 
 This document describes where that design leads.
 

@@ -38,7 +38,7 @@ hello/
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
@@ -217,13 +217,13 @@ A program that depends on `mymath` from Example 3.
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "IMath": {
         "from":           "mymath",
-        "contract":      "modules/mymath/interfaces/IMath.hop",
+        "contract":      "modules/mymath/contracts/IMath.hop",
         "implementation": "modules/mymath/src/Math.hop"
       }
     }
@@ -274,7 +274,7 @@ The `cast` module provides the `cast<T>(expr)` template function for explicit ty
       "IO": { ... },
       "Cast": {
         "from":           "cast",
-        "contract":      "modules/cast/interfaces/Cast.hop",
+        "contract":      "modules/cast/contracts/Cast.hop",
         "implementation": "modules/cast/src/Cast.hop"
       }
     }
@@ -385,19 +385,19 @@ A program using the x86_64 SIMD contract for vectorized byte scanning.
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/IO.hop",
+        "contract":      "modules/linux/contracts/IO.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "modules/linux/interfaces/FileSystem.hop",
+        "contract":      "modules/linux/contracts/FileSystem.hop",
         "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "SIMD": {
         "from":           "x86_64",
-        "contract":      "modules/x86_64/interfaces/SIMD.hop",
+        "contract":      "modules/x86_64/contracts/SIMD.hop",
         "implementation": "modules/x86_64/src/SIMD.hop"
       }
     }
