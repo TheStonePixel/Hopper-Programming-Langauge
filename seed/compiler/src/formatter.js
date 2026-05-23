@@ -49,7 +49,7 @@ function fmtBind(d) {
 }
 
 function fmtStrict(d) {
-    return `strict ${d.type} ${d.name} = ${d.hardwareAddress}`
+    return `${d.type} ${d.name} @ ${d.hardwareAddress}`
 }
 
 function fmtAlias(d) {

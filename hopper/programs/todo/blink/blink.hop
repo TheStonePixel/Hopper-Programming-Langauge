@@ -15,9 +15,9 @@
 import uart from uart
 
 // BCM2835 GPIO MMIO registers
-strict int GPFSEL4 = 0x20200010   // function select for GPIO 40-49  (32-bit)
-strict int GPSET1  = 0x20200024   // set    bank 1 (GPIO 32-63)
-strict int GPCLR1  = 0x20200030   // clear  bank 1 (GPIO 32-63)
+int GPFSEL4 @ 0x20200010   // function select for GPIO 40-49  (32-bit)
+int GPSET1  @ 0x20200024   // set    bank 1 (GPIO 32-63)
+int GPCLR1  @ 0x20200030   // clear  bank 1 (GPIO 32-63)
 
 function delay(int n) {
     int i = 0

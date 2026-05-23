@@ -1,15 +1,15 @@
 // BCM2835 UART0 (PL011) hardware registers — Pi Zero bare-metal
 // init_uart_clock=3000000 must be set in config.txt
-strict int GPFSEL1    = 0x20200004
-strict int GPPUD      = 0x20200094
-strict int GPPUDCLK0  = 0x20200098
-strict int UART0_DR   = 0x20201000
-strict int UART0_FR   = 0x20201018
-strict int UART0_IBRD = 0x20201024
-strict int UART0_FBRD = 0x20201028
-strict int UART0_LCRH = 0x2020102C
-strict int UART0_CR   = 0x20201030
-strict int UART0_ICR  = 0x20201044
+int GPFSEL1    @ 0x20200004
+int GPPUD      @ 0x20200094
+int GPPUDCLK0  @ 0x20200098
+int UART0_DR   @ 0x20201000
+int UART0_FR   @ 0x20201018
+int UART0_IBRD @ 0x20201024
+int UART0_FBRD @ 0x20201028
+int UART0_LCRH @ 0x2020102C
+int UART0_CR   @ 0x20201030
+int UART0_ICR  @ 0x20201044
 
 function _uartDelay(int n) {
     int i = 0

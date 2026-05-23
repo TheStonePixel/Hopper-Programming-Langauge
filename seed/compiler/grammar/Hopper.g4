@@ -17,7 +17,7 @@ topLevelDecl
     | aliasDecl
     | entryDecl
     | bindDecl
-    | strictDecl
+    | mmioDecl
     | bitfieldDecl
     | contractDecl
     ;
@@ -33,10 +33,10 @@ bindDecl
     : 'bind' HexLiteral '=' Identifier '::' 'address'
     ;
 
-// strict — named alias for a memory-mapped hardware register
-// strict int uart_dr = 0x40021000
-strictDecl
-    : 'strict' type Identifier '=' HexLiteral
+// mmio — memory-mapped hardware register placed at a physical address
+// UartSR usart1_sr @ 0x40011000
+mmioDecl
+    : type Identifier '@' HexLiteral
     ;
 
 // entry — the program entry point, not a function

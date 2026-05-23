@@ -479,9 +479,9 @@ export class AstBuilder extends HopperVisitor {
         return BindDecl(hardwareAddress, functionName);
     }
 
-    // ── strict ───────────────────────────────────────────────────────────
+    // ── mmio ─────────────────────────────────────────────────────────────
 
-    visitStrictDecl(ctx) {
+    visitMmioDecl(ctx) {
         const type            = ctx.type().getText();
         const name            = ctx.Identifier().getText();
         const hardwareAddress = ctx.HexLiteral().getText();

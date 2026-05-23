@@ -1,4 +1,4 @@
-// Tests strict bitfield — memory-mapped hardware register access
+// Tests MMIO bitfield — memory-mapped hardware register access
 // Field reads/writes generate volatile load/store + shift/mask automatically
 // Compile only — no hardware to run against in tests
 
@@ -23,8 +23,8 @@ bitfield GpioModer {
     pad 16
 }
 
-strict UartCR1  uart_cr1 = 0x40013800
-strict GpioModer gpioa   = 0x48000000
+UartCR1  uart_cr1 @ 0x40013800
+GpioModer gpioa   @ 0x48000000
 
 entry main {
     // Enable UART, transmitter and receiver

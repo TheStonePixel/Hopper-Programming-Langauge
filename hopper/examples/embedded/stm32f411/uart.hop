@@ -108,28 +108,28 @@ bitfield UartCR3 {
 
 
 // ── USART1 registers — PA9 (TX) PA10 (RX) — APB2 ─────────────────────────────
-strict UartSR  usart1_sr  = 0x40011000
-strict UartDR  usart1_dr  = 0x40011004
-strict UartBRR usart1_brr = 0x40011008
-strict UartCR1 usart1_cr1 = 0x4001100C
-strict UartCR2 usart1_cr2 = 0x40011010
-strict UartCR3 usart1_cr3 = 0x40011014
+UartSR  usart1_sr  @ 0x40011000
+UartDR  usart1_dr  @ 0x40011004
+UartBRR usart1_brr @ 0x40011008
+UartCR1 usart1_cr1 @ 0x4001100C
+UartCR2 usart1_cr2 @ 0x40011010
+UartCR3 usart1_cr3 @ 0x40011014
 
 // ── USART2 registers — PA2 (TX) PA3 (RX) — APB1 ──────────────────────────────
-strict UartSR  usart2_sr  = 0x40004400
-strict UartDR  usart2_dr  = 0x40004404
-strict UartBRR usart2_brr = 0x40004408
-strict UartCR1 usart2_cr1 = 0x4000440C
-strict UartCR2 usart2_cr2 = 0x40004410
-strict UartCR3 usart2_cr3 = 0x40004414
+UartSR  usart2_sr  @ 0x40004400
+UartDR  usart2_dr  @ 0x40004404
+UartBRR usart2_brr @ 0x40004408
+UartCR1 usart2_cr1 @ 0x4000440C
+UartCR2 usart2_cr2 @ 0x40004410
+UartCR3 usart2_cr3 @ 0x40004414
 
 // ── USART6 registers — PC6 (TX) PC7 (RX) — APB2 ──────────────────────────────
-strict UartSR  usart6_sr  = 0x40011400
-strict UartDR  usart6_dr  = 0x40011404
-strict UartBRR usart6_brr = 0x40011408
-strict UartCR1 usart6_cr1 = 0x4001140C
-strict UartCR2 usart6_cr2 = 0x40011410
-strict UartCR3 usart6_cr3 = 0x40011414
+UartSR  usart6_sr  @ 0x40011400
+UartDR  usart6_dr  @ 0x40011404
+UartBRR usart6_brr @ 0x40011408
+UartCR1 usart6_cr1 @ 0x4001140C
+UartCR2 usart6_cr2 @ 0x40011410
+UartCR3 usart6_cr3 @ 0x40011414
 
 
 // ── USART1 ────────────────────────────────────────────────────────────────────

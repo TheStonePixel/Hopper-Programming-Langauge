@@ -50,12 +50,12 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#strictDecl.
-	enterStrictDecl(ctx) {
+	// Enter a parse tree produced by HopperParser#mmioDecl.
+	enterMmioDecl(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#strictDecl.
-	exitStrictDecl(ctx) {
+	// Exit a parse tree produced by HopperParser#mmioDecl.
+	exitMmioDecl(ctx) {
 	}
 
 
