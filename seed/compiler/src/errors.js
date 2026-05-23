@@ -5,13 +5,40 @@ const WRAP_WIDTH = 80;
 // ANSI colors — disabled when stderr is not a TTY or NO_COLOR is set.
 const useColor = process.stderr.isTTY && !process.env.NO_COLOR;
 
-const C = {
-    reset:  useColor ? "\x1b[0m"    : "",
-    white:  useColor ? "\x1b[97m"   : "",  // bright white — data values
-    muted:  useColor ? "\x1b[2m"    : "",  // dim          — tag labels (Module:, File:, Line:)
-    red:    useColor ? "\x1b[31m"   : "",  // red          — "Error" word + flag character
-    blue:   useColor ? "\x1b[34m"   : "",  // blue         — "Warning" word + flag character
-    cyan:   useColor ? "\x1b[36m"   : "",  // cyan         — Hint line
+// ── raw ANSI codes ─────────────────────────────────────────────────────────
+const ANSI = {
+    reset:        "\x1b[0m",
+    bold:         "\x1b[1m",
+    dim:          "\x1b[2m",
+    red:          "\x1b[31m",
+    yellow:       "\x1b[33m",
+    green:        "\x1b[32m",
+    blue:         "\x1b[34m",
+    magenta:      "\x1b[35m",
+    cyan:         "\x1b[36m",
+    white:        "\x1b[37m",
+    brightWhite:  "\x1b[97m",
+    brightRed:    "\x1b[91m",
+    brightYellow: "\x1b[93m",
+    brightBlue:   "\x1b[94m",
+    brightCyan:   "\x1b[96m",
+    gray:         "\x1b[90m",
+};
+
+const off = (code) => useColor ? code : "";
+
+// ── theme — change these to restyle all diagnostics ───────────────────────
+const THEME = {
+    errorFlag:    off(ANSI.red),          // × character on error lines
+    errorWord:    off(ANSI.red),          // "Error:" label
+    warningFlag:  off(ANSI.blue),         // ◆ character on warning lines
+    warningWord:  off(ANSI.blue),         // "Warning:" label
+    tagLabel:     off(ANSI.dim),          // Module:  File:  Line:
+    dataValue:    off(ANSI.brightWhite),  // hello  main.hop  14
+    message:      off(ANSI.white),        // indented message text
+    hint:         off(ANSI.cyan),         // Hint: ...
+    unknown:      off(ANSI.dim),          // (unknown location)
+    reset:        off(ANSI.reset),
 };
 
 export const Severity = {
@@ -77,20 +104,20 @@ function wrap(text, indent = "  ") {
 //   ◆ File: main.hop  Line: 14           (no module)
 //   ◆ (unknown location)
 function locLine(loc, flagColor, flag) {
-    if (!loc) return `${flagColor}${flag}${C.reset} ${C.muted}(unknown location)${C.reset}`;
+    const T = THEME;
+    if (!loc) return `${flagColor}${flag}${T.reset} ${T.unknown}(unknown location)${T.reset}`;
 
     const file = loc.file.split(/[\\/]/).pop();
 
-    // tag(label) returns dim label text; val(v) returns bright-white value text
-    const tag = t => `${C.muted}${t}:${C.reset}`;
-    const val = v => `${C.white}${v}${C.reset}`;
+    const tag = t => `${T.tagLabel}${t}:${T.reset}`;
+    const val = v => `${T.dataValue}${v}${T.reset}`;
 
     const parts = [];
     if (loc.module) parts.push(`${tag("Module")} ${val(loc.module)}`);
     parts.push(`${tag("File")} ${val(file)}`);
     parts.push(`${tag("Line")} ${val(loc.line)}`);
 
-    return `${flagColor}${flag}${C.reset} ${parts.join("  ")}`;
+    return `${flagColor}${flag}${T.reset} ${parts.join("  ")}`;
 }
 
 // Formats a HopperError into the 4-line diagnostic format:
@@ -102,11 +129,12 @@ function locLine(loc, flagColor, flag) {
 //
 // For warnings the flag is ◆ and "Warning" is blue.
 export function formatError(err) {
-    const isWarning  = err.severity === Severity.Warning;
-    const flagColor  = isWarning ? C.blue  : C.red;
-    const wordColor  = isWarning ? C.blue  : C.red;
-    const flag       = isWarning ? "◆"     : "×";
-    const label      = isWarning ? "Warning" : "Error";
+    const T         = THEME;
+    const isWarning = err.severity === Severity.Warning;
+    const flagColor = isWarning ? T.warningFlag : T.errorFlag;
+    const wordColor = isWarning ? T.warningWord : T.errorWord;
+    const flag      = isWarning ? "◆"           : "×";
+    const label     = isWarning ? "Warning"      : "Error";
 
     // Message indented to clear past "Error: " / "Warning: "
     const msgIndent = " ".repeat(label.length + 2);
@@ -114,9 +142,9 @@ export function formatError(err) {
     const lines = [];
 
     lines.push(locLine(err.loc, flagColor, flag));
-    lines.push(`${wordColor}${label}:${C.reset} ${C.white}${err.errType || label}${C.reset}`);
-    lines.push(`${C.white}${wrap(msgIndent + err.message, msgIndent)}${C.reset}`);
-    if (err.hint) lines.push(`${C.cyan}${wrap(`Hint: ${err.hint}`)}${C.reset}`);
+    lines.push(`${wordColor}${label}:${T.reset} ${T.dataValue}${err.errType || label}${T.reset}`);
+    lines.push(`${T.message}${wrap(msgIndent + err.message, msgIndent)}${T.reset}`);
+    if (err.hint) lines.push(`${T.hint}${wrap(`Hint: ${err.hint}`)}${T.reset}`);
 
     return lines.join("\n");
 }
