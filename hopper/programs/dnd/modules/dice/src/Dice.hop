@@ -1,0 +1,32 @@
+// Dice — pseudo-random number generator for game mechanics.
+//
+// Seed at construction (use a value derived from player input for variety).
+// roll(sides) returns a uniform integer in [1, sides] — same as rolling a
+// physical die with that many faces (d4, d6, d8, d10, d12, d20, d100).
+//
+// Algorithm: 32-bit LCG (Knuth multiplicative variant).
+// Cheap on bare-metal — one multiply, one add, no division in next().
+
+class Dice {
+    int seed
+
+    constructor(int initialSeed) {
+        self.seed = initialSeed
+    }
+
+    // Advance the generator and return the raw next value.
+    function next() int {
+        self.seed = self.seed * 1664525 + 1013904223
+        return self.seed
+    }
+
+    // Roll a die with the given number of sides. Returns 1..sides.
+    function roll(int sides) int {
+        int r = self.next()
+        if (r < 0) {
+            r = 0 - r
+        }
+        int mod = r - (r / sides) * sides
+        return mod + 1
+    }
+}

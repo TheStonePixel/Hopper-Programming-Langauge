@@ -1,0 +1,9 @@
+contract Uart {
+    function init()
+    function putc(int c)
+    function getc() int
+    function puts(address s)
+    function putsLn(address s)
+    function putInt(int n)
+    function putHex(int n)
+}

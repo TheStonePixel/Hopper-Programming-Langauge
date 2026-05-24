@@ -1,0 +1,98 @@
+// QEMU virt machine PL011 UART — base address 0x09000000
+//
+// Same PL011 chip as the Pi Zero implementation, different board address.
+// QEMU pre-initialises the UART so no baud/clock setup is needed — the
+// constructor is a no-op.  Swap StandardUart for QemuUart (or vice versa)
+// in hopper.json sources without touching application code.
+//
+// Bitfield models the flag register layout from the PL011 datasheet:
+//   bit 4 (rxfe): receive FIFO empty  — spin before read
+//   bit 5 (txff): transmit FIFO full — spin before write
+
+bitfield PL011Flags {
+    bit cts     // bit 0: clear to send
+    bit dsr     // bit 1: data set ready
+    bit dcd     // bit 2: data carrier detect
+    bit busy    // bit 3: UART busy
+    bit rxfe    // bit 4: receive FIFO empty
+    bit txff    // bit 5: transmit FIFO full
+    bit rxff    // bit 6: receive FIFO full
+    bit txfe    // bit 7: transmit FIFO empty
+    pad 24
+}
+
+int        QEMU_DR @ 0x09000000   // data register: write = TX byte, read = RX byte
+PL011Flags QEMU_FR @ 0x09000018   // flag register: chip status bits
+
+function _qemuPutc(int c) {
+    while (QEMU_FR.txff == 1) {}
+    QEMU_DR = c
+}
+
+function _qemuGetc() int {
+    while (QEMU_FR.rxfe == 1) {}
+    return QEMU_DR
+}
+
+function _qemuPuts(address s) {
+    int i = 0
+    while (true) {
+        address p = s + i
+        byte b = p::value
+        int bv = int (b)
+        if (bv == 0) {
+            break
+        }
+        _qemuPutc(bv)
+        i = i + 1
+    }
+}
+
+function _qemuPutsLn(address s) {
+    _qemuPuts(s)
+    _qemuPutc(13)
+    _qemuPutc(10)
+}
+
+function _qemuPutInt(int n) {
+    if (n < 0) {
+        _qemuPutc(45)
+        n = 0 - n
+    }
+    if (n == 0) {
+        _qemuPutc(48)
+        return
+    }
+    address tmp = allocate 24
+    int count = 0
+    while (n > 0) {
+        int d = n - (n / 10) * 10
+        int dch = d + 48
+        byte db = byte (dch)
+        address p = tmp + count
+        p::value = db
+        count = count + 1
+        n = n / 10
+    }
+    int i = count - 1
+    while (i >= 0) {
+        address p = tmp + i
+        byte b = p::value
+        int bv = int (b)
+        _qemuPutc(bv)
+        i = i - 1
+    }
+    deallocate tmp
+}
+
+class QemuUart satisfies Uart {
+    constructor() {}
+
+    function init()            {}
+    function putc(int c)       { _qemuPutc(c) }
+    function getc() int        { return _qemuGetc() }
+    function puts(address s)   { _qemuPuts(s) }
+    function putsLn(address s) { _qemuPutsLn(s) }
+    function putInt(int n)     { _qemuPutInt(n) }
+    function putHex(int n)     {}
+}

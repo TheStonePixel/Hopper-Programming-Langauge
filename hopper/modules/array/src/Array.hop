@@ -1,13 +1,18 @@
 // Array<T> — generic fixed-capacity array backed by heap allocation.
 //
+// T can be any primitive type (int, byte, bool, float, address).
+// Each slot occupies 8 bytes regardless of T so that slot arithmetic
+// is uniform: slot address = data + index * 8.
+//
 // Usage:
-//   Array<int> buf = Array<int>(64)
-//   buf.push(42)
-//   int val = buf.get(0)
-//   buf.destructor()
+//   Array<int>  nums = Array<int>(64)
+//   Array<byte> tags = Array<byte>(32)
+//   nums.push(42)
+//   int val = nums.get(0)
+//   nums.destructor()
 
-template Array<int> {
-    address data    // heap-allocated block, 8 bytes per element
+template Array<T> {
+    address data    // heap-allocated block, 8 bytes per slot
     int     len     // number of elements currently stored
     int     cap     // maximum elements before the buffer is full
 
@@ -21,8 +26,8 @@ template Array<int> {
         deallocate self.data
     }
 
-    // Append an element. Silently drops if at capacity.
-    function push(int val) {
+    // Append one element. Silently drops if at capacity.
+    function push(T val) {
         if (self.len < self.cap) {
             address slot = self.data + self.len * 8
             slot::value  = val
@@ -31,7 +36,7 @@ template Array<int> {
     }
 
     // Read element at index i. Returns 0 if out of bounds.
-    function get(int i) int {
+    function get(int i) T {
         if (i < 0) {
             return 0
         }
@@ -42,7 +47,7 @@ template Array<int> {
         return slot::value
     }
 
-    // Current number of elements.
+    // Current number of stored elements.
     function length() int {
         return self.len
     }

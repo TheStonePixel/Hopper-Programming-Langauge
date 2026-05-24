@@ -17,6 +17,13 @@ _start:
     and  x0, x0, #3
     cbnz x0, .park
 
+    // Enable FP/SIMD — CPACR_EL1.FPEN = 0b11 (no trap on FP/SIMD access).
+    // At reset FPEN = 0 which traps ldr/str of q-registers used by the compiler.
+    mrs  x0, cpacr_el1
+    orr  x0, x0, #(3 << 20)
+    msr  cpacr_el1, x0
+    isb
+
     // Stack at 8 MB above load address — safe above kernel image
     ldr  x0, =0x40800000
     mov  sp, x0
