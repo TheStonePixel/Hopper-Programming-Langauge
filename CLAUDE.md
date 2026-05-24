@@ -1,5 +1,28 @@
 # Hopper Programming Language — Claude Working Context
 
+## MANDATORY: Read the Spec Before Writing Any Hopper Code
+
+**Before writing any Hopper source file, contract, module, or `hopper.json` manifest, you MUST
+read the relevant sections of `hopper-spec/`.** This is non-negotiable and applies every time,
+not just the first time. The spec is the ground truth — CLAUDE.md, existing code, and build
+tool behavior are subordinate to it.
+
+| Task | Spec sections to read first |
+|------|-----------------------------|
+| Any source code | `01-language/` — syntax, types, memory, modules |
+| Module or contract design | `01-language/08-modules/`, `06-stdlib/` |
+| Any `hopper.json` | `04-packages/11.1-package-manifests.md`, `03-build/10.3-target-resolution.md` |
+| Bare-metal project | `04-packages/11.1-package-manifests.md`, `03-build/` (full section) |
+| Import statements | `01-language/08-modules/8.2-imports.md` |
+| Collections (String, Array, etc.) | `06-stdlib/13.2-collections.md` |
+| Build commands | `03-build/10-build-system.md` |
+
+**Failure to read the spec before writing code is the root cause of every architectural
+violation in this repository.** Do not invent syntax, manifest fields, module names, or type
+names — look them up first.
+
+---
+
 ## Language Specification
 
 The authoritative language reference is the spec at `hopper-spec/`. Key sections:
@@ -16,6 +39,7 @@ details and toolchain conventions that are NOT in the spec.
 
 ## Critical Rules
 
+0. **Read the spec before writing anything** — open `hopper-spec/` and read the relevant sections listed in the mandatory table above. No exceptions. Existing code in this repo is NOT a reliable reference; it contains known violations.
 1. **Always use `hopper init` to create new projects** — never hand-craft directories.
 2. **Always use `hopper build` to compile** — never invoke `hopperc.js` or `clang` directly unless debugging the compiler itself.
 3. **Always use `hopper install <name>` to add dependencies** — never copy module files manually. This is how the build tool is tested — use it constantly.
@@ -467,6 +491,98 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
 ```
 
 The `exports` field on libraries is documentation/tooling only for now — consuming projects still declare bindings in their own `targets` section.
+
+### Bare-Metal Program (QEMU virt / Pi Zero)
+```json
+{
+  "name": "blink",
+  "version": "0.1.0",
+  "type": "program",
+  "board": "qemu-virt",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "uart": "0.1.0"
+  },
+  "targets": {
+    "aarch64-bare": {
+      "IO": {
+        "from":           "uart",
+        "contract":      "modules/uart/contracts/IO.hop",
+        "implementation": "modules/uart/src/QemuUart.hop"
+      }
+    }
+  }
+}
+```
+
+Critical bare-metal manifest rules (read `04-packages/11.1-package-manifests.md` before touching):
+- `"type"` MUST be `"program"` for bare-metal — NOT `"executable"`
+- `"board"` field selects the board config; the board's `llvmTarget` (e.g. `"aarch64-bare"`) is the required key in `targets`
+- `"sources"` is NOT a valid field — never use it. Use `"entry"` + `"targets"` bindings
+- The targets key MUST match the board's `llvmTarget` string exactly (e.g. `"aarch64-bare"` for qemu-virt), NOT `"host"`
+
+---
+
+## Spec-Defined Standard Library Types
+
+These types are defined in `hopper-spec/06-stdlib/13.2-collections.md`. Read that file
+before using any collection type. Do NOT reimplement them — install them with `hopper install ds`.
+
+### `String` (not `AsciiString`, not `MyString`)
+- Spec name: `String`
+- Template definition: `template String<byte>` — fixed parameter, use WITHOUT angle brackets
+- Module: `ds` — install with `hopper install ds`
+- Usage: `String name` (declare), `String(64)` (construct with capacity)
+- NEVER create a custom string class — `String` is the spec type
+
+### `Array<T>`
+- Template definition: `template Array<T>` — free parameter, MUST supply `<T>` at use site
+- Module: `ds` — install with `hopper install ds`
+- Usage: `Array<int>`, `Array<byte>`, `Array<String>`
+- NEVER reimplement a dynamic array — use `Array<T>`
+
+### Import pattern for `ds`
+```hopper
+import String from ds
+import Array from ds
+```
+Add binding in `hopper.json` targets:
+```json
+"String": {
+  "from": "ds",
+  "contract": "modules/ds/contracts/String.hop",
+  "implementation": "modules/ds/src/String.hop"
+}
+```
+
+---
+
+## Hardware Abstraction — Non-Negotiable
+
+**Application source code MUST NEVER reference hardware-specific names.**
+
+The abstraction model is:
+```
+Hardware registers / ISA instructions
+    ↓  wrapped in  ↓
+class SomeName satisfies IO    ← implementation, lives in modules/
+    ↓  exposed via  ↓
+contract IO { ... }            ← contract file
+    ↓  imported as  ↓
+import IO from uart            ← what the program sees
+    ↓  called as   ↓
+io.write(buf, len)             ← hardware-neutral method call
+```
+
+**Violations of this rule make the language look amateurish.** Examples of what MUST NOT
+appear in application source:
+- `_qemuPutc(c)` — QEMU-specific, must be behind an IO contract
+- `_qemuGetc()` — same
+- `_qemuPuts(s)` — same
+- Any function prefixed with `_qemu`, `_linux`, `_x86`, `_arm`, or any ISA/hardware name
+
+The `hopper.json` targets section is the ONLY place where hardware implementation paths appear.
+Program source and contract files are hardware-neutral by design.
 
 ---
 
