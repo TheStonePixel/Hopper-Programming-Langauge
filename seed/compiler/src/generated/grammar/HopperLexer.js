@@ -246,7 +246,7 @@ export default class HopperLexer extends antlr4.Lexer {
                          "'ensures'", "'struct'", "'pad'", "'bitfield'", 
                          "'['", "']'", "'String'", "'int'", "'byte'", "'char'", 
                          "'float'", "'bool'", "'string'", "'unsigned'", 
-                         "'contract'", "'class'", "'satisfies'", "'operator'", 
+                         "'interface'", "'class'", "'satisfies'", "'operator'", 
                          "'constructor'", "'destructor'", "'value'", "'size'", 
                          "'+'", "'*'", "'/'", "'%'", "'=='", "'!='", "'<='", 
                          "'>='", "'&'", "'|'", "'^'", "'<<'", "'>>'", "'...'", 

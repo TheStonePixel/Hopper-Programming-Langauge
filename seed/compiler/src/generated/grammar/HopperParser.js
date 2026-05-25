@@ -436,7 +436,7 @@ export default class HopperParser extends antlr4.Parser {
                             "'<'", "'>'", "'requires'", "'ensures'", "'struct'", 
                             "'pad'", "'bitfield'", "'['", "']'", "'String'", 
                             "'int'", "'byte'", "'char'", "'float'", "'bool'", 
-                            "'string'", "'unsigned'", "'contract'", "'class'", 
+                            "'string'", "'unsigned'", "'interface'", "'class'", 
                             "'satisfies'", "'operator'", "'constructor'", 
                             "'destructor'", "'value'", "'size'", "'+'", 
                             "'*'", "'/'", "'%'", "'=='", "'!='", "'<='", 
@@ -466,8 +466,8 @@ export default class HopperParser extends antlr4.Parser {
                          "aliasDecl", "functionDecl", "templateFunctionDecl", 
                          "contractClause", "structDecl", "structMember", 
                          "bitfieldDecl", "bitfieldMember", "templateDecl", 
-                         "templateName", "templateParam", "contractDecl", 
-                         "contractMember", "classDecl", "className", "satisfiesList", 
+                         "templateName", "templateParam", "interfaceDecl", 
+                         "interfaceMember", "classDecl", "className", "satisfiesList", 
                          "classMember", "fieldName", "operatorSymbol", "paramList", 
                          "externParamList", "param", "paramName", "type", 
                          "block", "statement", "constrainClause", "invariantClause", 
@@ -624,7 +624,7 @@ export default class HopperParser extends antlr4.Parser {
 	        case 13:
 	            this.enterOuterAlt(localctx, 13);
 	            this.state = 142;
-	            this.contractDecl();
+	            this.interfaceDecl();
 	            break;
 
 	        }
@@ -1854,9 +1854,9 @@ export default class HopperParser extends antlr4.Parser {
 
 
 
-	contractDecl() {
-	    let localctx = new ContractDeclContext(this, this._ctx, this.state);
-	    this.enterRule(localctx, 38, HopperParser.RULE_contractDecl);
+	interfaceDecl() {
+	    let localctx = new InterfaceDeclContext(this, this._ctx, this.state);
+	    this.enterRule(localctx, 38, HopperParser.RULE_interfaceDecl);
 	    var _la = 0;
 	    try {
 	        this.enterOuterAlt(localctx, 1);
@@ -1881,7 +1881,7 @@ export default class HopperParser extends antlr4.Parser {
 	        _la = this._input.LA(1);
 	        if(_la===12 || _la===18) {
 	            this.state = 499;
-	            this.contractMember();
+	            this.interfaceMember();
 	            this.state = 508;
 	            this._errHandler.sync(this);
 	            var _alt = this._interp.adaptivePredict(this._input,53,this._ctx)
@@ -1898,7 +1898,7 @@ export default class HopperParser extends antlr4.Parser {
 	                        _la = this._input.LA(1);
 	                    } while(_la===91);
 	                    this.state = 505;
-	                    this.contractMember(); 
+	                    this.interfaceMember(); 
 	                }
 	                this.state = 510;
 	                this._errHandler.sync(this);
@@ -1935,9 +1935,9 @@ export default class HopperParser extends antlr4.Parser {
 
 
 
-	contractMember() {
-	    let localctx = new ContractMemberContext(this, this._ctx, this.state);
-	    this.enterRule(localctx, 40, HopperParser.RULE_contractMember);
+	interfaceMember() {
+	    let localctx = new InterfaceMemberContext(this, this._ctx, this.state);
+	    this.enterRule(localctx, 40, HopperParser.RULE_interfaceMember);
 	    var _la = 0;
 	    try {
 	        this.state = 539;
@@ -1945,7 +1945,7 @@ export default class HopperParser extends antlr4.Parser {
 	        var la_ = this._interp.adaptivePredict(this._input,58,this._ctx);
 	        switch(la_) {
 	        case 1:
-	            localctx = new ContractFuncContext(this, localctx);
+	            localctx = new InterfaceFuncContext(this, localctx);
 	            this.enterOuterAlt(localctx, 1);
 	            this.state = 521;
 	            this.match(HopperParser.T__17);
@@ -1968,7 +1968,7 @@ export default class HopperParser extends antlr4.Parser {
 	            break;
 
 	        case 2:
-	            localctx = new ContractProcContext(this, localctx);
+	            localctx = new InterfaceProcContext(this, localctx);
 	            this.enterOuterAlt(localctx, 2);
 	            this.state = 530;
 	            this.match(HopperParser.T__17);
@@ -1989,7 +1989,7 @@ export default class HopperParser extends antlr4.Parser {
 	            break;
 
 	        case 3:
-	            localctx = new ContractEnumContext(this, localctx);
+	            localctx = new InterfaceEnumContext(this, localctx);
 	            this.enterOuterAlt(localctx, 3);
 	            this.state = 538;
 	            this.enumDecl();
@@ -4623,8 +4623,8 @@ HopperParser.RULE_bitfieldMember = 15;
 HopperParser.RULE_templateDecl = 16;
 HopperParser.RULE_templateName = 17;
 HopperParser.RULE_templateParam = 18;
-HopperParser.RULE_contractDecl = 19;
-HopperParser.RULE_contractMember = 20;
+HopperParser.RULE_interfaceDecl = 19;
+HopperParser.RULE_interfaceMember = 20;
 HopperParser.RULE_classDecl = 21;
 HopperParser.RULE_className = 22;
 HopperParser.RULE_satisfiesList = 23;
@@ -4788,8 +4788,8 @@ class TopLevelDeclContext extends antlr4.ParserRuleContext {
 	    return this.getTypedRuleContext(BitfieldDeclContext,0);
 	};
 
-	contractDecl() {
-	    return this.getTypedRuleContext(ContractDeclContext,0);
+	interfaceDecl() {
+	    return this.getTypedRuleContext(InterfaceDeclContext,0);
 	};
 
 	enterRule(listener) {
@@ -6431,7 +6431,7 @@ class FixedParamContext extends TemplateParamContext {
 
 HopperParser.FixedParamContext = FixedParamContext;
 
-class ContractDeclContext extends antlr4.ParserRuleContext {
+class InterfaceDeclContext extends antlr4.ParserRuleContext {
 
     constructor(parser, parent, invokingState) {
         if(parent===undefined) {
@@ -6442,7 +6442,7 @@ class ContractDeclContext extends antlr4.ParserRuleContext {
         }
         super(parent, invokingState);
         this.parser = parser;
-        this.ruleIndex = HopperParser.RULE_contractDecl;
+        this.ruleIndex = HopperParser.RULE_interfaceDecl;
     }
 
 	Identifier() {
@@ -6461,32 +6461,32 @@ class ContractDeclContext extends antlr4.ParserRuleContext {
 	};
 
 
-	contractMember = function(i) {
+	interfaceMember = function(i) {
 	    if(i===undefined) {
 	        i = null;
 	    }
 	    if(i===null) {
-	        return this.getTypedRuleContexts(ContractMemberContext);
+	        return this.getTypedRuleContexts(InterfaceMemberContext);
 	    } else {
-	        return this.getTypedRuleContext(ContractMemberContext,i);
+	        return this.getTypedRuleContext(InterfaceMemberContext,i);
 	    }
 	};
 
 	enterRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.enterContractDecl(this);
+	        listener.enterInterfaceDecl(this);
 		}
 	}
 
 	exitRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.exitContractDecl(this);
+	        listener.exitInterfaceDecl(this);
 		}
 	}
 
 	accept(visitor) {
 	    if ( visitor instanceof HopperVisitor ) {
-	        return visitor.visitContractDecl(this);
+	        return visitor.visitInterfaceDecl(this);
 	    } else {
 	        return visitor.visitChildren(this);
 	    }
@@ -6497,7 +6497,7 @@ class ContractDeclContext extends antlr4.ParserRuleContext {
 
 
 
-class ContractMemberContext extends antlr4.ParserRuleContext {
+class InterfaceMemberContext extends antlr4.ParserRuleContext {
 
     constructor(parser, parent, invokingState) {
         if(parent===undefined) {
@@ -6508,7 +6508,7 @@ class ContractMemberContext extends antlr4.ParserRuleContext {
         }
         super(parent, invokingState);
         this.parser = parser;
-        this.ruleIndex = HopperParser.RULE_contractMember;
+        this.ruleIndex = HopperParser.RULE_interfaceMember;
     }
 
 
@@ -6520,7 +6520,7 @@ class ContractMemberContext extends antlr4.ParserRuleContext {
 }
 
 
-class ContractFuncContext extends ContractMemberContext {
+class InterfaceFuncContext extends InterfaceMemberContext {
 
     constructor(parser, ctx) {
         super(parser);
@@ -6541,19 +6541,19 @@ class ContractFuncContext extends ContractMemberContext {
 
 	enterRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.enterContractFunc(this);
+	        listener.enterInterfaceFunc(this);
 		}
 	}
 
 	exitRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.exitContractFunc(this);
+	        listener.exitInterfaceFunc(this);
 		}
 	}
 
 	accept(visitor) {
 	    if ( visitor instanceof HopperVisitor ) {
-	        return visitor.visitContractFunc(this);
+	        return visitor.visitInterfaceFunc(this);
 	    } else {
 	        return visitor.visitChildren(this);
 	    }
@@ -6562,9 +6562,9 @@ class ContractFuncContext extends ContractMemberContext {
 
 }
 
-HopperParser.ContractFuncContext = ContractFuncContext;
+HopperParser.InterfaceFuncContext = InterfaceFuncContext;
 
-class ContractProcContext extends ContractMemberContext {
+class InterfaceProcContext extends InterfaceMemberContext {
 
     constructor(parser, ctx) {
         super(parser);
@@ -6581,19 +6581,19 @@ class ContractProcContext extends ContractMemberContext {
 
 	enterRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.enterContractProc(this);
+	        listener.enterInterfaceProc(this);
 		}
 	}
 
 	exitRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.exitContractProc(this);
+	        listener.exitInterfaceProc(this);
 		}
 	}
 
 	accept(visitor) {
 	    if ( visitor instanceof HopperVisitor ) {
-	        return visitor.visitContractProc(this);
+	        return visitor.visitInterfaceProc(this);
 	    } else {
 	        return visitor.visitChildren(this);
 	    }
@@ -6602,9 +6602,9 @@ class ContractProcContext extends ContractMemberContext {
 
 }
 
-HopperParser.ContractProcContext = ContractProcContext;
+HopperParser.InterfaceProcContext = InterfaceProcContext;
 
-class ContractEnumContext extends ContractMemberContext {
+class InterfaceEnumContext extends InterfaceMemberContext {
 
     constructor(parser, ctx) {
         super(parser);
@@ -6617,19 +6617,19 @@ class ContractEnumContext extends ContractMemberContext {
 
 	enterRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.enterContractEnum(this);
+	        listener.enterInterfaceEnum(this);
 		}
 	}
 
 	exitRule(listener) {
 	    if(listener instanceof HopperListener ) {
-	        listener.exitContractEnum(this);
+	        listener.exitInterfaceEnum(this);
 		}
 	}
 
 	accept(visitor) {
 	    if ( visitor instanceof HopperVisitor ) {
-	        return visitor.visitContractEnum(this);
+	        return visitor.visitInterfaceEnum(this);
 	    } else {
 	        return visitor.visitChildren(this);
 	    }
@@ -6638,7 +6638,7 @@ class ContractEnumContext extends ContractMemberContext {
 
 }
 
-HopperParser.ContractEnumContext = ContractEnumContext;
+HopperParser.InterfaceEnumContext = InterfaceEnumContext;
 
 class ClassDeclContext extends antlr4.ParserRuleContext {
 
@@ -9744,8 +9744,8 @@ HopperParser.BitfieldMemberContext = BitfieldMemberContext;
 HopperParser.TemplateDeclContext = TemplateDeclContext; 
 HopperParser.TemplateNameContext = TemplateNameContext; 
 HopperParser.TemplateParamContext = TemplateParamContext; 
-HopperParser.ContractDeclContext = ContractDeclContext; 
-HopperParser.ContractMemberContext = ContractMemberContext; 
+HopperParser.InterfaceDeclContext = InterfaceDeclContext; 
+HopperParser.InterfaceMemberContext = InterfaceMemberContext; 
 HopperParser.ClassDeclContext = ClassDeclContext; 
 HopperParser.ClassNameContext = ClassNameContext; 
 HopperParser.SatisfiesListContext = SatisfiesListContext; 

@@ -192,26 +192,26 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 	}
 
 
-	// Visit a parse tree produced by HopperParser#contractDecl.
+	// Visit a parse tree produced by HopperParser#interfaceDecl.
 	visitContractDecl(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
-	// Visit a parse tree produced by HopperParser#ContractFunc.
-	visitContractFunc(ctx) {
+	// Visit a parse tree produced by HopperParser#InterfaceFunc.
+	visitInterfaceFunc(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
-	// Visit a parse tree produced by HopperParser#ContractProc.
-	visitContractProc(ctx) {
+	// Visit a parse tree produced by HopperParser#InterfaceProc.
+	visitInterfaceProc(ctx) {
 	  return this.visitChildren(ctx);
 	}
 
 
-	// Visit a parse tree produced by HopperParser#ContractEnum.
-	visitContractEnum(ctx) {
+	// Visit a parse tree produced by HopperParser#InterfaceEnum.
+	visitInterfaceEnum(ctx) {
 	  return this.visitChildren(ctx);
 	}
 

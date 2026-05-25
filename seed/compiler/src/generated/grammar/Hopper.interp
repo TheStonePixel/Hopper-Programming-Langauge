@@ -36,7 +36,7 @@ null
 'bool'
 'string'
 'unsigned'
-'contract'
+'interface'
 'class'
 'satisfies'
 'operator'
@@ -212,8 +212,8 @@ bitfieldMember
 templateDecl
 templateName
 templateParam
-contractDecl
-contractMember
+interfaceDecl
+interfaceMember
 classDecl
 className
 satisfiesList

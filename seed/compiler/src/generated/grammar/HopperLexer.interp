@@ -36,7 +36,7 @@ null
 'bool'
 'string'
 'unsigned'
-'contract'
+'interface'
 'class'
 'satisfies'
 'operator'

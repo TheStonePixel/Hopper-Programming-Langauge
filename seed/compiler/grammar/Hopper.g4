@@ -19,7 +19,7 @@ topLevelDecl
     | bindDecl
     | mmioDecl
     | bitfieldDecl
-    | contractDecl
+    | interfaceDecl
     ;
 
 importDecl
@@ -136,15 +136,15 @@ templateParam
     | 'unsigned' 'byte' # FixedParam
     ;
 
-// contract = compile-time contract: a set of method signatures a class must satisfy
-contractDecl
-    : 'contract' Identifier '{' NEWLINE* (contractMember (NEWLINE+ contractMember)* NEWLINE*)? '}'
+// interface = compile-time interface: a set of method signatures a class must satisfy
+interfaceDecl
+    : 'interface' Identifier '{' NEWLINE* (interfaceMember (NEWLINE+ interfaceMember)* NEWLINE*)? '}'
     ;
 
-contractMember
-    : 'function' fieldName '(' paramList? ')' type   # ContractFunc
-    | 'function' fieldName '(' paramList? ')'        # ContractProc
-    | enumDecl                                        # ContractEnum
+interfaceMember
+    : 'function' fieldName '(' paramList? ')' type   # InterfaceFunc
+    | 'function' fieldName '(' paramList? ')'        # InterfaceProc
+    | enumDecl                                        # InterfaceEnum
     ;
 
 // class = data + behavior, compiler-optimized layout
@@ -159,7 +159,7 @@ className
     | 'String'
     ;
 
-// satisfies — list of contracts the class must conform to
+// satisfies — list of interfaces the class must conform to
 satisfiesList
     : 'satisfies' Identifier (',' Identifier)*
     ;

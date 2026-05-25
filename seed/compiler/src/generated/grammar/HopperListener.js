@@ -284,39 +284,39 @@ export default class HopperListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#contractDecl.
+	// Enter a parse tree produced by HopperParser#interfaceDecl.
 	enterContractDecl(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#contractDecl.
+	// Exit a parse tree produced by HopperParser#interfaceDecl.
 	exitContractDecl(ctx) {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#ContractFunc.
-	enterContractFunc(ctx) {
+	// Enter a parse tree produced by HopperParser#InterfaceFunc.
+	enterInterfaceFunc(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#ContractFunc.
-	exitContractFunc(ctx) {
-	}
-
-
-	// Enter a parse tree produced by HopperParser#ContractProc.
-	enterContractProc(ctx) {
-	}
-
-	// Exit a parse tree produced by HopperParser#ContractProc.
-	exitContractProc(ctx) {
+	// Exit a parse tree produced by HopperParser#InterfaceFunc.
+	exitInterfaceFunc(ctx) {
 	}
 
 
-	// Enter a parse tree produced by HopperParser#ContractEnum.
-	enterContractEnum(ctx) {
+	// Enter a parse tree produced by HopperParser#InterfaceProc.
+	enterInterfaceProc(ctx) {
 	}
 
-	// Exit a parse tree produced by HopperParser#ContractEnum.
-	exitContractEnum(ctx) {
+	// Exit a parse tree produced by HopperParser#InterfaceProc.
+	exitInterfaceProc(ctx) {
+	}
+
+
+	// Enter a parse tree produced by HopperParser#InterfaceEnum.
+	enterInterfaceEnum(ctx) {
+	}
+
+	// Exit a parse tree produced by HopperParser#InterfaceEnum.
+	exitInterfaceEnum(ctx) {
 	}
 
 
