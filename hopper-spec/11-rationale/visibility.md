@@ -18,7 +18,7 @@ A library declares its public contract in an contract file:
 
 ```hopper
 // interfaces/Buffer.hop
-contract Buffer {
+interface Buffer {
     function write(address data, int len) int
     function flush() int
     function close()

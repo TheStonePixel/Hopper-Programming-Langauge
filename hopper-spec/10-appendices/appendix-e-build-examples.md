@@ -140,7 +140,7 @@ mymath/
 ### interfaces/IMath.hop
 
 ```hopper
-contract IMath {
+interface IMath {
     function abs(int x) int
     function max(int a, int b) int
     function min(int a, int b) int

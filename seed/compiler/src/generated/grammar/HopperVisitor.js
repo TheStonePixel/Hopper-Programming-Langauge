@@ -193,7 +193,7 @@ export default class HopperVisitor extends antlr4.tree.ParseTreeVisitor {
 
 
 	// Visit a parse tree produced by HopperParser#interfaceDecl.
-	visitContractDecl(ctx) {
+	visitInterfaceDecl(ctx) {
 	  return this.visitChildren(ctx);
 	}
 

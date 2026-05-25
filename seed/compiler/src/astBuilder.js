@@ -296,13 +296,13 @@ export class AstBuilder extends HopperVisitor {
         return BitfieldPad(bits);
     }
 
-    // ── contract ──────────────────────────────────────────────────────────
+    // ── interface ──────────────────────────────────────────────────────────
 
-    visitContractDecl(ctx) {
+    visitInterfaceDecl(ctx) {
         const name = ctx.Identifier().getText();
         const methods = [];
         const enums = [];
-        for (const m of (ctx.contractMember ? ctx.contractMember() : [])) {
+        for (const m of (ctx.interfaceMember ? ctx.interfaceMember() : [])) {
             const node = this.visit(m);
             if (!node) continue;
             if (node.kind === "InterfaceMethod") methods.push(node);
@@ -311,11 +311,11 @@ export class AstBuilder extends HopperVisitor {
         return InterfaceDecl(name, methods, enums);
     }
 
-    visitContractEnum(ctx) {
+    visitInterfaceEnum(ctx) {
         return this.visitEnumDecl(ctx.enumDecl());
     }
 
-    visitContractFunc(ctx) {
+    visitInterfaceFunc(ctx) {
         const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))
@@ -323,7 +323,7 @@ export class AstBuilder extends HopperVisitor {
         return InterfaceMethod(name, params, ctx.type().getText());
     }
 
-    visitContractProc(ctx) {
+    visitInterfaceProc(ctx) {
         const name = ctx.fieldName().getText();
         const params = ctx.paramList()
             ? ctx.paramList().param().map(p => Param(p.paramName().getText(), p.type().getText()))

@@ -4,7 +4,7 @@
 // the original terminal state in close().  All output is buffered; flush()
 // pushes the accumulated bytes to the display.
 
-contract Terminal {
+interface Terminal {
     function width()  int
     function height() int
 

@@ -1,4 +1,4 @@
-contract FileReader {
+interface FileReader {
     function valid() bool
     function done() bool
     function readBytes(address buf, int max) int

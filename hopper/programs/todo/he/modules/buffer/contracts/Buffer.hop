@@ -1,4 +1,4 @@
-contract Buffer {
+interface Buffer {
     function ensureNonempty()
     function lineCount() int
     function lineAt(int i) address

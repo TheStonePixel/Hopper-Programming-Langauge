@@ -16,7 +16,7 @@ extern function printf(string fmt, ...) int
 
 // ── contract ─────────────────────────────────────────────────────────────────
 
-contract Iterator {
+interface Iterator {
     function hasNext() bool
     function next() int
     function reset()

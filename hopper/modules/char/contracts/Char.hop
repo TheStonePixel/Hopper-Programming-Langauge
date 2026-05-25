@@ -1,4 +1,4 @@
-contract Char {
+interface Char {
     function isAlpha(byte c) bool
     function isDigit(byte c) bool
     function isAlphaNum(byte c) bool

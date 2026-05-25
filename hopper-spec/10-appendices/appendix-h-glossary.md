@@ -66,9 +66,9 @@ By convention, `asm {}` blocks MUST NOT appear in application program source fil
 
 ## binding
 
-An entry in the `targets.<target>` section of `hopper.json` that connects an contract name to its contract file and implementation file. A binding has three required fields: `"from"` (the module name), `"contract"` (path to the `.hop` file declaring the contract), and `"implementation"` (path to the `.hop` file implementing it). The binding is the sole place where hardware is named in a project — changing the `"implementation"` path is the entire porting change when retargeting.
+An entry in the `targets.<target>` section of `hopper.json` that connects an interface name to its interface file and implementation file. A binding has three required fields: `"from"` (the module name), `"contract"` (path to the `.hop` file declaring the interface), and `"implementation"` (path to the `.hop` file implementing it). The binding is the sole place where hardware is named in a project — changing the `"implementation"` path is the entire porting change when retargeting.
 
-See also: **contract**, **module**.
+See also: **interface**, **module**.
 
 ---
 
@@ -214,11 +214,11 @@ By convention, inline assembly MUST NOT appear in application code.
 
 ---
 
-## contract
+## interface
 
-A top-level declaration of a named set of function signatures that a class may implement: `contract IO { function read(...) int ... }`. Interfaces carry no data, no default implementations, and (in the current grammar) no constants. They are compile-time contracts. A class asserts conformance with `satisfies InterfaceName`; the compiler verifies every signature matches.
+A top-level declaration of a named set of function signatures that a class may implement: `interface IO { function read(...) int ... }`. Interfaces carry no data, no default implementations, and (in the current grammar) no constants. They are compile-time specifications. A class asserts conformance with `satisfies InterfaceName`; the compiler verifies every signature matches.
 
-Interfaces are the mechanism by which Hopper decouples OS-level names from hardware-level implementations. Program source imports contract names; `hopper.json` bindings connect those names to hardware-specific implementation files.
+Interfaces are the mechanism by which Hopper decouples OS-level names from hardware-level implementations. Program source imports interface names; `hopper.json` bindings connect those names to hardware-specific implementation files.
 
 See also: **binding**, **satisfies**, **conforming module**.
 

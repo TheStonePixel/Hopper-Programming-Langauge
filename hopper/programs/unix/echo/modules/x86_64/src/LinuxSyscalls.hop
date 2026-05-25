@@ -7,7 +7,7 @@
 // Syscall ABI: number → rax, args → rdi rsi rdx r10 r8 r9, return ← rax.
 // No libc. No arch passthrough. No external dependencies.
 
-contract LinuxSyscalls {
+interface LinuxSyscalls {
 
     // ── I/O ──────────────────────────────────────────────────────────────────
 

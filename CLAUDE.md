@@ -10,7 +10,7 @@ tool behavior are subordinate to it.
 | Task | Spec sections to read first |
 |------|-----------------------------|
 | Any source code | `01-language/` — syntax, types, memory, modules |
-| Module or contract design | `01-language/08-modules/`, `06-stdlib/` |
+| Module or interface design | `01-language/08-modules/`, `06-stdlib/` |
 | Any `hopper.json` | `04-packages/11.1-package-manifests.md`, `03-build/10.3-target-resolution.md` |
 | Bare-metal project | `04-packages/11.1-package-manifests.md`, `03-build/` (full section) |
 | Import statements | `01-language/08-modules/8.2-imports.md` |
@@ -77,7 +77,7 @@ project/
   src/                 # source files
   modules/             # nested dependency projects (same shape)
   tests/
-  interfaces/          # exported contract contracts (executables only)
+  interfaces/          # exported interface contracts (executables only)
 ```
 
 ---
@@ -165,7 +165,7 @@ Resolves via the consuming project's `hopper.json` targets section:
   }
 }
 ```
-- The contract name must match `from` field in the binding.
+- The interface name must match `from` field in the binding.
 - Both the contract file and the implementation file are compiled in.
 - Free functions from the implementation file come into scope — programs call them directly.
 
@@ -177,7 +177,7 @@ import tty from linux
 - Lowercase module name, no binding in hopper.json — falls through to file resolution.
 - Resolves to `modules/<name>/src/<module>.hop` or stdlib.
 - Used only by legacy lowercase files in `hopper/nonconform/`.
-- Do NOT use this form in application code — use the contract import form.
+- Do NOT use this form in application code — use the interface import form.
 
 ---
 
@@ -258,7 +258,7 @@ class MyClass {
 
 ### Interfaces
 ```hopper
-contract IO {
+interface IO {
     function read(int fd, address buf, int count) int
     function write(int fd, address buf, int count) int
 }
@@ -385,19 +385,19 @@ zero source changes anywhere.
 #### Hardware layer (`x86_64/`)
 The x86_64 module contains two kinds of things:
 
-**LinuxSyscalls** — the joint Linux OS ABI + x86-64 ISA contract. Syscall numbers here are
+**LinuxSyscalls** — the joint Linux OS ABI + x86-64 ISA interface. Syscall numbers here are
 specific to Linux on x86-64 (different on ARM64 Linux, different on macOS x86-64). The file
-`x86_64/src/LinuxSyscalls.hop` contains `contract LinuxSyscalls` (documenting ~150 syscalls)
+`x86_64/src/LinuxSyscalls.hop` contains `interface LinuxSyscalls` (documenting ~150 syscalls)
 plus free function implementations of each one using inline asm. No class, no instantiation —
 the free functions come into scope when a build target's `implementation` resolves to this file.
 
 **SIMD** — SSE2 vector operations: `scanByte16`, `scanByte2x16`, `scanByteOR4x16`, `popcnt16`,
 `bsf16`. The class `X86SIMD satisfies SIMD` wraps SSE2 instructions. SIMD is an ISA capability,
-not an OS contract, so it uses a class and programs instantiate `X86SIMD` directly.
+not an OS interface, so it uses a class and programs instantiate `X86SIMD` directly.
 Files: `x86_64/contracts/SIMD.hop` + `x86_64/src/SIMD.hop`.
 
-#### OS contract layer (`linux/`)
-A pure contract module — no implementation files, no classes, no source to edit when porting.
+#### OS interface layer (`linux/`)
+A pure interface module — no implementation files, no classes, no source to edit when porting.
 Exports 7 interfaces that declare what a Linux program needs:
 - `IO` — read, write, pread64, pwrite64, readv, writev, sendfile, splice, tee, ioctl
 - `FileSystem` — open, close, stat, mkdir, unlink, rename, getcwd, dup, pipe, inotify, ...
@@ -420,7 +420,7 @@ To retarget: change `x86_64` to `arm64` in every `implementation` path. That is 
 porting change for the build layer. Program source and linux interfaces are untouched.
 
 ### Non-conforming legacy modules (`hopper/nonconform/`)
-Everything in `hopper/nonconform/` was written before the new contract standard.
+Everything in `hopper/nonconform/` was written before the new interface standard.
 Do NOT import from any of these until they have been updated and moved to `hopper/modules/`:
 `Pointer`, `algo`, `ascii`, `char`, `cli`, `concurrent`, `core`, `ds`, `fs`, `io`, `json`,
 `llvm`, `math`, `path`, `regex`, `stream`, `string`, `tui`, `uart`, `utf8`
@@ -429,18 +429,18 @@ Do NOT import from any of these until they have been updated and moved to `hoppe
 ```
 program → import IO from linux
              ↓ hopper.json targets binding resolves to:
-          linux/contracts/IO.hop       (contract contract)
-          x86_64/src/LinuxSyscalls.hop  (contract LinuxSyscalls + free functions)
+          linux/contracts/IO.hop       (interface file)
+          x86_64/src/LinuxSyscalls.hop  (interface LinuxSyscalls + free functions)
                                          → inline-ASM syscalls, no further dependencies
           free functions from LinuxSyscalls.hop come into scope → program calls open(), read()...
 ```
 
 **Important — keyword collision**: `bind` is a grammar keyword (hardware address linker directive).
-The socket `bind` syscall is exposed as `socketBind` in both the `LinuxSyscalls` contract and
-the `linux/contracts/Socket.hop` contract.
+The socket `bind` syscall is exposed as `socketBind` in both the `LinuxSyscalls` interface and
+the `linux/contracts/Socket.hop` interface.
 
-**Important — `LinuxSyscalls.hop` is self-contained**: the contract declaration and free
-function implementations live in the same `src/` file. This ensures the contract is in scope
+**Important — `LinuxSyscalls.hop` is self-contained**: the interface declaration and free
+function implementations live in the same `src/` file. This ensures the interface is in scope
 when any file imports LinuxSyscalls, regardless of how the build system resolves the path.
 
 ---
@@ -567,7 +567,7 @@ Hardware registers / ISA instructions
     ↓  wrapped in  ↓
 class SomeName satisfies IO    ← implementation, lives in modules/
     ↓  exposed via  ↓
-contract IO { ... }            ← contract file
+interface IO { ... }           ← interface file
     ↓  imported as  ↓
 import IO from uart            ← what the program sees
     ↓  called as   ↓
@@ -576,26 +576,26 @@ io.write(buf, len)             ← hardware-neutral method call
 
 **Violations of this rule make the language look amateurish.** Examples of what MUST NOT
 appear in application source:
-- `_qemuPutc(c)` — QEMU-specific, must be behind an IO contract
+- `_qemuPutc(c)` — QEMU-specific, must be behind an IO interface
 - `_qemuGetc()` — same
 - `_qemuPuts(s)` — same
 - Any function prefixed with `_qemu`, `_linux`, `_x86`, `_arm`, or any ISA/hardware name
 
 The `hopper.json` targets section is the ONLY place where hardware implementation paths appear.
-Program source and contract files are hardware-neutral by design.
+Program source and interface files are hardware-neutral by design.
 
 ---
 
 ## Known Gaps / Open Items
 
 - **`exports` in library hopper.json** — declared but not yet consumed by the build system. Build system currently relies on consumer declaring full binding paths.
-- **Constants inside interfaces** — `constDecl` is not in `interfaceDecl` grammar, so interfaces cannot carry named constants. Use `enum` inside the contract body instead (which IS supported).
+- **Constants inside interfaces** — `constDecl` is not in `interfaceDecl` grammar, so interfaces cannot carry named constants. Use `enum` inside the interface body instead (which IS supported).
 
 ---
 
 ## Hardware Capability Modules (x86_64 SIMD)
 
-`x86_64` is a full capability module — not just syscall stubs. It exports a `SIMD` contract that programs import the same way they import OS interfaces.
+`x86_64` is a full capability module — not just syscall stubs. It exports a `SIMD` interface that programs import the same way they import OS interfaces.
 
 **Convention: no `asm {}` blocks in program source files.** Hardware specifics live exclusively in `x86_64/src/SIMD.hop`. Programs call methods on an `X86SIMD` instance.
 
@@ -604,7 +604,7 @@ Program source and contract files are hardware-neutral by design.
 `x86_64/contracts/SIMD.hop` — `x86_64/src/SIMD.hop` (class `X86SIMD satisfies SIMD`):
 
 ```hopper
-contract SIMD {
+interface SIMD {
     // Scan 16 bytes at ptr for byte value b. Returns 16-bit mask (bit i set if byte[i] == b).
     function scanByte16(address ptr, int b) int
 

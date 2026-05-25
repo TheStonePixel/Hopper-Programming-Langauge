@@ -7,7 +7,7 @@ enum JsonKind {
     OBJECT = 5
 }
 
-contract JSON {
+interface JSON {
     function parse(address src, int len) address
     function nodeKind(address node) int
     function nodeInt(address node) int

@@ -1,6 +1,6 @@
 // SSE2/x86-64 SIMD primitives for byte scanning.
 
-contract SIMD {
+interface SIMD {
     // Scan 16 bytes at ptr for byte value b. Returns 16-bit mask (bit i set if byte[i] == b).
     function scanByte16(address ptr, int b) int
 

@@ -65,7 +65,7 @@ Use **PascalCase**. Each word begins with an uppercase letter.
 
 ```hopper
 class LinkedList { ... }
-contract FileSystem { ... }
+interface FileSystem { ... }
 class X86SIMD { ... }      // acronyms: all-caps is acceptable
 ```
 

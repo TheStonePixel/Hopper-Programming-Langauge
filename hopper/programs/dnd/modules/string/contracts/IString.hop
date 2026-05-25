@@ -1,4 +1,4 @@
-contract IString {
+interface IString {
     function length() int
     function capacity() int
     function isEmpty() bool

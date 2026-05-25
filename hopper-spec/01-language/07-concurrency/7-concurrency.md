@@ -9,7 +9,7 @@ created or scheduled.
 
 Concurrent execution is achieved exclusively through operating-system system
 calls accessed via the `linux` module. On Linux/x86-64, the relevant entry
-points include `fork`, `clone`, `clone3`, and the POSIX thread contract
+points include `fork`, `clone`, `clone3`, and the POSIX thread interface
 layered on top of `clone`. Programs that require concurrent execution MUST
 invoke these OS APIs directly.
 
@@ -53,6 +53,6 @@ a synchronization operation by itself.
 - The execution model (Chapter 6) defines program start-up, function calls, and
   undefined behavior in the single-threaded case. §7.7 extends the undefined
   behavior rules to data races.
-- The `linux` module contract contracts (§Process, §IO, §Memory, §Socket,
+- The `linux` module interface definitions (§Process, §IO, §Memory, §Socket,
   §Network) are the normative definitions of the OS APIs referenced in this
   chapter.

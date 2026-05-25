@@ -21,7 +21,7 @@ enum ErrorCode {
     INVALID_STATE     = 34
 }
 
-contract Core {
+interface Core {
     function panic(address msg)
     function assert(bool cond, address msg)
     function soft(bool cond, address msg)

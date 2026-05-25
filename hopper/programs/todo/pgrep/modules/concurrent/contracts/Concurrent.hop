@@ -1,13 +1,13 @@
-contract Concurrent { }
+interface Concurrent { }
 
-contract Mutex {
+interface Mutex {
     function lock()
     function tryLock() bool
     function unlock()
     function rawHandle() address
 }
 
-contract Condvar {
+interface Condvar {
     function wait(address mutHandle)
     function signal()
     function broadcast()

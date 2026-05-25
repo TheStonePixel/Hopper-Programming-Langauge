@@ -53,7 +53,7 @@ Hopper's contract system is already a weak form of contract verification: the co
 The forward direction extends contracts to behavioral specifications. An contract function could carry a precondition, postcondition, and invariant expressed in Hopper source:
 
 ```hopper
-contract Allocator {
+interface Allocator {
     // requires: size > 0
     // ensures: result != null
     function alloc(int size) address

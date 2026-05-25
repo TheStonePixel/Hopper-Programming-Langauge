@@ -8,7 +8,7 @@
 // The linux module depends on this contract to implement its OS abstractions.
 // Programs depend on linux, never on LinuxSyscalls directly.
 
-contract LinuxSyscalls {
+interface LinuxSyscalls {
 
     // ── I/O ──────────────────────────────────────────────────────────────────
 

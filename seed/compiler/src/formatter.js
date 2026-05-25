@@ -94,7 +94,7 @@ function fmtStruct(d) {
 }
 
 function fmtInterface(d) {
-    const lines = [`contract ${d.name} {`]
+    const lines = [`interface ${d.name} {`]
     for (const m of d.methods || []) {
         const params = (m.params || []).map(p => `${p.type} ${p.name}`).join(', ')
         const ret    = m.returnType ? ` ${m.returnType}` : ''

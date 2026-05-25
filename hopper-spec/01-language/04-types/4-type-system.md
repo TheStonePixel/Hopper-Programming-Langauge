@@ -50,7 +50,7 @@ Hopper types are divided into the following categories:
 
 **Composite types** (§4.2) — aggregates with named fields: `struct` (layout only), `class` (data and behavior), `template` (parameterized class), `bitfield` (bit-packed layout), `enum` (named integer constants), and `callback` (function pointer).
 
-**Interface types** (§4.6) — named sets of method signatures that classes may implement. Interface types are not value types; a variable cannot have an contract type directly.
+**Interface types** (§4.6) — named sets of method signatures that classes may implement. Interface types are not value types; a variable cannot have an interface type directly.
 
 ---
 

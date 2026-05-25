@@ -29,7 +29,7 @@ import IO from linux
 import IO, FileSystem from linux
 ```
 
-The name before `from` is an contract-binding name. The compiler resolves it through the consuming project's `hopper.json` `targets` section. This form brings free functions and types from both the named contract file and its corresponding implementation file into scope.
+The name before `from` is an interface-binding name. The compiler resolves it through the consuming project's `hopper.json` `targets` section. This form brings free functions and types from both the named interface file and its corresponding implementation file into scope.
 
 **Module import — legacy; for use only in `hopper/nonconform/` code:**
 
@@ -40,11 +40,11 @@ import tty from linux
 
 The name after `from` is a package directory name. The compiler resolves it by walking up the directory tree looking for `modules/<name>/`. The symbol names before `from` are used to select individual `.hop` files within that module's `src/` directory.
 
-New programs SHOULD use the contract import form exclusively. The module import form SHALL NOT be used in new application code.
+New programs SHOULD use the interface import form exclusively. The module import form SHALL NOT be used in new application code.
 
 ### 8.4 Interface Binding Resolution
 
-An contract import resolves through a two-file binding declared in `hopper.json`:
+An interface import resolves through a two-file binding declared in `hopper.json`:
 
 ```json
 {
@@ -66,14 +66,14 @@ When the compiler encounters `import IO from linux`, it MUST:
 2. Read the binding for `IO` under the active target (default: `host`).
 3. Validate that the binding's `from` field matches the package name stated in the import (`linux`). A mismatch MUST be a compile error.
 4. Verify that both the `contract` and `implementation` file paths exist. A missing file MUST be a compile error.
-5. Parse and merge the contract file AST into the current compilation unit (if not already visited).
+5. Parse and merge the interface file AST into the current compilation unit (if not already visited).
 6. Parse and merge the implementation file AST into the current compilation unit (if not already visited).
 
 All free functions, classes, structs, enums, interfaces, templates, and type aliases from both loaded files become available in the importer's scope.
 
 ### 8.5 Hardware Independence Principle
 
-Programs MUST name only OS-level contract names (`IO`, `FileSystem`, `Socket`, etc.) in source `import` statements. Hardware-specific paths (`x86_64`, `arm64`) MUST appear only in `hopper.json` `targets` bindings. To retarget a program from one ISA to another, only the `implementation` paths in `hopper.json` need to change; no `.hop` source file requires modification.
+Programs MUST name only OS-level interface names (`IO`, `FileSystem`, `Socket`, etc.) in source `import` statements. Hardware-specific paths (`x86_64`, `arm64`) MUST appear only in `hopper.json` `targets` bindings. To retarget a program from one ISA to another, only the `implementation` paths in `hopper.json` need to change; no `.hop` source file requires modification.
 
 ### 8.6 Relation to Subsections
 

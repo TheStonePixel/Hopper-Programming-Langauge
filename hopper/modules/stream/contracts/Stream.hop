@@ -1,4 +1,4 @@
-contract Stream {
+interface Stream {
     function peek() byte
     function advance()
     function remaining() int

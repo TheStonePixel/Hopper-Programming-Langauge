@@ -12,9 +12,9 @@ This is a quick-reference index of terms that have specific meanings in this spe
 | **Library** | A Hopper project of type `library` with no entry point |
 | **Module** | A single `.hop` source file; the unit of compilation |
 | **Package** | A directory with a `hopper.json` manifest; the unit of distribution |
-| **Interface** | A named set of function signatures declared with `contract` |
-| **Implementation** | A class or free functions satisfying an contract contract |
-| **Binding** | A `hopper.json` targets entry mapping an contract to an implementation |
+| **Interface** | A named set of function signatures declared with `interface` |
+| **Implementation** | A class or free functions satisfying an interface |
+| **Binding** | A `hopper.json` targets entry mapping an interface to an implementation |
 | **Target** | A named build configuration in `hopper.json` (e.g., `host`) |
 | **Entry point** | The `entry` declaration compiled to `main` in the output binary |
 | **Inline assembly** | An `asm { }` block containing architecture-specific instructions |
