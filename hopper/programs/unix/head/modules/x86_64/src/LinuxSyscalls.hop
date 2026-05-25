@@ -1,0 +1,1199 @@
+// Linux x86-64 syscall contract and implementation.
+//
+// This file is self-contained: the contract declaration (LinuxSyscalls) and
+// the concrete class (X86LinuxSyscalls) live together so that regular module
+// imports resolve both in one load, without requiring a separate binding.
+//
+// Syscall ABI: number → rax, args → rdi rsi rdx r10 r8 r9, return ← rax.
+// No libc. No arch passthrough. No external dependencies.
+
+interface LinuxSyscalls {
+
+    // ── I/O ──────────────────────────────────────────────────────────────────
+
+    function read(int fd, address buf, int count) int
+    function write(int fd, address buf, int count) int
+    function pread64(int fd, address buf, int count, int offset) int
+    function pwrite64(int fd, address buf, int count, int offset) int
+    function readv(int fd, address iov, int iovcnt) int
+    function writev(int fd, address iov, int iovcnt) int
+    function sendfile(int outfd, int infd, address offset, int count) int
+    function splice(int fdin, address offin, int fdout, address offout, int len, int flags) int
+    function tee(int fdin, int fdout, int len, int flags) int
+    function ioctl(int fd, int request, address arg) int
+
+    // ── FileSystem ───────────────────────────────────────────────────────────
+
+    function open(string path, int flags, int mode) int
+    function close(int fd) int
+    function creat(string path, int mode) int
+    function stat(string path, address buf) int
+    function fstat(int fd, address buf) int
+    function lstat(string path, address buf) int
+    function statfs(string path, address buf) int
+    function fstatfs(int fd, address buf) int
+    function lseek(int fd, int offset, int whence) int
+    function access(string path, int mode) int
+    function chmod(string path, int mode) int
+    function fchmod(int fd, int mode) int
+    function chown(string path, int uid, int gid) int
+    function fchown(int fd, int uid, int gid) int
+    function lchown(string path, int uid, int gid) int
+    function umask(int mask) int
+    function truncate(string path, int length) int
+    function ftruncate(int fd, int length) int
+    function fsync(int fd) int
+    function fdatasync(int fd) int
+    function sync() int
+    function getdents64(int fd, address buf, int count) int
+    function getcwd(address buf, int bufsz) int
+    function chdir(string path) int
+    function fchdir(int fd) int
+    function mkdir(string path, int mode) int
+    function rmdir(string path) int
+    function rename(string oldpath, string newpath) int
+    function link(string oldpath, string newpath) int
+    function unlink(string path) int
+    function symlink(string target, string linkpath) int
+    function readlink(string path, address buf, int bufsz) int
+    function dup(int oldfd) int
+    function dup2(int oldfd, int newfd) int
+    function dup3(int oldfd, int newfd, int flags) int
+    function pipe(address fds) int
+    function pipe2(address fds, int flags) int
+    function fcntl(int fd, int cmd, int arg) int
+    function flock(int fd, int op) int
+    function openat(int dirfd, string path, int flags, int mode) int
+    function mkdirat(int dirfd, string path, int mode) int
+    function unlinkat(int dirfd, string path, int flags) int
+    function renameat(int olddirfd, string oldpath, int newdirfd, string newpath) int
+    function linkat(int olddirfd, string oldpath, int newdirfd, string newpath, int flags) int
+    function symlinkat(string target, int newdirfd, string linkpath) int
+    function readlinkat(int dirfd, string path, address buf, int bufsz) int
+    function fchmodat(int dirfd, string path, int mode, int flags) int
+    function faccessat(int dirfd, string path, int mode, int flags) int
+    function fchownat(int dirfd, string path, int uid, int gid, int flags) int
+    function inotify_init1(int flags) int
+    function inotify_add_watch(int fd, string path, int mask) int
+    function inotify_rm_watch(int fd, int wd) int
+
+    // ── Memory ───────────────────────────────────────────────────────────────
+
+    function mmap(address addr, int len, int prot, int flags, int fd, int offset) address
+    function munmap(address addr, int len) int
+    function mprotect(address addr, int len, int prot) int
+    function mremap(address old_addr, int old_size, int new_size, int flags, address new_addr) address
+    function msync(address addr, int len, int flags) int
+    function madvise(address addr, int len, int advice) int
+    function mincore(address addr, int len, address vec) int
+    function mlock(address addr, int len) int
+    function munlock(address addr, int len) int
+    function mlockall(int flags) int
+    function munlockall() int
+    function memfd_create(string name, int flags) int
+
+    // ── Process ──────────────────────────────────────────────────────────────
+
+    function exit(int code)
+    function exit_group(int code)
+    function fork() int
+    function vfork() int
+    function clone(int flags, address stack, address ptid, address ctid, int regs) int
+    function clone3(address args, int argsz) int
+    function execve(string filename, string[] argv, string[] envp) int
+    function execveat(int dirfd, string path, string[] argv, string[] envp, int flags) int
+    function waitpid(int pid, address wstatus, int options) int
+    function waitid(int idtype, int id, address infop, int options) int
+    function getpid() int
+    function getppid() int
+    function gettid() int
+    function getuid() int
+    function getgid() int
+    function geteuid() int
+    function getegid() int
+    function setuid(int uid) int
+    function setgid(int gid) int
+    function setreuid(int ruid, int euid) int
+    function setregid(int rgid, int egid) int
+    function setsid() int
+    function setpgid(int pid, int pgid) int
+    function getpgid(int pid) int
+    function kill(int pid, int sig) int
+    function tkill(int tid, int sig) int
+    function tgkill(int tgid, int tid, int sig) int
+    function pause() int
+    function alarm(int seconds) int
+    function rt_sigaction(int sig, address act, address oldact, int sigsetsize) int
+    function rt_sigprocmask(int how, address set, address oldset, int sigsetsize) int
+    function rt_sigpending(address set, int sigsetsize) int
+    function rt_sigsuspend(address mask, int sigsetsize) int
+    function sigaltstack(address ss, address oss) int
+    function ptrace(int request, int pid, address addr, address data) int
+
+    // ── System ───────────────────────────────────────────────────────────────
+
+    function uname(address buf) int
+    function sysinfo(address buf) int
+    function getrusage(int who, address rusage) int
+    function getrlimit(int resource, address rlim) int
+    function setrlimit(int resource, address rlim) int
+    function prctl(int option, int arg2, int arg3, int arg4, int arg5) int
+    function arch_prctl(int code, address addr) int
+    function nanosleep(address req, address rem) int
+    function clock_gettime(int clockid, address ts) int
+    function clock_settime(int clockid, address ts) int
+    function clock_getres(int clockid, address res) int
+    function clock_nanosleep(int clockid, int flags, address req, address rem) int
+    function gettimeofday(address tv, address tz) int
+    function settimeofday(address tv, address tz) int
+    function times(address buf) int
+    function getitimer(int which, address val) int
+    function setitimer(int which, address val, address oval) int
+    function sched_yield() int
+    function sched_getscheduler(int pid) int
+    function sched_setscheduler(int pid, int policy, address param) int
+    function sched_getparam(int pid, address param) int
+    function sched_setparam(int pid, address param) int
+    function sched_getaffinity(int pid, int cpusetsize, address mask) int
+    function sched_setaffinity(int pid, int cpusetsize, address mask) int
+    function getpriority(int which, int who) int
+    function setpriority(int which, int who, int prio) int
+    function chroot(string path) int
+    function brk(address addr) int
+
+    // ── Socket ───────────────────────────────────────────────────────────────
+
+    function socket(int domain, int type, int protocol) int
+    function socketBind(int fd, address addr, int addrlen) int
+    function listen(int fd, int backlog) int
+    function accept(int fd, address addr, address addrlen) int
+    function accept4(int fd, address addr, address addrlen, int flags) int
+    function connect(int fd, address addr, int addrlen) int
+    function shutdown(int fd, int how) int
+    function getsockname(int fd, address addr, address addrlen) int
+    function getpeername(int fd, address addr, address addrlen) int
+    function socketpair(int domain, int type, int protocol, address fds) int
+    function send(int fd, address buf, int len, int flags) int
+    function recv(int fd, address buf, int len, int flags) int
+    function sendto(int fd, address buf, int len, int flags, address addr, int addrlen) int
+    function recvfrom(int fd, address buf, int len, int flags, address addr, address addrlen) int
+    function sendmsg(int fd, address msg, int flags) int
+    function recvmsg(int fd, address msg, int flags) int
+    function sendmmsg(int fd, address msgs, int vlen, int flags) int
+    function recvmmsg(int fd, address msgs, int vlen, int flags, address timeout) int
+    function setsockopt(int fd, int level, int optname, address optval, int optlen) int
+    function getsockopt(int fd, int level, int optname, address optval, address optlen) int
+
+    // ── Network (I/O multiplexing) ───────────────────────────────────────────
+
+    function select(int nfds, address readfds, address writefds, address exceptfds, address timeout) int
+    function pselect6(int nfds, address readfds, address writefds, address exceptfds, address timeout, address sigmask) int
+    function poll(address fds, int nfds, int timeout) int
+    function ppoll(address fds, int nfds, address tmo, address sigmask, int sigsetsize) int
+    function epoll_create1(int flags) int
+    function epoll_ctl(int epfd, int op, int fd, address event) int
+    function epoll_wait(int epfd, address events, int maxevents, int timeout) int
+    function epoll_pwait(int epfd, address events, int maxevents, int timeout, address sigmask, int sigsetsize) int
+}
+
+// ── I/O ──────────────────────────────────────────────────────────────────
+
+function read(int fd, address buf, int count) int {
+    int result
+    asm { rax = 0   rdi = fd   rsi = buf   rdx = count   syscall   result = rax }
+    return result
+}
+
+function write(int fd, address buf, int count) int {
+    int result
+    asm { rax = 1   rdi = fd   rsi = buf   rdx = count   syscall   result = rax }
+    return result
+}
+
+function pread64(int fd, address buf, int count, int offset) int {
+    int result
+    asm { rax = 17   rdi = fd   rsi = buf   rdx = count   r10 = offset   syscall   result = rax }
+    return result
+}
+
+function pwrite64(int fd, address buf, int count, int offset) int {
+    int result
+    asm { rax = 18   rdi = fd   rsi = buf   rdx = count   r10 = offset   syscall   result = rax }
+    return result
+}
+
+function readv(int fd, address iov, int iovcnt) int {
+    int result
+    asm { rax = 19   rdi = fd   rsi = iov   rdx = iovcnt   syscall   result = rax }
+    return result
+}
+
+function writev(int fd, address iov, int iovcnt) int {
+    int result
+    asm { rax = 20   rdi = fd   rsi = iov   rdx = iovcnt   syscall   result = rax }
+    return result
+}
+
+function sendfile(int outfd, int infd, address offset, int count) int {
+    int result
+    asm { rax = 40   rdi = outfd   rsi = infd   rdx = offset   r10 = count   syscall   result = rax }
+    return result
+}
+
+function splice(int fdin, address offin, int fdout, address offout, int len, int flags) int {
+    int result
+    asm { rax = 275   rdi = fdin   rsi = offin   rdx = fdout   r10 = offout   r8 = len   r9 = flags   syscall   result = rax }
+    return result
+}
+
+function tee(int fdin, int fdout, int len, int flags) int {
+    int result
+    asm { rax = 276   rdi = fdin   rsi = fdout   rdx = len   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function ioctl(int fd, int request, address arg) int {
+    int result
+    asm { rax = 16   rdi = fd   rsi = request   rdx = arg   syscall   result = rax }
+    return result
+}
+
+// ── FileSystem ───────────────────────────────────────────────────────────
+
+function open(string path, int flags, int mode) int {
+    int result
+    asm { rax = 2   rdi = path   rsi = flags   rdx = mode   syscall   result = rax }
+    return result
+}
+
+function close(int fd) int {
+    int result
+    asm { rax = 3   rdi = fd   syscall   result = rax }
+    return result
+}
+
+function creat(string path, int mode) int {
+    int result
+    asm { rax = 85   rdi = path   rsi = mode   syscall   result = rax }
+    return result
+}
+
+function stat(string path, address buf) int {
+    int result
+    asm { rax = 4   rdi = path   rsi = buf   syscall   result = rax }
+    return result
+}
+
+function fstat(int fd, address buf) int {
+    int result
+    asm { rax = 5   rdi = fd   rsi = buf   syscall   result = rax }
+    return result
+}
+
+function lstat(string path, address buf) int {
+    int result
+    asm { rax = 6   rdi = path   rsi = buf   syscall   result = rax }
+    return result
+}
+
+function statfs(string path, address buf) int {
+    int result
+    asm { rax = 137   rdi = path   rsi = buf   syscall   result = rax }
+    return result
+}
+
+function fstatfs(int fd, address buf) int {
+    int result
+    asm { rax = 138   rdi = fd   rsi = buf   syscall   result = rax }
+    return result
+}
+
+function lseek(int fd, int offset, int whence) int {
+    int result
+    asm { rax = 8   rdi = fd   rsi = offset   rdx = whence   syscall   result = rax }
+    return result
+}
+
+function access(string path, int mode) int {
+    int result
+    asm { rax = 21   rdi = path   rsi = mode   syscall   result = rax }
+    return result
+}
+
+function chmod(string path, int mode) int {
+    int result
+    asm { rax = 90   rdi = path   rsi = mode   syscall   result = rax }
+    return result
+}
+
+function fchmod(int fd, int mode) int {
+    int result
+    asm { rax = 91   rdi = fd   rsi = mode   syscall   result = rax }
+    return result
+}
+
+function chown(string path, int uid, int gid) int {
+    int result
+    asm { rax = 92   rdi = path   rsi = uid   rdx = gid   syscall   result = rax }
+    return result
+}
+
+function fchown(int fd, int uid, int gid) int {
+    int result
+    asm { rax = 93   rdi = fd   rsi = uid   rdx = gid   syscall   result = rax }
+    return result
+}
+
+function lchown(string path, int uid, int gid) int {
+    int result
+    asm { rax = 94   rdi = path   rsi = uid   rdx = gid   syscall   result = rax }
+    return result
+}
+
+function umask(int mask) int {
+    int result
+    asm { rax = 95   rdi = mask   syscall   result = rax }
+    return result
+}
+
+function truncate(string path, int length) int {
+    int result
+    asm { rax = 76   rdi = path   rsi = length   syscall   result = rax }
+    return result
+}
+
+function ftruncate(int fd, int length) int {
+    int result
+    asm { rax = 77   rdi = fd   rsi = length   syscall   result = rax }
+    return result
+}
+
+function fsync(int fd) int {
+    int result
+    asm { rax = 74   rdi = fd   syscall   result = rax }
+    return result
+}
+
+function fdatasync(int fd) int {
+    int result
+    asm { rax = 75   rdi = fd   syscall   result = rax }
+    return result
+}
+
+function sync() int {
+    int result
+    asm { rax = 162   syscall   result = rax }
+    return result
+}
+
+function getdents64(int fd, address buf, int count) int {
+    int result
+    asm { rax = 217   rdi = fd   rsi = buf   rdx = count   syscall   result = rax }
+    return result
+}
+
+function getcwd(address buf, int bufsz) int {
+    int result
+    asm { rax = 79   rdi = buf   rsi = bufsz   syscall   result = rax }
+    return result
+}
+
+function chdir(string path) int {
+    int result
+    asm { rax = 80   rdi = path   syscall   result = rax }
+    return result
+}
+
+function fchdir(int fd) int {
+    int result
+    asm { rax = 81   rdi = fd   syscall   result = rax }
+    return result
+}
+
+function mkdir(string path, int mode) int {
+    int result
+    asm { rax = 83   rdi = path   rsi = mode   syscall   result = rax }
+    return result
+}
+
+function rmdir(string path) int {
+    int result
+    asm { rax = 84   rdi = path   syscall   result = rax }
+    return result
+}
+
+function rename(string oldpath, string newpath) int {
+    int result
+    asm { rax = 82   rdi = oldpath   rsi = newpath   syscall   result = rax }
+    return result
+}
+
+function link(string oldpath, string newpath) int {
+    int result
+    asm { rax = 86   rdi = oldpath   rsi = newpath   syscall   result = rax }
+    return result
+}
+
+function unlink(string path) int {
+    int result
+    asm { rax = 87   rdi = path   syscall   result = rax }
+    return result
+}
+
+function symlink(string target, string linkpath) int {
+    int result
+    asm { rax = 88   rdi = target   rsi = linkpath   syscall   result = rax }
+    return result
+}
+
+function readlink(string path, address buf, int bufsz) int {
+    int result
+    asm { rax = 89   rdi = path   rsi = buf   rdx = bufsz   syscall   result = rax }
+    return result
+}
+
+function dup(int oldfd) int {
+    int result
+    asm { rax = 32   rdi = oldfd   syscall   result = rax }
+    return result
+}
+
+function dup2(int oldfd, int newfd) int {
+    int result
+    asm { rax = 33   rdi = oldfd   rsi = newfd   syscall   result = rax }
+    return result
+}
+
+function dup3(int oldfd, int newfd, int flags) int {
+    int result
+    asm { rax = 292   rdi = oldfd   rsi = newfd   rdx = flags   syscall   result = rax }
+    return result
+}
+
+function pipe(address fds) int {
+    int result
+    asm { rax = 22   rdi = fds   syscall   result = rax }
+    return result
+}
+
+function pipe2(address fds, int flags) int {
+    int result
+    asm { rax = 293   rdi = fds   rsi = flags   syscall   result = rax }
+    return result
+}
+
+function fcntl(int fd, int cmd, int arg) int {
+    int result
+    asm { rax = 72   rdi = fd   rsi = cmd   rdx = arg   syscall   result = rax }
+    return result
+}
+
+function flock(int fd, int op) int {
+    int result
+    asm { rax = 73   rdi = fd   rsi = op   syscall   result = rax }
+    return result
+}
+
+function openat(int dirfd, string path, int flags, int mode) int {
+    int result
+    asm { rax = 257   rdi = dirfd   rsi = path   rdx = flags   r10 = mode   syscall   result = rax }
+    return result
+}
+
+function mkdirat(int dirfd, string path, int mode) int {
+    int result
+    asm { rax = 258   rdi = dirfd   rsi = path   rdx = mode   syscall   result = rax }
+    return result
+}
+
+function unlinkat(int dirfd, string path, int flags) int {
+    int result
+    asm { rax = 263   rdi = dirfd   rsi = path   rdx = flags   syscall   result = rax }
+    return result
+}
+
+function renameat(int olddirfd, string oldpath, int newdirfd, string newpath) int {
+    int result
+    asm { rax = 264   rdi = olddirfd   rsi = oldpath   rdx = newdirfd   r10 = newpath   syscall   result = rax }
+    return result
+}
+
+function linkat(int olddirfd, string oldpath, int newdirfd, string newpath, int flags) int {
+    int result
+    asm { rax = 265   rdi = olddirfd   rsi = oldpath   rdx = newdirfd   r10 = newpath   r8 = flags   syscall   result = rax }
+    return result
+}
+
+function symlinkat(string target, int newdirfd, string linkpath) int {
+    int result
+    asm { rax = 266   rdi = target   rsi = newdirfd   rdx = linkpath   syscall   result = rax }
+    return result
+}
+
+function readlinkat(int dirfd, string path, address buf, int bufsz) int {
+    int result
+    asm { rax = 267   rdi = dirfd   rsi = path   rdx = buf   r10 = bufsz   syscall   result = rax }
+    return result
+}
+
+function fchmodat(int dirfd, string path, int mode, int flags) int {
+    int result
+    asm { rax = 268   rdi = dirfd   rsi = path   rdx = mode   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function faccessat(int dirfd, string path, int mode, int flags) int {
+    int result
+    asm { rax = 269   rdi = dirfd   rsi = path   rdx = mode   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function fchownat(int dirfd, string path, int uid, int gid, int flags) int {
+    int result
+    asm { rax = 260   rdi = dirfd   rsi = path   rdx = uid   r10 = gid   r8 = flags   syscall   result = rax }
+    return result
+}
+
+function inotify_init1(int flags) int {
+    int result
+    asm { rax = 294   rdi = flags   syscall   result = rax }
+    return result
+}
+
+function inotify_add_watch(int fd, string path, int mask) int {
+    int result
+    asm { rax = 254   rdi = fd   rsi = path   rdx = mask   syscall   result = rax }
+    return result
+}
+
+function inotify_rm_watch(int fd, int wd) int {
+    int result
+    asm { rax = 255   rdi = fd   rsi = wd   syscall   result = rax }
+    return result
+}
+
+// ── Memory ───────────────────────────────────────────────────────────────
+
+function mmap(address addr, int len, int prot, int flags, int fd, int offset) address {
+    int result
+    asm { rax = 9   rdi = addr   rsi = len   rdx = prot   r10 = flags   r8 = fd   r9 = offset   syscall   result = rax }
+    address p = address (result)
+    return p
+}
+
+function munmap(address addr, int len) int {
+    int result
+    asm { rax = 11   rdi = addr   rsi = len   syscall   result = rax }
+    return result
+}
+
+function mprotect(address addr, int len, int prot) int {
+    int result
+    asm { rax = 10   rdi = addr   rsi = len   rdx = prot   syscall   result = rax }
+    return result
+}
+
+function mremap(address old_addr, int old_size, int new_size, int flags, address new_addr) address {
+    int result
+    asm { rax = 25   rdi = old_addr   rsi = old_size   rdx = new_size   r10 = flags   r8 = new_addr   syscall   result = rax }
+    address p = address (result)
+    return p
+}
+
+function msync(address addr, int len, int flags) int {
+    int result
+    asm { rax = 26   rdi = addr   rsi = len   rdx = flags   syscall   result = rax }
+    return result
+}
+
+function madvise(address addr, int len, int advice) int {
+    int result
+    asm { rax = 28   rdi = addr   rsi = len   rdx = advice   syscall   result = rax }
+    return result
+}
+
+function mincore(address addr, int len, address vec) int {
+    int result
+    asm { rax = 27   rdi = addr   rsi = len   rdx = vec   syscall   result = rax }
+    return result
+}
+
+function mlock(address addr, int len) int {
+    int result
+    asm { rax = 149   rdi = addr   rsi = len   syscall   result = rax }
+    return result
+}
+
+function munlock(address addr, int len) int {
+    int result
+    asm { rax = 150   rdi = addr   rsi = len   syscall   result = rax }
+    return result
+}
+
+function mlockall(int flags) int {
+    int result
+    asm { rax = 151   rdi = flags   syscall   result = rax }
+    return result
+}
+
+function munlockall() int {
+    int result
+    asm { rax = 152   syscall   result = rax }
+    return result
+}
+
+function memfd_create(string name, int flags) int {
+    int result
+    asm { rax = 319   rdi = name   rsi = flags   syscall   result = rax }
+    return result
+}
+
+// ── Process ──────────────────────────────────────────────────────────────
+
+function exit(int code) {
+    asm { rax = 60   rdi = code   syscall }
+}
+
+function exit_group(int code) {
+    asm { rax = 231   rdi = code   syscall }
+}
+
+function fork() int {
+    int result
+    asm { rax = 57   syscall   result = rax }
+    return result
+}
+
+function vfork() int {
+    int result
+    asm { rax = 58   syscall   result = rax }
+    return result
+}
+
+function clone(int flags, address stack, address ptid, address ctid, int regs) int {
+    int result
+    asm { rax = 56   rdi = flags   rsi = stack   rdx = ptid   r10 = ctid   r8 = regs   syscall   result = rax }
+    return result
+}
+
+function clone3(address args, int argsz) int {
+    int result
+    asm { rax = 435   rdi = args   rsi = argsz   syscall   result = rax }
+    return result
+}
+
+function execve(string filename, string[] argv, string[] envp) int {
+    int result
+    asm { rax = 59   rdi = filename   rsi = argv   rdx = envp   syscall   result = rax }
+    return result
+}
+
+function execveat(int dirfd, string path, string[] argv, string[] envp, int flags) int {
+    int result
+    asm { rax = 322   rdi = dirfd   rsi = path   rdx = argv   r10 = envp   r8 = flags   syscall   result = rax }
+    return result
+}
+
+function waitpid(int pid, address wstatus, int options) int {
+    int result
+    asm { rax = 61   rdi = pid   rsi = wstatus   rdx = options   syscall   result = rax }
+    return result
+}
+
+function waitid(int idtype, int id, address infop, int options) int {
+    int result
+    asm { rax = 247   rdi = idtype   rsi = id   rdx = infop   r10 = options   syscall   result = rax }
+    return result
+}
+
+function getpid() int {
+    int result
+    asm { rax = 39   syscall   result = rax }
+    return result
+}
+
+function getppid() int {
+    int result
+    asm { rax = 110   syscall   result = rax }
+    return result
+}
+
+function gettid() int {
+    int result
+    asm { rax = 186   syscall   result = rax }
+    return result
+}
+
+function getuid() int {
+    int result
+    asm { rax = 102   syscall   result = rax }
+    return result
+}
+
+function getgid() int {
+    int result
+    asm { rax = 104   syscall   result = rax }
+    return result
+}
+
+function geteuid() int {
+    int result
+    asm { rax = 107   syscall   result = rax }
+    return result
+}
+
+function getegid() int {
+    int result
+    asm { rax = 108   syscall   result = rax }
+    return result
+}
+
+function setuid(int uid) int {
+    int result
+    asm { rax = 105   rdi = uid   syscall   result = rax }
+    return result
+}
+
+function setgid(int gid) int {
+    int result
+    asm { rax = 106   rdi = gid   syscall   result = rax }
+    return result
+}
+
+function setreuid(int ruid, int euid) int {
+    int result
+    asm { rax = 113   rdi = ruid   rsi = euid   syscall   result = rax }
+    return result
+}
+
+function setregid(int rgid, int egid) int {
+    int result
+    asm { rax = 114   rdi = rgid   rsi = egid   syscall   result = rax }
+    return result
+}
+
+function setsid() int {
+    int result
+    asm { rax = 112   syscall   result = rax }
+    return result
+}
+
+function setpgid(int pid, int pgid) int {
+    int result
+    asm { rax = 109   rdi = pid   rsi = pgid   syscall   result = rax }
+    return result
+}
+
+function getpgid(int pid) int {
+    int result
+    asm { rax = 121   rdi = pid   syscall   result = rax }
+    return result
+}
+
+function kill(int pid, int sig) int {
+    int result
+    asm { rax = 62   rdi = pid   rsi = sig   syscall   result = rax }
+    return result
+}
+
+function tkill(int tid, int sig) int {
+    int result
+    asm { rax = 200   rdi = tid   rsi = sig   syscall   result = rax }
+    return result
+}
+
+function tgkill(int tgid, int tid, int sig) int {
+    int result
+    asm { rax = 234   rdi = tgid   rsi = tid   rdx = sig   syscall   result = rax }
+    return result
+}
+
+function pause() int {
+    int result
+    asm { rax = 34   syscall   result = rax }
+    return result
+}
+
+function alarm(int seconds) int {
+    int result
+    asm { rax = 37   rdi = seconds   syscall   result = rax }
+    return result
+}
+
+function rt_sigaction(int sig, address act, address oldact, int sigsetsize) int {
+    int result
+    asm { rax = 13   rdi = sig   rsi = act   rdx = oldact   r10 = sigsetsize   syscall   result = rax }
+    return result
+}
+
+function rt_sigprocmask(int how, address set, address oldset, int sigsetsize) int {
+    int result
+    asm { rax = 14   rdi = how   rsi = set   rdx = oldset   r10 = sigsetsize   syscall   result = rax }
+    return result
+}
+
+function rt_sigpending(address set, int sigsetsize) int {
+    int result
+    asm { rax = 127   rdi = set   rsi = sigsetsize   syscall   result = rax }
+    return result
+}
+
+function rt_sigsuspend(address mask, int sigsetsize) int {
+    int result
+    asm { rax = 130   rdi = mask   rsi = sigsetsize   syscall   result = rax }
+    return result
+}
+
+function sigaltstack(address ss, address oss) int {
+    int result
+    asm { rax = 131   rdi = ss   rsi = oss   syscall   result = rax }
+    return result
+}
+
+function ptrace(int request, int pid, address addr, address data) int {
+    int result
+    asm { rax = 101   rdi = request   rsi = pid   rdx = addr   r10 = data   syscall   result = rax }
+    return result
+}
+
+// ── System ───────────────────────────────────────────────────────────────
+
+function uname(address buf) int {
+    int result
+    asm { rax = 63   rdi = buf   syscall   result = rax }
+    return result
+}
+
+function sysinfo(address buf) int {
+    int result
+    asm { rax = 99   rdi = buf   syscall   result = rax }
+    return result
+}
+
+function getrusage(int who, address rusage) int {
+    int result
+    asm { rax = 98   rdi = who   rsi = rusage   syscall   result = rax }
+    return result
+}
+
+function getrlimit(int resource, address rlim) int {
+    int result
+    asm { rax = 97   rdi = resource   rsi = rlim   syscall   result = rax }
+    return result
+}
+
+function setrlimit(int resource, address rlim) int {
+    int result
+    asm { rax = 160   rdi = resource   rsi = rlim   syscall   result = rax }
+    return result
+}
+
+function prctl(int option, int arg2, int arg3, int arg4, int arg5) int {
+    int result
+    asm { rax = 157   rdi = option   rsi = arg2   rdx = arg3   r10 = arg4   r8 = arg5   syscall   result = rax }
+    return result
+}
+
+function arch_prctl(int code, address addr) int {
+    int result
+    asm { rax = 158   rdi = code   rsi = addr   syscall   result = rax }
+    return result
+}
+
+function nanosleep(address req, address rem) int {
+    int result
+    asm { rax = 35   rdi = req   rsi = rem   syscall   result = rax }
+    return result
+}
+
+function clock_gettime(int clockid, address ts) int {
+    int result
+    asm { rax = 228   rdi = clockid   rsi = ts   syscall   result = rax }
+    return result
+}
+
+function clock_settime(int clockid, address ts) int {
+    int result
+    asm { rax = 227   rdi = clockid   rsi = ts   syscall   result = rax }
+    return result
+}
+
+function clock_getres(int clockid, address res) int {
+    int result
+    asm { rax = 229   rdi = clockid   rsi = res   syscall   result = rax }
+    return result
+}
+
+function clock_nanosleep(int clockid, int flags, address req, address rem) int {
+    int result
+    asm { rax = 230   rdi = clockid   rsi = flags   rdx = req   r10 = rem   syscall   result = rax }
+    return result
+}
+
+function gettimeofday(address tv, address tz) int {
+    int result
+    asm { rax = 96   rdi = tv   rsi = tz   syscall   result = rax }
+    return result
+}
+
+function settimeofday(address tv, address tz) int {
+    int result
+    asm { rax = 164   rdi = tv   rsi = tz   syscall   result = rax }
+    return result
+}
+
+function times(address buf) int {
+    int result
+    asm { rax = 100   rdi = buf   syscall   result = rax }
+    return result
+}
+
+function getitimer(int which, address val) int {
+    int result
+    asm { rax = 36   rdi = which   rsi = val   syscall   result = rax }
+    return result
+}
+
+function setitimer(int which, address val, address oval) int {
+    int result
+    asm { rax = 38   rdi = which   rsi = val   rdx = oval   syscall   result = rax }
+    return result
+}
+
+function sched_yield() int {
+    int result
+    asm { rax = 24   syscall   result = rax }
+    return result
+}
+
+function sched_getscheduler(int pid) int {
+    int result
+    asm { rax = 145   rdi = pid   syscall   result = rax }
+    return result
+}
+
+function sched_setscheduler(int pid, int policy, address param) int {
+    int result
+    asm { rax = 144   rdi = pid   rsi = policy   rdx = param   syscall   result = rax }
+    return result
+}
+
+function sched_getparam(int pid, address param) int {
+    int result
+    asm { rax = 143   rdi = pid   rsi = param   syscall   result = rax }
+    return result
+}
+
+function sched_setparam(int pid, address param) int {
+    int result
+    asm { rax = 142   rdi = pid   rsi = param   syscall   result = rax }
+    return result
+}
+
+function sched_getaffinity(int pid, int cpusetsize, address mask) int {
+    int result
+    asm { rax = 204   rdi = pid   rsi = cpusetsize   rdx = mask   syscall   result = rax }
+    return result
+}
+
+function sched_setaffinity(int pid, int cpusetsize, address mask) int {
+    int result
+    asm { rax = 203   rdi = pid   rsi = cpusetsize   rdx = mask   syscall   result = rax }
+    return result
+}
+
+function getpriority(int which, int who) int {
+    int result
+    asm { rax = 140   rdi = which   rsi = who   syscall   result = rax }
+    return result
+}
+
+function setpriority(int which, int who, int prio) int {
+    int result
+    asm { rax = 141   rdi = which   rsi = who   rdx = prio   syscall   result = rax }
+    return result
+}
+
+function chroot(string path) int {
+    int result
+    asm { rax = 161   rdi = path   syscall   result = rax }
+    return result
+}
+
+function brk(address addr) int {
+    int result
+    asm { rax = 12   rdi = addr   syscall   result = rax }
+    return result
+}
+
+// ── Socket ───────────────────────────────────────────────────────────────
+
+function socket(int domain, int type, int protocol) int {
+    int result
+    asm { rax = 41   rdi = domain   rsi = type   rdx = protocol   syscall   result = rax }
+    return result
+}
+
+function socketBind(int fd, address addr, int addrlen) int {
+    int result
+    asm { rax = 49   rdi = fd   rsi = addr   rdx = addrlen   syscall   result = rax }
+    return result
+}
+
+function listen(int fd, int backlog) int {
+    int result
+    asm { rax = 50   rdi = fd   rsi = backlog   syscall   result = rax }
+    return result
+}
+
+function accept(int fd, address addr, address addrlen) int {
+    int result
+    asm { rax = 43   rdi = fd   rsi = addr   rdx = addrlen   syscall   result = rax }
+    return result
+}
+
+function accept4(int fd, address addr, address addrlen, int flags) int {
+    int result
+    asm { rax = 288   rdi = fd   rsi = addr   rdx = addrlen   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function connect(int fd, address addr, int addrlen) int {
+    int result
+    asm { rax = 42   rdi = fd   rsi = addr   rdx = addrlen   syscall   result = rax }
+    return result
+}
+
+function shutdown(int fd, int how) int {
+    int result
+    asm { rax = 48   rdi = fd   rsi = how   syscall   result = rax }
+    return result
+}
+
+function getsockname(int fd, address addr, address addrlen) int {
+    int result
+    asm { rax = 51   rdi = fd   rsi = addr   rdx = addrlen   syscall   result = rax }
+    return result
+}
+
+function getpeername(int fd, address addr, address addrlen) int {
+    int result
+    asm { rax = 52   rdi = fd   rsi = addr   rdx = addrlen   syscall   result = rax }
+    return result
+}
+
+function socketpair(int domain, int type, int protocol, address fds) int {
+    int result
+    asm { rax = 53   rdi = domain   rsi = type   rdx = protocol   r10 = fds   syscall   result = rax }
+    return result
+}
+
+function send(int fd, address buf, int len, int flags) int {
+    int result
+    asm { rax = 44   rdi = fd   rsi = buf   rdx = len   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function recv(int fd, address buf, int len, int flags) int {
+    int result
+    asm { rax = 45   rdi = fd   rsi = buf   rdx = len   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function sendto(int fd, address buf, int len, int flags, address addr, int addrlen) int {
+    int result
+    asm { rax = 44   rdi = fd   rsi = buf   rdx = len   r10 = flags   r8 = addr   r9 = addrlen   syscall   result = rax }
+    return result
+}
+
+function recvfrom(int fd, address buf, int len, int flags, address addr, address addrlen) int {
+    int result
+    asm { rax = 45   rdi = fd   rsi = buf   rdx = len   r10 = flags   r8 = addr   r9 = addrlen   syscall   result = rax }
+    return result
+}
+
+function sendmsg(int fd, address msg, int flags) int {
+    int result
+    asm { rax = 46   rdi = fd   rsi = msg   rdx = flags   syscall   result = rax }
+    return result
+}
+
+function recvmsg(int fd, address msg, int flags) int {
+    int result
+    asm { rax = 47   rdi = fd   rsi = msg   rdx = flags   syscall   result = rax }
+    return result
+}
+
+function sendmmsg(int fd, address msgs, int vlen, int flags) int {
+    int result
+    asm { rax = 307   rdi = fd   rsi = msgs   rdx = vlen   r10 = flags   syscall   result = rax }
+    return result
+}
+
+function recvmmsg(int fd, address msgs, int vlen, int flags, address timeout) int {
+    int result
+    asm { rax = 299   rdi = fd   rsi = msgs   rdx = vlen   r10 = flags   r8 = timeout   syscall   result = rax }
+    return result
+}
+
+function setsockopt(int fd, int level, int optname, address optval, int optlen) int {
+    int result
+    asm { rax = 54   rdi = fd   rsi = level   rdx = optname   r10 = optval   r8 = optlen   syscall   result = rax }
+    return result
+}
+
+function getsockopt(int fd, int level, int optname, address optval, address optlen) int {
+    int result
+    asm { rax = 55   rdi = fd   rsi = level   rdx = optname   r10 = optval   r8 = optlen   syscall   result = rax }
+    return result
+}
+
+// ── Network (I/O multiplexing) ───────────────────────────────────────────
+
+function select(int nfds, address readfds, address writefds, address exceptfds, address timeout) int {
+    int result
+    asm { rax = 23   rdi = nfds   rsi = readfds   rdx = writefds   r10 = exceptfds   r8 = timeout   syscall   result = rax }
+    return result
+}
+
+function pselect6(int nfds, address readfds, address writefds, address exceptfds, address timeout, address sigmask) int {
+    int result
+    asm { rax = 270   rdi = nfds   rsi = readfds   rdx = writefds   r10 = exceptfds   r8 = timeout   r9 = sigmask   syscall   result = rax }
+    return result
+}
+
+function poll(address fds, int nfds, int timeout) int {
+    int result
+    asm { rax = 7   rdi = fds   rsi = nfds   rdx = timeout   syscall   result = rax }
+    return result
+}
+
+function ppoll(address fds, int nfds, address tmo, address sigmask, int sigsetsize) int {
+    int result
+    asm { rax = 271   rdi = fds   rsi = nfds   rdx = tmo   r10 = sigmask   r8 = sigsetsize   syscall   result = rax }
+    return result
+}
+
+function epoll_create1(int flags) int {
+    int result
+    asm { rax = 291   rdi = flags   syscall   result = rax }
+    return result
+}
+
+function epoll_ctl(int epfd, int op, int fd, address event) int {
+    int result
+    asm { rax = 233   rdi = epfd   rsi = op   rdx = fd   r10 = event   syscall   result = rax }
+    return result
+}
+
+function epoll_wait(int epfd, address events, int maxevents, int timeout) int {
+    int result
+    asm { rax = 232   rdi = epfd   rsi = events   rdx = maxevents   r10 = timeout   syscall   result = rax }
+    return result
+}
+
+function epoll_pwait(int epfd, address events, int maxevents, int timeout, address sigmask, int sigsetsize) int {
+    int result
+    asm { rax = 281   rdi = epfd   rsi = events   rdx = maxevents   r10 = timeout   r8 = sigmask   r9 = sigsetsize   syscall   result = rax }
+    return result
+}

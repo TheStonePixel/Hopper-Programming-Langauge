@@ -1,0 +1,7 @@
+// EXPECT_ERROR: MMIO safety violation
+
+int uart_dr @ 0x09000000
+
+entry main {
+    address ptr = uart_dr::address
+}

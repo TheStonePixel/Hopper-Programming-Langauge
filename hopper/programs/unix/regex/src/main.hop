@@ -1,0 +1,811 @@
+// regex — line-oriented pattern search
+//
+// Usage: regex [-nilcvr] <pattern> [file ...]
+//   -n  prefix each matching line with its line number
+//   -i  case-insensitive matching
+//   -l  print only filenames that contain a match
+//   -c  print only a count of matching lines per file
+//   -v  invert: print lines that do NOT match
+//   -r  recurse into directories (default: skip them)
+//
+// With no files, reads stdin.
+
+import Regex      from regex
+import IO         from linux
+import FileSystem from linux
+import SIMD       from x86_64
+
+extern function printf(string fmt, ...) int
+
+
+// Returns true if pat has no special regex metacharacters (pure literal).
+function _patIsLit(address pat) bool {
+    int i = 0
+    while (true) {
+        address p = pat + i
+        byte b = p::value
+        int c = int (b)
+        if (c == 0)  { return true }
+        if (c == 46) { return false }
+        if (c == 42) { return false }
+        if (c == 43) { return false }
+        if (c == 63) { return false }
+        if (c == 91) { return false }
+        if (c == 94) { return false }
+        if (c == 36) { return false }
+        if (c == 92) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+// Length of a null-terminated string (= literal pattern length).
+function _patLen(address pat) int {
+    int n = 0
+    while (true) {
+        address p = pat + n
+        byte b = p::value
+        int c = int (b)
+        if (c == 0) { return n }
+        n = n + 1
+    }
+    return n
+}
+
+// Verify pat[1..plen-1] == text[1..plen-1] (first char already matched by SSE2).
+function _checkLit(address text, address pat, int plen) bool {
+    int k = 1
+    while (k < plen) {
+        address pp = pat + k
+        byte pb = pp::value
+        address tp = text + k
+        byte tb = tp::value
+        if (pb != tb) { return false }
+        k = k + 1
+    }
+    return true
+}
+
+enum Flag {
+    N = 1
+    I = 2
+    L = 4
+    C = 8
+    V = 16
+    R = 32
+}
+
+enum Limits {
+    MAX_FILES = 8192
+    LINE_MAX  = 4096
+    CHUNK     = 65536
+}
+
+function strLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 0) { return n }
+        n = n + 1
+    }
+    return n
+}
+
+function strDup(address s) address {
+    int len = strLen(s)
+    address dst = allocate len + 1
+    int i = 0
+    while (i <= len) {
+        address sp = s + i
+        address dp = dst + i
+        byte b = sp::value
+        dp::value = b
+        i = i + 1
+    }
+    return dst
+}
+
+function strAppend(address src, address dst, int off) int {
+    int i = 0
+    while (true) {
+        address sp = src + i
+        byte b = sp::value
+        int bi = int (b)
+        if (bi == 0) { return off + i }
+        address dp = dst + off + i
+        dp::value = b
+        i = i + 1
+    }
+    return off + i
+}
+
+function strLower(address s, int len) {
+    int i = 0
+    while (i < len) {
+        address p = s + i
+        byte b = p::value
+        int bi = int (b)
+        if (bi >= 65 && bi <= 90) {
+            byte lo = byte ((bi + 32))
+            p::value = lo
+        }
+        i = i + 1
+    }
+}
+
+function direntReclen(address e) int {
+    address rp = e + 16
+    int r = rp::value
+    return r & 0xFFFF
+}
+
+function direntType(address e) int {
+    address tp = e + 18
+    byte t = tp::value
+    return int (t)
+}
+
+function direntIsDot(address e) bool {
+    address np = e + 19
+    byte b0 = np::value
+    int i0 = int (b0)
+    if (i0 != 46) { return false }
+    address np1 = np + 1
+    byte b1 = np1::value
+    int i1 = int (b1)
+    if (i1 == 0) { return true }
+    if (i1 != 46) { return false }
+    address np2 = np + 2
+    byte b2 = np2::value
+    int i2 = int (b2)
+    return i2 == 0
+}
+
+// Lowercase a region of a buffer in-place.
+function lowerRegion(address buf, int start, int len) {
+    int k = 0
+    while (k < len) {
+        address p = buf + start + k
+        byte b = p::value
+        int bi = int (b)
+        if (bi >= 65 && bi <= 90) {
+            byte lo = byte ((bi + 32))
+            p::value = lo
+        }
+        k = k + 1
+    }
+}
+
+function grepFd(StandardRegex re, address pat, int fd, address name, int flags, int showName) int {
+    int flagN = flags & Flag.N
+    int flagI = flags & Flag.I
+    int flagL = flags & Flag.L
+    int flagC = flags & Flag.C
+    int flagV = flags & Flag.V
+
+    address chunk   = allocate Limits.CHUNK + 16
+    address lineBuf = allocate Limits.LINE_MAX
+    address lowBuf  = null
+    if (flagI != 0) { lowBuf = allocate Limits.LINE_MAX }
+    X86SIMD simd = X86SIMD()
+
+    // Literal fast-path: precompute first-char and pattern length once.
+    // Only used when flagI == 0 (casefold always buffers into lowBuf for matchAt).
+    int pIsLit = 0
+    int plen   = 0
+    int pfc    = 0
+    if (flagI == 0) {
+        if (_patIsLit(pat)) {
+            pIsLit = 1
+            plen   = _patLen(pat)
+            if (plen > 0) {
+                address pp0 = pat
+                byte pfb = pp0::value
+                pfc = int (pfb)
+                pfc = pfc & 0xFF
+            }
+        }
+    }
+
+    int lineLen    = 0
+    int lineNum    = 0
+    int matchCount = 0
+    int printed    = 0
+
+    bool eof = false
+    while (!eof) {
+        int nr = read(fd, chunk, Limits.CHUNK)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            int ci = 0
+
+            // lineStart >= 0: current line begins at chunk[lineStart] (no copy yet).
+            // lineStart == -1: line started in a prior chunk (data in lineBuf/lowBuf).
+            int lineStart = -1
+            if (flagI == 0 && lineLen == 0) { lineStart = 0 }
+
+            // lineMatch: true if pattern found in the current in-chunk line.
+            // Only meaningful when lineStart >= 0 && pIsLit && plen > 0.
+            bool lineMatch = false
+
+            // --- 16-bytes-at-a-time SSE2 scan ---
+            while (ci + 16 <= nr) {
+                address wp = chunk + ci
+
+                if (pIsLit != 0 && plen > 0) {
+                    // Literal fast path: scan for first-char AND newline in one load.
+                    int pair   = simd.scanByte2x16(wp, pfc, 10)
+                    int fcMask = pair & 0xFFFF
+                    int nlMask = (pair >> 16) & 0xFFFF
+
+                    if (nlMask == 0) {
+                        // No newline.
+                        if (lineStart >= 0) {
+                            // In-chunk: check fcMask for pattern hits.
+                            int fm = fcMask
+                            while (fm != 0) {
+                                int j = simd.bsf16(fm)
+                                if (ci + j + plen <= nr) {
+                                    if (_checkLit(chunk + ci + j, pat, plen)) {
+                                        lineMatch = true
+                                    }
+                                }
+                                fm = fm & (fm - 1)
+                            }
+                        } else {
+                            // Cross-chunk: copy 16 bytes to lineBuf.
+                            if (lineLen + 16 <= Limits.LINE_MAX - 1) {
+                                address wp1 = chunk + ci
+                                int w1 = wp1::value
+                                address dp1 = lineBuf + lineLen
+                                dp1::value = w1
+                                address wp2 = chunk + ci + 8
+                                int w2 = wp2::value
+                                address dp2 = lineBuf + lineLen + 8
+                                dp2::value = w2
+                                lineLen = lineLen + 16
+                            }
+                        }
+                        ci = ci + 16
+                    } else {
+                        // Newline found — process it.
+                        int pos = simd.bsf16(nlMask)
+                        lineNum = lineNum + 1
+
+                        if (lineStart >= 0) {
+                            // Check fcMask bits before this newline.
+                            int rangeMask = (1 << pos) - 1
+                            int fm = fcMask & rangeMask
+                            while (fm != 0) {
+                                int j = simd.bsf16(fm)
+                                if (ci + j + plen <= nr) {
+                                    if (_checkLit(chunk + ci + j, pat, plen)) {
+                                        lineMatch = true
+                                    }
+                                }
+                                fm = fm & (fm - 1)
+                            }
+
+                            bool shouldOutput = lineMatch
+                            if (flagV != 0) { shouldOutput = !shouldOutput }
+                            if (shouldOutput) {
+                                matchCount = matchCount + 1
+                                if (flagL != 0) {
+                                    if (printed == 0) {
+                                        printf("%s\n", name)
+                                        printed = 1
+                                    }
+                                } else if (flagC == 0) {
+                                    if (showName != 0) { printf("%s:", name) }
+                                    if (flagN != 0) { printf("%lld:", lineNum) }
+                                    address matchFrom = chunk + lineStart
+                                    address nlp = chunk + ci + pos
+                                    byte savedNL = nlp::value
+                                    byte nulB = byte (0)
+                                    nlp::value = nulB
+                                    printf("%s\n", matchFrom)
+                                    nlp::value = savedNL
+                                }
+                            }
+                            lineMatch = false
+                            lineStart = ci + pos + 1
+                        } else {
+                            // Cross-chunk: copy bytes 0..pos-1 then matchAt.
+                            int k = 0
+                            while (k < pos) {
+                                if (lineLen < Limits.LINE_MAX - 1) {
+                                    address sp = chunk + ci + k
+                                    byte sb = sp::value
+                                    address dlp = lineBuf + lineLen
+                                    dlp::value = sb
+                                    lineLen = lineLen + 1
+                                }
+                                k = k + 1
+                            }
+                            address term = lineBuf + lineLen
+                            byte nul = byte (0)
+                            term::value = nul
+                            bool m = re.matchAt(pat, lineBuf)
+                            if (flagV != 0) { m = !m }
+                            if (m) {
+                                matchCount = matchCount + 1
+                                if (flagL != 0) {
+                                    if (printed == 0) {
+                                        printf("%s\n", name)
+                                        printed = 1
+                                    }
+                                } else if (flagC == 0) {
+                                    if (showName != 0) { printf("%s:", name) }
+                                    if (flagN != 0) { printf("%lld:", lineNum) }
+                                    printf("%s\n", lineBuf)
+                                }
+                            }
+                            lineLen = 0
+                            lineMatch = false
+                            lineStart = ci + pos + 1
+                        }
+                        ci = ci + pos + 1
+                    }
+                } else {
+                    // General path: newline scan only, matchAt per line.
+                    int nlMask = simd.scanByte16(wp, 10)
+
+                    if (nlMask == 0) {
+                        if (lineStart >= 0) {
+                            // In-chunk: no copy.
+                        } else {
+                            if (lineLen + 16 <= Limits.LINE_MAX - 1) {
+                                if (flagI == 0) {
+                                    address wp1 = chunk + ci
+                                    int w1 = wp1::value
+                                    address dp1 = lineBuf + lineLen
+                                    dp1::value = w1
+                                    address wp2 = chunk + ci + 8
+                                    int w2 = wp2::value
+                                    address dp2 = lineBuf + lineLen + 8
+                                    dp2::value = w2
+                                } else {
+                                    int k = 0
+                                    while (k < 16) {
+                                        address sp = chunk + ci + k
+                                        byte sb = sp::value
+                                        int sbi = int (sb)
+                                        address dlp = lineBuf + lineLen + k
+                                        dlp::value = sb
+                                        int blo = sbi
+                                        if (blo >= 65 && blo <= 90) { blo = blo + 32 }
+                                        byte bloB = byte (blo)
+                                        address dlw = lowBuf + lineLen + k
+                                        dlw::value = bloB
+                                        k = k + 1
+                                    }
+                                }
+                                lineLen = lineLen + 16
+                            }
+                        }
+                        ci = ci + 16
+                    } else {
+                        int pos = simd.bsf16(nlMask)
+                        lineNum = lineNum + 1
+
+                        if (lineStart >= 0) {
+                            address matchFrom = chunk + lineStart
+                            address nlp = chunk + ci + pos
+                            byte savedNL = nlp::value
+                            byte nulB = byte (0)
+                            nlp::value = nulB
+                            bool m = re.matchAt(pat, matchFrom)
+                            if (flagV != 0) { m = !m }
+                            if (m) {
+                                matchCount = matchCount + 1
+                                if (flagL != 0) {
+                                    if (printed == 0) {
+                                        printf("%s\n", name)
+                                        printed = 1
+                                    }
+                                } else if (flagC == 0) {
+                                    if (showName != 0) { printf("%s:", name) }
+                                    if (flagN != 0) { printf("%lld:", lineNum) }
+                                    printf("%s\n", matchFrom)
+                                }
+                            }
+                            nlp::value = savedNL
+                            lineStart = ci + pos + 1
+                        } else {
+                            int k = 0
+                            while (k < pos) {
+                                if (lineLen < Limits.LINE_MAX - 1) {
+                                    address sp = chunk + ci + k
+                                    byte sb = sp::value
+                                    int sbi = int (sb)
+                                    address dlp = lineBuf + lineLen
+                                    dlp::value = sb
+                                    if (flagI != 0) {
+                                        int blo = sbi
+                                        if (blo >= 65 && blo <= 90) { blo = blo + 32 }
+                                        byte bloB = byte (blo)
+                                        address dlw = lowBuf + lineLen
+                                        dlw::value = bloB
+                                    }
+                                    lineLen = lineLen + 1
+                                }
+                                k = k + 1
+                            }
+                            address term = lineBuf + lineLen
+                            byte nul = byte (0)
+                            term::value = nul
+                            if (flagI != 0) {
+                                address lt = lowBuf + lineLen
+                                lt::value = nul
+                            }
+                            address matchBuf = lineBuf
+                            if (flagI != 0) { matchBuf = lowBuf }
+                            bool m = re.matchAt(pat, matchBuf)
+                            if (flagV != 0) { m = !m }
+                            if (m) {
+                                matchCount = matchCount + 1
+                                if (flagL != 0) {
+                                    if (printed == 0) {
+                                        printf("%s\n", name)
+                                        printed = 1
+                                    }
+                                } else if (flagC == 0) {
+                                    if (showName != 0) { printf("%s:", name) }
+                                    if (flagN != 0) { printf("%lld:", lineNum) }
+                                    printf("%s\n", lineBuf)
+                                }
+                            }
+                            lineLen = 0
+                            lineStart = ci + pos + 1
+                        }
+                        ci = ci + pos + 1
+                    }
+                }
+            }
+
+            // --- tail: remaining < 16 bytes, byte-at-a-time ---
+            while (ci < nr) {
+                address cp = chunk + ci
+                byte b = cp::value
+                int bi = int (b)
+                if (bi == 10) {
+                    lineNum = lineNum + 1
+                    if (lineStart >= 0) {
+                        if (pIsLit != 0 && plen > 0) {
+                            bool shouldOutput = lineMatch
+                            if (flagV != 0) { shouldOutput = !shouldOutput }
+                            if (shouldOutput) {
+                                matchCount = matchCount + 1
+                                if (flagL != 0) {
+                                    if (printed == 0) {
+                                        printf("%s\n", name)
+                                        printed = 1
+                                    }
+                                } else if (flagC == 0) {
+                                    if (showName != 0) { printf("%s:", name) }
+                                    if (flagN != 0) { printf("%lld:", lineNum) }
+                                    address matchFrom = chunk + lineStart
+                                    address nlp = chunk + ci
+                                    byte savedNL = nlp::value
+                                    byte nulB = byte (0)
+                                    nlp::value = nulB
+                                    printf("%s\n", matchFrom)
+                                    nlp::value = savedNL
+                                }
+                            }
+                            lineMatch = false
+                            lineStart = ci + 1
+                        } else {
+                            address matchFrom = chunk + lineStart
+                            address nlp = chunk + ci
+                            byte savedNL = nlp::value
+                            byte nulB = byte (0)
+                            nlp::value = nulB
+                            bool m = re.matchAt(pat, matchFrom)
+                            if (flagV != 0) { m = !m }
+                            if (m) {
+                                matchCount = matchCount + 1
+                                if (flagL != 0) {
+                                    if (printed == 0) {
+                                        printf("%s\n", name)
+                                        printed = 1
+                                    }
+                                } else if (flagC == 0) {
+                                    if (showName != 0) { printf("%s:", name) }
+                                    if (flagN != 0) { printf("%lld:", lineNum) }
+                                    printf("%s\n", matchFrom)
+                                }
+                            }
+                            nlp::value = savedNL
+                            lineStart = ci + 1
+                        }
+                    } else {
+                        address term = lineBuf + lineLen
+                        byte nul = byte (0)
+                        term::value = nul
+                        if (flagI != 0) {
+                            address lt = lowBuf + lineLen
+                            lt::value = nul
+                        }
+                        address matchBuf = lineBuf
+                        if (flagI != 0) { matchBuf = lowBuf }
+                        bool m = re.matchAt(pat, matchBuf)
+                        if (flagV != 0) { m = !m }
+                        if (m) {
+                            matchCount = matchCount + 1
+                            if (flagL != 0) {
+                                if (printed == 0) {
+                                    printf("%s\n", name)
+                                    printed = 1
+                                }
+                            } else if (flagC == 0) {
+                                if (showName != 0) { printf("%s:", name) }
+                                if (flagN != 0) { printf("%lld:", lineNum) }
+                                printf("%s\n", lineBuf)
+                            }
+                        }
+                        lineLen = 0
+                        lineMatch = false
+                        lineStart = ci + 1
+                    }
+                } else {
+                    if (pIsLit != 0 && plen > 0 && lineStart >= 0) {
+                        if (bi == pfc) {
+                            if (ci + plen <= nr) {
+                                if (_checkLit(chunk + ci, pat, plen)) {
+                                    lineMatch = true
+                                }
+                            }
+                        }
+                    } else if (lineStart == -1) {
+                        if (lineLen < Limits.LINE_MAX - 1) {
+                            address lp = lineBuf + lineLen
+                            lp::value = b
+                            if (flagI != 0) {
+                                int blo = bi
+                                if (blo >= 65 && blo <= 90) { blo = blo + 32 }
+                                byte bloB = byte (blo)
+                                address dp = lowBuf + lineLen
+                                dp::value = bloB
+                            }
+                            lineLen = lineLen + 1
+                        }
+                    }
+                }
+                ci = ci + 1
+            }
+
+            // Flush any partial in-chunk line to lineBuf for the next chunk.
+            if (lineStart >= 0 && lineStart < nr) {
+                int k = lineStart
+                while (k < nr) {
+                    if (lineLen < Limits.LINE_MAX - 1) {
+                        address sp = chunk + k
+                        byte sb = sp::value
+                        address dlp = lineBuf + lineLen
+                        dlp::value = sb
+                        lineLen = lineLen + 1
+                    }
+                    k = k + 1
+                }
+            }
+        }
+    }
+
+    if (lineLen > 0) {
+        lineNum = lineNum + 1
+        address term = lineBuf + lineLen
+        byte nul = byte (0)
+        term::value = nul
+        if (flagI != 0) {
+            address lt = lowBuf + lineLen
+            lt::value = nul
+        }
+        address matchBuf = lineBuf
+        if (flagI != 0) { matchBuf = lowBuf }
+        bool m = re.matchAt(pat, matchBuf)
+        if (flagV != 0) { m = !m }
+        if (m) {
+            matchCount = matchCount + 1
+            if (flagL != 0) {
+                if (printed == 0) {
+                    printf("%s\n", name)
+                    printed = 1
+                }
+            } else if (flagC == 0) {
+                if (showName != 0) { printf("%s:", name) }
+                if (flagN != 0) { printf("%lld:", lineNum) }
+                printf("%s\n", lineBuf)
+            }
+        }
+    }
+
+    if (flagC != 0) {
+        if (showName != 0) { printf("%s:", name) }
+        printf("%lld\n", matchCount)
+    }
+
+    if (flagI != 0) { deallocate lowBuf }
+    deallocate lineBuf
+    deallocate chunk
+    return matchCount
+}
+
+function grepFile(StandardRegex re, address pat, address filename, int flags, int showName) int {
+    int fd = open(filename, OpenFlag.O_RDONLY, 0)
+    if (fd < 0) {
+        printf("regex: %s: cannot open\n", filename)
+        return 0
+    }
+    int n = grepFd(re, pat, fd, filename, flags, showName)
+    close(fd)
+    return n
+}
+
+function collectFiles(address pathStr, address filePtrs, address countPtr, int flagR) {
+    int dirfd = open(pathStr, OpenFlag.O_DIRECTORY, 0)
+    if (dirfd < 0) {
+        int cur = countPtr::value
+        if (cur < Limits.MAX_FILES) {
+            address slot = filePtrs + cur * 8
+            slot::value = strDup(pathStr)
+            cur = cur + 1
+            countPtr::value = cur
+        }
+        return
+    }
+    if (flagR == 0) {
+        close(dirfd)
+        return
+    }
+
+    address buf = allocate Limits.CHUNK
+    bool reading = true
+    while (reading) {
+        int nr = getdents64(dirfd, buf, Limits.CHUNK)
+        if (nr <= 0) { reading = false }
+        if (reading) {
+            int off = 0
+            while (off < nr) {
+                address ent = buf + off
+                int reclen = direntReclen(ent)
+                if (reclen <= 0) { off = nr }
+                if (reclen > 0) {
+                    if (!direntIsDot(ent)) {
+                        int dtype = direntType(ent)
+                        address name = ent + 19
+
+                        address child = allocate 4096
+                        int coff = strAppend(pathStr, child, 0)
+                        if (coff > 0) {
+                            address last = child + coff - 1
+                            byte lb = last::value
+                            int lbi = int (lb)
+                            if (lbi != 47) {
+                                address slashp = child + coff
+                                byte slash = byte (47)
+                                slashp::value = slash
+                                coff = coff + 1
+                            }
+                        }
+                        coff = strAppend(name, child, coff)
+                        address termp = child + coff
+                        byte nul = byte (0)
+                        termp::value = nul
+
+                        if (dtype == 8) {
+                            int cur = countPtr::value
+                            if (cur < Limits.MAX_FILES) {
+                                address slot = filePtrs + cur * 8
+                                slot::value = strDup(child)
+                                cur = cur + 1
+                                countPtr::value = cur
+                            }
+                        } else if (dtype == 4) {
+                            collectFiles(child, filePtrs, countPtr, flagR)
+                        }
+                        deallocate child
+                    }
+                    off = off + reclen
+                }
+            }
+        }
+    }
+    deallocate buf
+    close(dirfd)
+}
+
+entry main(int argc, string[] argv) {
+    if (argc < 2) {
+        printf("usage: regex [-nilcvr] <pattern> [file ...]\n")
+        return
+    }
+
+    int flags  = 0
+    int patIdx = 0
+
+    int ai = 1
+    while (ai < argc && patIdx == 0) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = int (a0)
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = int (fc)
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 110) {
+                    flags = flags | Flag.N
+                    fi = fi + 1
+                } else if (fci == 105) {
+                    flags = flags | Flag.I
+                    fi = fi + 1
+                } else if (fci == 108) {
+                    flags = flags | Flag.L
+                    fi = fi + 1
+                } else if (fci == 99) {
+                    flags = flags | Flag.C
+                    fi = fi + 1
+                } else if (fci == 118) {
+                    flags = flags | Flag.V
+                    fi = fi + 1
+                } else if (fci == 114) {
+                    flags = flags | Flag.R
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            patIdx = ai
+        }
+        ai = ai + 1
+    }
+
+    if (patIdx == 0) {
+        printf("regex: missing pattern\n")
+        return
+    }
+
+    address rawPat = argv[patIdx]
+    address pat = strDup(rawPat)
+    if ((flags & Flag.I) != 0) { strLower(pat, strLen(pat)) }
+
+    StandardRegex re = StandardRegex()
+
+    address filePtrs = allocate Limits.MAX_FILES * 8
+    int fileCount = 0
+
+    int fi2 = patIdx + 1
+    while (fi2 < argc) {
+        address farg = argv[fi2]
+        collectFiles(farg, filePtrs, fileCount::address, flags & Flag.R)
+        fi2 = fi2 + 1
+    }
+
+    if (fileCount == 0) {
+        address stdinStr = address ("stdin")
+        grepFd(re, pat, 0, stdinStr, flags, 0)
+    } else {
+        int showName = 0
+        if (fileCount > 1) { showName = 1 }
+        int fi3 = 0
+        while (fi3 < fileCount) {
+            address fs = filePtrs + fi3 * 8
+            address fname = fs::value
+            grepFile(re, pat, fname, flags, showName)
+            deallocate fname
+            fi3 = fi3 + 1
+        }
+    }
+
+    deallocate filePtrs
+    deallocate pat
+}

@@ -1,0 +1,12 @@
+{
+  "name": "factory",
+  "version": "0.1.0",
+  "description": "Factory pattern — shape construction via enum-tagged factory functions",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {},
+  "targets": {
+    "host": {}
+  }
+}

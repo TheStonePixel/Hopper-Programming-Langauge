@@ -1,0 +1,8 @@
+// COMPILE_ONLY
+// XFAIL
+// Verifies all 150+ extern LLVM C API declarations and StandardLLVM class compile
+// (linking fails without libLLVM installed — marked XFAIL)
+import LLVM from llvm
+
+extern function printf(string fmt, ...) int
+entry main { }

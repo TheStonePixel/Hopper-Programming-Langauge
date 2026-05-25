@@ -1,0 +1,89 @@
+// factory.hop — Factory pattern: object construction by enum tag
+//
+// Factory functions select the right constructor based on a ShapeKind tag.
+// All shapes share the same contract (area, perimeter, print) regardless of
+// which factory created them — callers never construct shapes directly.
+//
+// Demonstrates: enum dispatch, tagged union via class, uniform contract,
+//               encapsulating construction logic in named factory functions.
+//
+// Build: hopper build factory.hop
+
+extern function printf(string fmt, ...) int
+
+// ── shape kinds ───────────────────────────────────────────────────────────────
+
+enum ShapeKind {
+    Circle    = 0
+    Rectangle = 1
+    Triangle  = 2
+}
+
+// ── Shape — tagged representation ────────────────────────────────────────────
+
+class Shape {
+    int kind    // ShapeKind variant
+    int a       // Circle: radius;  Rectangle/Triangle: width or base
+    int b       // Circle: unused;  Rectangle: height;  Triangle: height
+
+    constructor(int k, int x, int y) {
+        self.kind = k
+        self.a    = x
+        self.b    = y
+    }
+
+    function area() int {
+        if (self.kind == ShapeKind.Circle)    { return self.a * self.a * 3 }
+        if (self.kind == ShapeKind.Rectangle) { return self.a * self.b }
+        if (self.kind == ShapeKind.Triangle)  { return (self.a * self.b) / 2 }
+        return 0
+    }
+
+    function perimeter() int {
+        if (self.kind == ShapeKind.Circle)    { return self.a * 6 }
+        if (self.kind == ShapeKind.Rectangle) { return 2 * (self.a + self.b) }
+        if (self.kind == ShapeKind.Triangle)  { return self.a + self.b + self.a }
+        return 0
+    }
+
+    function print() {
+        if (self.kind == ShapeKind.Circle) {
+            printf("circle(r=%lld):      area=%lld  perimeter=%lld\n", self.a, self.area(), self.perimeter())
+        }
+        if (self.kind == ShapeKind.Rectangle) {
+            printf("rectangle(%lldx%lld):  area=%lld  perimeter=%lld\n", self.a, self.b, self.area(), self.perimeter())
+        }
+        if (self.kind == ShapeKind.Triangle) {
+            printf("triangle(%lld,%lld):   area=%lld  perimeter=%lld\n", self.a, self.b, self.area(), self.perimeter())
+        }
+    }
+}
+
+// ── factory functions ─────────────────────────────────────────────────────────
+
+function makeCircle(int radius) Shape {
+    Shape s = Shape(ShapeKind.Circle, radius, 0)
+    return s
+}
+
+function makeRectangle(int w, int h) Shape {
+    Shape s = Shape(ShapeKind.Rectangle, w, h)
+    return s
+}
+
+function makeTriangle(int base, int height) Shape {
+    Shape s = Shape(ShapeKind.Triangle, base, height)
+    return s
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    Shape c = makeCircle(5)
+    Shape r = makeRectangle(6, 4)
+    Shape t = makeTriangle(3, 4)
+
+    c.print()
+    r.print()
+    t.print()
+}

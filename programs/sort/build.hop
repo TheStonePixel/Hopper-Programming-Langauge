@@ -1,8 +1,0 @@
-const name    = "sort"
-const version = "0.1.0"
-const entry   = "sort.hop"
-const target  = "linux/x86_64"
-
-import io    from linux
-import array from ds
-import sort  from algo

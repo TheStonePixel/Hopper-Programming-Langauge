@@ -1,7 +1,0 @@
-
-import io from core
-entry main(int argc, string[] argv) {
-
-	print("Hello, Hopper")
-	return 0
-}

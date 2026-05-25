@@ -1,0 +1,25 @@
+{
+  "name": "core",
+  "version": "0.1.0",
+  "description": "Core utilities: assert/panic, print helpers, TestSuite, ErrorCode enum",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {
+    "arch": "0.1.0"
+  },
+  "exports": {
+    "Core": {
+      "contract":      "interfaces/Core.hop",
+      "implementation": "src/Core.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Core": {
+        "from":           "core",
+        "contract":      "interfaces/Core.hop",
+        "implementation": "src/Core.hop"
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "patterns",
+  "version": "0.1.0",
+  "description": "Design pattern tests for the Hopper language",
+  "license": "MIT",
+  "type": "library",
+  "targets": {
+    "host": {
+      "Array": {
+        "from":           "ds",
+        "contract":      "../../modules/ds/contracts/Array.hop",
+        "implementation": "../../modules/ds/src/Array.hop"
+      }
+    }
+  }
+}

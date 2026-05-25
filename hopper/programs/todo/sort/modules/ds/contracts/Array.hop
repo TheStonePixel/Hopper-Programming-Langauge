@@ -1,0 +1,15 @@
+interface Array {
+    function len() int
+    function cap() int
+    function get(int i) address
+    function set(int i, address val)
+    function push(address val)
+    function pop() address
+    function peek() address
+    function empty() bool
+    function reset()
+    function contains(address val) bool
+    function indexOf(address val) int
+    function remove(int i)
+    function insert(int i, address val)
+}

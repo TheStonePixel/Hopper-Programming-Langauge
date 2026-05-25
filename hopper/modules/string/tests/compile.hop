@@ -1,0 +1,6 @@
+// COMPILE_ONLY
+// Verifies AsciiString class and IString contract compile
+import IString from string
+
+entry main {
+}

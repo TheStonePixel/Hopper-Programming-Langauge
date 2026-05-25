@@ -1,0 +1,103 @@
+// strategy.hop — Strategy pattern: swappable algorithm via stored callback
+//
+// A Validator context holds a pluggable validation function as an address.
+// Swapping the strategy at runtime changes validation behaviour without
+// touching any other part of the system.
+//
+// Demonstrates: stored callback as policy, setStrategy() swap,
+//               higher-order countPassing(), address casting.
+//
+// Build: hopper build strategy.hop
+
+import Array from ds
+
+extern function printf(string fmt, ...) int
+
+// ── strategies — all share the signature (int) -> int ─────────────────────────
+//   return 1 = pass, 0 = fail
+
+function isPositive(int n) int {
+    if (n > 0) { return 1 }
+    return 0
+}
+
+function isEven(int n) int {
+    if ((n % 2) == 0) { return 1 }
+    return 0
+}
+
+function isInByte(int n) int {
+    if (n >= 0 && n <= 255) { return 1 }
+    return 0
+}
+
+function isNonZero(int n) int {
+    if (n != 0) { return 1 }
+    return 0
+}
+
+// ── Validator — strategy context ──────────────────────────────────────────────
+
+class Validator {
+    address strategy     // callback(int) int — 1=pass, 0=fail
+
+    constructor(address fn) {
+        self.strategy = fn
+    }
+
+    function setStrategy(address fn) {
+        self.strategy = fn
+    }
+
+    function check(int value) int {
+        callback(int) int fn  = address (self.strategy)
+        return fn(value)
+    }
+
+    function countPassing(StandardArray values) int {
+        int passed = 0
+        int i = 0
+        while (i < values.len()) {
+            callback(int) int fn  = address (self.strategy)
+            address _a = values.get(i)
+            int val = int (_a)
+            passed = passed + fn(val)
+            i = i + 1
+        }
+        return passed
+    }
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    StandardArray nums = StandardArray(8)
+    address _n0 = address (-5)
+    nums.push(_n0)
+    address _n1 = address (0)
+    nums.push(_n1)
+    address _n2 = address (3)
+    nums.push(_n2)
+    address _n3 = address (8)
+    nums.push(_n3)
+    address _n4 = address (-2)
+    nums.push(_n4)
+    address _n5 = address (12)
+    nums.push(_n5)
+    address _n6 = address (7)
+    nums.push(_n6)
+
+    int n = nums.len()
+
+    Validator v = Validator(isPositive::address)
+    printf("isPositive: %lld/%lld pass\n", v.countPassing(nums), n)
+
+    v.setStrategy(isEven::address)
+    printf("isEven:     %lld/%lld pass\n", v.countPassing(nums), n)
+
+    v.setStrategy(isNonZero::address)
+    printf("isNonZero:  %lld/%lld pass\n", v.countPassing(nums), n)
+
+    v.setStrategy(isInByte::address)
+    printf("isInByte:   %lld/%lld pass\n", v.countPassing(nums), n)
+}

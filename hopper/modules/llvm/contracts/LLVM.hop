@@ -1,0 +1,17 @@
+interface LLVM {
+    function contextCreate() address
+    function contextDispose(address ctx)
+    function moduleCreate(address ctx, address name) address
+    function moduleDispose(address module)
+    function moduleDump(address module)
+    function moduleVerify(address module) int
+    function modulePrintToString(address module) address
+    function moduleWriteBitcode(address module, address path) int
+    function disposeMessage(address msg)
+    function builderCreate(address ctx) address
+    function builderDispose(address builder)
+    function builderPositionAtEnd(address builder, address block)
+    function passManagerCreate() address
+    function passManagerDispose(address pm)
+    function passManagerRun(address pm, address module) int
+}

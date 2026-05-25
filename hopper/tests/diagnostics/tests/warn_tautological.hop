@@ -1,0 +1,10 @@
+// EXPECT_ERROR: Redundant constraint
+
+function identity(int x) int
+requires true
+{
+    return x
+}
+
+entry main {
+}

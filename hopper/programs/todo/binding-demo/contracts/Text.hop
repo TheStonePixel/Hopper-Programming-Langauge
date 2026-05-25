@@ -1,0 +1,4 @@
+interface Text {
+    function greet()
+    function describe() int
+}

@@ -1,0 +1,28 @@
+{
+  "name": "ls",
+  "version": "0.1.0",
+  "description": "",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "linux": "0.1.0",
+    "x86_64": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "IO": {
+        "from": "linux",
+        "contract": "modules/linux/contracts/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
+      },
+      "FileSystem": {
+        "from": "linux",
+        "contract": "modules/linux/contracts/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "inline": true
+      }
+    }
+  }
+}

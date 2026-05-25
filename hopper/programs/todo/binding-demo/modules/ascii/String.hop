@@ -1,0 +1,11 @@
+extern function printf(string fmt, ...) int
+
+class String {
+    function greet() {
+        printf("hello from ascii.String\n")
+    }
+
+    function describe() int {
+        return 1
+    }
+}

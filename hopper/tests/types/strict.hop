@@ -1,0 +1,12 @@
+// Tests MMIO declaration — hardware register placed at physical address
+// On Linux: SIGSEGV proves the volatile store actually targeted the address.
+// On bare metal: writes reach the hardware register.
+// EXPECT_SEGFAULT
+
+int uart_dr @ 0x40021000
+int uart_sr @ 0x40021004
+
+entry main {
+    uart_dr = 65
+    int status = uart_sr
+}

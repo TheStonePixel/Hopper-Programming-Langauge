@@ -1,0 +1,9 @@
+// EXPECT_ERROR: Unused variable
+
+function compute(int x) int {
+    int unused = x * 2
+    return x
+}
+
+entry main {
+}

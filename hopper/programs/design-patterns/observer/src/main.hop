@@ -1,0 +1,85 @@
+// observer.hop — Observer pattern: event-driven pub/sub via callback tables
+//
+// An Observable stores a list of subscriber callbacks as addresses.
+// When its value changes every subscriber is called with the old and new
+// value in the order it subscribed.  New subscribers added at runtime
+// are included in subsequent notifications.
+//
+// Demonstrates: Array<address> dispatch table, runtime subscribe,
+//               callback casting, event notification loop.
+//
+// Build: hopper build observer.hop
+
+import Array from ds
+
+extern function printf(string fmt, ...) int
+
+// ── event handlers ────────────────────────────────────────────────────────────
+
+function onLog(int old, int next) int {
+    printf("log:   %lld -> %lld\n", old, next)
+    return 0
+}
+
+function onAudit(int old, int next) int {
+    int delta = next - old
+    printf("audit: delta=%lld\n", delta)
+    return 0
+}
+
+function onAlert(int old, int next) int {
+    printf("alert: value is now %lld\n", next)
+    return 0
+}
+
+// ── Observable ────────────────────────────────────────────────────────────────
+
+class Observable {
+    int            value
+    StandardArray listeners
+
+    constructor(int initial) {
+        self.value     = initial
+        self.listeners = StandardArray(8)
+    }
+
+    function get() int {
+        return self.value
+    }
+
+    function subscribe(address handler) {
+        self.listeners.push(handler)
+    }
+
+    function set(int newVal) {
+        int old = self.value
+        self.value = newVal
+        int i = 0
+        while (i < self.listeners.len()) {
+            address fn = self.listeners.get(i)
+            callback(int, int) int handler = address (fn)
+            handler(old, newVal)
+            i = i + 1
+        }
+    }
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    Observable counter = Observable(0)
+
+    counter.subscribe(onLog::address)
+    counter.subscribe(onAudit::address)
+
+    printf("-- set 10 --\n")
+    counter.set(10)
+
+    printf("-- set 25 --\n")
+    counter.set(25)
+
+    counter.subscribe(onAlert::address)
+
+    printf("-- set 5 --\n")
+    counter.set(5)
+}

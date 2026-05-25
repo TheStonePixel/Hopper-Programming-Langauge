@@ -1,0 +1,29 @@
+---
+title: "Hopper Programming Language"
+subtitle: "Language Specification — Section 1: Language"
+author: "The Hopper Project"
+date: "2026"
+lang: en
+
+geometry: "margin=1in"
+fontsize: 11pt
+mainfont: "DejaVu Serif"
+monofont: "DejaVu Sans Mono"
+monofontoptions: "Scale=0.85"
+
+toc: true
+toc-depth: 3
+number-sections: true
+colorlinks: true
+linkcolor: "blue"
+urlcolor: "blue"
+
+header-includes:
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+  - \fancyhead[L]{Hopper Language Specification}
+  - \fancyhead[R]{\thepage}
+  - \fancyfoot[C]{}
+  - \usepackage{listings}
+  - \lstset{basicstyle=\ttfamily\small, breaklines=true}
+---

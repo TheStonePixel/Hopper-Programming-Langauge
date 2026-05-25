@@ -1,8 +1,0 @@
-{
-  "name": "x86_64",
-  "version": "0.1.0",
-  "description": "Raw x86-64 syscall bindings (do not import directly)",
-  "license": "Apache-2.0",
-  "type": "library",
-  "main": "src/io.hop"
-}

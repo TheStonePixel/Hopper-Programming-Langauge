@@ -1,0 +1,21 @@
+interface IString {
+    function length() int
+    function capacity() int
+    function isEmpty() bool
+    function pointer() address
+    function get(int i) byte
+    function equals(address other) bool
+    function contains(address sub) bool
+    function startsWith(address prefix) bool
+    function endsWith(address suffix) bool
+    function indexOf(address sub) int
+    function clear()
+    function set(address src)
+    function appendStr(address src)
+    function appendChar(byte c)
+    function appendInt(int n)
+    function reverse()
+    function trimLeft()
+    function trimRight()
+    function trim()
+}

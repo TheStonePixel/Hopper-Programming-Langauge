@@ -1,8 +1,0 @@
-{
-  "name": "linux",
-  "version": "0.1.0",
-  "description": "Linux OS syscall wrappers \u2014 fork, exec, sockets, timers",
-  "license": "Apache-2.0",
-  "type": "library",
-  "main": "src/io.hop"
-}

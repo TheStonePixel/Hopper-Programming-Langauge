@@ -1,0 +1,22 @@
+{
+  "name": "dnd",
+  "version": "0.1.0",
+  "description": "Bare-metal D&D dungeon crawler — dice, combat, ASCII adventure on QEMU virt",
+  "license": "MIT",
+  "type": "executable",
+  "board": "qemu-virt",
+  "sources": [
+    "modules/uart/contracts/Uart.hop",
+    "modules/uart/src/QemuUart.hop",
+    "modules/string/contracts/IString.hop",
+    "modules/string/src/AsciiString.hop",
+    "modules/dice/src/Dice.hop",
+    "src/game.hop",
+    "src/main.hop"
+  ],
+  "dependencies": {
+    "uart": "0.1.0",
+    "string": "0.1.0",
+    "dice": "0.1.0"
+  }
+}

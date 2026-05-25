@@ -1,0 +1,388 @@
+// Buffer — text buffer as parallel arrays of heap-allocated lines
+
+extern function memcpy(address dst, address src, int n) address
+
+enum BufferLimits {
+    MAX_LINES = 4096
+    INIT_CAP  = 64
+}
+
+class StandardBuffer satisfies Buffer {
+    address dataArr
+    address lenArr
+    address capArr
+    int count
+    int dirty
+    address fname
+
+    constructor() {
+        self.dataArr = allocate BufferLimits.MAX_LINES * 8
+        self.lenArr  = allocate BufferLimits.MAX_LINES * 8
+        self.capArr  = allocate BufferLimits.MAX_LINES * 8
+        self.count   = 0
+        self.dirty   = 0
+        self.fname   = null
+    }
+
+    destructor() {
+        int i = 0
+        while (i < self.count) {
+            address slot = self.dataArr + i * 8
+            int pval = slot::value
+            if (pval != 0) {
+                address d = address (pval)
+                deallocate d
+            }
+            i = i + 1
+        }
+        deallocate self.dataArr
+        deallocate self.lenArr
+        deallocate self.capArr
+        if (int (self.fname) != 0) {
+            deallocate self.fname
+        }
+    }
+
+    function _lineData(int i) address {
+        address slot = self.dataArr + i * 8
+        int pval = slot::value
+        return address (pval)
+    }
+
+    function _lineLen(int i) int {
+        address slot = self.lenArr + i * 8
+        int v = slot::value
+        return v
+    }
+
+    function _lineCap(int i) int {
+        address slot = self.capArr + i * 8
+        int v = slot::value
+        return v
+    }
+
+    function _setData(int i, address ptr) {
+        address slot = self.dataArr + i * 8
+        slot::value = int (ptr)
+    }
+
+    function _setLen(int i, int len) {
+        address slot = self.lenArr + i * 8
+        slot::value = len
+    }
+
+    function _setCap(int i, int cap) {
+        address slot = self.capArr + i * 8
+        slot::value = cap
+    }
+
+    function lineCount() int { return self.count }
+
+    function getDirty() int { return self.dirty }
+
+    function isDirty() bool {
+        if (self.dirty == 1) { return true }
+        return false
+    }
+
+    function lineData(int row) address {
+        return self._lineData(row)
+    }
+
+    function lineLen(int row) int {
+        return self._lineLen(row)
+    }
+
+    function lineAt(int i) address {
+        return self._lineData(i)
+    }
+
+    function filename() address {
+        return self.fname
+    }
+
+    function setFilename(address name) {
+        if (int (self.fname) != 0) {
+            deallocate self.fname
+        }
+        int nlen = 0
+        while (true) {
+            address p = name + nlen
+            byte b = p::value
+            int bi = int (b)
+            if (bi == 0) { break }
+            nlen = nlen + 1
+        }
+        address buf = allocate nlen + 1
+        int i = 0
+        while (i < nlen) {
+            address src = name + i
+            address dst = buf + i
+            byte b = src::value
+            dst::value = b
+            i = i + 1
+        }
+        address term = buf + nlen
+        byte zero = 0
+        term::value = zero
+        self.fname = buf
+    }
+
+    function appendLine(address src) {
+        int srclen = 0
+        if (int (src) != 0) {
+            while (true) {
+                address p = src + srclen
+                byte b = p::value
+                int bi = int (b)
+                if (bi == 0) { break }
+                srclen = srclen + 1
+            }
+        }
+        int cap = BufferLimits.INIT_CAP
+        if (srclen + 1 > cap) { cap = srclen + 1 }
+        address data = allocate cap
+        if (srclen > 0 && int (src) != 0) {
+            memcpy(data, src, srclen)
+        }
+        int row = self.count
+        self._setData(row, data)
+        self._setLen(row, srclen)
+        self._setCap(row, cap)
+        self.count = self.count + 1
+    }
+
+    function _appendRaw(address src, int srclen) {
+        int cap = BufferLimits.INIT_CAP
+        if (srclen + 1 > cap) { cap = srclen + 1 }
+        address data = allocate cap
+        if (srclen > 0 && int (src) != 0) {
+            memcpy(data, src, srclen)
+        }
+        int row = self.count
+        self._setData(row, data)
+        self._setLen(row, srclen)
+        self._setCap(row, cap)
+        self.count = self.count + 1
+    }
+
+    function ensureNonempty() {
+        if (self.count == 0) {
+            self._appendRaw(null, 0)
+        }
+    }
+
+    function _growLine(int row, int need) {
+        int cap = self._lineCap(row)
+        if (need <= cap) { return }
+        int newcap = cap * 2
+        if (newcap < need) { newcap = need }
+        address old = self._lineData(row)
+        address nd = allocate newcap
+        int len = self._lineLen(row)
+        if (len > 0 && int (old) != 0) {
+            memcpy(nd, old, len)
+        }
+        if (int (old) != 0) { deallocate old }
+        self._setData(row, nd)
+        self._setCap(row, newcap)
+    }
+
+    function insertChar(int row, int col, byte b) {
+        int len = self._lineLen(row)
+        self._growLine(row, len + 2)
+        address data = self._lineData(row)
+        int i = len
+        while (i > col) {
+            address dst = data + i
+            address src = data + i - 1
+            byte ch = src::value
+            dst::value = ch
+            i = i - 1
+        }
+        address cp = data + col
+        cp::value = b
+        self._setLen(row, len + 1)
+        self.dirty = 1
+    }
+
+    function insertCharAt(int row, int col, byte b) {
+        self.insertChar(row, col, b)
+    }
+
+    function deleteChar(int row, int col) {
+        if (row < 0) { return }
+        if (row >= self.count) { return }
+        int len = self._lineLen(row)
+        if (col < 0) { return }
+        if (col >= len) { return }
+        address data = self._lineData(row)
+        int i = col
+        while (i < len - 1) {
+            address dst = data + i
+            address src = data + i + 1
+            byte ch = src::value
+            dst::value = ch
+            i = i + 1
+        }
+        self._setLen(row, len - 1)
+        self.dirty = 1
+    }
+
+    function deleteCharAt(int row, int col) {
+        self.deleteChar(row, col)
+    }
+
+    function insertNewline(int row) {
+        self.splitLine(row, self._lineLen(row))
+    }
+
+    function deleteLine(int row) {
+        if (row < 0) { return }
+        if (row >= self.count) { return }
+        address slot = self.dataArr + row * 8
+        int pval = slot::value
+        if (pval != 0) {
+            address d = address (pval)
+            deallocate d
+        }
+        int i = row
+        while (i < self.count - 1) {
+            address ds = self.dataArr + i * 8
+            address ls = self.lenArr  + i * 8
+            address cs = self.capArr  + i * 8
+            address dn = self.dataArr + (i + 1) * 8
+            address ln = self.lenArr  + (i + 1) * 8
+            address cn = self.capArr  + (i + 1) * 8
+            int dv = dn::value
+            int lv = ln::value
+            int cv = cn::value
+            ds::value = dv
+            ls::value = lv
+            cs::value = cv
+            i = i + 1
+        }
+        self.count = self.count - 1
+        self.dirty = 1
+    }
+
+    function joinLines(int row) {
+        if (row + 1 >= self.count) { return }
+        int len0 = self._lineLen(row)
+        int len1 = self._lineLen(row + 1)
+        self._growLine(row, len0 + len1 + 1)
+        address data0 = self._lineData(row)
+        address data1 = self._lineData(row + 1)
+        address dst = data0 + len0
+        if (len1 > 0) { memcpy(dst, data1, len1) }
+        self._setLen(row, len0 + len1)
+        if (int (data1) != 0) { deallocate data1 }
+        int i = row + 1
+        while (i < self.count - 1) {
+            address ds = self.dataArr + i * 8
+            address ls = self.lenArr  + i * 8
+            address cs = self.capArr  + i * 8
+            address dn = self.dataArr + (i + 1) * 8
+            address ln = self.lenArr  + (i + 1) * 8
+            address cn = self.capArr  + (i + 1) * 8
+            int dv = dn::value
+            int lv = ln::value
+            int cv = cn::value
+            ds::value = dv
+            ls::value = lv
+            cs::value = cv
+            i = i + 1
+        }
+        self.count = self.count - 1
+        self.dirty = 1
+    }
+
+    function splitLine(int row, int col) {
+        int len = self._lineLen(row)
+        address data = self._lineData(row)
+        int taillen = len - col
+        address tail = data + col
+        self._appendRaw(tail, taillen)
+        int last = self.count - 1
+        while (last > row + 1) {
+            address da = self.dataArr + last * 8
+            address la = self.lenArr  + last * 8
+            address ca = self.capArr  + last * 8
+            address db = self.dataArr + (last - 1) * 8
+            address lb = self.lenArr  + (last - 1) * 8
+            address cb = self.capArr  + (last - 1) * 8
+            int dav = da::value
+            int lav = la::value
+            int cav = ca::value
+            int dbv = db::value
+            int lbv = lb::value
+            int cbv = cb::value
+            da::value = dbv
+            la::value = lbv
+            ca::value = cbv
+            db::value = dav
+            lb::value = lav
+            cb::value = cav
+            last = last - 1
+        }
+        self._setLen(row, col)
+        self.dirty = 1
+    }
+
+    function load(address data, int len) {
+        int start = 0
+        int i = 0
+        while (i <= len) {
+            address cp = data + i
+            int ch = 0
+            if (i < len) {
+                byte b = cp::value
+                ch = int (b)
+            }
+            if (ch == 10) {
+                address lstart = data + start
+                self._appendRaw(lstart, i - start)
+                start = i + 1
+            }
+            if (i == len) {
+                if (i > start) {
+                    address lstart = data + start
+                    self._appendRaw(lstart, i - start)
+                }
+            }
+            i = i + 1
+        }
+        if (self.count == 0) {
+            self._appendRaw(null, 0)
+        }
+        self.dirty = 0
+    }
+
+    function flatten(address outLen) address {
+        int total = 0
+        int i = 0
+        while (i < self.count) {
+            total = total + self._lineLen(i) + 1
+            i = i + 1
+        }
+        address out = allocate total + 1
+        int pos = 0
+        i = 0
+        while (i < self.count) {
+            address d = self._lineData(i)
+            int l = self._lineLen(i)
+            if (l > 0 && int (d) != 0) {
+                address dst = out + pos
+                memcpy(dst, d, l)
+                pos = pos + l
+            }
+            address nl = out + pos
+            byte newline = 10
+            nl::value = newline
+            pos = pos + 1
+            i = i + 1
+        }
+        outLen::value = pos
+        return out
+    }
+}

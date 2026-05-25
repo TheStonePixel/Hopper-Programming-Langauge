@@ -1,0 +1,26 @@
+// Tests else-if chaining
+// EXPECT: medium
+// EXPECT: big
+// EXPECT: small
+// EXPECT: zero
+
+extern function printf(string fmt, ...) int
+
+function classify(int x) {
+    if (x > 100) {
+        printf("big\n")
+    } else if (x > 10) {
+        printf("medium\n")
+    } else if (x > 0) {
+        printf("small\n")
+    } else {
+        printf("zero\n")
+    }
+}
+
+entry main {
+    classify(50)
+    classify(200)
+    classify(5)
+    classify(0)
+}

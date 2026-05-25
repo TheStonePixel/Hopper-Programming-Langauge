@@ -1,0 +1,125 @@
+function _swap(address arr, int i, int j) {
+    address pi = arr + i * 8
+    address pj = arr + j * 8
+    address vi = pi::value
+    address vj = pj::value
+    pi::value = vj
+    pj::value = vi
+}
+
+function _partition(address arr, int lo, int hi, callback(address, address) int cmp) int {
+    address pivot = arr + hi * 8
+    address pv = pivot::value
+    int i = lo - 1
+    int j = lo
+    while (j < hi) {
+        address pj = arr + j * 8
+        address vj = pj::value
+        int c = cmp(vj, pv)
+        if (c <= 0) {
+            i = i + 1
+            _swap(arr, i, j)
+        }
+        j = j + 1
+    }
+    _swap(arr, i + 1, hi)
+    return i + 1
+}
+
+function _quickSortRange(address arr, int lo, int hi, callback(address, address) int cmp) {
+    if (lo >= hi) { return }
+    int p = _partition(arr, lo, hi, cmp)
+    _quickSortRange(arr, lo, p - 1, cmp)
+    _quickSortRange(arr, p + 1, hi, cmp)
+}
+
+function _mergeParts(address arr, int lo, int mid, int hi, address scratch, callback(address, address) int cmp) {
+    int i = lo
+    int j = mid + 1
+    int k = lo
+    while (i <= mid) {
+        if (j > hi) {
+            address pi = arr + i * 8
+            address ps = scratch + k * 8
+            address vi = pi::value
+            ps::value = vi
+            i = i + 1
+            k = k + 1
+        } else {
+            address pi = arr + i * 8
+            address pj = arr + j * 8
+            address vi = pi::value
+            address vj = pj::value
+            int c = cmp(vi, vj)
+            if (c <= 0) {
+                address ps = scratch + k * 8
+                ps::value = vi
+                i = i + 1
+            } else {
+                address ps = scratch + k * 8
+                ps::value = vj
+                j = j + 1
+            }
+            k = k + 1
+        }
+    }
+    while (j <= hi) {
+        address pj = arr + j * 8
+        address ps = scratch + k * 8
+        address vj = pj::value
+        ps::value = vj
+        j = j + 1
+        k = k + 1
+    }
+    int m = lo
+    while (m <= hi) {
+        address ps = scratch + m * 8
+        address pa = arr + m * 8
+        address vs = ps::value
+        pa::value = vs
+        m = m + 1
+    }
+}
+
+function _mergeSortRange(address arr, int lo, int hi, address scratch, callback(address, address) int cmp) {
+    if (lo >= hi) { return }
+    int mid = (lo + hi) / 2
+    _mergeSortRange(arr, lo, mid, scratch, cmp)
+    _mergeSortRange(arr, mid + 1, hi, scratch, cmp)
+    _mergeParts(arr, lo, mid, hi, scratch, cmp)
+}
+
+class StandardAlgo satisfies Algo {
+    function insertionSort(address arr, int len, callback(address, address) int cmp) {
+        int i = 1
+        while (i < len) {
+            address pi = arr + i * 8
+            address key = pi::value
+            int j = i - 1
+            while (j >= 0) {
+                address pj = arr + j * 8
+                address vj = pj::value
+                int c = cmp(vj, key)
+                if (c <= 0) { break }
+                address pj1 = arr + (j + 1) * 8
+                pj1::value = vj
+                j = j - 1
+            }
+            address pj1 = arr + (j + 1) * 8
+            pj1::value = key
+            i = i + 1
+        }
+    }
+
+    function quickSort(address arr, int len, callback(address, address) int cmp) {
+        if (len <= 1) { return }
+        _quickSortRange(arr, 0, len - 1, cmp)
+    }
+
+    function mergeSort(address arr, int len, callback(address, address) int cmp) {
+        if (len <= 1) { return }
+        address scratch = allocate len * 8
+        _mergeSortRange(arr, 0, len - 1, scratch, cmp)
+        deallocate scratch
+    }
+}

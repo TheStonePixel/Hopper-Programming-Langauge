@@ -1,0 +1,13 @@
+interface Cast {
+    function ptrToInt(address ptr) int
+    function intToPtr(int n) address
+    function byteToInt(byte b) int
+    function ubyteToInt(byte b) int
+    function intToByte(int n) byte
+    function charToInt(byte c) int
+    function intToChar(int n) byte
+    function floatToInt(float f) int
+    function intToFloat(int n) float
+    function boolToInt(bool b) int
+    function intToBool(int n) bool
+}

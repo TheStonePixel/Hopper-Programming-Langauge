@@ -1,0 +1,11 @@
+// COMPILE_ONLY
+// A fully clean program — no warnings, no errors.
+
+function add(int a, int b) int {
+    int result = a + b
+    return result
+}
+
+entry main {
+    int _sum = add(1, 2)
+}

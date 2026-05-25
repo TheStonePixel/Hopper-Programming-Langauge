@@ -1,0 +1,148 @@
+// main.hop — application layer
+//
+// This file knows nothing about hardware. It only sees:
+//   - PL011 (a class that satisfies IO — defined in pl011.hop)
+//   - Array<int> (a generic buffer — defined in modules/array)
+//
+// Abstraction stack visible in this file alone:
+//   floor  →  uart.putc / uart.getc     (IO contract method calls)
+//   middle →  linebuf.push / .get / .clear  (Array<int> operations)
+//   ceiling → application logic: read a line, save it, replay it
+//
+// The hardware specifics — bitfield PL011FR, uart_dr @ 0x09000000 — live
+// entirely in pl011.hop. Swap that file for a different UART and this file
+// does not change at all.
+//
+// Build and run:
+//   hopper build
+//   hopper flash        (launches QEMU for board: qemu-virt)
+//   Ctrl-A X to exit QEMU
+
+entry main {
+    // Instantiate the UART driver — one object wraps all MMIO detail
+    PL011 uart = PL011()
+
+    // Fixed-capacity line buffer backed by the bare-metal bump allocator
+    // (128 ints = 128 bytes, since each element is 8 bytes in the Array layout)
+    Array<int> linebuf = Array<int>(128)
+
+    // ── Banner ────────────────────────────────────────────────────────────
+    // Prove TX works before entering the interactive loop.
+    // One putc per character: char literals compile to their ASCII int value.
+
+    uart.putc('H')
+    uart.putc('o')
+    uart.putc('p')
+    uart.putc('p')
+    uart.putc('e')
+    uart.putc('r')
+    uart.putc(' ')
+    uart.putc('b')
+    uart.putc('a')
+    uart.putc('r')
+    uart.putc('e')
+    uart.putc('-')
+    uart.putc('m')
+    uart.putc('e')
+    uart.putc('t')
+    uart.putc('a')
+    uart.putc('l')
+    uart.putc('\r')
+    uart.putc('\n')
+
+    uart.putc('T')
+    uart.putc('y')
+    uart.putc('p')
+    uart.putc('e')
+    uart.putc(' ')
+    uart.putc('a')
+    uart.putc(' ')
+    uart.putc('l')
+    uart.putc('i')
+    uart.putc('n')
+    uart.putc('e')
+    uart.putc(',')
+    uart.putc(' ')
+    uart.putc('p')
+    uart.putc('r')
+    uart.putc('e')
+    uart.putc('s')
+    uart.putc('s')
+    uart.putc(' ')
+    uart.putc('E')
+    uart.putc('n')
+    uart.putc('t')
+    uart.putc('e')
+    uart.putc('r')
+    uart.putc('\r')
+    uart.putc('\n')
+    uart.putc('\r')
+    uart.putc('\n')
+
+    // ── Main loop ─────────────────────────────────────────────────────────
+    // Read one character at a time from the UART.
+    // Accumulate into linebuf until Enter (carriage return) arrives.
+    // On Enter: report how many chars were saved, then replay the whole line.
+
+    while (1 == 1) {
+        int c = uart.getc()     // block until a byte arrives
+        uart.putc(c)            // echo it back so the user sees what they typed
+
+        if (c == '\r') {
+            // Complete the line ending
+            uart.putc('\n')
+
+            // Print "[Saved N chars]" — N is linebuf.length()
+            // Integer printing without a runtime: long divide to extract each digit.
+            int n = linebuf.length()
+
+            uart.putc('[')
+            uart.putc('S')
+            uart.putc('a')
+            uart.putc('v')
+            uart.putc('e')
+            uart.putc('d')
+            uart.putc(' ')
+
+            if (n >= 100) {
+                uart.putc(48 + n / 100)
+                uart.putc(48 + n / 10 - n / 100 * 10)
+                uart.putc(48 + n - n / 10 * 10)
+            } else {
+                if (n >= 10) {
+                    uart.putc(48 + n / 10)
+                    uart.putc(48 + n - n / 10 * 10)
+                } else {
+                    uart.putc(48 + n)
+                }
+            }
+
+            uart.putc(' ')
+            uart.putc('c')
+            uart.putc('h')
+            uart.putc('a')
+            uart.putc('r')
+            uart.putc('s')
+            uart.putc(']')
+            uart.putc('\r')
+            uart.putc('\n')
+
+            // Replay every char we stored — using Array<int>.get(i)
+            // This proves that linebuf held the data correctly across the loop.
+            int i = 0
+            while (i < linebuf.length()) {
+                uart.putc(linebuf.get(i))
+                i = i + 1
+            }
+            uart.putc('\r')
+            uart.putc('\n')
+            uart.putc('\r')
+            uart.putc('\n')
+
+            // Reset the buffer for the next line (keeps the allocated memory)
+            linebuf.clear()
+        } else {
+            linebuf.push(c)     // accumulate into the buffer
+        }
+    }
+}

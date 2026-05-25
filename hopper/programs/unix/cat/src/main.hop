@@ -1,0 +1,151 @@
+// cat — concatenate and print files
+//
+// Usage: cat [-n] [file ...]
+//   -n  number all output lines
+//   default: copy stdin/files to stdout
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    CHUNK = 65536
+}
+
+// Write lineNum right-aligned in 6 chars + tab to stdout.
+// Uses numBuf (must be >= 8 bytes). Avoids printf buffering vs write() ordering.
+function writeLineNum(int lineNum, address numBuf) {
+    int k = 0
+    while (k < 6) {
+        address p = numBuf + k
+        byte sp = 32
+        p::value = sp
+        k = k + 1
+    }
+    address tp = numBuf + 6
+    byte tab = 9
+    tp::value = tab
+    int pos = 5
+    int m = lineNum
+    while (m > 0) {
+        int digit = m % 10
+        int dc = digit + 48
+        byte db = byte (dc)
+        address dp = numBuf + pos
+        dp::value = db
+        m = m / 10
+        pos = pos - 1
+    }
+    write(1, numBuf, 7)
+}
+
+function catFd(int fd, address buf, address numBuf, int lineNum, bool showN) int {
+    bool eof = false
+    bool atLineStart = true
+    while (!eof) {
+        int nr = read(fd, buf, Limits.CHUNK)
+        if (nr <= 0) {
+            eof = true
+        } else if (!showN) {
+            int written = 0
+            bool err = false
+            while (written < nr && !err) {
+                int w = write(1, buf + written, nr - written)
+                if (w <= 0) { err = true } else { written = written + w }
+            }
+            if (err) { eof = true }
+        } else {
+            int i = 0
+            while (i < nr) {
+                if (atLineStart) {
+                    writeLineNum(lineNum, numBuf)
+                    lineNum = lineNum + 1
+                    atLineStart = false
+                }
+                int j = i
+                bool foundNl = false
+                while (j < nr) {
+                    address p = buf + j
+                    byte b = p::value
+                    int c = int (b)
+                    if (c == 10) {
+                        foundNl = true
+                        break
+                    }
+                    j = j + 1
+                }
+                if (foundNl) {
+                    write(1, buf + i, j - i + 1)
+                    atLineStart = true
+                    i = j + 1
+                } else {
+                    write(1, buf + i, nr - i)
+                    i = nr
+                }
+            }
+        }
+    }
+    return lineNum
+}
+
+function catFile(address filename, address buf, address numBuf, int lineNum, bool showN) int {
+    int fd = open(filename, OpenFlag.O_RDONLY, 0)
+    if (fd < 0) {
+        printf("cat: %s: cannot open\n", filename)
+        return lineNum
+    }
+    int result = catFd(fd, buf, numBuf, lineNum, showN)
+    close(fd)
+    return result
+}
+
+entry main(int argc, string[] argv) {
+    bool showN = false
+    int firstFile = 0
+
+    int ai = 1
+    while (ai < argc && firstFile == 0) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = int (a0)
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = int (fc)
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 110) {
+                    showN = true
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            firstFile = ai
+        }
+        ai = ai + 1
+    }
+
+    address buf    = allocate Limits.CHUNK + 16
+    address numBuf = allocate 8
+    int lineNum = 1
+
+    if (firstFile == 0) {
+        catFd(0, buf, numBuf, lineNum, showN)
+    } else {
+        int fi2 = firstFile
+        while (fi2 < argc) {
+            address fname = argv[fi2]
+            lineNum = catFile(fname, buf, numBuf, lineNum, showN)
+            fi2 = fi2 + 1
+        }
+    }
+
+    deallocate buf
+    deallocate numBuf
+}

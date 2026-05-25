@@ -1,0 +1,5 @@
+interface Editor {
+    function open_file(string path)
+    function ensure_nonempty()
+    function run()
+}

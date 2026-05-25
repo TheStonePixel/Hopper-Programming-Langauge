@@ -1,0 +1,28 @@
+{
+  "name": "math",
+  "version": "0.1.0",
+  "description": "Integer math: abs, min, max, clamp, pow, factorial, gcd, lcm, fib, isqrt",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Math": {
+      "contract":      "interfaces/Math.hop",
+      "implementation": "src/Math.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Math": {
+        "from":           "math",
+        "contract":      "interfaces/Math.hop",
+        "implementation": "src/Math.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "contract":      "../core/contracts/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
+  }
+}

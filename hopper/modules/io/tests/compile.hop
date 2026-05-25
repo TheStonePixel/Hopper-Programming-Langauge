@@ -1,0 +1,7 @@
+// COMPILE_ONLY
+// Verifies FileReader, FileWriter, and file free-functions compile cleanly
+import FileReader from io
+import FileWriter from io
+
+entry main {
+}

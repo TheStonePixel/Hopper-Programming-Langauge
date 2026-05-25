@@ -1,0 +1,264 @@
+// find — recursive file search
+//
+// Usage: find [path] [-name PATTERN] [-type f|d] [-maxdepth N]
+
+import IO         from linux
+import FileSystem from linux
+
+extern function printf(string fmt, ...) int
+
+enum Limits {
+    BUFSZ    = 65536
+    PATHBUF  = 4096
+}
+
+function strLen(address s) int {
+    int n = 0
+    while (true) {
+        address p = s + n
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 0) { return n }
+        n = n + 1
+    }
+}
+
+function strEq(address a, address b) bool {
+    int i = 0
+    while (true) {
+        address ap = a + i
+        address bp = b + i
+        byte ab = ap::value
+        byte bb = bp::value
+        int ac = int (ab)
+        int bc = int (bb)
+        if (ac != bc) { return false }
+        if (ac == 0)  { return true }
+        i = i + 1
+    }
+    return true
+}
+
+function parseInt(address s) int {
+    int n = 0
+    int i = 0
+    bool done = false
+    while (!done) {
+        address p = s + i
+        byte b = p::value
+        int c = int (b)
+        if (c >= 48 && c <= 57) {
+            n = n * 10 + c - 48
+            i = i + 1
+        } else {
+            done = true
+        }
+    }
+    return n
+}
+
+function globMatch(address pat, address name) bool {
+    int pi = 0
+    int ni = 0
+    int starPi = -1
+    int starNi = -1
+    bool running = true
+    bool matched = false
+
+    while (running) {
+        address pp = pat + pi
+        byte pb = pp::value
+        int pc = int (pb)
+        address np = name + ni
+        byte nb = np::value
+        int nc = int (nb)
+
+        if (pc == 0 && nc == 0) {
+            matched = true
+            running = false
+        } else if (pc == 42) {
+            starPi = pi
+            starNi = ni
+            pi = pi + 1
+        } else if (nc != 0 && (pc == 63 || pc == nc)) {
+            pi = pi + 1
+            ni = ni + 1
+        } else if (starPi != -1 && nc != 0) {
+            starNi = starNi + 1
+            ni = starNi
+            pi = starPi + 1
+        } else {
+            running = false
+        }
+    }
+    return matched
+}
+
+function direntReclen(address e) int {
+    address rp = e + 16
+    int r = rp::value
+    return r & 0xFFFF
+}
+
+function direntType(address e) int {
+    address tp = e + 18
+    byte t = tp::value
+    return int (t)
+}
+
+function isDot(address name) bool {
+    byte b0 = name::value
+    int i0 = int (b0)
+    if (i0 != 46) { return false }
+    address p1 = name + 1
+    byte b1 = p1::value
+    int i1 = int (b1)
+    if (i1 == 0) { return true }
+    if (i1 != 46) { return false }
+    address p2 = name + 2
+    byte b2 = p2::value
+    int i2 = int (b2)
+    return i2 == 0
+}
+
+function buildPath(address dir, int dlen, address name, address out) int {
+    int i = 0
+    while (i < dlen) {
+        address sp = dir + i
+        byte sb = sp::value
+        address dp = out + i
+        dp::value = sb
+        i = i + 1
+    }
+    address lastp = dir + dlen - 1
+    byte lastb = lastp::value
+    int lasti = int (lastb)
+    int pos = dlen
+    if (lasti != 47) {
+        address slashp = out + pos
+        byte slash = 47
+        slashp::value = slash
+        pos = pos + 1
+    }
+    int ni = 0
+    int nlen = strLen(name)
+    while (ni < nlen) {
+        address sp = name + ni
+        byte sb = sp::value
+        address dp = out + pos + ni
+        dp::value = sb
+        ni = ni + 1
+    }
+    address termp = out + pos + nlen
+    byte nul = byte (0)
+    termp::value = nul
+    return pos + nlen
+}
+
+function doFind(address path, address namePattern, int typeFilter, int maxDepth, int depth) {
+    if (maxDepth >= 0 && depth >= maxDepth) { return }
+
+    int fd = open(path, OpenFlag.O_RDONLY | OpenFlag.O_DIRECTORY, 0)
+    if (fd < 0) { return }
+
+    address buf     = allocate Limits.BUFSZ
+    address pathbuf = allocate Limits.PATHBUF
+    int plen = strLen(path)
+
+    bool reading = true
+    while (reading) {
+        int nr = getdents64(fd, buf, Limits.BUFSZ)
+        if (nr <= 0) {
+            reading = false
+        }
+        if (reading) {
+            int off = 0
+            while (off < nr) {
+                address ent = buf + off
+                int reclen = direntReclen(ent)
+                if (reclen <= 0) {
+                    off = nr
+                }
+                if (reclen > 0) {
+                    address name = ent + 19
+                    if (!isDot(name)) {
+                        int dtype = direntType(ent)
+                        buildPath(path, plen, name, pathbuf)
+
+                        bool matchName = true
+                        if (namePattern != null) {
+                            matchName = globMatch(namePattern, name)
+                        }
+                        bool matchType = true
+                        if (typeFilter == 102 && dtype != 8) { matchType = false }
+                        if (typeFilter == 100 && dtype != 4) { matchType = false }
+
+                        if (matchName && matchType) {
+                            printf("%s\n", pathbuf)
+                        }
+
+                        if (dtype == 4) {
+                            doFind(pathbuf, namePattern, typeFilter, maxDepth, depth + 1)
+                        }
+                    }
+                    off = off + reclen
+                }
+            }
+        }
+    }
+
+    deallocate pathbuf
+    deallocate buf
+    close(fd)
+}
+
+entry main(int argc, string[] argv) {
+    address startPath = address (".")
+    address namePattern = null
+    int typeFilter      = 0
+    int maxDepth        = -1
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = int (a0)
+        if (a0i == 45) {
+            address nflag = address ("-name")
+            address tflag = address ("-type")
+            address mflag = address ("-maxdepth")
+            if (strEq(arg, nflag)) {
+                if (ai + 1 < argc) {
+                    namePattern = argv[ai + 1]
+                    ai = ai + 2
+                } else {
+                    ai = ai + 1
+                }
+            } else if (strEq(arg, tflag)) {
+                if (ai + 1 < argc) {
+                    address tv = argv[ai + 1]
+                    byte tvb = tv::value
+                    typeFilter = int (tvb)
+                    ai = ai + 2
+                } else {
+                    ai = ai + 1
+                }
+            } else if (strEq(arg, mflag)) {
+                if (ai + 1 < argc) {
+                    maxDepth = parseInt(argv[ai + 1])
+                    ai = ai + 2
+                } else {
+                    ai = ai + 1
+                }
+            } else {
+                ai = ai + 1
+            }
+        } else {
+            startPath = arg
+            ai = ai + 1
+        }
+    }
+
+    printf("%s\n", startPath)
+    doFind(startPath, namePattern, typeFilter, maxDepth, 0)
+}

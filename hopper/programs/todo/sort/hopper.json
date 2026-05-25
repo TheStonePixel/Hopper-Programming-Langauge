@@ -1,0 +1,20 @@
+{
+  "name": "sort",
+  "version": "0.1.0",
+  "description": "Generic sort with callback comparators — filter, map, reduce, forEach",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "sort.hop",
+  "dependencies": {
+    "ds": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "Array": {
+        "from": "ds",
+        "contract": "modules/ds/contracts/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
+      }
+    }
+  }
+}

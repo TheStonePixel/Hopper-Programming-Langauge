@@ -1,0 +1,81 @@
+// TEST: area visitor
+// EXPECT: areas:      75  24  6
+
+// TEST: perimeter visitor
+// EXPECT: perimeters: 30  20  10
+
+// TEST: describe visitor
+// EXPECT: circle    r=5
+// EXPECT: rect      6x4
+// EXPECT: triangle  base=3 h=4
+
+extern function printf(string fmt, ...) int
+
+enum ShapeKind {
+    Circle    = 0
+    Rectangle = 1
+    Triangle  = 2
+}
+
+class Shape {
+    int kind
+    int a
+    int b
+
+    constructor(int k, int x, int y) {
+        self.kind = k
+        self.a    = x
+        self.b    = y
+    }
+
+    function accept(address visitor) int {
+        callback(int, int, int) int fn = address (visitor)
+        return fn(self.kind, self.a, self.b)
+    }
+}
+
+function makeCircle(int r) Shape {
+    Shape s = Shape(ShapeKind.Circle, r, 0)
+    return s
+}
+function makeRect(int w, int h) Shape {
+    Shape s = Shape(ShapeKind.Rectangle, w, h)
+    return s
+}
+function makeTri(int b, int h) Shape {
+    Shape s = Shape(ShapeKind.Triangle, b, h)
+    return s
+}
+
+function visitArea(int kind, int a, int b) int {
+    if (kind == ShapeKind.Circle)    { return a * a * 3 }
+    if (kind == ShapeKind.Rectangle) { return a * b }
+    if (kind == ShapeKind.Triangle)  { return (a * b) / 2 }
+    return 0
+}
+
+function visitPerimeter(int kind, int a, int b) int {
+    if (kind == ShapeKind.Circle)    { return a * 6 }
+    if (kind == ShapeKind.Rectangle) { return 2 * (a + b) }
+    if (kind == ShapeKind.Triangle)  { return a + b + a }
+    return 0
+}
+
+function visitDescribe(int kind, int a, int b) int {
+    if (kind == ShapeKind.Circle)    { printf("circle    r=%lld\n", a) }
+    if (kind == ShapeKind.Rectangle) { printf("rect      %lldx%lld\n", a, b) }
+    if (kind == ShapeKind.Triangle)  { printf("triangle  base=%lld h=%lld\n", a, b) }
+    return 0
+}
+
+entry main {
+    Shape c = makeCircle(5)
+    Shape r = makeRect(6, 4)
+    Shape t = makeTri(3, 4)
+
+    printf("areas:      %lld  %lld  %lld\n", c.accept(visitArea::address), r.accept(visitArea::address), t.accept(visitArea::address))
+    printf("perimeters: %lld  %lld  %lld\n", c.accept(visitPerimeter::address), r.accept(visitPerimeter::address), t.accept(visitPerimeter::address))
+    c.accept(visitDescribe::address)
+    r.accept(visitDescribe::address)
+    t.accept(visitDescribe::address)
+}

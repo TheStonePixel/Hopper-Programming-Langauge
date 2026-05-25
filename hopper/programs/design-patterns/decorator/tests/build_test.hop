@@ -1,0 +1,6 @@
+// Verifies decorator compiles successfully
+// COMPILE_ONLY
+
+extern function printf(string fmt, ...) int
+
+entry main { }

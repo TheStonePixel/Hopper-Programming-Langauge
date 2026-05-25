@@ -1,0 +1,4 @@
+interface Regex {
+    function match(address pattern, address text) int
+    function matchAt(address pattern, address text) bool
+}

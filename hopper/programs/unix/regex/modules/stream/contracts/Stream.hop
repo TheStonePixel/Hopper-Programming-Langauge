@@ -1,0 +1,11 @@
+interface Stream {
+    function peek() byte
+    function advance()
+    function remaining() int
+    function atEnd() bool
+    function reset()
+    function peekAt(int offset) byte
+    function pos() int
+    function advanceBy(int n)
+    function scan16dual(int bc1, int bc2) int
+}

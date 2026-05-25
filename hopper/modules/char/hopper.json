@@ -1,0 +1,28 @@
+{
+  "name": "char",
+  "version": "0.1.0",
+  "description": "Character classification and conversion: isAlpha, isDigit, toUpper, toLower, etc.",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Char": {
+      "contract":      "interfaces/Char.hop",
+      "implementation": "src/Char.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Char": {
+        "from":           "char",
+        "contract":      "interfaces/Char.hop",
+        "implementation": "src/Char.hop"
+      },
+      "Core": {
+        "from":           "core",
+        "contract":      "../core/contracts/Core.hop",
+        "implementation": "../core/src/Core.hop"
+      }
+    }
+  }
+}

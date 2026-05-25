@@ -1,0 +1,5 @@
+// EXPECT_ERROR: Undeclared function
+
+entry main {
+    doesNotExist(42)
+}

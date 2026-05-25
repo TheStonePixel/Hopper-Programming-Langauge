@@ -1,0 +1,890 @@
+// htop.hop — live process monitor
+//
+// Reads /proc every second, computes per-process and system CPU%,
+// and renders a full-terminal dashboard.
+//
+// Layout:
+//   hopper-top ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//   CPU  [████████████░░░░░░░░]  42.3%
+//   MEM  [████░░░░░░░░░░░░░░░░]   3.2 GB / 16.0 GB
+//
+//     PID     CPU%      MEM  ST  COMMAND
+//    1234    42.3%   142 MB   R  firefox
+
+import IO         from linux
+import FileSystem from linux
+import System     from linux
+import Array      from ds
+import Map        from ds
+
+// ── OutputBuf — growable byte buffer for terminal rendering ───────────────────
+
+class OutputBuf {
+    address data
+    int length
+    int capacity
+
+    constructor(int cap) {
+        self.capacity = cap
+        self.length   = 0
+        self.data     = allocate cap
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow(int needed) {
+        int newCap = self.capacity * 2
+        if (newCap < needed) { newCap = needed }
+        address nb = allocate newCap
+        int i = 0
+        while (i < self.length) {
+            address s = self.data + i
+            address d = nb + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        deallocate self.data
+        self.data     = nb
+        self.capacity = newCap
+    }
+
+    function clear() {
+        self.length = 0
+    }
+
+    function pointer() address {
+        return self.data
+    }
+
+    function length() int {
+        return self.length
+    }
+
+    // Append a single byte value (as int for convenience).
+    function appendByte(int bi) {
+        if (self.length + 1 > self.capacity) { self._grow(self.length + 2) }
+        byte b = byte (bi)
+        address p = self.data + self.length
+        p::value = b
+        self.length = self.length + 1
+    }
+
+    // Append a null-terminated string literal / address.
+    function appendLiteral(address src) {
+        int i = 0
+        while (true) {
+            address p = src + i
+            byte b = p::value
+            int bv = int (b)
+            if (bv == 0) { break }
+            self.appendByte(bv)
+            i = i + 1
+        }
+    }
+
+    // Append a decimal integer.
+    function appendNumber(int n) {
+        if (n < 0) {
+            self.appendByte(45)
+            n = 0 - n
+        }
+        if (n == 0) {
+            self.appendByte(48)
+            return
+        }
+        address tmp = allocate 24
+        int count = 0
+        int v = n
+        while (v > 0) {
+            int d = v - (v / 10) * 10
+            int dch = d + 48
+            byte db = byte (dch)
+            address tp = tmp + count
+            tp::value = db
+            count = count + 1
+            v = v / 10
+        }
+        int i = count - 1
+        while (i >= 0) {
+            address tp = tmp + i
+            byte b = tp::value
+            int bv = int (b)
+            self.appendByte(bv)
+            i = i - 1
+        }
+        deallocate tmp
+    }
+}
+
+// ── dirent64 helpers ──────────────────────────────────────────────────────────
+
+function direntReclen(address e) int {
+    address rp = e + 16
+    int r = rp::value
+    return r & 0xFFFF
+}
+
+function isDotEntry(address e) bool {
+    address np = e + 19
+    byte b0 = np::value
+    int i0 = int (b0)
+    if (i0 != 46) { return false }
+    address np1 = np + 1
+    byte b1 = np1::value
+    int i1 = int (b1)
+    if (i1 == 0)  { return true }
+    if (i1 != 46) { return false }
+    address np2 = np + 2
+    byte b2 = np2::value
+    int i2 = int (b2)
+    return i2 == 0
+}
+
+// ── string / number helpers ───────────────────────────────────────────────────
+
+function isAllDigits(address s) bool {
+    int i = 0
+    while (true) {
+        address p = s + i
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 0)  { return i > 0 }
+        if (bi < 48)  { return false }
+        if (bi > 57)  { return false }
+        i = i + 1
+    }
+    return false
+}
+
+function strToInt(address s) int {
+    int n = 0
+    int i = 0
+    while (true) {
+        address p = s + i
+        byte b = p::value
+        int bi = int (b)
+        if (bi < 48 || bi > 57) { return n }
+        n = n * 10 + (bi - 48)
+        i = i + 1
+    }
+    return n
+}
+
+// Write decimal integer n into dst. Returns number of digits written.
+function intToAddr(int n, address dst) int {
+    if (n == 0) {
+        byte z = byte (48)
+        dst::value = z
+        address ep = dst + 1
+        byte nul = byte (0)
+        ep::value = nul
+        return 1
+    }
+    address tmp = allocate 24
+    int len = 0
+    int v = n
+    while (v > 0) {
+        int d = v % 10
+        byte db = byte ((d + 48))
+        address tp = tmp + len
+        tp::value = db
+        v = v / 10
+        len = len + 1
+    }
+    int i = 0
+    while (i < len) {
+        address tp = tmp + (len - 1 - i)
+        byte b = tp::value
+        address dp = dst + i
+        dp::value = b
+        i = i + 1
+    }
+    address ep = dst + len
+    byte nul = byte (0)
+    ep::value = nul
+    deallocate tmp
+    return len
+}
+
+// Build /proc/<pid>/stat into pathBuf.
+function buildStatPath(int pid, address pathBuf) {
+    // "/proc/"
+    address prefix = address ("/proc/")
+    int i = 0
+    while (true) {
+        address sp = prefix + i
+        byte b = sp::value
+        int bi = int (b)
+        address dp = pathBuf + i
+        dp::value = b
+        if (bi == 0) { break }
+        i = i + 1
+    }
+    // i is now at the null terminator position = 6
+    int pidLen = intToAddr(pid, pathBuf + i)
+    i = i + pidLen
+    // "/stat"
+    address suffix = address ("/stat")
+    int j = 0
+    while (true) {
+        address sp = suffix + j
+        byte b = sp::value
+        int bi = int (b)
+        address dp = pathBuf + i + j
+        dp::value = b
+        if (bi == 0) { break }
+        j = j + 1
+    }
+}
+
+// Open path, read into buf, close. Returns bytes read or -1.
+function readFile(address pathBuf, address buf, int maxLen) int {
+    int fd = open(pathBuf, 0, 0)
+    if (fd < 0) { return -1 }
+    int n = read(fd, buf, maxLen)
+    close(fd)
+    if (n < 0) { return -1 }
+    if (n < maxLen) {
+        address ep = buf + n
+        byte z = byte (0)
+        ep::value = z
+    }
+    return n
+}
+
+// Advance pos past current token and following whitespace.
+function nextField(address buf, int pos) int {
+    // skip non-whitespace
+    while (true) {
+        address p = buf + pos
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 0 || bi == 32 || bi == 10 || bi == 9) { break }
+        pos = pos + 1
+    }
+    // skip whitespace
+    while (true) {
+        address p = buf + pos
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 0 || (bi != 32 && bi != 10 && bi != 9)) { return pos }
+        pos = pos + 1
+    }
+    return pos
+}
+
+// Parse decimal integer (handles leading '-') at buf[pos].
+function parseIntAt(address buf, int pos) int {
+    bool neg = false
+    address p0 = buf + pos
+    byte b0 = p0::value
+    int bi0 = int (b0)
+    if (bi0 == 45) {
+        neg = true
+        pos = pos + 1
+    }
+    int n = 0
+    while (true) {
+        address p = buf + pos
+        byte b = p::value
+        int bi = int (b)
+        if (bi < 48 || bi > 57) { break }
+        n = n * 10 + (bi - 48)
+        pos = pos + 1
+    }
+    if (neg) { n = 0 - n }
+    return n
+}
+
+// True if buf[pos..] starts with the null-terminated string pat.
+function matchesAt(address buf, int pos, string pat) bool {
+    address pp = address (pat)
+    int i = 0
+    while (true) {
+        address pp2 = pp + i
+        byte pb = pp2::value
+        int pbi = int (pb)
+        if (pbi == 0) { return true }
+        address bp = buf + pos + i
+        byte bb = bp::value
+        int bbi = int (bb)
+        if (bbi != pbi) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+// ── /proc/pid/stat parser ─────────────────────────────────────────────────────
+
+function parseProcStat(address buf, int n, address utimeOut, address stimeOut, address vsizeKBOut, address rssKBOut, address stateOut, address nameDst) {
+    // Find closing ')' — scan backwards to handle parens in comm
+    int closeP = n - 1
+    while (closeP > 0) {
+        address p = buf + closeP
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 41) { break }   // ')'
+        closeP = closeP - 1
+    }
+
+    // Find opening '(' to extract name
+    int openP = 0
+    while (openP < closeP) {
+        address p = buf + openP
+        byte b = p::value
+        int bi = int (b)
+        if (bi == 40) { break }   // '('
+        openP = openP + 1
+    }
+
+    // Copy name
+    int nameLen = closeP - openP - 1
+    if (nameLen < 0) { nameLen = 0 }
+    if (nameLen > 31) { nameLen = 31 }
+    int k = 0
+    while (k < nameLen) {
+        address sp = buf + openP + 1 + k
+        byte b = sp::value
+        address dp = nameDst + k
+        dp::value = b
+        k = k + 1
+    }
+    address nulp = nameDst + nameLen
+    byte nul = byte (0)
+    nulp::value = nul
+
+    // Parse fields after ')'
+    int pos = closeP + 1
+
+    // Skip space, read state char (field 3)
+    pos = nextField(buf, pos)
+    address sp2 = buf + pos
+    byte state = sp2::value
+    int stateInt = int (state)
+    stateOut::value = stateInt
+    pos = pos + 1
+
+    // 11 nextField calls → field 14 (utime)
+    int f = 0
+    while (f < 11) {
+        pos = nextField(buf, pos)
+        f = f + 1
+    }
+    utimeOut::value = parseIntAt(buf, pos)
+
+    pos = nextField(buf, pos)   // → field 15 (stime)
+    stimeOut::value = parseIntAt(buf, pos)
+
+    pos = nextField(buf, pos)   // → field 16
+
+    // 7 nextField calls → field 23 (vsize, bytes)
+    f = 0
+    while (f < 7) {
+        pos = nextField(buf, pos)
+        f = f + 1
+    }
+    int vsize = parseIntAt(buf, pos)
+    vsizeKBOut::value = vsize / 1024
+
+    pos = nextField(buf, pos)   // → field 24 (rss, pages)
+    rssKBOut::value = parseIntAt(buf, pos) * 4
+}
+
+// ── /proc/stat parser ─────────────────────────────────────────────────────────
+
+function parseCPUStat(address buf, int n, address totalOut, address idleOut) {
+    // Skip "cpu" token
+    int pos = nextField(buf, 0)
+    int user    = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int nice    = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int system  = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int idle    = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int iowait  = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int irq     = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int softirq = parseIntAt(buf, pos)
+    pos = nextField(buf, pos)
+    int steal   = parseIntAt(buf, pos)
+    totalOut::value = user + nice + system + idle + iowait + irq + softirq + steal
+    idleOut::value  = idle + iowait
+}
+
+// ── /proc/meminfo parser ──────────────────────────────────────────────────────
+
+function parseMemInfo(address buf, int n, address totalKBOut, address availKBOut) {
+    totalKBOut::value = 0
+    availKBOut::value = 0
+    int pos = 0
+    while (pos < n) {
+        if (matchesAt(buf, pos, "MemTotal:")) {
+            pos = nextField(buf, pos)
+            totalKBOut::value = parseIntAt(buf, pos)
+        }
+        if (matchesAt(buf, pos, "MemAvailable:")) {
+            pos = nextField(buf, pos)
+            availKBOut::value = parseIntAt(buf, pos)
+        }
+        // advance to next line
+        while (pos < n) {
+            address p = buf + pos
+            byte b = p::value
+            int bi = int (b)
+            pos = pos + 1
+            if (bi == 10) { break }
+        }
+    }
+}
+
+// ── Monitor ───────────────────────────────────────────────────────────────────
+// Arrays store ints as addresses (cast). Map stores pid->ticks (both cast).
+
+class Monitor {
+    StandardArray pids
+    StandardArray ut
+    StandardArray st
+    StandardArray vmKB
+    StandardArray rssKB
+    StandardArray cpu10
+    StandardArray states
+    StandardArray names
+    StandardArray order
+    StandardMap   prevTicks
+    int prevTotal
+    int prevIdle
+    int memTotalKB
+    int memAvailKB
+    int sysCpu10
+    OutputBuf out
+
+    constructor() {
+        self.pids      = StandardArray(512)
+        self.ut        = StandardArray(512)
+        self.st        = StandardArray(512)
+        self.vmKB      = StandardArray(512)
+        self.rssKB     = StandardArray(512)
+        self.cpu10     = StandardArray(512)
+        self.states    = StandardArray(512)
+        self.names     = StandardArray(512)
+        self.order     = StandardArray(512)
+        self.prevTicks = StandardMap(512)
+        self.prevTotal = 0
+        self.prevIdle  = 0
+        self.memTotalKB = 0
+        self.memAvailKB = 0
+        self.sysCpu10  = 0
+        self.out       = OutputBuf(131072)
+    }
+
+    // Free name buffers and reset all per-frame arrays.
+    function clearProcs() {
+        int i = 0
+        int cnt = self.names.len()
+        while (i < cnt) {
+            address n = self.names.get(i)
+            deallocate n
+            i = i + 1
+        }
+        self.pids.reset()
+        self.ut.reset()
+        self.st.reset()
+        self.vmKB.reset()
+        self.rssKB.reset()
+        self.cpu10.reset()
+        self.states.reset()
+        self.names.reset()
+        self.order.reset()
+    }
+
+    function collectProcs(address readBuf, address pathBuf, address dirBuf) {
+        int procFd = open("/proc", 0, 0)
+        if (procFd < 0) { return }
+        int dirN = getdents64(procFd, dirBuf, 65536)
+        close(procFd)
+        if (dirN <= 0) { return }
+
+        int doff = 0
+        while (doff < dirN) {
+            address e = dirBuf + doff
+            int reclen = direntReclen(e)
+            if (reclen <= 0) { break }
+            doff = doff + reclen
+
+            if (isDotEntry(e)) { continue }
+
+            address namePtr = e + 19
+            if (!isAllDigits(namePtr)) { continue }
+
+            int pid = strToInt(namePtr)
+            buildStatPath(pid, pathBuf)
+
+            int n = readFile(pathBuf, readBuf, 65536)
+            if (n <= 0) { continue }
+
+            address nameBuf = allocate 64
+            int utime   = 0
+            int stime   = 0
+            int vsizeKB = 0
+            int rssKB   = 0
+            int state   = 0
+
+            parseProcStat(readBuf, n, utime::address, stime::address, vsizeKB::address, rssKB::address, state::address, nameBuf)
+
+            address pidA = address (pid)
+            address utimeA = address (utime)
+            address stimeA = address (stime)
+            address vsizeA = address (vsizeKB)
+            address rssKBA = address (rssKB)
+            address stateA = address (state)
+            self.pids.push(pidA)
+            self.ut.push(utimeA)
+            self.st.push(stimeA)
+            self.vmKB.push(vsizeA)
+            self.rssKB.push(rssKBA)
+            self.states.push(stateA)
+            self.names.push(nameBuf)
+            address zero = address (0)
+            self.cpu10.push(zero)
+        }
+    }
+
+    function computeCPU(address readBuf, address pathBuf) {
+        // System-wide CPU
+        address statPath = address ("/proc/stat")
+        int n = readFile(statPath, readBuf, 65536)
+        if (n > 0) {
+            int totalCPU = 0
+            int idleCPU  = 0
+            parseCPUStat(readBuf, n, totalCPU::address, idleCPU::address)
+            int deltaTotal = totalCPU - self.prevTotal
+            int deltaIdle  = idleCPU  - self.prevIdle
+            if (deltaTotal > 0) {
+                int active = deltaTotal - deltaIdle
+                self.sysCpu10 = active * 1000 / deltaTotal
+            }
+            self.prevTotal = totalCPU
+            self.prevIdle  = idleCPU
+        }
+
+        // Per-process CPU
+        int count = self.pids.len()
+        int i = 0
+        while (i < count) {
+            address pidA = self.pids.get(i)
+            int pid = int (pidA)
+            address utA = self.ut.get(i)
+            int utv = int (utA)
+            address stA = self.st.get(i)
+            int stv = int (stA)
+            int curr = utv + stv
+            int prev = 0
+            address pidKey = address (pid)
+            if (self.prevTicks.contains(pidKey)) {
+                address prevA = self.prevTicks.get(pidKey)
+                prev = int (prevA)
+            }
+            int delta = curr - prev
+            if (delta < 0) { delta = 0 }
+            int c10 = 0
+            int dTot = self.prevTotal
+            if (dTot > 0) {
+                c10 = delta * 1000 / (dTot / 100)
+                if (c10 > 9999) { c10 = 9999 }
+            }
+            address c10A = address (c10)
+            self.cpu10.set(i, c10A)
+            address currA = address (curr)
+            self.prevTicks.set(pidKey, currA)
+            i = i + 1
+        }
+    }
+
+    function readMem(address readBuf) {
+        address memPath = address ("/proc/meminfo")
+        int n = readFile(memPath, readBuf, 8192)
+        if (n > 0) {
+            int tmpTotal = 0
+            int tmpAvail = 0
+            parseMemInfo(readBuf, n, tmpTotal::address, tmpAvail::address)
+            self.memTotalKB = tmpTotal
+            self.memAvailKB = tmpAvail
+        }
+    }
+
+    // Bubble sort order[] descending by cpu10.
+    function sortProcs() {
+        self.order.reset()
+        int n = self.pids.len()
+        int i = 0
+        while (i < n) {
+            address ia = address (i)
+            self.order.push(ia)
+            i = i + 1
+        }
+        bool swapped = true
+        while (swapped) {
+            swapped = false
+            int j = 0
+            while (j < n - 1) {
+                address aA = self.order.get(j)
+                address bA = self.order.get(j + 1)
+                int a = int (aA)
+                int b = int (bA)
+                address acpuA = self.cpu10.get(a)
+                address bcpuA = self.cpu10.get(b)
+                int acpu = int (acpuA)
+                int bcpu = int (bcpuA)
+                if (acpu < bcpu) {
+                    self.order.set(j, bA)
+                    self.order.set(j + 1, aA)
+                    swapped = true
+                }
+                j = j + 1
+            }
+        }
+    }
+
+    // ── render helpers ────────────────────────────────────────────────────────
+
+    // Right-align integer n in a field of width chars.
+    function appendPadded(int n, int width) {
+        address tmp = allocate 24
+        int len = intToAddr(n, tmp)
+        int spaces = width - len
+        int i = 0
+        while (i < spaces) {
+            self.out.appendByte(32)
+            i = i + 1
+        }
+        i = 0
+        while (i < len) {
+            address tp = tmp + i
+            byte b = tp::value
+            int bi = int (b)
+            self.out.appendByte(bi)
+            i = i + 1
+        }
+        deallocate tmp
+    }
+
+    // Format cpu*10 as " XX.X%" right-aligned in 7 chars.
+    function appendCPU(int c10) {
+        int whole = c10 / 10
+        int frac  = c10 % 10
+        self.appendPadded(whole, 5)
+        self.out.appendByte(46)   // '.'
+        self.out.appendNumber(frac)
+        self.out.appendByte(37)   // '%'
+    }
+
+    // Format KB as right-aligned memory value in 9 chars.
+    function appendMem(int kb) {
+        if (kb < 1024) {
+            self.appendPadded(kb, 6)
+            self.out.appendLiteral(" KB")
+        }
+        if (kb >= 1024) {
+            if (kb < 1048576) {
+                self.appendPadded(kb / 1024, 6)
+                self.out.appendLiteral(" MB")
+            }
+            if (kb >= 1048576) {
+                int gb10 = kb * 10 / 1048576
+                self.appendPadded(gb10 / 10, 4)
+                self.out.appendByte(46)
+                self.out.appendNumber(gb10 % 10)
+                self.out.appendLiteral(" GB")
+            }
+        }
+    }
+
+    // Colored state character.
+    function appendState(int st) {
+        if (st == 82) {
+            // R — Running
+            self.out.appendLiteral("\x1b[1m\x1b[32m R\x1b[0m")
+        }
+        if (st == 83) {
+            // S — Sleeping
+            self.out.appendLiteral("\x1b[36m S\x1b[0m")
+        }
+        if (st == 68) {
+            // D — Disk wait
+            self.out.appendLiteral("\x1b[33m D\x1b[0m")
+        }
+        if (st == 90) {
+            // Z — Zombie
+            self.out.appendLiteral("\x1b[1m\x1b[31m Z\x1b[0m")
+        }
+        if (st == 84) {
+            // T — Stopped
+            self.out.appendLiteral("\x1b[2m T\x1b[0m")
+        }
+        if (st == 73) {
+            // I — Idle kernel thread
+            self.out.appendLiteral("\x1b[2m I\x1b[0m")
+        }
+        if (st != 82 && st != 83 && st != 68 && st != 90 && st != 84 && st != 73) {
+            self.out.appendLiteral("\x1b[2m ?\x1b[0m")
+        }
+    }
+
+    // Draw a 20-cell bar: filled cells colored, empty cells dim.
+    function appendBar(int filled, string fillColor) {
+        if (filled > 20) { filled = 20 }
+        if (filled < 0)  { filled = 0 }
+        self.out.appendLiteral("\x1b[0m")
+        address fc = address (fillColor)
+        self.out.appendLiteral(fc)
+        int i = 0
+        while (i < filled) {
+            self.out.appendLiteral("\xE2\x96\x88")   // full block
+            i = i + 1
+        }
+        self.out.appendLiteral("\x1b[2m")
+        while (i < 20) {
+            self.out.appendLiteral("\xE2\x96\x91")   // light shade
+            i = i + 1
+        }
+        self.out.appendLiteral("\x1b[0m")
+    }
+
+    // ── full frame render ─────────────────────────────────────────────────────
+
+    function render() {
+        self.out.clear()
+
+        // Move cursor home + clear
+        self.out.appendLiteral("\x1b[H\x1b[J")
+
+        // ── title ──
+        self.out.appendLiteral("\x1b[1m hopper-top\x1b[0m\x1b[2m  \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\x1b[0m\n")
+
+        // ── CPU bar ──
+        self.out.appendLiteral(" CPU  [")
+        int cpuFilled = self.sysCpu10 / 50
+        self.appendBar(cpuFilled, "\x1b[32m")
+        self.out.appendLiteral("]  ")
+        self.appendCPU(self.sysCpu10)
+        self.out.appendByte(10)
+
+        // ── memory bar ──
+        self.out.appendLiteral(" MEM  [")
+        int memUsed = self.memTotalKB - self.memAvailKB
+        int memFilled = 0
+        if (self.memTotalKB > 0) {
+            memFilled = memUsed * 20 / self.memTotalKB
+        }
+        self.appendBar(memFilled, "\x1b[34m")
+        self.out.appendLiteral("]  ")
+        int usedGB10  = memUsed * 10 / 1048576
+        int totalGB10 = self.memTotalKB * 10 / 1048576
+        self.out.appendNumber(usedGB10 / 10)
+        self.out.appendByte(46)
+        self.out.appendNumber(usedGB10 % 10)
+        self.out.appendLiteral(" GB / ")
+        self.out.appendNumber(totalGB10 / 10)
+        self.out.appendByte(46)
+        self.out.appendNumber(totalGB10 % 10)
+        self.out.appendLiteral(" GB\n\n")
+
+        // ── column headers ──
+        self.out.appendLiteral("\x1b[1m\x1b[2m   PID    CPU%       MEM  ST  COMMAND\x1b[0m\n")
+
+        // ── process rows ──
+        int count = self.pids.len()
+        int shown = 0
+        int i = 0
+        while (i < count && shown < 35) {
+            address idxA = self.order.get(i)
+            int idx = int (idxA)
+            address pidA = self.pids.get(idx)
+            int pid = int (pidA)
+            address c10A = self.cpu10.get(idx)
+            int c10 = int (c10A)
+            address rssA = self.rssKB.get(idx)
+            int rss = int (rssA)
+            address stA = self.states.get(idx)
+            int st = int (stA)
+            address nm = self.names.get(idx)
+
+            self.appendPadded(pid, 6)
+            self.out.appendByte(32)
+            self.appendCPU(c10)
+            self.out.appendByte(32)
+            self.appendMem(rss)
+            self.out.appendByte(32)
+            self.out.appendByte(32)
+            self.appendState(st)
+            self.out.appendLiteral("  \x1b[0m")
+
+            // Command name (truncate at 22 chars)
+            int ni = 0
+            while (ni < 22) {
+                address np = nm + ni
+                byte nb = np::value
+                int nbi = int (nb)
+                if (nbi == 0) { break }
+                self.out.appendByte(nbi)
+                ni = ni + 1
+            }
+            self.out.appendByte(10)
+
+            i = i + 1
+            shown = shown + 1
+        }
+
+        // ── footer ──
+        self.out.appendLiteral("\x1b[2m  ")
+        self.out.appendNumber(count)
+        self.out.appendLiteral(" processes\x1b[0m\n")
+
+        write(1, self.out.pointer(), self.out.length())
+    }
+
+    function run() {
+        address readBuf = allocate 131072
+        address pathBuf = allocate 512
+        address dirBuf  = allocate 65536
+
+        // Hide cursor
+        address hideCursor = address ("\x1b[?25l")
+        write(1, hideCursor, 6)
+
+        while (true) {
+            self.clearProcs()
+            self.collectProcs(readBuf, pathBuf, dirBuf)
+            self.computeCPU(readBuf, pathBuf)
+            self.readMem(readBuf)
+            self.sortProcs()
+            self.render()
+
+            // Sleep 1 second via nanosleep(timespec{1, 0}, NULL)
+            address ts = allocate 16
+            ts::value = 1
+            address nsp = ts + 8
+            nsp::value = 0
+            address nullPtr = address (0)
+            nanosleep(ts, nullPtr)
+            deallocate ts
+        }
+
+        deallocate readBuf
+        deallocate pathBuf
+        deallocate dirBuf
+    }
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main(int argc, address argv) {
+    Monitor m = Monitor()
+    m.run()
+}

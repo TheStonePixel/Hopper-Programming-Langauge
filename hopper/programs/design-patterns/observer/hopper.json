@@ -1,0 +1,20 @@
+{
+  "name": "observer",
+  "version": "0.1.0",
+  "description": "Observer pattern — event pub/sub via callback dispatch tables",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "ds": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "Array": {
+        "from": "ds",
+        "contract": "modules/ds/contracts/Array.hop",
+        "implementation": "modules/ds/src/Array.hop"
+      }
+    }
+  }
+}

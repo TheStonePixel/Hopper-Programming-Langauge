@@ -1,672 +1,369 @@
+<script setup>
+import PageShell from '@/components/PageShell.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import PageContainer from '@/components/PageContainer.vue'
+import ContentSection from '@/components/ContentSection.vue'
+import LinkButton from '@/components/LinkButton.vue'
+</script>
+
 <template>
-  <div class="page">
+  <PageShell>
 
-    <header class="page-header">
-      <div class="inner">
-        <span class="label">About</span>
-        <h1>Hopper</h1>
-        <p class="sub">A systems and hardware programming language built from first principles.</p>
-      </div>
-    </header>
-
-    <!-- Why -->
-    <section class="section">
-      <div class="inner">
-        <h2>Why Hopper exists</h2>
-        <p>
-          Systems programming has not fundamentally changed since the 1970s. C is still the
-          language of choice for bare-metal work — not because it is the best tool, but because
-          everything else brings too much overhead, too much complexity, or too much runtime.
-        </p>
-        <p>
-          The cost of C shows up in every embedded project: interrupt vectors in assembly startup
-          files, MMIO registers as raw pointer casts, volatile sprinkled everywhere as a prayer,
-          linker scripts that must be written by hand for every new target. None of this is
-          inherent to the problem. It is inherited from a language designed before the hardware
-          model was understood.
-        </p>
-        <p>
-          Hopper treats hardware as a first-class language concern. Memory-mapped registers,
-          interrupt vector entries, bit-packed hardware layouts, and program entry points are
-          all keywords — not workarounds in linker scripts or macros in vendor SDKs.
-        </p>
-      </div>
-    </section>
-
-    <!-- Principles -->
-    <section class="section alt">
-      <div class="inner">
-        <h2>Design principles</h2>
-        <div class="principles">
-
-          <div class="principle">
-            <div class="principle-num">01</div>
-            <h3>Hardware is first-class</h3>
-            <p>
-              <code>strict</code>, <code>bind</code>, <code>bitfield</code>, and <code>entry</code>
-              are keywords. A complete bare-metal ARM program — vector table, MMIO registers,
-              reset handler, all of it — is expressible in pure Hopper with no assembly files
-              and no linker script.
-            </p>
-          </div>
-
-          <div class="principle">
-            <div class="principle-num">02</div>
-            <h3>Nothing is implicit</h3>
-            <p>
-              No implicit type conversions, no implicit allocations, no implicit copies.
-              Every cast is spelled out with <code>cast</code>. Every heap allocation is a
-              keyword. The reader always knows exactly what the machine is doing — because
-              the programmer had to write it explicitly.
-            </p>
-          </div>
-
-          <div class="principle">
-            <div class="principle-num">03</div>
-            <h3>Correctness is built in</h3>
-            <p>
-              <code>requires</code> and <code>ensures</code> are contract annotations, not
-              comments. <code>invariant</code> is a loop assertion, not a convention.
-              In debug builds they are runtime checks; in <code>--strict</code> mode they
-              are compile-time proofs. Production builds strip them to zero overhead.
-            </p>
-          </div>
-
-          <div class="principle">
-            <div class="principle-num">04</div>
-            <h3>One language, full stack</h3>
-            <p>
-              The same language that blinks an LED on bare-metal ARM also sorts data
-              structures, reads JSON, and drives a TUI. No embedded dialect, no unsafe
-              subset. The hardware primitives are additive — they do not restrict what
-              the language can express elsewhere.
-            </p>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- At a glance -->
-    <section class="section">
-      <div class="inner">
-        <h2>Language at a glance</h2>
-        <div class="glance-grid">
-          <div class="glance-col">
-            <div class="glance-group">
-              <div class="glance-heading">Type system</div>
-              <ul>
-                <li>Primitive types: <code>int</code>, <code>float</code>, <code>byte</code>, <code>bool</code>, <code>char</code>, <code>bit</code>, <code>address</code>, <code>string</code></li>
-                <li>User types: <code>struct</code>, <code>class</code>, <code>enum</code>, <code>bitfield</code>, <code>alias</code></li>
-                <li>Generics via monomorphized <code>template</code></li>
-                <li>Compile-time <code>interface</code> contracts (no vtable)</li>
-                <li>No implicit conversions — explicit <code>cast</code> everywhere</li>
-              </ul>
-            </div>
-            <div class="glance-group">
-              <div class="glance-heading">Memory</div>
-              <ul>
-                <li><code>allocate</code> / <code>deallocate</code> keywords</li>
-                <li>Smart pointers: <code>Unique&lt;T&gt;</code>, <code>Shared&lt;T&gt;</code>, <code>Pointer&lt;T&gt;</code></li>
-                <li><code>defer</code> for guaranteed cleanup</li>
-                <li><code>Result&lt;T&gt;</code> for recoverable errors</li>
-                <li>No garbage collector, no runtime</li>
-              </ul>
-            </div>
-          </div>
-          <div class="glance-col">
-            <div class="glance-group">
-              <div class="glance-heading">Hardware</div>
-              <ul>
-                <li><code>strict</code> — volatile MMIO register alias</li>
-                <li><code>bind</code> — interrupt vector table entry</li>
-                <li><code>bitfield</code> — bit-packed register layout</li>
-                <li><code>entry</code> — program entry / reset handler</li>
-                <li>Targets: x86-64 Linux, ARMv6 bare-metal</li>
-              </ul>
-            </div>
-            <div class="glance-group">
-              <div class="glance-heading">Correctness</div>
-              <ul>
-                <li><code>requires</code> / <code>ensures</code> function contracts</li>
-                <li><code>invariant</code> loop assertions</li>
-                <li><code>constrain</code> range checks on assignment</li>
-                <li><code>--release</code>: contracts stripped, zero cost</li>
-                <li><code>--strict</code>: violations are compile-time errors</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Status -->
-    <section class="section alt">
-      <div class="inner">
-        <h2>Current status</h2>
-        <p>
-          Hopper is in active prototype development. The core language is complete and
-          functional. The toolchain compiles Hopper source to native binaries via LLVM,
-          with 594 passing assertions across the full test suite.
-        </p>
-        <div class="status-grid">
-          <div class="status-col">
-            <div class="status-heading">Done</div>
-            <ul class="status-list done">
-              <li>Full grammar and ANTLR4 parser</li>
-              <li>LLVM IR code generator</li>
-              <li>All primitive types and operators</li>
-              <li>Classes, structs, templates, enums, interfaces</li>
-              <li>Inline assembly, extern FFI</li>
-              <li>Hardware keywords: <code>strict</code>, <code>bind</code>, <code>bitfield</code>, <code>entry</code></li>
-              <li>Contract system: <code>requires</code>, <code>ensures</code>, <code>invariant</code>, <code>constrain</code></li>
-              <li>Bare-metal ARMv6 target</li>
-              <li>Standard library: 20+ modules</li>
-              <li>594-assertion test suite</li>
-              <li>VS Code syntax extension</li>
-            </ul>
-          </div>
-          <div class="status-col">
-            <div class="status-heading">In progress</div>
-            <ul class="status-list inprogress">
-              <li>Self-hosted compiler (bootstrap)</li>
-              <li>Parser written in Hopper</li>
-              <li>LLVM IR emitter written in Hopper</li>
-            </ul>
-            <div class="status-heading" style="margin-top: 1.5rem">Planned</div>
-            <ul class="status-list planned">
-              <li>Error propagation operator (<code>?</code> / <code>try</code>)</li>
-              <li>LSP language server</li>
-              <li><code>hopper fmt</code>, <code>hopper debug</code> CLI commands</li>
-              <li>Package registry</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Vision -->
-    <section class="section">
-      <div class="inner">
-        <h2>Where it's going</h2>
-        <p>
-          The immediate goal is self-hosting — a Hopper compiler written in Hopper, with
-          no Node.js dependency in the compilation path. This is the milestone that closes
-          the feedback loop: the language must be expressive enough to implement itself.
-        </p>
-        <p>
-          Beyond that: a package registry built on the existing <code>hopper.json</code>
-          manifest format, a custom bytecode IR for faster compilation and a smaller
-          toolchain binary, and eventually a JIT layer for hot-path optimization in
-          long-running programs.
-        </p>
-        <p>
-          The long-term vision is a single statically-linked binary — compiler, formatter,
-          package manager, debugger — written entirely in Hopper, distributed with no
-          external dependencies.
-        </p>
-      </div>
-    </section>
-
-    <!-- Open -->
-    <section class="section alt">
-      <div class="inner">
-        <h2>Built openly</h2>
-        <p>
-          Hopper is developed in public. The full source — compiler, standard library,
-          programs, and website — is on GitHub. The language is being designed and built
-          iteratively, with every decision visible in the commit history.
-        </p>
-        <p>
-          If you want to follow development, read code, or contribute, the repository is
-          the place to start. Everything in progress is tracked in the roadmap.
-        </p>
-        <div class="link-row">
-          <a class="link-btn primary" href="https://github.com/thestonepixel/hopper-programming-langauge" target="_blank">GitHub</a>
-          <a class="link-btn" href="/docs">Documentation</a>
-          <a class="link-btn" href="/syntax">Syntax Guide</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Philosophy ── -->
+    <PageHeader
+      label="About"
+      title="Hopper"
+      sub="A systems and hardware programming language built from first principles."
+      width="md"
+      size="md"
+    />
 
     <!-- Why Hopper Exists -->
-    <section class="section phil-first">
-      <div class="inner">
-        <span class="phil-label">Philosophy</span>
-        <h2>Why Hopper Exists</h2>
-        <p>
-          I am building Hopper because the tools I want to build require a language that does not currently exist.
-        </p>
-        <div class="pull-quote">
-          <p>The compiler is the means.<br>The tools are the end.</p>
-        </div>
-        <p>
-          Most existing systems languages solve part of the problem. Few solve the whole thing
-          coherently. Some prioritize abstraction over visibility. Some prioritize safety over
-          control. Some accumulated so much complexity over time that the language itself became
-          harder to reason about than the software written in it.
-        </p>
-        <p>
-          Hopper exists because I believe most of the important problems in systems programming
-          were already solved decades ago — just not in the same place.
-        </p>
-        <div class="pull-quote">
-          <p>The goal is not reinvention.<br>The goal is assembly.</p>
-        </div>
+    <ContentSection class="phil-first">
+      <span class="phil-label">Philosophy</span>
+      <h2 v-reveal>Why Hopper Exists</h2>
+      <p>
+        I am building Hopper because the tools I want to build require a language that does not currently exist.
+      </p>
+      <div class="pull-quote">
+        <p>The compiler is the means.<br>The tools are the end.</p>
       </div>
-    </section>
+      <p>
+        Most existing systems languages solve part of the problem. Few solve the whole thing
+        coherently. Some prioritize abstraction over visibility. Some prioritize safety over
+        control. Some accumulated so much complexity over time that the language itself became
+        harder to reason about than the software written in it.
+      </p>
+      <p>
+        Hopper exists because I believe most of the important problems in systems programming
+        were already solved decades ago — just not in the same place.
+      </p>
+      <div class="pull-quote">
+        <p>The goal is not reinvention.<br>The goal is assembly.</p>
+      </div>
+    </ContentSection>
 
     <!-- What I Believe -->
-    <section class="section alt">
-      <div class="inner">
-        <h2>What I Believe</h2>
-        <div class="beliefs">
-          <div class="belief">I believe systems programming should expose the machine instead of hiding it.</div>
-          <div class="belief">I believe the runtime cost of code should be obvious from the source.</div>
-          <div class="belief">I believe abstraction is useful only when it preserves clarity and control.</div>
-          <div class="belief">I believe languages become fragile when they grow faster than their users can fully understand them.</div>
-          <div class="belief">I believe stability matters more than novelty.</div>
-          <div class="belief">I believe "finished" is one of the highest compliments a language can earn.</div>
-        </div>
-        <p>
-          A language that changes constantly forces its users to continuously relearn the
-          foundation beneath them. A language that stabilizes becomes infrastructure.
-          Infrastructure lasts.
-        </p>
-        <p>
-          Hopper is designed with the intention of eventually becoming stable enough to stop
-          evolving in fundamental ways. Not abandoned. Finished.
-        </p>
-      </div>
-    </section>
+    <ContentSection alt>
+      <h2 v-reveal>What I Believe</h2>
+      <ul class="beliefs">
+        <li>I believe systems programming should expose the machine instead of hiding it.</li>
+        <li>I believe the runtime cost of code should be obvious from the source.</li>
+        <li>I believe abstraction is useful only when it preserves clarity and control.</li>
+        <li>I believe languages become fragile when they grow faster than their users can fully understand them.</li>
+        <li>I believe stability matters more than novelty.</li>
+        <li>I believe "finished" is one of the highest compliments a language can earn.</li>
+      </ul>
+      <p>
+        A language that changes constantly forces its users to continuously relearn the
+        foundation beneath them. A language that stabilizes becomes infrastructure.
+        Infrastructure lasts.
+      </p>
+      <p>
+        Hopper is designed with the intention of eventually becoming stable enough to stop
+        evolving in fundamental ways. Not abandoned. Finished.
+      </p>
+    </ContentSection>
 
     <!-- Direction -->
-    <section class="section">
-      <div class="inner">
-        <h2>Direction</h2>
-        <p>
-          Hopper has a single direction-setter. That is intentional.
-        </p>
-        <p>
-          I am not building Hopper by committee, consensus process, or market research. I am
-          building it according to a coherent philosophy and a long-term design direction.
-          Contributions are welcome. Disagreement is expected. Forking is permitted.
-        </p>
-        <p>Apache 2.0 guarantees that nobody is trapped.</p>
-        <div class="pull-quote">
-          <p>The direction remains centralized.<br>The exit remains open.</p>
-        </div>
-        <p>Both are necessary.</p>
+    <ContentSection>
+      <h2 v-reveal>Direction</h2>
+      <p>Hopper has a single direction-setter.</p>
+      <p>That is intentional.</p>
+      <p>
+        I am not building Hopper by committee, consensus process, or market research. I am
+        building it according to a coherent philosophy and a long-term design direction.
+        Contributions are welcome. Disagreement is expected. Forking is permitted.
+      </p>
+      <p>Apache 2.0 guarantees that nobody is trapped.</p>
+      <div class="pull-quote">
+        <p>The direction remains centralized.<br>The exit remains open.</p>
       </div>
-    </section>
+      <p>Both are necessary.</p>
+    </ContentSection>
 
-    <!-- Building Things That Last -->
-    <section class="section alt">
-      <div class="inner">
-        <h2>Building Things That Last</h2>
-        <p>
-          I believe long projects are completed by persistence more than brilliance.
-        </p>
-        <p>
-          Most ambitious software projects fail slowly. Not because the ideas were impossible,
-          but because the people building them eventually stopped showing up. The people who
-          finish things are usually the people still in the chair years after the excitement
-          wears off.
-        </p>
-        <p>
-          I plan to still be in the chair. I also plan to leave it cleanly when the work is
-          done. I want to build tools, operating systems, compilers, runtimes, and
-          hardware-oriented software. Hopper exists to make those possible. The language
-          itself is not the final product.
-        </p>
-      </div>
-    </section>
+    <!-- Determinism -->
+    <ContentSection alt>
+      <h2 v-reveal>Determinism</h2>
+      <p>Hopper will stop. That is by design.</p>
+      <p>
+        A deterministic system produces the same output from the same input, every time.
+        A language that keeps changing violates that contract. Every new version is a new
+        variable introduced into every program ever written in it.
+      </p>
+      <p>The more you change a language, the more you change what it meant to have written something in it.</p>
+      <p>Hopper is not a perpetual project. It is a problem to be solved.</p>
+      <p>When the language is correct and expressive, development ends. Not because we stopped caring. Because we finished.</p>
+    </ContentSection>
 
     <!-- On Other Languages -->
-    <section class="section">
-      <div class="inner">
-        <h2>On Other Languages</h2>
-        <p>
-          Hopper is not built from rejection of the past. It is built from respect for it.
-        </p>
-        <div class="lang-grid">
-          <div class="lang-card">
-            <div class="lang-name">C</div>
-            <p>Proved how much could be accomplished with a small language close to the machine.</p>
-          </div>
-          <div class="lang-card">
-            <div class="lang-name">C++</div>
-            <p>Proved deterministic resource management and zero-overhead abstractions could scale.</p>
-          </div>
-          <div class="lang-card">
-            <div class="lang-name">Ada</div>
-            <p>Proved contracts and correctness systems mattered in real-world safety-critical software.</p>
-          </div>
-          <div class="lang-card">
-            <div class="lang-name">Forth</div>
-            <p>Proved hardware description could live in user space instead of compiler internals.</p>
-          </div>
-          <div class="lang-card">
-            <div class="lang-name">Lisp</div>
-            <p>Proved small languages can survive for generations.</p>
-          </div>
+    <ContentSection>
+      <div class="orbit-wrap">
+        <div class="orbit-ring"></div>
+        <div class="orbit-center">
+          <p>The problem is not that previous languages failed to teach us anything.</p>
+          <p>The problem is that the industry keeps forgetting the lessons.</p>
         </div>
-        <p>
-          Hopper borrows from all of them because all of them discovered something important.
-        </p>
-        <p>
-          The problem is not that previous languages failed to teach us anything.
-          The problem is that the industry keeps forgetting the lessons.
-        </p>
+        <div class="orbit-node n-c">
+          <div class="node-name">C</div>
+          <div class="node-desc">Proved how much could be accomplished with a small language close to the machine.</div>
+        </div>
+        <div class="orbit-node n-cpp">
+          <div class="node-name">C++</div>
+          <div class="node-desc">Proved deterministic resource management and zero-overhead abstractions could scale.</div>
+        </div>
+        <div class="orbit-node n-ada">
+          <div class="node-name">Ada</div>
+          <div class="node-desc">Proved contracts and correctness systems mattered in real-world safety-critical software.</div>
+        </div>
+        <div class="orbit-node n-forth">
+          <div class="node-name">Forth</div>
+          <div class="node-desc">Proved hardware description could live in user space instead of compiler internals.</div>
+        </div>
+        <div class="orbit-node n-lisp">
+          <div class="node-name">Lisp</div>
+          <div class="node-desc">Proved small languages can survive for generations.</div>
+        </div>
       </div>
-    </section>
+    </ContentSection>
 
-    <!-- Impermanence -->
-    <section class="section alt">
-      <div class="inner">
-        <h2>Impermanence</h2>
-        <p>
-          I do not expect Hopper to last forever. Nothing does.
-        </p>
-        <p>
-          If Hopper succeeds, eventually something better should replace it. That is healthy.
-          Languages should earn their survival through usefulness, not institutional inertia.
-        </p>
-        <p>
-          Too many ecosystems survive indefinitely through accumulated compatibility obligations,
-          governance structures, and endless revision cycles. Languages become permanent
-          construction projects instead of stable foundations.
-        </p>
-        <p>
-          I would rather Hopper become stable, useful, and eventually obsolete than endlessly
-          "modernized." All things are impermanent.
-        </p>
-        <p class="memento">Memento mori.</p>
+    <!-- Memento Mori -->
+    <ContentSection alt>
+      <h2 v-reveal>All Things Must Die</h2>
+      <p>I do not expect Hopper to last forever. Nothing does.</p>
+      <p>
+        If Hopper succeeds, eventually something better should replace it. That is healthy.
+        Languages should earn their survival through usefulness, not institutional inertia.
+      </p>
+      <p>
+        Too many ecosystems survive indefinitely through accumulated compatibility obligations,
+        governance structures, and endless revision cycles. Languages become permanent
+        construction projects instead of stable foundations.
+      </p>
+      <p>
+        I would rather Hopper become stable, useful, and eventually obsolete than endlessly
+        "modernized." All things are impermanent.
+      </p>
+      <div class="memento-block">
+        <p class="memento-text">Memento mori.</p>
       </div>
-    </section>
+    </ContentSection>
 
     <!-- Final Principle -->
     <section class="final-principle">
-      <div class="inner">
+      <PageContainer width="md">
         <p class="fp-line">The compiler is the kernel.</p>
         <p class="fp-line">Everything else is userland.</p>
         <p class="fp-sub">That is Hopper.</p>
-      </div>
+      </PageContainer>
     </section>
 
-    <footer class="page-footer">
-      <div class="inner">
-        <p>Hopper — open source systems language &nbsp;·&nbsp; prototype</p>
+    <!-- Built Openly -->
+    <ContentSection alt>
+      <h2 v-reveal>Built openly</h2>
+      <p>
+        Hopper is developed in public. The full source — compiler, standard library,
+        programs, and website — is on GitHub. The language is being designed and built
+        iteratively, with every decision visible in the commit history.
+      </p>
+      <p>
+        If you want to follow development, read code, or contribute, the repository is
+        the place to start. Everything in progress is tracked in the roadmap.
+      </p>
+      <div class="link-row">
+        <LinkButton
+          href="https://github.com/thestonepixel/hopper-programming-langauge"
+          variant="primary"
+          external
+        >GitHub</LinkButton>
+        <LinkButton href="/docs">Documentation</LinkButton>
+        <LinkButton href="/roadmap">Roadmap</LinkButton>
       </div>
+    </ContentSection>
+
+    <footer class="page-footer">
+      <PageContainer width="md">
+        <p>Hopper — open source systems language &nbsp;·&nbsp; prototype</p>
+      </PageContainer>
     </footer>
 
-  </div>
+  </PageShell>
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: #faf9f6;
-}
+/* ── Page-specific ── */
+.phil-first { border-top: 2px solid var(--color-border); }
 
-.inner {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 0 5vw;
-}
-
-/* ── Header ── */
-.label {
+.phil-label {
   display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #9ca3af;
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
-
-.page-header {
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
-  padding: 4rem 0 3.5rem;
-}
-
-.page-header h1 {
-  font-size: 4rem;
-  font-weight: 800;
-  letter-spacing: -2px;
-  color: #111827;
-  margin-bottom: 0.75rem;
-}
-
-.page-header .sub {
-  font-size: 1.05rem;
-  color: #6b7280;
-}
-
-/* ── Sections ── */
-.section {
-  padding: 4.5rem 0;
-  border-bottom: 1px solid #e5e7eb;
-  background: #faf9f6;
-}
-
-.section.alt {
-  background: #ffffff;
-}
-
-.section h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.6rem;
-  border-bottom: 2px solid #e5e7eb;
-}
-
-.section p {
-  font-size: 0.975rem;
-  color: #4b5563;
-  line-height: 1.9;
-  margin-bottom: 1rem;
-  max-width: 680px;
-}
-
-.section p:last-child { margin-bottom: 0; }
-
-.section p code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.85em;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
-  padding: 0.1em 0.35em;
-  color: #1e293b;
-}
-
-/* ── Principles ── */
-.principles {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-top: 0.5rem;
-}
-
-.principle {
-  background: #faf9f6;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 1.75rem;
-}
-
-.section.alt .principle {
-  background: #ffffff;
-}
-
-.principle-num {
   font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 2px;
-  color: #2563eb;
-  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--color-brand);
+  margin-bottom: 1.25rem;
 }
 
-.principle h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 0.65rem;
+.pull-quote {
+  border-left: 3px solid var(--color-brand);
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  margin: 2rem 0;
 }
 
-.principle p {
-  font-size: 0.9rem;
-  color: #6b7280;
+.pull-quote p {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--color-text-deep);
   line-height: 1.75;
+  margin: 0;
+  max-width: none;
+  font-weight: 500;
+}
+
+/* ── Beliefs ── */
+.beliefs {
+  list-style: none;
+  padding: 0;
+  margin: 1.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.beliefs li {
+  font-size: 0.975rem;
+  color: var(--color-text-strong);
+  line-height: 1.75;
+  padding-left: 1.25rem;
+  position: relative;
+}
+
+.beliefs li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--color-brand);
+  font-weight: 700;
+}
+
+/* ── Language orbit ── */
+.orbit-wrap {
+  position: relative;
+  width: 700px;
+  max-width: 100%;
+  height: 720px;
+  margin: 2.5rem auto;
+}
+
+.orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 500px;
+  height: 500px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px solid rgba(37, 99, 235, 0.3);
+  background: transparent;
+  pointer-events: none;
+}
+
+.orbit-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 210px;
+  text-align: center;
+}
+
+.orbit-center p {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--color-text-strong);
+  line-height: 1.65;
+  margin: 0 0 0.6rem;
+  max-width: none;
+}
+
+.orbit-center p:last-child { margin-bottom: 0; }
+
+.orbit-node {
+  position: absolute;
+  width: 155px;
+  height: 155px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  border: 1.5px solid rgba(37, 99, 235, 0.3);
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.orbit-node:hover {
+  transform: translate(-50%, -50%) scale(1.05);
+  border-color: var(--color-brand);
+}
+
+/* Pentagon position */
+.n-c     { left: 50%;   top: 14.1%; }
+.n-cpp   { left: 84.2%; top: 38.9%; }
+.n-ada   { left: 71.1%; top: 79.1%; }
+.n-forth { left: 28.9%; top: 79.1%; }
+.n-lisp  { left: 15.8%; top: 38.9%; }
+
+.node-name {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--color-brand);
+  margin-bottom: 0.3rem;
+}
+
+.node-desc {
+  font-size: 0.775rem;
+  color: var(--color-text-faint);
+  line-height: 1.55;
+}
+
+/* ── Memento ── */
+.memento-block { margin-top: 2.5rem; }
+
+.memento-text {
+  font-size: 1.4rem;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--color-text) !important;
+  margin: 0 !important;
+}
+
+/* ── Final Principle ── */
+.final-principle {
+  background: var(--color-surface-dark);
+  padding: 6rem 0;
+  text-align: center;
+}
+
+.fp-line {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-text-on-dark);
+  line-height: 1.6;
+  letter-spacing: -0.5px;
   margin: 0;
   max-width: none;
 }
 
-.principle p code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.85em;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
-  padding: 0.1em 0.35em;
-  color: #1e293b;
-}
-
-/* ── Glance grid ── */
-.glance-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-  margin-top: 0.5rem;
-}
-
-.glance-group {
-  margin-bottom: 1.75rem;
-}
-
-.glance-group:last-child { margin-bottom: 0; }
-
-.glance-heading {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #9ca3af;
-  margin-bottom: 0.75rem;
-}
-
-.glance-group ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.glance-group li {
-  font-size: 0.9rem;
-  color: #4b5563;
-  line-height: 1.6;
-  padding-left: 1rem;
-  position: relative;
-}
-
-.glance-group li::before {
-  content: '·';
-  position: absolute;
-  left: 0;
-  color: #2563eb;
-  font-weight: 700;
-}
-
-.glance-group li code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.82em;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
-  padding: 0.1em 0.3em;
-  color: #1e293b;
-}
-
-/* ── Status ── */
-.status-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-  margin-top: 1.5rem;
-}
-
-.status-heading {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #9ca3af;
-  margin-bottom: 0.75rem;
-}
-
-.status-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.status-list li {
-  font-size: 0.9rem;
-  color: #4b5563;
-  line-height: 1.6;
-  padding-left: 1.4rem;
-  position: relative;
-}
-
-.status-list.done li::before {
-  content: '✓';
-  position: absolute;
-  left: 0;
-  color: #16a34a;
-  font-size: 0.8rem;
-  font-weight: 700;
-  top: 0.05em;
-}
-
-.status-list.inprogress li::before {
-  content: '◐';
-  position: absolute;
-  left: 0;
-  color: #2563eb;
-  font-size: 0.8rem;
-  top: 0.05em;
-}
-
-.status-list.planned li::before {
-  content: '○';
-  position: absolute;
-  left: 0;
-  color: #d1d5db;
-  font-size: 0.8rem;
-  top: 0.05em;
-}
-
-.status-list li code {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.82em;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
-  padding: 0.1em 0.3em;
-  color: #1e293b;
+.fp-sub {
+  font-size: 1rem;
+  color: var(--color-text-soft);
+  margin-top: 1.5rem !important;
+  max-width: none;
 }
 
 /* ── Link row ── */
@@ -677,164 +374,53 @@
   flex-wrap: wrap;
 }
 
-.link-btn {
-  display: inline-block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 0.6rem 1.25rem;
-  border-radius: 7px;
-  text-decoration: none;
-  border: 1.5px solid #e5e7eb;
-  color: #374151;
-  background: #ffffff;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.link-btn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-}
-
-.link-btn.primary {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
-}
-
-.link-btn.primary:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  color: #ffffff;
-}
-
 /* ── Footer ── */
 .page-footer {
   padding: 2.5rem 0;
-  background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   text-align: center;
 }
 
 .page-footer p {
   font-size: 0.85rem;
-  color: #9ca3af;
-}
-
-/* ── Philosophy ── */
-.phil-first {
-  border-top: 2px solid #e5e7eb;
-}
-
-.phil-label {
-  display: block;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #2563eb;
-  margin-bottom: 1.25rem;
-}
-
-.pull-quote {
-  border-left: 3px solid #2563eb;
-  padding: 0.5rem 0 0.5rem 1.5rem;
-  margin: 2rem 0;
-}
-
-.pull-quote p {
-  font-size: 1.15rem;
-  font-style: italic;
-  color: #1e293b;
-  line-height: 1.75;
-  margin: 0;
-  max-width: none;
-  font-weight: 500;
-}
-
-/* ── Beliefs ── */
-.beliefs {
-  margin: 1.75rem 0;
-  border-top: 1px solid #f3f4f6;
-}
-
-.belief {
-  font-size: 0.975rem;
-  color: #374151;
-  line-height: 1.75;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-/* ── Language cards ── */
-.lang-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
-  margin: 1.75rem 0;
-}
-
-.lang-card {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 1.25rem 1rem;
-}
-
-.lang-name {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #2563eb;
-  margin-bottom: 0.6rem;
-}
-
-.lang-card p {
-  font-size: 0.875rem;
-  color: #6b7280;
-  line-height: 1.65;
-  margin: 0;
-  max-width: none;
-}
-
-/* ── Memento ── */
-.memento {
-  font-style: italic;
-  color: #9ca3af !important;
-  margin-top: 1.5rem;
-}
-
-/* ── Final Principle ── */
-.final-principle {
-  background: #111827;
-  padding: 6rem 0;
-  text-align: center;
-}
-
-.fp-line {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #f9fafb;
-  line-height: 1.6;
-  letter-spacing: -0.5px;
-  margin: 0;
-  max-width: none;
-}
-
-.fp-sub {
-  font-size: 1rem;
-  color: #6b7280;
-  margin-top: 1.5rem !important;
-  max-width: none;
+  color: var(--color-text-faint);
 }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .principles  { grid-template-columns: 1fr; }
-  .glance-grid { grid-template-columns: 1fr; }
-  .status-grid { grid-template-columns: 1fr; }
-  .lang-grid   { grid-template-columns: 1fr 1fr; }
-  .page-header h1 { font-size: 2.75rem; }
   .fp-line { font-size: 1.25rem; }
+
+  .orbit-wrap {
+    position: static;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin: 1.75rem 0;
+  }
+  .orbit-ring { display: none; }
+  .orbit-center {
+    position: static;
+    transform: none;
+    width: 100%;
+    text-align: left;
+    order: -1;
+  }
+  .orbit-node {
+    position: static;
+    transform: none;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+  .orbit-node:hover { transform: none; }
+  .node-desc { flex: 1; }
 }
 </style>

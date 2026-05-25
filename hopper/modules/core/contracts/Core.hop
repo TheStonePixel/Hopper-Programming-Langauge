@@ -1,0 +1,36 @@
+enum ErrorCode {
+    NONE              = 0
+    IO_ERROR          = 1
+    NOT_FOUND         = 2
+    PERMISSION_DENIED = 3
+    ALREADY_EXISTS    = 4
+    END_OF_FILE       = 5
+    BROKEN_PIPE       = 6
+    OUT_OF_MEMORY     = 10
+    OUT_OF_BOUNDS     = 11
+    NULL_POINTER      = 12
+    INVALID_INPUT     = 20
+    PARSE_ERROR       = 21
+    OVERFLOW          = 22
+    UNDERFLOW         = 23
+    EMPTY             = 24
+    TIMEOUT           = 30
+    INTERRUPTED       = 31
+    NOT_SUPPORTED     = 32
+    BUSY              = 33
+    INVALID_STATE     = 34
+}
+
+interface Core {
+    function panic(address msg)
+    function assert(bool cond, address msg)
+    function soft(bool cond, address msg)
+    function printStr(address s)
+    function printInt(int n)
+    function printBool(bool b)
+    function printByte(byte c)
+    function newline()
+    function eprintStr(address s)
+    function readLine(address buf, int maxLen) int
+    function parseIntBuf(address buf, int len) int
+}

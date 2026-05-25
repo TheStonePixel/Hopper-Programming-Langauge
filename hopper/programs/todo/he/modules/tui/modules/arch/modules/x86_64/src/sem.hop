@@ -1,0 +1,58 @@
+// x86-64 System V semaphore syscalls
+//
+// SysV semaphores are arrays of counting semaphores in the kernel.
+// For new code prefer futex-based semaphores (see linux/thread.hop) —
+// these exist for compatibility and for cross-process synchronization
+// without shared memory.
+//
+// Calling convention: nr → rax | args → rdi rsi rdx r10 r8 r9 | return ← rax
+
+// Syscall nr 64 — get or create a semaphore array. Returns semid or negative errno.
+// key: IPC_PRIVATE=0 for a private set.
+// nsems: number of semaphores in the array.
+// semflg: IPC_CREAT=512 | IPC_EXCL=1024 | permission bits.
+function semget(int key, int nsems, int semflg) int {
+    int result
+    asm {
+        rax = 64
+        rdi = key
+        rsi = nsems
+        rdx = semflg
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 65 — perform operations on semaphores.
+// sops points to an array of struct sembuf {ushort sem_num, short sem_op, short sem_flg}.
+// sem_op>0 increments, <0 decrements (blocking if result<0), =0 waits for zero.
+function semop(int semid, address sops, int nsops) int {
+    int result
+    asm {
+        rax = 65
+        rdi = semid
+        rsi = sops
+        rdx = nsops
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 66 — control or query a semaphore set.
+// cmd: IPC_RMID=0 (remove) IPC_STAT=2 GETVAL=12 SETVAL=16 GETALL=13 SETALL=17.
+// arg is cmd-dependent: SETVAL passes the value directly as int; others use address.
+function semctl(int semid, int semnum, int cmd, int arg) int {
+    int result
+    asm {
+        rax = 66
+        rdi = semid
+        rsi = semnum
+        rdx = cmd
+        r10 = arg
+        syscall
+        result = rax
+    }
+    return result
+}

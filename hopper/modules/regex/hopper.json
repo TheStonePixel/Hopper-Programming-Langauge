@@ -1,0 +1,23 @@
+{
+  "name": "regex",
+  "version": "0.1.0",
+  "description": "Regex pattern matching: match and matchAt with ., *, ?, +, [], ^ anchors",
+  "license": "MIT",
+  "type": "library",
+  "dependencies": {},
+  "exports": {
+    "Regex": {
+      "contract":      "interfaces/Regex.hop",
+      "implementation": "src/Regex.hop"
+    }
+  },
+  "targets": {
+    "host": {
+      "Regex": {
+        "from":           "regex",
+        "contract":      "interfaces/Regex.hop",
+        "implementation": "src/Regex.hop"
+      }
+    }
+  }
+}

@@ -1,0 +1,195 @@
+// x86-64 memory mapping syscalls
+//
+// mmap / munmap / mprotect are the foundation of custom allocators, JIT compilers,
+// and file-backed I/O. All use the kernel directly — no libc.
+//
+// Calling convention: nr → rax | args → rdi rsi rdx r10 r8 r9 | return ← rax
+
+// ── core mapping ─────────────────────────────────────────────────────────────
+
+// Syscall nr 9 — map memory or a file into the address space.
+// addr: hint (pass 0 for any address).
+// prot: PROT_READ=1 | PROT_WRITE=2 | PROT_EXEC=4 | PROT_NONE=0.
+// flags: MAP_PRIVATE=2 | MAP_ANON=32 (for anonymous pages).
+//        MAP_SHARED=1 for file-backed shared mappings.
+// fd: -1 for anonymous; a file fd for file-backed.
+// offset: must be page-aligned; 0 for anonymous.
+// Returns the mapped address on success, -1 (MAP_FAILED) on error.
+function mmap(address addr, int len, int prot, int flags, int fd, int offset) address {
+    int result
+    asm {
+        rax = 9
+        rdi = addr
+        rsi = len
+        rdx = prot
+        r10 = flags
+        r8 = fd
+        r9 = offset
+        syscall
+        result = rax
+    }
+    address r = address (result)
+    return r
+}
+
+// Syscall nr 11 — unmap a memory region. len is rounded up to page size.
+function munmap(address addr, int len) int {
+    int result
+    asm {
+        rax = 11
+        rdi = addr
+        rsi = len
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 10 — change the protection on a mapped region.
+// prot: PROT_READ=1 PROT_WRITE=2 PROT_EXEC=4 PROT_NONE=0.
+function mprotect(address addr, int len, int prot) int {
+    int result
+    asm {
+        rax = 10
+        rdi = addr
+        rsi = len
+        rdx = prot
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 25 — resize or move a mapping.
+// flags: MREMAP_MAYMOVE=1 (required if new size exceeds existing space).
+// new_addr is only used with MREMAP_FIXED=2.
+function mremap(address old_addr, int old_size, int new_size, int flags, address new_addr) address {
+    int result
+    asm {
+        rax = 25
+        rdi = old_addr
+        rsi = old_size
+        rdx = new_size
+        r10 = flags
+        r8 = new_addr
+        syscall
+        result = rax
+    }
+    address r = address (result)
+    return r
+}
+
+// ── sync and hints ────────────────────────────────────────────────────────────
+
+// Syscall nr 26 — flush changes in a mapped file region back to the filesystem.
+// flags: MS_ASYNC=1 (queue) MS_SYNC=4 (wait) MS_INVALIDATE=2 (invalidate cached copies).
+function msync(address addr, int len, int flags) int {
+    int result
+    asm {
+        rax = 26
+        rdi = addr
+        rsi = len
+        rdx = flags
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 28 — advise the kernel about expected access patterns.
+// advice: MADV_NORMAL=0 MADV_SEQUENTIAL=2 MADV_RANDOM=1 MADV_DONTNEED=4 MADV_FREE=8.
+function madvise(address addr, int len, int advice) int {
+    int result
+    asm {
+        rax = 28
+        rdi = addr
+        rsi = len
+        rdx = advice
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 27 — query which pages are resident in RAM.
+// vec points to a byte array of (len+PAGE_SIZE-1)/PAGE_SIZE bytes; bit 0 of each = resident.
+function mincore(address addr, int len, address vec) int {
+    int result
+    asm {
+        rax = 27
+        rdi = addr
+        rsi = len
+        rdx = vec
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// ── locking ───────────────────────────────────────────────────────────────────
+
+// Syscall nr 149 — lock a region into RAM (prevents paging; real-time critical sections).
+function mlock(address addr, int len) int {
+    int result
+    asm {
+        rax = 149
+        rdi = addr
+        rsi = len
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 150 — unlock a region, allowing it to be paged again.
+function munlock(address addr, int len) int {
+    int result
+    asm {
+        rax = 150
+        rdi = addr
+        rsi = len
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 151 — lock all current (and optionally future) pages.
+// flags: MCL_CURRENT=1 MCL_FUTURE=2.
+function mlockall(int flags) int {
+    int result
+    asm {
+        rax = 151
+        rdi = flags
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// Syscall nr 152 — unlock all pages.
+function munlockall() int {
+    int result
+    asm {
+        rax = 152
+        syscall
+        result = rax
+    }
+    return result
+}
+
+// ── anonymous fd-backed memory ────────────────────────────────────────────────
+
+// Syscall nr 319 — create an anonymous file in RAM. Useful for JIT code buffers
+// and shared memory without a filesystem path. flags: MFD_CLOEXEC=1 MFD_ALLOW_SEALING=2.
+function memfd_create(string name, int flags) int {
+    int result
+    asm {
+        rax = 319
+        rdi = name
+        rsi = flags
+        syscall
+        result = rax
+    }
+    return result
+}

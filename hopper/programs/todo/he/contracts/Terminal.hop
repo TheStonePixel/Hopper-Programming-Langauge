@@ -1,0 +1,42 @@
+// Terminal — contract contract for a full-featured text terminal.
+//
+// Implementations must provide raw-mode setup on construction and restore
+// the original terminal state in close().  All output is buffered; flush()
+// pushes the accumulated bytes to the display.
+
+interface Terminal {
+    function width()  int
+    function height() int
+
+    function flush()
+    function clear()
+    function close()
+
+    function moveTo(int row, int col)
+    function hideCursor()
+    function showCursor()
+
+    function reset()
+    function bold()
+    function dim()
+    function italic()
+    function underline()
+    function blink()
+    function reverse()
+
+    function setFg(int color)
+    function setBg(int color)
+    function setFg256(int n)
+    function setBg256(int n)
+    function setFgRgb(int r, int g, int b)
+    function setBgRgb(int r, int g, int b)
+
+    function writeStr(address s)
+    function writeChar(byte c)
+    function writeInt(int n)
+
+    function drawBox(int row, int col, int w, int h)
+    function fillRect(int row, int col, int w, int h)
+
+    function readKey() Key
+}

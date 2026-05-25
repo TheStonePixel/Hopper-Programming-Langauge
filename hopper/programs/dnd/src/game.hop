@@ -1,0 +1,240 @@
+// game.hop — helper functions for the dungeon crawler
+//
+// All output goes through the QemuUart free functions (_qemuPutsLn etc.)
+// which are visible here because QemuUart.hop is merged into the same
+// compilation unit via the sources array.
+//
+// Rooms:
+//   0  Dungeon Entrance   exits: north→1
+//   1  Torch-lit Corridor exits: south→0  east→2  north→3  (goblin)
+//   2  Armory             exits: west→1   (sword)
+//   3  Throne Room        exits: south→1  (orc boss)
+
+// ── output helpers ────────────────────────────────────────────────────────
+
+function println() {
+    _qemuPutc(13)
+    _qemuPutc(10)
+}
+
+function printStat(address label, int val) {
+    _qemuPuts(label)
+    _qemuPutInt(val)
+    println()
+}
+
+// Print a signed modifier in the "+N" / "-N" / "+0" form used by D&D.
+function printMod(int mod) {
+    if (mod >= 0) {
+        _qemuPutc(43)
+    }
+    _qemuPutInt(mod)
+}
+
+// ── line input ────────────────────────────────────────────────────────────
+
+// Read one line from UART into buf. Echoes each character, stops on CR/LF.
+// Strips trailing whitespace so "look  \r" equals "look".
+function readLine(AsciiString buf) {
+    buf.clear()
+    while (true) {
+        int c = _qemuGetc()
+        if (c == 13) {
+            break
+        }
+        if (c == 10) {
+            break
+        }
+        if (c == 8) {
+            if (buf.length() > 0) {
+                buf.trimRight()
+                _qemuPutc(8)
+                _qemuPutc(32)
+                _qemuPutc(8)
+            }
+        } else {
+            _qemuPutc(c)
+            byte cb = byte (c)
+            buf.appendChar(cb)
+        }
+    }
+    buf.trim()
+    println()
+}
+
+// ── room descriptions ─────────────────────────────────────────────────────
+
+function describeRoom(int room, bool goblinDead, bool orcDead, bool swordTaken) {
+    println()
+    if (room == 0) {
+        _qemuPutsLn("=== DUNGEON ENTRANCE ===")
+        _qemuPutsLn("Damp stone walls close in around you. A single torch sputters above")
+        _qemuPutsLn("a passage leading north into darkness.")
+        _qemuPutsLn("Exits: north")
+    } else {
+        if (room == 1) {
+            _qemuPutsLn("=== TORCH-LIT CORRIDOR ===")
+            _qemuPutsLn("A long corridor stretches ahead. Bones crunch underfoot.")
+            if (!goblinDead) {
+                _qemuPutsLn("A goblin crouches in the shadows — it sees you!")
+            } else {
+                _qemuPutsLn("A dead goblin slumps against the wall.")
+            }
+            _qemuPutsLn("Exits: south, east, north")
+        } else {
+            if (room == 2) {
+                _qemuPutsLn("=== ARMORY ===")
+                _qemuPutsLn("Rusted weapons line the walls. A chest sits in the corner.")
+                if (!swordTaken) {
+                    _qemuPutsLn("A fine sword gleams on a rack. (type 'take sword')")
+                } else {
+                    _qemuPutsLn("The sword rack is empty.")
+                }
+                _qemuPutsLn("Exits: west")
+            } else {
+                if (room == 3) {
+                    _qemuPutsLn("=== THRONE ROOM ===")
+                    _qemuPutsLn("A vaulted chamber smelling of rot. A crumbling throne dominates")
+                    _qemuPutsLn("the far wall.")
+                    if (!orcDead) {
+                        _qemuPutsLn("An ORC WARLORD rises from the throne, axe in hand!")
+                    } else {
+                        _qemuPutsLn("The orc warlord lies dead. Silence fills the throne room.")
+                    }
+                    _qemuPutsLn("Exits: south")
+                }
+            }
+        }
+    }
+    println()
+}
+
+// ── movement ──────────────────────────────────────────────────────────────
+
+// Returns the destination room, or -1 if the exit does not exist.
+function tryMove(int room, address dir) int {
+    if (room == 0) {
+        if (_strEq(dir, "north")) { return 1 }
+        if (_strEq(dir, "n"))     { return 1 }
+    } else {
+        if (room == 1) {
+            if (_strEq(dir, "south")) { return 0 }
+            if (_strEq(dir, "s"))     { return 0 }
+            if (_strEq(dir, "east"))  { return 2 }
+            if (_strEq(dir, "e"))     { return 2 }
+            if (_strEq(dir, "north")) { return 3 }
+            if (_strEq(dir, "n"))     { return 3 }
+        } else {
+            if (room == 2) {
+                if (_strEq(dir, "west")) { return 1 }
+                if (_strEq(dir, "w"))    { return 1 }
+            } else {
+                if (room == 3) {
+                    if (_strEq(dir, "south")) { return 1 }
+                    if (_strEq(dir, "s"))     { return 1 }
+                }
+            }
+        }
+    }
+    return -1
+}
+
+// Quick null-terminated string equality (address vs string literal).
+function _strEq(address a, address b) bool {
+    int i = 0
+    while (true) {
+        address pa = a + i
+        address pb = b + i
+        byte ba = pa::value
+        byte bb = pb::value
+        int va = int (ba)
+        int vb = int (bb)
+        if (va != vb) { return false }
+        if (va == 0)  { return true }
+        i = i + 1
+    }
+    return true
+}
+
+// ── stat display ──────────────────────────────────────────────────────────
+
+function printStats(int hp, int maxHp, int strMod, int dexMod, int ac, bool hasSword, bool hasPotion) {
+    println()
+    _qemuPutsLn("=== YOUR STATS ===")
+    _qemuPuts("  HP  : ")
+    _qemuPutInt(hp)
+    _qemuPutc(47)
+    _qemuPutInt(maxHp)
+    println()
+    _qemuPuts("  STR : ")
+    printMod(strMod)
+    println()
+    _qemuPuts("  DEX : ")
+    printMod(dexMod)
+    println()
+    _qemuPuts("  AC  : ")
+    _qemuPutInt(ac)
+    println()
+    _qemuPuts("  Weapon : ")
+    if (hasSword) {
+        _qemuPutsLn("sword (d6)")
+    } else {
+        _qemuPutsLn("dagger (d4)")
+    }
+    _qemuPuts("  Potion : ")
+    if (hasPotion) {
+        _qemuPutsLn("1x health potion")
+    } else {
+        _qemuPutsLn("none")
+    }
+    println()
+}
+
+// ── combat ────────────────────────────────────────────────────────────────
+
+// Player attacks the enemy. Prints the exchange, returns updated enemy HP.
+function playerAttack(Dice dice, int playerStrMod, bool hasSword, int enemyHp, int enemyAc) int {
+    int atkRoll = dice.roll(20) + playerStrMod
+    _qemuPuts("  You attack: rolled ")
+    _qemuPutInt(atkRoll)
+    _qemuPuts(" vs AC ")
+    _qemuPutInt(enemyAc)
+    _qemuPuts("... ")
+    if (atkRoll >= enemyAc) {
+        int dmg = 0
+        if (hasSword) {
+            dmg = dice.roll(6) + playerStrMod
+        } else {
+            dmg = dice.roll(4) + playerStrMod
+        }
+        if (dmg < 1) { dmg = 1 }
+        _qemuPuts("HIT! ")
+        _qemuPutInt(dmg)
+        _qemuPutsLn(" damage.")
+        enemyHp = enemyHp - dmg
+    } else {
+        _qemuPutsLn("MISS.")
+    }
+    return enemyHp
+}
+
+// Enemy strikes the player. Prints the exchange, returns damage dealt (0 for miss).
+function enemyAttack(Dice dice, int playerAc, int enemyAtkMod, int enemyDmgDie) int {
+    int eAtkRoll = dice.roll(20) + enemyAtkMod
+    _qemuPuts("  Enemy strikes: rolled ")
+    _qemuPutInt(eAtkRoll)
+    _qemuPuts(" vs your AC ")
+    _qemuPutInt(playerAc)
+    _qemuPuts("... ")
+    if (eAtkRoll >= playerAc) {
+        int eDmg = dice.roll(enemyDmgDie)
+        if (eDmg < 1) { eDmg = 1 }
+        _qemuPuts("HIT! You take ")
+        _qemuPutInt(eDmg)
+        _qemuPutsLn(" damage.")
+        return eDmg
+    } else {
+        _qemuPutsLn("MISS.")
+        return 0
+    }
+}

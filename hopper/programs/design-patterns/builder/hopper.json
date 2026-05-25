@@ -1,0 +1,12 @@
+{
+  "name": "builder",
+  "version": "0.1.0",
+  "description": "Builder pattern — multi-step HTTP request construction with defaults",
+  "license": "MIT",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {},
+  "targets": {
+    "host": {}
+  }
+}

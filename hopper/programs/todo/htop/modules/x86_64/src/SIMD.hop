@@ -1,0 +1,209 @@
+class X86SIMD satisfies SIMD {
+
+    function scanByte16(address ptr, int b) int {
+        int bc = b | (b << 8) | (b << 16) | (b << 24)
+        int mask = 0
+        asm {
+            rdi = ptr
+            rsi = bc
+            movd xmm1, esi
+            pshufd xmm1, xmm1, 0
+            movdqu xmm0, [rdi]
+            pcmpeqb xmm0, xmm1
+            pmovmskb rax, xmm0
+            mask = rax
+        }
+        return mask
+    }
+
+    function scanByte2x16(address ptr, int b1, int b2) int {
+        int bc1 = b1 | (b1 << 8) | (b1 << 16) | (b1 << 24)
+        int bc2 = b2 | (b2 << 8) | (b2 << 16) | (b2 << 24)
+        int result = 0
+        asm {
+            rdi = ptr
+            rsi = bc1
+            rdx = bc2
+            movd xmm2, esi
+            pshufd xmm2, xmm2, 0
+            movd xmm3, edx
+            pshufd xmm3, xmm3, 0
+            movdqu xmm0, [rdi]
+            movdqa xmm1, xmm0
+            pcmpeqb xmm0, xmm2
+            pcmpeqb xmm1, xmm3
+            pmovmskb rax, xmm0
+            pmovmskb rcx, xmm1
+            shl rcx, 16
+            or rax, rcx
+            result = rax
+        }
+        return result
+    }
+
+    function scanByteOR4x16(address ptr, int b1, int b2, int b3, int b4) int {
+        int bc1 = b1 | (b1 << 8) | (b1 << 16) | (b1 << 24)
+        int bc2 = b2 | (b2 << 8) | (b2 << 16) | (b2 << 24)
+        int bc3 = b3 | (b3 << 8) | (b3 << 16) | (b3 << 24)
+        int bc4 = b4 | (b4 << 8) | (b4 << 16) | (b4 << 24)
+        int mask = 0
+        asm {
+            rdi = ptr
+            rsi = bc1
+            rdx = bc2
+            rcx = bc3
+            r8 = bc4
+            movd xmm4, esi
+            pshufd xmm4, xmm4, 0
+            movd xmm5, edx
+            pshufd xmm5, xmm5, 0
+            movd xmm6, ecx
+            pshufd xmm6, xmm6, 0
+            movd xmm7, r8d
+            pshufd xmm7, xmm7, 0
+            movdqu xmm0, [rdi]
+            movdqa xmm1, xmm0
+            movdqa xmm2, xmm0
+            movdqa xmm3, xmm0
+            pcmpeqb xmm0, xmm4
+            pcmpeqb xmm1, xmm5
+            pcmpeqb xmm2, xmm6
+            pcmpeqb xmm3, xmm7
+            por xmm0, xmm1
+            por xmm2, xmm3
+            por xmm0, xmm2
+            pmovmskb rax, xmm0
+            mask = rax
+        }
+        return mask
+    }
+
+    function popcnt16(int mask) int {
+        int n = 0
+        asm {
+            rdi = mask
+            popcnt rax, rdi
+            n = rax
+        }
+        return n
+    }
+
+    function bsf16(int mask) int {
+        int n = 0
+        asm {
+            rdi = mask
+            bsf rax, rdi
+            n = rax
+        }
+        return n
+    }
+
+    function copy16(address src, address dst) {
+        asm {
+            rdi = src
+            rsi = dst
+            movdqu xmm0, [rdi]
+            movdqu [rsi], xmm0
+        }
+    }
+
+    function rangeXor16(address src, address dst, int lo, int hi, int xorVal) {
+        int range = hi - lo
+        int lobc = lo | (lo << 8) | (lo << 16) | (lo << 24)
+        int rangebc = range | (range << 8) | (range << 16) | (range << 24)
+        int xbc = xorVal | (xorVal << 8) | (xorVal << 16) | (xorVal << 24)
+        asm {
+            rdi = src
+            rsi = dst
+            rdx = lobc
+            rcx = rangebc
+            r8 = xbc
+            movdqu xmm0, [rdi]
+            movd xmm1, edx
+            pshufd xmm1, xmm1, 0
+            movd xmm2, ecx
+            pshufd xmm2, xmm2, 0
+            movd xmm3, r8d
+            pshufd xmm3, xmm3, 0
+            movdqa xmm4, xmm0
+            psubb xmm4, xmm1
+            movdqa xmm5, xmm4
+            pminub xmm5, xmm2
+            pcmpeqb xmm5, xmm4
+            pand xmm5, xmm3
+            pxor xmm0, xmm5
+            movdqu [rsi], xmm0
+        }
+    }
+
+    function translateRange(address src, address dst, int count, int lo, int hi, int xorVal) int {
+        int range = hi - lo
+        int lobc = lo | (lo << 8) | (lo << 16) | (lo << 24)
+        int rangebc = range | (range << 8) | (range << 16) | (range << 24)
+        int xbc = xorVal | (xorVal << 8) | (xorVal << 16) | (xorVal << 24)
+        // Pre-broadcast constants into 16-byte stack buffers; load once per block.
+        address lobuf   = allocate 16
+        address rangebuf = allocate 16
+        address xbuf    = allocate 16
+        asm {
+            rdi = lobuf
+            rsi = rangebuf
+            rdx = xbuf
+            rax = lobc
+            rbx = rangebc
+            rcx = xbc
+            movd xmm1, eax
+            pshufd xmm1, xmm1, 0
+            movdqu [rdi], xmm1
+            movd xmm2, ebx
+            pshufd xmm2, xmm2, 0
+            movdqu [rsi], xmm2
+            movd xmm3, ecx
+            pshufd xmm3, xmm3, 0
+            movdqu [rdx], xmm3
+        }
+        int i = 0
+        while (i + 16 <= count) {
+            address sp = src + i
+            address dp = dst + i
+            asm {
+                rdi = sp
+                rsi = dp
+                rdx = lobuf
+                rcx = rangebuf
+                r8 = xbuf
+                movdqu xmm0, [rdi]
+                movdqu xmm1, [rdx]
+                movdqu xmm2, [rcx]
+                movdqu xmm3, [r8]
+                movdqa xmm4, xmm0
+                psubb xmm4, xmm1
+                movdqa xmm5, xmm4
+                pminub xmm5, xmm2
+                pcmpeqb xmm5, xmm4
+                pand xmm5, xmm3
+                pxor xmm0, xmm5
+                movdqu [rsi], xmm0
+            }
+            i = i + 16
+        }
+        while (i < count) {
+            address sp = src + i
+            byte b = sp::value
+            int bi = int (b)
+            address dp = dst + i
+            if (bi >= lo && bi <= hi) {
+                int mapped = bi ^ xorVal
+                byte mb = byte (mapped)
+                dp::value = mb
+            } else {
+                dp::value = b
+            }
+            i = i + 1
+        }
+        deallocate xbuf
+        deallocate rangebuf
+        deallocate lobuf
+        return count
+    }
+}

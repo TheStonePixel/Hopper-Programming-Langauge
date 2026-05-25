@@ -1,0 +1,87 @@
+// Tests StandardChar: isAlpha, isDigit, isAlphaNum, isSpace, isUpper, isLower, toUpper, toLower, digitValue, hexValue
+// EXPECT: PASS  isAlpha a
+// EXPECT: PASS  isAlpha Z
+// EXPECT: PASS  isAlpha not digit
+// EXPECT: PASS  isDigit 5
+// EXPECT: PASS  isDigit not alpha
+// EXPECT: PASS  isAlphaNum a
+// EXPECT: PASS  isAlphaNum 3
+// EXPECT: PASS  isAlphaNum not space
+// EXPECT: PASS  isSpace space
+// EXPECT: PASS  isSpace tab
+// EXPECT: PASS  isSpace not alpha
+// EXPECT: PASS  isUpper A
+// EXPECT: PASS  isUpper not lower
+// EXPECT: PASS  isLower z
+// EXPECT: PASS  isLower not upper
+// EXPECT: PASS  toUpper a
+// EXPECT: PASS  toUpper already upper
+// EXPECT: PASS  toLower Z
+// EXPECT: PASS  toLower already lower
+// EXPECT: PASS  digitValue 7
+// EXPECT: PASS  hexValue a
+// EXPECT: PASS  hexValue F
+// EXPECT: char: 22 passed, 0 failed
+import Core from core
+import Char from char
+
+entry main {
+    TestSuite t = TestSuite("char")
+    StandardChar c = StandardChar()
+
+    byte ba = 97
+    byte bZ = 90
+    byte b0 = 48
+    byte b5 = 53
+    byte bA = 65
+    byte bz = 122
+    byte bsp = 32
+    byte btab = 9
+    byte b3 = 51
+    byte b7 = 55
+    byte bF = 70
+
+    t.check(c.isAlpha(ba), "isAlpha a")
+    t.check(c.isAlpha(bZ), "isAlpha Z")
+    t.check(!c.isAlpha(b5), "isAlpha not digit")
+
+    t.check(c.isDigit(b5), "isDigit 5")
+    t.check(!c.isDigit(ba), "isDigit not alpha")
+
+    t.check(c.isAlphaNum(ba), "isAlphaNum a")
+    t.check(c.isAlphaNum(b3), "isAlphaNum 3")
+    t.check(!c.isAlphaNum(bsp), "isAlphaNum not space")
+
+    t.check(c.isSpace(bsp), "isSpace space")
+    t.check(c.isSpace(btab), "isSpace tab")
+    t.check(!c.isSpace(ba), "isSpace not alpha")
+
+    t.check(c.isUpper(bA), "isUpper A")
+    t.check(!c.isUpper(ba), "isUpper not lower")
+
+    t.check(c.isLower(bz), "isLower z")
+    t.check(!c.isLower(bA), "isLower not upper")
+
+    byte up = c.toUpper(ba)
+    int upi = int (up)
+    t.checkEq(upi, 65, "toUpper a")
+
+    byte upA = c.toUpper(bA)
+    int upAi = int (upA)
+    t.checkEq(upAi, 65, "toUpper already upper")
+
+    byte lo = c.toLower(bZ)
+    int loi = int (lo)
+    t.checkEq(loi, 122, "toLower Z")
+
+    byte loz = c.toLower(bz)
+    int lozi = int (loz)
+    t.checkEq(lozi, 122, "toLower already lower")
+
+    t.checkEq(c.digitValue(b7), 7, "digitValue 7")
+
+    t.checkEq(c.hexValue(ba), 10, "hexValue a")
+    t.checkEq(c.hexValue(bF), 15, "hexValue F")
+
+    t.done()
+}

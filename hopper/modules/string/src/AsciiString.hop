@@ -1,0 +1,269 @@
+class AsciiString satisfies IString {
+    address data
+    int length
+    int capacity
+
+    constructor(int cap) {
+        self.capacity = cap
+        self.length   = 0
+        self.data     = allocate cap
+        byte z = 0
+        address p = self.data
+        p::value = z
+    }
+
+    destructor() {
+        deallocate self.data
+    }
+
+    function _grow(int needed) {
+        int newCap = self.capacity * 2
+        if (newCap < needed) { newCap = needed }
+        address nb = allocate newCap
+        int i = 0
+        while (i < self.length) {
+            address s = self.data + i
+            address d = nb + i
+            byte b = s::value
+            d::value = b
+            i = i + 1
+        }
+        address np = nb + self.length
+        byte z = 0
+        np::value = z
+        deallocate self.data
+        self.data     = nb
+        self.capacity = newCap
+    }
+
+    function length() int   { return self.length }
+    function capacity() int { return self.capacity }
+    function isEmpty() bool { return self.length == 0 }
+    function pointer() address { return self.data }
+
+    function get(int i) byte {
+        address p = self.data + i
+        byte b = p::value
+        return b
+    }
+
+    function equals(address other) bool {
+        int i = 0
+        while (true) {
+            address sp = self.data + i
+            address op = other + i
+            byte sb = sp::value
+            byte ob = op::value
+            int sv = int (sb)
+            int ov = int (ob)
+            if (sv != ov) { return false }
+            if (sv == 0)  { return true }
+            i = i + 1
+        }
+        return true
+    }
+
+    function indexOf(address sub) int {
+        int i = 0
+        while (i < self.length) {
+            int j = 0
+            bool match = true
+            while (true) {
+                address sp = sub + j
+                byte sb = sp::value
+                int sv = int (sb)
+                if (sv == 0) { break }
+                address dp = self.data + i + j
+                byte db = dp::value
+                int dv = int (db)
+                if (sv != dv) {
+                    match = false
+                    break
+                }
+                j = j + 1
+            }
+            if (match) { return i }
+            i = i + 1
+        }
+        return -1
+    }
+
+    function contains(address sub) bool { return self.indexOf(sub) >= 0 }
+
+    function startsWith(address prefix) bool {
+        int i = 0
+        while (true) {
+            address pp = prefix + i
+            byte pb = pp::value
+            int pv = int (pb)
+            if (pv == 0) { return true }
+            if (i >= self.length) { return false }
+            address dp = self.data + i
+            byte db = dp::value
+            int dv = int (db)
+            if (pv != dv) { return false }
+            i = i + 1
+        }
+        return true
+    }
+
+    function endsWith(address suffix) bool {
+        int slen = 0
+        while (true) {
+            address p = suffix + slen
+            byte b = p::value
+            int v = int (b)
+            if (v == 0) { break }
+            slen = slen + 1
+        }
+        if (slen > self.length) { return false }
+        int offset = self.length - slen
+        int i = 0
+        while (i < slen) {
+            address sp = suffix + i
+            address dp = self.data + offset + i
+            byte sb = sp::value
+            byte db = dp::value
+            int sv = int (sb)
+            int dv = int (db)
+            if (sv != dv) { return false }
+            i = i + 1
+        }
+        return true
+    }
+
+    function clear() {
+        self.length = 0
+        byte z = 0
+        address p = self.data
+        p::value = z
+    }
+
+    function set(address src) {
+        self.clear()
+        self.appendStr(src)
+    }
+
+    function appendChar(byte c) {
+        if (self.length + 2 > self.capacity) { self._grow(self.length + 2) }
+        address p = self.data + self.length
+        p::value = c
+        self.length = self.length + 1
+        address np = self.data + self.length
+        byte z = 0
+        np::value = z
+    }
+
+    function appendStr(address src) {
+        int i = 0
+        while (true) {
+            address p = src + i
+            byte b = p::value
+            int v = int (b)
+            if (v == 0) { break }
+            self.appendChar(b)
+            i = i + 1
+        }
+    }
+
+    function appendInt(int n) {
+        if (n < 0) {
+            byte minus = 45
+            self.appendChar(minus)
+            n = 0 - n
+        }
+        if (n == 0) {
+            byte zero = 48
+            self.appendChar(zero)
+            return
+        }
+        address tmp = allocate 24
+        int count = 0
+        while (n > 0) {
+            int digit = n - (n / 10) * 10
+            int dch = digit + 48
+            byte db = byte (dch)
+            address p = tmp + count
+            p::value = db
+            count = count + 1
+            n = n / 10
+        }
+        int i = count - 1
+        while (i >= 0) {
+            address p = tmp + i
+            byte b = p::value
+            self.appendChar(b)
+            i = i - 1
+        }
+        deallocate tmp
+    }
+
+    function reverse() {
+        int lo = 0
+        int hi = self.length - 1
+        while (lo < hi) {
+            address lp = self.data + lo
+            address hp = self.data + hi
+            byte lb = lp::value
+            byte hb = hp::value
+            lp::value = hb
+            hp::value = lb
+            lo = lo + 1
+            hi = hi - 1
+        }
+    }
+
+    function trimLeft() {
+        int i = 0
+        while (i < self.length) {
+            address p = self.data + i
+            byte b = p::value
+            int v = int (b)
+            if (v != 32) {
+                if (v != 9) {
+                    if (v != 10) {
+                        if (v != 13) { break }
+                    }
+                }
+            }
+            i = i + 1
+        }
+        if (i == 0) { return }
+        int j = 0
+        while (i + j < self.length) {
+            address src = self.data + i + j
+            address dst = self.data + j
+            byte b = src::value
+            dst::value = b
+            j = j + 1
+        }
+        self.length = self.length - i
+        address np = self.data + self.length
+        byte z = 0
+        np::value = z
+    }
+
+    function trimRight() {
+        while (self.length > 0) {
+            address p = self.data + self.length - 1
+            byte b = p::value
+            int v = int (b)
+            if (v != 32) {
+                if (v != 9) {
+                    if (v != 10) {
+                        if (v != 13) { break }
+                    }
+                }
+            }
+            self.length = self.length - 1
+        }
+        address np = self.data + self.length
+        byte z = 0
+        np::value = z
+    }
+
+    function trim() {
+        self.trimRight()
+        self.trimLeft()
+    }
+}

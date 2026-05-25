@@ -1,0 +1,94 @@
+// command.hop — Command pattern: encapsulate operations for replay
+//
+// Commands are callbacks that mutate state through a pointer.
+// CommandQueue records every executed command so the sequence can be
+// replayed from scratch — useful for undo/redo and audit logs.
+//
+// Demonstrates: address as mutable state, callback-as-command,
+//               execution log, deterministic replay.
+//
+// Build: hopper build command.hop
+
+import Array from ds
+
+extern function printf(string fmt, ...) int
+
+// ── commands — each takes a pointer to state, mutates it ────────────────────
+
+function doIncrement(address p) int {
+    int v = p::value
+    p::value = v + 1
+    printf("  inc -> %lld\n", v + 1)
+    return 0
+}
+
+function doDecrement(address p) int {
+    int v = p::value
+    p::value = v - 1
+    printf("  dec -> %lld\n", v - 1)
+    return 0
+}
+
+function doDouble(address p) int {
+    int v = p::value
+    p::value = v * 2
+    printf("  dbl -> %lld\n", v * 2)
+    return 0
+}
+
+function doHalve(address p) int {
+    int v = p::value
+    p::value = v / 2
+    printf("  hlv -> %lld\n", v / 2)
+    return 0
+}
+
+// ── CommandQueue — records and replays commands ───────────────────────────────
+
+class CommandQueue {
+    StandardArray log
+
+    constructor() {
+        self.log = StandardArray(16)
+    }
+
+    function run(address state, address cmd) {
+        callback(address) int fn  = address (cmd)
+        fn(state)
+        self.log.push(cmd)
+    }
+
+    function replay(address state) {
+        printf("--- replay %lld commands ---\n", self.log.len())
+        int i = 0
+        while (i < self.log.len()) {
+            address fn = self.log.get(i)
+            callback(address) int cmd = address (fn)
+            cmd(state)
+            i = i + 1
+        }
+    }
+}
+
+// ── entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    int counter = 0
+    address ptr = counter::address
+
+    CommandQueue q = CommandQueue()
+
+    printf("execute:\n")
+    q.run(ptr, doIncrement::address)
+    q.run(ptr, doIncrement::address)
+    q.run(ptr, doDouble::address)
+    q.run(ptr, doIncrement::address)
+    q.run(ptr, doDecrement::address)
+
+    printf("counter = %lld\n\n", counter)
+
+    counter = 0
+    printf("replay from zero:\n")
+    q.replay(ptr)
+    printf("counter = %lld\n", counter)
+}

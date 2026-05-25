@@ -1,0 +1,5 @@
+// EXPECT_ERROR: Undeclared variable
+
+entry main {
+    int x = missing + 1
+}

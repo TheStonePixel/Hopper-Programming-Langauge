@@ -1,0 +1,317 @@
+// Battleship 1 — C-level memory
+//
+// This is the baseline: no generics, no classes, no smart pointers.
+// The board is a raw heap allocation. Every cell access is manual pointer
+// arithmetic. The input buffer is manually allocated and freed.
+// RNG state is passed as an address and mutated in place.
+//
+// This is deliberately long. The verbosity is the point — it shows
+// exactly how much work the higher layers save.
+//
+// Board layout: 800 bytes — 100 int cells × 8 bytes each (int = 64-bit)
+//   Cell values:  0 = water   1 = ship   2 = hit   3 = miss
+//   Display:      . = water   # = ship   X = hit   o = miss
+
+import io  from core
+import io  from io
+import sys from linux
+
+// ── RNG ───────────────────────────────────────────────────────────────────────
+// Linear congruential generator. State lives in the caller — no globals.
+// Pass the address of an int; each call advances it and returns a non-negative value.
+
+function rngStep(address state) int {
+    int s = state::value
+    s = s * 1664525 + 1013904223
+    state::value = s
+    int r = s & 0x7FFFFFFF
+    return r
+}
+
+function rngMod(address state, int n) int {
+    return rngStep(state) % n
+}
+
+// ── Board allocation ──────────────────────────────────────────────────────────
+// The board is a raw heap block: 100 cells × 8 bytes.
+// Caller is responsible for calling boardFree when done.
+
+function boardAlloc() address {
+    address board = allocate 800
+    int i = 0
+    while (i < 100) {
+        address cell = board + i * 8
+        cell::value = 0
+        i = i + 1
+    }
+    return board
+}
+
+function boardFree(address board) {
+    deallocate board
+}
+
+// ── Cell access ───────────────────────────────────────────────────────────────
+// Every read and write goes through these functions.
+// The arithmetic: row × 10 + col gives the flat index; × 8 scales to byte offset.
+
+function cellGet(address board, int r, int c) int {
+    address cell = board + (r * 10 + c) * 8
+    int v = cell::value
+    return v
+}
+
+function cellSet(address board, int r, int c, int val) {
+    address cell = board + (r * 10 + c) * 8
+    cell::value = val
+}
+
+function cellGetFlat(address board, int idx) int {
+    address cell = board + idx * 8
+    int v = cell::value
+    return v
+}
+
+// ── Ship placement ────────────────────────────────────────────────────────────
+
+function canPlace(address board, int r, int c, int len, int dir) bool {
+    bool ok = true
+    int i = 0
+    while (i < len) {
+        int rr = r
+        int cc = c
+        if (dir == 0) { cc = c + i }
+        if (dir == 1) { rr = r + i }
+        if (rr >= 10) { ok = false }
+        if (cc >= 10) { ok = false }
+        if (ok) {
+            if (cellGet(board, rr, cc) == 1) { ok = false }
+        }
+        i = i + 1
+    }
+    return ok
+}
+
+function placeShip(address board, int len, address rng) {
+    bool placed = false
+    while (!placed) {
+        int r   = rngMod(rng, 10)
+        int c   = rngMod(rng, 10)
+        int dir = rngMod(rng, 2)
+        if (canPlace(board, r, c, len, dir)) {
+            int i = 0
+            while (i < len) {
+                int rr = r
+                int cc = c
+                if (dir == 0) { cc = c + i }
+                if (dir == 1) { rr = r + i }
+                cellSet(board, rr, cc, 1)
+                i = i + 1
+            }
+            placed = true
+        }
+    }
+}
+
+function placeFleet(address board, address rng) {
+    placeShip(board, 5, rng)
+    placeShip(board, 4, rng)
+    placeShip(board, 3, rng)
+    placeShip(board, 3, rng)
+    placeShip(board, 2, rng)
+}
+
+// ── Display ───────────────────────────────────────────────────────────────────
+
+function printGrid(address board, bool reveal) {
+    println("   0 1 2 3 4 5 6 7 8 9")
+    int r = 0
+    while (r < 10) {
+        printInt(r)
+        print("  ")
+        int c = 0
+        while (c < 10) {
+            int v = cellGet(board, r, c)
+            if (v == 2) { print("X ") }
+            if (v == 3) { print("o ") }
+            if (v == 0) { print(". ") }
+            if (v == 1) {
+                if (reveal)  { print("# ") }
+                if (!reveal) { print(". ") }
+            }
+            c = c + 1
+        }
+        print("\n")
+        r = r + 1
+    }
+}
+
+function shipsLeft(address board) int {
+    int count = 0
+    int i = 0
+    while (i < 100) {
+        if (cellGetFlat(board, i) == 1) { count = count + 1 }
+        i = i + 1
+    }
+    return count
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+// Manually scan a "row col" line. The input buffer is allocated by the caller.
+// Finds the space, calls parseInt on each half, writes results through pointers.
+
+function parseShot(address buf, int n, address rowOut, address colOut) bool {
+    int spaceIdx = -1
+    int i = 0
+    while (i < n) {
+        address p = buf + i
+        byte ch = p::value
+        int chi = int (ch)
+        if (chi == 32) {
+            spaceIdx = i
+            i = n
+        }
+        i = i + 1
+    }
+    if (spaceIdx <= 0) { return false }
+
+    int row = parseInt(buf, spaceIdx)
+    address rest = buf + spaceIdx + 1
+    int col = parseInt(rest, n - spaceIdx - 1)
+
+    rowOut::value = row
+    colOut::value = col
+    return true
+}
+
+// ── Turns ─────────────────────────────────────────────────────────────────────
+
+function playerTurn(address board) {
+    bool valid = false
+    address buf = allocate 64
+    while (!valid) {
+        print("  Your shot (row col): ")
+        int n = readLine(buf, 64)
+        int row = 0
+        int col = 0
+        bool ok = parseShot(buf, n, row::address, col::address)
+        if (!ok) {
+            println("  Invalid — enter two numbers separated by a space.")
+        }
+        if (ok) {
+            if (row < 0)   { ok = false }
+            if (col < 0)   { ok = false }
+            if (row >= 10) { ok = false }
+            if (col >= 10) { ok = false }
+            if (!ok) { println("  Out of bounds — row and col must be 0 to 9.") }
+        }
+        if (ok) {
+            int v = cellGet(board, row, col)
+            if (v == 2) { println("  Already hit there — try again.") }
+            if (v == 3) { println("  Already fired there — try again.") }
+            if (v == 0) {
+                cellSet(board, row, col, 3)
+                println("  o  Miss.")
+                valid = true
+            }
+            if (v == 1) {
+                cellSet(board, row, col, 2)
+                println("  X  Direct hit!")
+                valid = true
+            }
+        }
+    }
+    deallocate buf
+}
+
+function computerTurn(address board, address rng) {
+    bool done = false
+    while (!done) {
+        int r = rngMod(rng, 10)
+        int c = rngMod(rng, 10)
+        int v = cellGet(board, r, c)
+        if (v == 0) {
+            cellSet(board, r, c, 3)
+            print("  o  Computer fires at ")
+            printInt(r)
+            print(" ")
+            printInt(c)
+            println("  Miss.")
+            done = true
+        }
+        if (v == 1) {
+            cellSet(board, r, c, 2)
+            print("  X  Computer hits at ")
+            printInt(r)
+            print(" ")
+            printInt(c)
+            println("!")
+            done = true
+        }
+    }
+}
+
+// ── Entry ─────────────────────────────────────────────────────────────────────
+
+entry main {
+    int rng = getpid()
+
+    address playerBoard   = boardAlloc()
+    address computerBoard = boardAlloc()
+
+    placeFleet(playerBoard,   rng::address)
+    placeFleet(computerBoard, rng::address)
+
+    print("\n")
+    println("  BATTLESHIP 1  —  low level")
+    println("  Sink all 17 enemy ship cells to win.")
+    println("  X hit   o miss   . water   # ship")
+
+    bool gameOver   = false
+    bool playerWins = false
+
+    while (!gameOver) {
+        print("\n")
+        print("  Your Fleet (")
+        printInt(shipsLeft(playerBoard))
+        println(" remaining)")
+        printGrid(playerBoard, true)
+
+        print("\n")
+        print("  Enemy Waters (")
+        printInt(shipsLeft(computerBoard))
+        println(" remaining)")
+        printGrid(computerBoard, false)
+        print("\n")
+
+        playerTurn(computerBoard)
+
+        if (shipsLeft(computerBoard) == 0) {
+            gameOver   = true
+            playerWins = true
+        }
+
+        if (!gameOver) {
+            computerTurn(playerBoard, rng::address)
+            if (shipsLeft(playerBoard) == 0) {
+                gameOver = true
+            }
+        }
+    }
+
+    print("\n")
+    println("  Final Boards")
+    println("  Your fleet:")
+    printGrid(playerBoard, true)
+    print("\n")
+    println("  Enemy fleet:")
+    printGrid(computerBoard, true)
+    print("\n")
+
+    if (playerWins)  { println("  Victory! All enemy ships sunk!") }
+    if (!playerWins) { println("  Defeated. Your fleet is gone.") }
+    print("\n")
+
+    boardFree(playerBoard)
+    boardFree(computerBoard)
+}

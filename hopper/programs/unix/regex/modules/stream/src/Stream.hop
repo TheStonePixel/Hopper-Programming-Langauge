@@ -1,0 +1,92 @@
+class ByteStream satisfies Stream {
+    address data
+    int position
+    int length
+
+    constructor(address buf, int len) {
+        self.data     = buf
+        self.position = 0
+        self.length   = len
+    }
+
+    function pos() int {
+        return self.position
+    }
+
+    function remaining() int {
+        return self.length - self.position
+    }
+
+    function atEnd() bool {
+        return self.position >= self.length
+    }
+
+    function peek() byte {
+        if (self.position >= self.length) {
+            byte z = 0
+            return z
+        }
+        address p = self.data + self.position
+        byte b = p::value
+        return b
+    }
+
+    function peekAt(int offset) byte {
+        int idx = self.position + offset
+        if (idx >= self.length) {
+            byte z = 0
+            return z
+        }
+        if (idx < 0) {
+            byte z = 0
+            return z
+        }
+        address p = self.data + idx
+        byte b = p::value
+        return b
+    }
+
+    function advance() {
+        if (self.position < self.length) {
+            self.position = self.position + 1
+        }
+    }
+
+    function advanceBy(int n) {
+        int newPos = self.position + n
+        if (newPos > self.length) { newPos = self.length }
+        self.position = newPos
+    }
+
+    // One 16-byte load; compare against bc1 and bc2 simultaneously.
+    // Returns bc1 match mask in bits 0–15, bc2 match mask in bits 16–31.
+    // Returns 0 if fewer than 16 bytes remain.
+    function scan16dual(int bc1, int bc2) int {
+        if (self.length - self.position < 16) { return 0 }
+        address ptr = self.data + self.position
+        int result = 0
+        asm {
+            rdi = ptr
+            rsi = bc1
+            rdx = bc2
+            movd xmm2, esi
+            pshufd xmm2, xmm2, 0
+            movd xmm3, edx
+            pshufd xmm3, xmm3, 0
+            movdqu xmm0, [rdi]
+            movdqa xmm1, xmm0
+            pcmpeqb xmm0, xmm2
+            pcmpeqb xmm1, xmm3
+            pmovmskb rax, xmm0
+            pmovmskb rcx, xmm1
+            shl rcx, 16
+            or rax, rcx
+            result = rax
+        }
+        return result
+    }
+
+    function reset() {
+        self.position = 0
+    }
+}

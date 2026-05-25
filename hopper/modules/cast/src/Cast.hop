@@ -1,0 +1,30 @@
+template function cast<int>(address src) int            { return int src          }
+template function cast<int>(byte src) int               { return int src          }
+template function cast<int>(char src) int               { return int src          }
+template function cast<int>(float src) int              { return int src          }
+template function cast<int>(bool src) int               { return int src          }
+template function cast<int>(unsigned byte src) int      { return unsigned int src }
+
+template function cast<address>(int src) address        { return address src      }
+template function cast<address>(string src) address     { return address src      }
+
+template function cast<byte>(int src) byte              { return byte src         }
+template function cast<byte>(float src) byte            { return byte src         }
+template function cast<byte>(bool src) byte             { return byte src         }
+
+template function cast<char>(int src) byte              { return byte src         }
+
+template function cast<float>(int src) float            { return float src        }
+template function cast<float>(byte src) float           { return float src        }
+template function cast<float>(bool src) float           { return float src        }
+
+template function cast<bool>(int src) bool              { return bool src         }
+template function cast<bool>(byte src) bool             { return bool src         }
+template function cast<bool>(float src) bool            { return bool src         }
+
+template function cast<string>(address src) string      { return string src       }
+
+template function cast<unsigned int>(byte src) unsigned int      { return unsigned int src }
+template function cast<unsigned int>(address src) unsigned int   { return unsigned int src }
+
+template function cast<unsigned byte>(int src) byte     { return byte src         }

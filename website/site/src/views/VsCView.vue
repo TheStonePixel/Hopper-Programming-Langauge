@@ -1,5 +1,8 @@
 <script setup>
-import CodeBlock from '../components/CodeBlock.vue'
+import CodeBlock from '@/components/CodeBlock.vue'
+import PageShell from '@/components/PageShell.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import PageContainer from '@/components/PageContainer.vue'
 
 const codes = {
     c0: `int n = 42;
@@ -93,22 +96,19 @@ printf("%d %d\\n", a, bv)   // 13 7`,
 </script>
 
 <template>
-  <div class="page">
+  <PageShell>
 
-    <header class="page-header">
-      <div class="container">
-        <span class="label">Memory Operations</span>
-        <h1>Hopper vs C</h1>
-        <p class="subtitle">
-          Every memory operation, side by side. Same semantics — cleaner syntax, zero ambiguity.
-          All examples are compiled and tested.
-        </p>
-      </div>
-    </header>
+    <PageHeader
+      label="Memory Operations"
+      title="Hopper vs C"
+      sub="Every memory operation, side by side. Same semantics — cleaner syntax, zero ambiguity. All examples are compiled and tested."
+      width="lg"
+      size="lg"
+    />
 
     <!-- 1. Address-of and Read -->
     <section class="compare">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">01</span>
           <h2>Address-of and Read</h2>
@@ -122,12 +122,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c0" />
           <CodeBlock label="Hopper" :code="codes.c1" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 2. Write Through Pointer -->
     <section class="compare alt">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">02</span>
           <h2>Write Through Pointer</h2>
@@ -140,12 +140,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c2" />
           <CodeBlock label="Hopper" :code="codes.c3" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 3. Size Operations -->
     <section class="compare">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">03</span>
           <h2>Size Operations</h2>
@@ -159,12 +159,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c4" />
           <CodeBlock label="Hopper" :code="codes.c5" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 4. Struct Size -->
     <section class="compare alt">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">04</span>
           <h2>Struct Size</h2>
@@ -177,12 +177,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c6" />
           <CodeBlock label="Hopper" :code="codes.c7" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 5. Array Element Address -->
     <section class="compare">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">05</span>
           <h2>Array Element Address</h2>
@@ -196,12 +196,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c8" />
           <CodeBlock label="Hopper" :code="codes.c9" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 6. Pointer Arithmetic -->
     <section class="compare alt">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">06</span>
           <h2>Pointer Arithmetic</h2>
@@ -215,12 +215,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c10" />
           <CodeBlock label="Hopper" :code="codes.c11" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 7. Null Check -->
     <section class="compare">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">07</span>
           <h2>Null Check</h2>
@@ -234,12 +234,12 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c12" />
           <CodeBlock label="Hopper" :code="codes.c13" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <!-- 8. Swap Via Pointers -->
     <section class="compare alt">
-      <div class="container">
+      <PageContainer width="lg">
         <div class="compare-header">
           <span class="num-badge">08</span>
           <h2>Swap Via Pointers</h2>
@@ -253,80 +253,33 @@ printf("%d %d\\n", a, bv)   // 13 7`,
           <CodeBlock label="C" :code="codes.c14" />
           <CodeBlock label="Hopper" :code="codes.c15" />
         </div>
-      </div>
+      </PageContainer>
     </section>
 
     <footer>
-      <div class="container">
+      <PageContainer width="lg">
         <p>All examples compiled and verified against the Hopper test suite.</p>
-      </div>
+      </PageContainer>
     </footer>
 
-  </div>
+  </PageShell>
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: #faf9f6;
-}
-
-.container {
-  width: 100%;
-  padding: 0 5vw;
-}
-
-.label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  color: #9ca3af;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-}
-
-/* ── Page Header ── */
-.page-header {
-  padding: 4rem 0 3.5rem;
-  background: #ffffff;
-  border-bottom: 2px solid #e5e7eb;
-}
-
-.page-header h1 {
-  font-size: 5rem;
-  font-weight: 800;
-  letter-spacing: -3px;
-  color: #111827;
-  margin-bottom: 1.25rem;
-}
-
-.subtitle {
-  font-size: 1.05rem;
-  color: #6b7280;
-  max-width: 700px;
-  line-height: 1.7;
-}
-
-/* ── Compare Sections ── */
 .compare {
   padding: 4rem 0;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.compare.alt {
-  background: #faf9f6;
-}
+.compare.alt { background: var(--color-bg); }
 
-.compare-header {
-  margin-bottom: 2rem;
-}
+.compare-header { margin-bottom: 2rem; }
 
 .num-badge {
   font-size: 0.7rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #d1d5db;
+  font-family: var(--font-mono);
+  color: var(--color-text-fainter);
   letter-spacing: 2px;
   display: block;
   margin-bottom: 0.6rem;
@@ -336,34 +289,36 @@ printf("%d %d\\n", a, bv)   // 13 7`,
 .compare-header h2 {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin-bottom: 0.6rem;
 }
 
 .compare-header p {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--color-text-soft);
   max-width: 900px;
   line-height: 1.7;
 }
 
-/* ── Code Pair ── */
 .pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
 }
 
-/* ── Footer ── */
 footer {
   padding: 3rem 0;
   text-align: center;
-  background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
 }
 
 footer p {
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--color-text-faint);
+}
+
+@media (max-width: 768px) {
+  .pair { grid-template-columns: 1fr; }
 }
 </style>

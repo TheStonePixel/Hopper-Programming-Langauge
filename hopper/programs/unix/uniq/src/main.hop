@@ -1,0 +1,295 @@
+// uniq — filter adjacent duplicate lines
+//
+// Usage: uniq [-cdu] [file]
+//   -c  prefix each line with its count
+//   -d  only print duplicate lines
+//   -u  only print unique lines
+
+import IO         from linux
+import FileSystem from linux
+import SIMD       from x86_64
+
+enum Limits {
+    BUFSZ   = 65536
+    LINEBUF = 4096
+    OUTBUF  = 65536
+}
+
+function strEq(address a, int alen, address b, int blen) bool {
+    if (alen != blen) { return false }
+    int i = 0
+    while (i < alen) {
+        address ap = a + i
+        address bp = b + i
+        byte ab = ap::value
+        byte bb = bp::value
+        int ac = int (ab)
+        int bc = int (bb)
+        if (ac != bc) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function copyLine(address src, int len, address dst) {
+    int i = 0
+    while (i < len) {
+        address sp = src + i
+        address dp = dst + i
+        byte b = sp::value
+        dp::value = b
+        i = i + 1
+    }
+}
+
+// Write count+space+line+newline into outbuf. Returns bytes written.
+function emitCount(int count, address line, int len, address outbuf) int {
+    int pos = 0
+    address tmp = allocate 24
+    int c = count
+    int digits = 0
+    int npad = 0
+    int di = 0
+    int i = 0
+    if (c == 0) {
+        address tp = tmp
+        byte z = 48
+        tp::value = z
+        digits = 1
+    } else {
+        while (c > 0) {
+            int dval = c % 10 + 48
+            byte db = byte (dval)
+            address tp = tmp + digits
+            tp::value = db
+            digits = digits + 1
+            c = c / 10
+        }
+    }
+    npad = 7 - digits
+    while (npad > 0) {
+        address op = outbuf + pos
+        byte sp = 32
+        op::value = sp
+        pos = pos + 1
+        npad = npad - 1
+    }
+    di = digits - 1
+    while (di >= 0) {
+        address op = outbuf + pos
+        address tp = tmp + di
+        byte db = tp::value
+        op::value = db
+        pos = pos + 1
+        di = di - 1
+    }
+    deallocate tmp
+    address spp = outbuf + pos
+    byte space = 32
+    spp::value = space
+    pos = pos + 1
+    while (i < len) {
+        address lp = line + i
+        byte b = lp::value
+        address op = outbuf + pos
+        op::value = b
+        pos = pos + 1
+        i = i + 1
+    }
+    byte nl = 10
+    address nlp = outbuf + pos
+    nlp::value = nl
+    pos = pos + 1
+    return pos
+}
+
+// Write the pending group to outbuf at outpos. Returns new outpos.
+function flushGroup(int count, address prevbuf, int prevlen, int flagC, int flagD, int flagU, address outbuf, int outpos) int {
+    bool shouldPrint = true
+    if (flagD != 0 && count == 1) { shouldPrint = false }
+    if (flagU != 0 && count > 1)  { shouldPrint = false }
+    if (shouldPrint) {
+        if (flagC != 0) {
+            int written = emitCount(count, prevbuf, prevlen, outbuf + outpos)
+            outpos = outpos + written
+        } else {
+            int k = 0
+            while (k < prevlen) {
+                address sp = prevbuf + k
+                byte sb = sp::value
+                address dp = outbuf + outpos + k
+                dp::value = sb
+                k = k + 1
+            }
+            outpos = outpos + prevlen
+            address nlp = outbuf + outpos
+            byte nl = 10
+            nlp::value = nl
+            outpos = outpos + 1
+        }
+    }
+    return outpos
+}
+
+function uniqFd(int fd, int flagC, int flagD, int flagU) {
+    address inbuf   = allocate Limits.BUFSZ
+    address prevbuf = allocate Limits.LINEBUF
+    address curbuf  = allocate Limits.LINEBUF
+    address outbuf  = allocate Limits.OUTBUF
+    int prevlen = 0
+    int curlen  = 0
+    int count   = 0
+    int outpos  = 0
+    X86SIMD simd = X86SIMD()
+
+    bool eof = false
+    while (!eof) {
+        int nr = read(fd, inbuf, Limits.BUFSZ)
+        if (nr <= 0) {
+            eof = true
+        } else {
+            int i = 0
+            // SIMD fast path: scan for newlines 16 bytes at a time
+            while (i + 16 <= nr) {
+                int mask = simd.scanByte16(inbuf + i, 10)
+                if (mask == 0) {
+                    // No newline: bulk copy 16 bytes to curbuf via SIMD
+                    if (curlen + 16 < Limits.LINEBUF) {
+                        simd.copy16(inbuf + i, curbuf + curlen)
+                        curlen = curlen + 16
+                    }
+                    i = i + 16
+                } else {
+                    // Newline somewhere in block: process byte by byte
+                    int blkend = i + 16
+                    while (i < blkend) {
+                        address ip = inbuf + i
+                        byte b = ip::value
+                        int bi = int (b)
+                        if (bi == 10) {
+                            if (count == 0) {
+                                copyLine(curbuf, curlen, prevbuf)
+                                prevlen = curlen
+                                count = 1
+                            } else if (strEq(curbuf, curlen, prevbuf, prevlen)) {
+                                count = count + 1
+                            } else {
+                                outpos = flushGroup(count, prevbuf, prevlen, flagC, flagD, flagU, outbuf, outpos)
+                                if (outpos > Limits.LINEBUF * 8) {
+                                    write(StdFd.STDOUT, outbuf, outpos)
+                                    outpos = 0
+                                }
+                                copyLine(curbuf, curlen, prevbuf)
+                                prevlen = curlen
+                                count = 1
+                            }
+                            curlen = 0
+                        } else {
+                            if (curlen < Limits.LINEBUF - 1) {
+                                address cp = curbuf + curlen
+                                cp::value = b
+                                curlen = curlen + 1
+                            }
+                        }
+                        i = i + 1
+                    }
+                }
+            }
+            // Scalar tail
+            while (i < nr) {
+                address ip = inbuf + i
+                byte b = ip::value
+                int bi = int (b)
+                if (bi == 10) {
+                    if (count == 0) {
+                        copyLine(curbuf, curlen, prevbuf)
+                        prevlen = curlen
+                        count = 1
+                    } else if (strEq(curbuf, curlen, prevbuf, prevlen)) {
+                        count = count + 1
+                    } else {
+                        outpos = flushGroup(count, prevbuf, prevlen, flagC, flagD, flagU, outbuf, outpos)
+                        if (outpos > Limits.LINEBUF * 8) {
+                            write(StdFd.STDOUT, outbuf, outpos)
+                            outpos = 0
+                        }
+                        copyLine(curbuf, curlen, prevbuf)
+                        prevlen = curlen
+                        count = 1
+                    }
+                    curlen = 0
+                } else {
+                    if (curlen < Limits.LINEBUF - 1) {
+                        address cp = curbuf + curlen
+                        cp::value = b
+                        curlen = curlen + 1
+                    }
+                }
+                i = i + 1
+            }
+        }
+    }
+
+    if (count > 0) {
+        outpos = flushGroup(count, prevbuf, prevlen, flagC, flagD, flagU, outbuf, outpos)
+    }
+    if (outpos > 0) {
+        write(StdFd.STDOUT, outbuf, outpos)
+    }
+
+    deallocate outbuf
+    deallocate curbuf
+    deallocate prevbuf
+    deallocate inbuf
+}
+
+entry main(int argc, string[] argv) {
+    int flagC = 0
+    int flagD = 0
+    int flagU = 0
+    int fileArg = 0
+
+    int ai = 1
+    while (ai < argc) {
+        address arg = argv[ai]
+        byte a0 = arg::value
+        int a0i = int (a0)
+        if (a0i == 45) {
+            int fi = 1
+            bool done = false
+            while (!done) {
+                address fp = arg + fi
+                byte fc = fp::value
+                int fci = int (fc)
+                if (fci == 0) {
+                    done = true
+                } else if (fci == 99) {
+                    flagC = 1
+                    fi = fi + 1
+                } else if (fci == 100) {
+                    flagD = 1
+                    fi = fi + 1
+                } else if (fci == 117) {
+                    flagU = 1
+                    fi = fi + 1
+                } else {
+                    done = true
+                }
+            }
+        } else {
+            if (fileArg == 0) { fileArg = ai }
+        }
+        ai = ai + 1
+    }
+
+    if (fileArg == 0) {
+        uniqFd(StdFd.STDIN, flagC, flagD, flagU)
+    } else {
+        address fname = argv[fileArg]
+        int fd = open(fname, OpenFlag.O_RDONLY, 0)
+        if (fd >= 0) {
+            uniqFd(fd, flagC, flagD, flagU)
+            close(fd)
+        }
+    }
+}

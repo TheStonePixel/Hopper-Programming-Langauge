@@ -1,0 +1,74 @@
+// TEST: int-backed enum
+// EXPECT: Color.Red = 0
+// EXPECT: Color.Green = 1
+// EXPECT: Color.Blue = 2
+// EXPECT: Color.Custom = 10
+// EXPECT: Color.AfterCustom = 11
+
+// TEST: string-backed enum
+// EXPECT: Direction.North = north
+// EXPECT: Direction.South = south
+// EXPECT: Direction.East = east
+// EXPECT: Direction.West = west
+
+// TEST: enum in expression
+// EXPECT: is red: 1
+// EXPECT: not blue: 1
+
+// TEST: string enum comparison
+// EXPECT: heading north: 1
+
+import io from core
+extern function printf(string fmt, ...) int
+
+enum Color {
+    Red    = 0
+    Green  = 1
+    Blue   = 2
+    Custom = 10
+    AfterCustom
+}
+
+enum Direction {
+    North = "north"
+    South = "south"
+    East  = "east"
+    West  = "west"
+}
+
+entry main {
+    printf("Color.Red = %lld\n",        Color.Red)
+    printf("Color.Green = %lld\n",      Color.Green)
+    printf("Color.Blue = %lld\n",       Color.Blue)
+    printf("Color.Custom = %lld\n",     Color.Custom)
+    printf("Color.AfterCustom = %lld\n", Color.AfterCustom)
+
+    printf("Direction.North = %s\n", Direction.North)
+    printf("Direction.South = %s\n", Direction.South)
+    printf("Direction.East = %s\n",  Direction.East)
+    printf("Direction.West = %s\n",  Direction.West)
+
+    int c = Color.Red
+    printf("is red: %lld\n",  c == Color.Red)
+    printf("not blue: %lld\n", c != Color.Blue)
+
+    address heading = Direction.North
+    bool goingNorth = strEq(heading, "north")
+    printf("heading north: %lld\n", goingNorth)
+}
+
+function strEq(address a, address b) bool {
+    int i = 0
+    while (true) {
+        address pa = a + i
+        address pb = b + i
+        byte ba = pa::value
+        byte bb = pb::value
+        int ai = int (ba)
+        int bi = int (bb)
+        if (ai != bi) { return false }
+        if (ai == 0)  { return true }
+        i = i + 1
+    }
+    return false
+}

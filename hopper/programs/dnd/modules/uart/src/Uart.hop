@@ -1,0 +1,123 @@
+// BCM2835 UART0 (PL011) hardware registers — Pi Zero bare-metal
+// init_uart_clock=3000000 must be set in config.txt
+int GPFSEL1    @ 0x20200004
+int GPPUD      @ 0x20200094
+int GPPUDCLK0  @ 0x20200098
+int UART0_DR   @ 0x20201000
+int UART0_FR   @ 0x20201018
+int UART0_IBRD @ 0x20201024
+int UART0_FBRD @ 0x20201028
+int UART0_LCRH @ 0x2020102C
+int UART0_CR   @ 0x20201030
+int UART0_ICR  @ 0x20201044
+
+function _uartDelay(int n) {
+    int i = 0
+    while (i < n) { i = i + 1 }
+}
+
+function _uartInit() {
+    UART0_CR = 0
+    int sel = GPFSEL1
+    sel = sel & -258049
+    sel = sel | 147456
+    GPFSEL1 = sel
+    GPPUD = 0
+    _uartDelay(150)
+    GPPUDCLK0 = 49152
+    _uartDelay(150)
+    GPPUD = 0
+    GPPUDCLK0 = 0
+    UART0_ICR = 2047
+    UART0_IBRD = 1
+    UART0_FBRD = 40
+    UART0_LCRH = 112
+    UART0_CR = 769
+}
+
+function _uartPutc(int c) {
+    while ((UART0_FR & 32) != 0) { }
+    UART0_DR = c & 255
+}
+
+function _uartGetc() int {
+    while ((UART0_FR & 16) != 0) { }
+    return UART0_DR & 255
+}
+
+function _uartPuts(address s) {
+    address p = s
+    byte b = p::value
+    int bi = int (b)
+    while (bi != 0) {
+        _uartPutc(bi)
+        p = p + 1
+        b = p::value
+        bi = int (b)
+    }
+}
+
+function _uartPutsLn(address s) {
+    _uartPuts(s)
+    _uartPutc(13)
+    _uartPutc(10)
+}
+
+function _uartPutInt(int n) {
+    if (n < 0) {
+        _uartPutc(45)
+        n = 0 - n
+    }
+    if (n == 0) {
+        _uartPutc(48)
+        return
+    }
+    address tmp = allocate 24
+    int count = 0
+    while (n > 0) {
+        int d = n % 10
+        int dch = d + 48
+        byte db = byte (dch)
+        address p = tmp + count
+        p::value = db
+        count = count + 1
+        n = n / 10
+    }
+    int i = count - 1
+    while (i >= 0) {
+        address p = tmp + i
+        byte b = p::value
+        int bi = int (b)
+        _uartPutc(bi)
+        i = i - 1
+    }
+    deallocate tmp
+}
+
+function _uartPutHex(int n) {
+    _uartPuts("0x")
+    int shift = 28
+    while (shift >= 0) {
+        int nibble = (n >> shift) & 15
+        if (nibble < 10) {
+            _uartPutc(nibble + 48)
+        } else {
+            _uartPutc(nibble + 55)
+        }
+        shift = shift - 4
+    }
+}
+
+class StandardUart satisfies Uart {
+    constructor() {
+        _uartInit()
+    }
+
+    function init()            { _uartInit()    }
+    function putc(int c)       { _uartPutc(c)   }
+    function getc() int        { return _uartGetc() }
+    function puts(address s)   { _uartPuts(s)   }
+    function putsLn(address s) { _uartPutsLn(s) }
+    function putInt(int n)     { _uartPutInt(n) }
+    function putHex(int n)     { _uartPutHex(n) }
+}

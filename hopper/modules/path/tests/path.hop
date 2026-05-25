@@ -1,0 +1,36 @@
+// Tests StandardPath: isAbsolute, length, basename, dirname, ext, join
+// EXPECT: PASS  isAbsolute
+// EXPECT: PASS  length
+// EXPECT: PASS  basename
+// EXPECT: PASS  dirname
+// EXPECT: PASS  ext
+// EXPECT: PASS  join
+// EXPECT: path: 6 passed, 0 failed
+import Core from core
+import Path from path
+
+entry main {
+    TestSuite t = TestSuite("path")
+
+    StandardPath p = StandardPath("/home/user/file.txt")
+    t.check(p.isAbsolute(), "isAbsolute")
+    t.checkEq(p.length(), 19, "length")
+
+    address buf = allocate 64
+
+    int n = p.basename(buf, 64)
+    t.checkStrEq(buf, "file.txt", "basename")
+
+    n = p.dirname(buf, 64)
+    t.checkStrEq(buf, "/home/user", "dirname")
+
+    n = p.ext(buf, 64)
+    t.checkStrEq(buf, ".txt", "ext")
+
+    StandardPath p2 = StandardPath("/var")
+    p2.join("log")
+    t.checkStrEq(p2.ptr(), "/var/log", "join")
+
+    deallocate buf
+    t.done()
+}

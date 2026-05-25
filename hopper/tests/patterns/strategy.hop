@@ -1,0 +1,82 @@
+// TEST: strategy returns correct counts
+// EXPECT: isPositive: 4/7 pass
+// EXPECT: isEven:     4/7 pass
+// EXPECT: isNonZero:  6/7 pass
+// EXPECT: isInByte:   5/7 pass
+
+import Array from ds
+
+extern function printf(string fmt, ...) int
+
+function isPositive(int n) int {
+    if (n > 0) { return 1 }
+    return 0
+}
+
+function isEven(int n) int {
+    if ((n % 2) == 0) { return 1 }
+    return 0
+}
+
+function isInByte(int n) int {
+    if (n >= 0 && n <= 255) { return 1 }
+    return 0
+}
+
+function isNonZero(int n) int {
+    if (n != 0) { return 1 }
+    return 0
+}
+
+class Validator {
+    address strategy
+
+    constructor(address fn) {
+        self.strategy = fn
+    }
+
+    function setStrategy(address fn) {
+        self.strategy = fn
+    }
+
+    function countPassing(StandardArray values) int {
+        int passed = 0
+        int i = 0
+        while (i < values.len()) {
+            callback(int) int fn = address (self.strategy)
+            address raw = values.get(i)
+            int val = int (raw)
+            passed = passed + fn(val)
+            i = i + 1
+        }
+        return passed
+    }
+}
+
+entry main {
+    StandardArray nums = StandardArray(8)
+    address a0 = address (-5)
+    nums.push(a0)
+    address a1 = address (0)
+    nums.push(a1)
+    address a2 = address (3)
+    nums.push(a2)
+    address a3 = address (8)
+    nums.push(a3)
+    address a4 = address (-2)
+    nums.push(a4)
+    address a5 = address (12)
+    nums.push(a5)
+    address a6 = address (7)
+    nums.push(a6)
+
+    int n = nums.len()
+    Validator v = Validator(isPositive::address)
+    printf("isPositive: %lld/%lld pass\n", v.countPassing(nums), n)
+    v.setStrategy(isEven::address)
+    printf("isEven:     %lld/%lld pass\n", v.countPassing(nums), n)
+    v.setStrategy(isNonZero::address)
+    printf("isNonZero:  %lld/%lld pass\n", v.countPassing(nums), n)
+    v.setStrategy(isInByte::address)
+    printf("isInByte:   %lld/%lld pass\n", v.countPassing(nums), n)
+}

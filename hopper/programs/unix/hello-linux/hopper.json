@@ -1,0 +1,27 @@
+{
+  "name": "hello-linux",
+  "version": "0.1.0",
+  "description": "Smoke test for linux module interface system",
+  "license": "Apache-2.0",
+  "type": "executable",
+  "entry": "src/main.hop",
+  "dependencies": {
+    "linux": "0.1.0"
+  },
+  "targets": {
+    "host": {
+      "IO": {
+        "from": "linux",
+        "contract": "modules/linux/contracts/IO.hop",
+        "implementation": "modules/linux/src/IO.hop",
+        "inline": true
+      },
+      "Process": {
+        "from": "linux",
+        "contract": "modules/linux/contracts/Process.hop",
+        "implementation": "modules/linux/src/Process.hop",
+        "inline": true
+      }
+    }
+  }
+}

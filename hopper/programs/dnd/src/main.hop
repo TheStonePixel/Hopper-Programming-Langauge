@@ -1,0 +1,264 @@
+// main.hop — Hopper Dungeon: bare-metal D&D on QEMU virt
+//
+// Abstraction stack from floor to ceiling:
+//   bitfield PL011Flags + @ MMIO   — hardware registers (QemuUart.hop)
+//   _qemuPutc / _qemuGetc          — raw character I/O (QemuUart.hop)
+//   class AsciiString              — line input buffer (AsciiString.hop)
+//   class Dice                     — LCG dice roller (Dice.hop)
+//   game logic (here)              — rooms, stats, combat
+//
+// Build:  hopper build
+// Run:    hopper flash      (launches QEMU - Ctrl-A X to exit)
+
+entry main {
+    AsciiString input = AsciiString(64)
+
+    // Title screen
+    println()
+    _qemuPutsLn("================================")
+    _qemuPutsLn("    HOPPER DUNGEON  v1.0")
+    _qemuPutsLn("  bare-metal D&D on QEMU virt")
+    _qemuPutsLn("================================")
+    println()
+
+    // Character name — each character hashed into the PRNG seed
+    _qemuPutsLn("What is your name, adventurer?")
+    _qemuPuts("> ")
+    input.clear()
+    int seed = 7
+    while (true) {
+        int c = _qemuGetc()
+        if (c == 13) { break }
+        if (c == 10) { break }
+        _qemuPutc(c)
+        seed = seed * 31 + c
+        byte cb = byte (c)
+        input.appendChar(cb)
+    }
+    println()
+
+    Dice dice = Dice(seed)
+
+    // Roll stats
+    int strRoll = dice.roll(6)
+    int dexRoll = dice.roll(6)
+    int hpRoll  = dice.roll(6) + dice.roll(6) + 6
+
+    int strMod = 0
+    if (strRoll <= 2) { strMod = 0 - 1 }
+    if (strRoll >= 5) { strMod = 1 }
+
+    int dexMod = 0
+    if (dexRoll <= 2) { dexMod = 0 - 1 }
+    if (dexRoll >= 5) { dexMod = 1 }
+
+    _qemuPuts("Fate smiles upon ")
+    _qemuPuts(input.pointer())
+    _qemuPutsLn("...")
+    println()
+    _qemuPuts("  STR ")
+    _qemuPutInt(strRoll)
+    _qemuPuts("  (")
+    printMod(strMod)
+    _qemuPuts(")")
+    println()
+    _qemuPuts("  DEX ")
+    _qemuPutInt(dexRoll)
+    _qemuPuts("  (")
+    printMod(dexMod)
+    _qemuPuts(")")
+    println()
+    _qemuPuts("  HP  ")
+    _qemuPutInt(hpRoll)
+    println()
+    println()
+    _qemuPutsLn("You carry a dagger and one health potion.")
+    _qemuPutsLn("Commands: look  go <dir>  attack  run  take sword  drink  stats  help")
+    println()
+
+    // Player state
+    int playerHp     = hpRoll
+    int playerMaxHp  = hpRoll
+    int playerStrMod = strMod
+    int playerDexMod = dexMod
+    int playerAc     = 10 + dexMod
+    bool hasSword    = false
+    bool hasPotion   = true
+    int playerRoom   = 0
+
+    // World state
+    bool goblinDead  = false
+    int  goblinHp    = 8
+    bool orcDead     = false
+    int  orcHp       = 20
+    bool swordTaken  = false
+
+    // Show starting room
+    describeRoom(playerRoom, goblinDead, orcDead, swordTaken)
+
+    // Game loop
+    bool alive = true
+    bool won   = false
+
+    while (alive) {
+        _qemuPuts("> ")
+        readLine(input)
+
+        if (input.startsWith("look") || input.startsWith("l")) {
+            describeRoom(playerRoom, goblinDead, orcDead, swordTaken)
+        } else {
+        if (input.startsWith("stats")) {
+            printStats(playerHp, playerMaxHp, playerStrMod, playerDexMod, playerAc, hasSword, hasPotion)
+        } else {
+        if (input.startsWith("help")) {
+            println()
+            _qemuPutsLn("Commands:")
+            _qemuPutsLn("  look         describe the room")
+            _qemuPutsLn("  go <dir>     move north south east west (or n s e w)")
+            _qemuPutsLn("  attack  (a)  attack the enemy here")
+            _qemuPutsLn("  run     (r)  try to flee combat")
+            _qemuPutsLn("  take sword   pick up the sword in the armory")
+            _qemuPutsLn("  drink        use your health potion (+10 HP)")
+            _qemuPutsLn("  stats        show your statistics")
+            println()
+        } else {
+        if (input.startsWith("drink")) {
+            if (hasPotion) {
+                playerHp = playerHp + 10
+                if (playerHp > playerMaxHp) { playerHp = playerMaxHp }
+                hasPotion = false
+                _qemuPuts("You drink the potion. +10 HP. Now at ")
+                _qemuPutInt(playerHp)
+                _qemuPutc(47)
+                _qemuPutInt(playerMaxHp)
+                println()
+            } else {
+                _qemuPutsLn("You have no potions left.")
+            }
+        } else {
+        if (input.startsWith("take")) {
+            if (playerRoom == 2 && !swordTaken) {
+                hasSword   = true
+                swordTaken = true
+                _qemuPutsLn("You take the sword. It hums with cold purpose. (weapon: d6)")
+            } else {
+                _qemuPutsLn("Nothing to take here.")
+            }
+        } else {
+        if (input.startsWith("go ") || input.startsWith("north") || input.startsWith("south") || input.startsWith("east") || input.startsWith("west") || input.startsWith("n") || input.startsWith("s") || input.startsWith("e") || input.startsWith("w")) {
+            bool enemyHere = false
+            if (playerRoom == 1 && !goblinDead) { enemyHere = true }
+            if (playerRoom == 3 && !orcDead)    { enemyHere = true }
+            if (enemyHere) {
+                _qemuPutsLn("The enemy blocks your path! Fight or run.")
+            } else {
+                address dirPtr = input.pointer()
+                if (input.startsWith("go ")) {
+                    dirPtr = dirPtr + 3
+                }
+                int dest = tryMove(playerRoom, dirPtr)
+                if (dest < 0) {
+                    _qemuPutsLn("No exit that way.")
+                } else {
+                    playerRoom = dest
+                    describeRoom(playerRoom, goblinDead, orcDead, swordTaken)
+                }
+            }
+        } else {
+        if (input.startsWith("attack") || input.startsWith("a")) {
+            bool hasEnemy = false
+            if (playerRoom == 1 && !goblinDead) { hasEnemy = true }
+            if (playerRoom == 3 && !orcDead)    { hasEnemy = true }
+            if (!hasEnemy) {
+                _qemuPutsLn("Nothing to attack here.")
+            } else {
+                if (playerRoom == 1) {
+                    _qemuPuts("--- Goblin HP: ")
+                    _qemuPutInt(goblinHp)
+                    _qemuPutsLn(" ---")
+                    goblinHp = playerAttack(dice, playerStrMod, hasSword, goblinHp, 11)
+                    if (goblinHp <= 0) {
+                        goblinDead = true
+                        _qemuPutsLn("The goblin collapses. You slay it!")
+                    } else {
+                        _qemuPuts("Goblin HP remaining: ")
+                        _qemuPutInt(goblinHp)
+                        println()
+                        int eDmg = enemyAttack(dice, playerAc, 1, 4)
+                        playerHp = playerHp - eDmg
+                    }
+                } else {
+                    _qemuPuts("--- Orc Warlord HP: ")
+                    _qemuPutInt(orcHp)
+                    _qemuPutsLn(" ---")
+                    orcHp = playerAttack(dice, playerStrMod, hasSword, orcHp, 14)
+                    if (orcHp <= 0) {
+                        orcDead = true
+                        won     = true
+                        alive   = false
+                    } else {
+                        _qemuPuts("Orc Warlord HP remaining: ")
+                        _qemuPutInt(orcHp)
+                        println()
+                        int eDmg = enemyAttack(dice, playerAc, 3, 8)
+                        playerHp = playerHp - eDmg
+                    }
+                }
+                if (playerHp <= 0) { alive = false }
+            }
+        } else {
+        if (input.startsWith("run") || input.startsWith("r")) {
+            bool inCombat = false
+            if (playerRoom == 1 && !goblinDead) { inCombat = true }
+            if (playerRoom == 3 && !orcDead)    { inCombat = true }
+            if (!inCombat) {
+                _qemuPutsLn("Nothing to run from.")
+            } else {
+                int fleeRoll = dice.roll(20) + playerDexMod
+                _qemuPuts("Flee roll: ")
+                _qemuPutInt(fleeRoll)
+                _qemuPuts(" vs 12... ")
+                if (fleeRoll > 12) {
+                    _qemuPutsLn("You escape!")
+                    if (playerRoom == 1) { playerRoom = 0 }
+                    if (playerRoom == 3) { playerRoom = 1 }
+                    describeRoom(playerRoom, goblinDead, orcDead, swordTaken)
+                } else {
+                    _qemuPutsLn("FAILED! The enemy strikes as you flee!")
+                    int eDmg = dice.roll(4)
+                    playerHp = playerHp - eDmg
+                    _qemuPuts("You take ")
+                    _qemuPutInt(eDmg)
+                    _qemuPutsLn(" damage.")
+                    if (playerHp <= 0) { alive = false }
+                }
+            }
+        } else {
+            _qemuPutsLn("Unknown command. Type 'help'.")
+        }}}}}}}}
+
+        if (alive) {
+            _qemuPuts("[HP: ")
+            _qemuPutInt(playerHp)
+            _qemuPutc(47)
+            _qemuPutInt(playerMaxHp)
+            _qemuPutsLn("]")
+        }
+    }
+
+    // End screen
+    println()
+    if (won) {
+        _qemuPutsLn("================================")
+        _qemuPutsLn("          VICTORY!")
+        _qemuPutsLn("  The Orc Warlord is defeated.")
+        _qemuPutsLn("  The dungeon is yours.")
+        _qemuPutsLn("================================")
+    } else {
+        _qemuPutsLn("================================")
+        _qemuPutsLn("         GAME OVER")
+        _qemuPutsLn("  You have fallen in the dark.")
+        _qemuPutsLn("================================")
+    }
+    println()
+}

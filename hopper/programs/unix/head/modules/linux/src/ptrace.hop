@@ -1,0 +1,15 @@
+// Linux ptrace — architecture-neutral.
+// Delegates to modules/target/ptrace.hop, which selects the ISA.
+//
+// Imported functions: ptrace
+//
+// ptrace constants are documented in linux/sys since ptrace is part of the
+// process control family. Import linux/sys for PTRACE_* values.
+//
+// ── request constants (also in linux/sys comments) ────────────────────────────
+//   PTRACE_TRACEME=0  PTRACE_PEEKTEXT=1  PTRACE_POKETEXT=4
+//   PTRACE_CONT=7  PTRACE_SINGLESTEP=9  PTRACE_GETREGS=12  PTRACE_SETREGS=13
+//   PTRACE_ATTACH=16  PTRACE_DETACH=17  PTRACE_SYSCALL=24
+//   PTRACE_SETOPTIONS=0x4200  PTRACE_GETSIGINFO=0x4202
+
+import ptrace from arch

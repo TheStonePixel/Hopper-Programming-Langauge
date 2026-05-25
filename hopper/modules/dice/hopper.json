@@ -1,0 +1,7 @@
+{
+  "name": "dice",
+  "version": "0.1.0",
+  "description": "Dice roller — LCG PRNG seeded at construction, roll(sides) returns 1..sides",
+  "license": "MIT",
+  "type": "library"
+}
