@@ -145,13 +145,26 @@ Diagnostic tests live in `hopper/tests/diagnostics/` — run with `hopper test` 
 
 ## Import System
 
-Two forms exist in the grammar:
+One import form:
 
-### Interface import (new, preferred)
 ```hopper
 import IO from linux
+import IO, FileSystem from linux
+import String from ds
+import abs from math
 ```
-Resolves via the consuming project's `hopper.json` targets section:
+
+A **module** is a directory, not a file. `from linux` means the `linux` module directory. The import name selects a named export from that module — which could be an interface, class, function, or enum. You do not declare what kind of thing you are importing; the build system figures it out.
+
+**Resolution:** Given `import Foo from bar`:
+
+1. Check `hopper.json` targets for a `Foo` binding:
+   - **Found** → interface resolution: load the `contract` file and the `implementation` file. Both are merged into scope. This is how hardware abstraction works — the program imports `IO from linux` and the build file decides which implementation backs it.
+   - **Not found** → direct resolution: scan `modules/bar/src/Foo.hop` (by convention files are named after their export), falling back to scanning all files in `modules/bar/src/` for a matching declaration.
+
+2. A visited-set prevents any file from being compiled twice.
+
+**Interface targets binding** (only needed when swapping implementations per target):
 ```json
 {
   "targets": {
@@ -165,19 +178,8 @@ Resolves via the consuming project's `hopper.json` targets section:
   }
 }
 ```
-- The interface name must match `from` field in the binding.
-- Both the contract file and the implementation file are compiled in.
-- Free functions from the implementation file come into scope — programs call them directly.
 
-### Module import (old, internal use only)
-```hopper
-import io from arch
-import tty from linux
-```
-- Lowercase module name, no binding in hopper.json — falls through to file resolution.
-- Resolves to `modules/<name>/src/<module>.hop` or stdlib.
-- Used only by legacy lowercase files in `hopper/nonconform/`.
-- Do NOT use this form in application code — use the interface import form.
+Simple modules (math, ds, etc.) with no platform-specific implementation need no targets entry — they resolve directly.
 
 ---
 
