@@ -37,8 +37,7 @@ export function formatAst(ast, originalSource = '') {
 // Node.js only — dynamically imports astBuilder to stay browser-safe
 export async function format(source, opts = {}) {
     const { buildAstFromSource } = await import('./astBuilder.js')
-    const baseDir = opts.baseDir || process.cwd()
-    const ast = buildAstFromSource(source, { baseDir, noImports: true })
+    const ast = buildAstFromSource(source, { sourceFile: opts.sourceFile || null })
     return formatAst(ast, source)
 }
 
