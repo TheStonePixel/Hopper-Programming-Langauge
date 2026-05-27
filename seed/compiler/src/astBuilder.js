@@ -1002,6 +1002,13 @@ export class AstBuilder extends HopperVisitor {
 // Walk up from baseDir looking for modules/<name>/ — no stdlib fallback.
 // All dependencies must be declared in hopper.json and installed via hopper install.
 function resolveModuleFiles(moduleName, names, baseDir, importingFile) {
+    // Bare import (no names) is not supported — always use `import X from module`
+    if (!names || names.length === 0) {
+        const from = importingFile ? ` in ${path.basename(importingFile)}` : "";
+        throw new Error(`Bare import of '${moduleName}' is not allowed${from}\n  Use: import <Name> from ${moduleName}`);
+    }
+
+    // Walk up the directory tree to find the module
     let dir = baseDir || process.cwd();
     while (true) {
         const candidate = path.join(dir, "modules", moduleName);
@@ -1017,24 +1024,38 @@ function resolveModuleFiles(moduleName, names, baseDir, importingFile) {
 }
 
 function filesToLoad(moduleDir, names, moduleName, importingFile) {
-    // Prefer src/ subdirectory if present (standard module layout)
     const srcDir  = path.join(moduleDir, "src");
     const loadDir = fs.existsSync(srcDir) ? srcDir : moduleDir;
+    const from    = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
 
-    if (names) {
-        return names.map(n => {
-            const file = path.join(loadDir, n + ".hop");
-            if (!fs.existsSync(file)) {
-                const from = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
-                throw new Error(`No file '${n}.hop' in module '${moduleName}'${from}\n  Looked in: ${loadDir}`);
-            }
-            return file;
-        });
-    } else {
-        return fs.readdirSync(loadDir)
-            .filter(f => f.endsWith(".hop"))
-            .map(f => path.join(loadDir, f));
-    }
+    return names.map(name => {
+        // 1. Convention: file named after the export
+        const byName = path.join(loadDir, name + ".hop");
+        if (fs.existsSync(byName)) return byName;
+
+        // 2. Scan all files for a matching declaration
+        const allFiles = fs.existsSync(loadDir)
+            ? fs.readdirSync(loadDir).filter(f => f.endsWith(".hop")).map(f => path.join(loadDir, f))
+            : [];
+        const declPattern = new RegExp(`^\\s*(interface|class|function|enum|template)\\s+${name}\\b`, "m");
+        const matches = allFiles.filter(f => declPattern.test(fs.readFileSync(f, "utf8")));
+
+        if (matches.length === 0) {
+            throw new Error(
+                `No export named '${name}' found in module '${moduleName}'${from}\n` +
+                `  Looked in: ${loadDir}\n` +
+                `  Available files: ${allFiles.map(f => path.basename(f)).join(", ") || "(none)"}`
+            );
+        }
+        if (matches.length > 1) {
+            throw new Error(
+                `Ambiguous import: '${name}' found in multiple files in module '${moduleName}'${from}\n` +
+                `  Matches: ${matches.map(f => path.basename(f)).join(", ")}\n` +
+                `  Rename one or use a binding in hopper.json to resolve`
+            );
+        }
+        return matches[0];
+    });
 }
 
 // Custom ANTLR error listener — routes syntax errors through the Hopper
