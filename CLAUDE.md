@@ -171,23 +171,15 @@ A **module** is a directory, not a file. `from linux` means the `linux` module d
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "${MODULE_DIR}/linux/contracts/IO.hop",
-        "implementation": "${MODULE_DIR}/x86_64/src/LinuxSyscalls.hop"
+        "contract":      "modules/linux/contracts/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
   }
 }
 ```
 
-**Path variables** — all path fields in `hopper.json` support:
-
-| Variable | Expands to |
-|----------|-----------|
-| `${PROJECT_DIR}` | Directory containing `hopper.json` |
-| `${MODULE_DIR}` | `${PROJECT_DIR}/modules` |
-| `${SRC_DIR}` | `${PROJECT_DIR}/src` |
-
-Every module lives under `${MODULE_DIR}` (real directory or symlink) — paths are always contained to the project.
+All paths in `hopper.json` are relative to the manifest's directory. Every module lives under `modules/` (real directory or symlink) — paths are always contained to the project and resolve correctly on any machine.
 
 Simple modules (math, ds, etc.) with no platform-specific implementation need no targets entry — they resolve directly.
 
@@ -424,8 +416,8 @@ The build file connects the OS contract to the hardware implementation:
 ```json
 "IO": {
   "from":           "linux",
-  "contract":      "${MODULE_DIR}/linux/contracts/IO.hop",
-  "implementation": "${MODULE_DIR}/x86_64/src/LinuxSyscalls.hop"
+  "contract":      "modules/linux/contracts/IO.hop",
+  "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
 }
 ```
 To retarget: change `x86_64` to `arm64` in every `implementation` path. That is the entire
@@ -472,13 +464,13 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "${MODULE_DIR}/linux/contracts/IO.hop",
-        "implementation": "${MODULE_DIR}/x86_64/src/LinuxSyscalls.hop"
+        "contract":      "modules/linux/contracts/IO.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "${MODULE_DIR}/linux/contracts/FileSystem.hop",
-        "implementation": "${MODULE_DIR}/x86_64/src/LinuxSyscalls.hop"
+        "contract":      "modules/linux/contracts/FileSystem.hop",
+        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
   }
@@ -519,8 +511,8 @@ The `exports` field on libraries is documentation/tooling only for now — consu
     "aarch64-bare": {
       "IO": {
         "from":           "uart",
-        "contract":      "${MODULE_DIR}/uart/contracts/IO.hop",
-        "implementation": "${MODULE_DIR}/uart/src/QemuUart.hop"
+        "contract":      "modules/uart/contracts/IO.hop",
+        "implementation": "modules/uart/src/QemuUart.hop"
       }
     }
   }
@@ -562,8 +554,8 @@ Add binding in `hopper.json` targets:
 ```json
 "String": {
   "from": "ds",
-  "contract": "${MODULE_DIR}/ds/contracts/String.hop",
-  "implementation": "${MODULE_DIR}/ds/src/String.hop"
+  "contract": "modules/ds/contracts/String.hop",
+  "implementation": "modules/ds/src/String.hop"
 }
 ```
 
@@ -652,8 +644,8 @@ Add to `hopper.json` targets:
 ```json
 "SIMD": {
   "from": "x86_64",
-  "contract": "${MODULE_DIR}/x86_64/contracts/SIMD.hop",
-  "implementation": "${MODULE_DIR}/x86_64/src/SIMD.hop"
+  "contract": "modules/x86_64/contracts/SIMD.hop",
+  "implementation": "modules/x86_64/src/SIMD.hop"
 }
 ```
 
