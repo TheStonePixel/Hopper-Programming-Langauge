@@ -5,7 +5,7 @@ import https from "node:https";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { execSync, spawn } from "node:child_process";
-import { buildAstFromSource } from "../compiler/src/astBuilder.js";
+import { buildAstFromSource, buildAstFromFiles } from "../compiler/src/astBuilder.js";
 import { genModule } from "../compiler/src/codegenLLVM.js";
 import { parseSource } from "../compiler/src/parse.js";
 import { HopperError, formatError, formatSuccess } from "../compiler/src/errors.js";
@@ -57,11 +57,95 @@ function loadBindings(sourceFile, target = "host") {
     return new Map();
 }
 
+// ── import resolution (build-system side) ──────────────────────────────────
+
+// Extract import statements from source text.
+function extractImports(source) {
+    const imports = [];
+    const re = /^[ \t]*import\s+([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s+from\s+([A-Za-z_][A-Za-z0-9_]*)[ \t]*$/gm;
+    let m;
+    while ((m = re.exec(source)) !== null) {
+        const names = m[1].split(',').map(n => n.trim());
+        const mod   = m[2];
+        for (const name of names) imports.push({ name, module: mod });
+    }
+    return imports;
+}
+
+// Resolve a single named direct import (no binding) to an absolute file path.
+function resolveDirectImport(name, moduleName, fromDir, importingFile) {
+    let dir = fromDir;
+    while (true) {
+        const candidate = path.join(dir, 'modules', moduleName);
+        if (fs.existsSync(candidate)) {
+            const srcDir  = path.join(candidate, 'src');
+            const loadDir = fs.existsSync(srcDir) ? srcDir : candidate;
+            // Convention: file named after export
+            const byName = path.join(loadDir, name + '.hop');
+            if (fs.existsSync(byName)) return byName;
+            // Scan for declaration
+            const allFiles = fs.existsSync(loadDir)
+                ? fs.readdirSync(loadDir).filter(f => f.endsWith('.hop')).map(f => path.join(loadDir, f))
+                : [];
+            const pat = new RegExp(`^\\s*(interface|class|function|enum|template)\\s+${name}\\b`, 'm');
+            const matches = allFiles.filter(f => pat.test(fs.readFileSync(f, 'utf8')));
+            const sf = importingFile ? ` (imported from ${path.basename(importingFile)})` : '';
+            if (matches.length === 0)
+                throw new Error(`No export named '${name}' found in module '${moduleName}'${sf}\n  Looked in: ${loadDir}\n  Available: ${allFiles.map(f => path.basename(f)).join(', ') || '(none)'}`);
+            if (matches.length > 1)
+                throw new Error(`Ambiguous import: '${name}' declared in multiple files in module '${moduleName}'${sf}\n  Matches: ${matches.map(f => path.basename(f)).join(', ')}\n  Rename one or add a binding in hopper.json`);
+            return matches[0];
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    const sf = importingFile ? ` (imported from ${path.basename(importingFile)})` : '';
+    throw new Error(`Module '${moduleName}' not found${sf}\n  Run: hopper install ${moduleName}`);
+}
+
+// Recursively resolve all imports for an entry file.
+// Returns ordered array (dependencies first, entry last):
+//   { path, inline, role: 'interface'|'implementation'|'source', bindingName? }
+function resolveAllImports(entryFile, bindings) {
+    const visited = new Set();
+    const ordered = [];
+
+    function visit(filePath, inline = false, role = 'source', bindingName = null) {
+        if (visited.has(filePath)) return;
+        visited.add(filePath);
+
+        const source   = fs.readFileSync(filePath, 'utf8');
+        const imports  = extractImports(source);
+        const fileDir  = path.dirname(filePath);
+
+        for (const { name, module: mod } of imports) {
+            if (bindings && bindings.has(name)) {
+                const b = bindings.get(name);
+                if (!fs.existsSync(b.contract))
+                    throw new Error(`Interface file not found for '${name}' (imported from ${path.basename(filePath)})\n  'for': ${b.contract}\n  Check the 'for' path in hopper.json`);
+                if (!fs.existsSync(b.implementation))
+                    throw new Error(`Implementation file not found for '${name}' (imported from ${path.basename(filePath)})\n  'use': ${b.implementation}\n  Check the 'use' path in hopper.json`);
+                visit(b.contract,       false,    'interface',      name);
+                visit(b.implementation, b.inline, 'implementation', name);
+            } else {
+                const resolved = resolveDirectImport(name, mod, fileDir, filePath);
+                visit(resolved);
+            }
+        }
+
+        ordered.push({ path: filePath, inline, role, bindingName });
+    }
+
+    visit(entryFile);
+    return ordered;
+}
+
 function toIR(file, target = "host") {
     const abs      = path.resolve(file);
-    const src      = fs.readFileSync(abs, "utf8");
     const bindings = loadBindings(abs, target);
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+    const resolved = resolveAllImports(abs, bindings);
+    const ast      = buildAstFromFiles(resolved);
     return genModule(ast, { target });
 }
 
@@ -296,9 +380,9 @@ function toObjectBare(files, llDir, oDir, cfg) {
     };
     for (const file of files) {
         const abs      = path.resolve(file);
-        const src      = fs.readFileSync(abs, "utf8");
         const bindings = loadBindings(abs, cfg.llvmTarget);
-        const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+        const resolved = resolveAllImports(abs, bindings);
+        const ast      = buildAstFromFiles(resolved);
         for (const key of ["functions","structs","classes","consts","aliases","templates",
                            "binds","stricts","bitfields","interfaces","enums","templateFunctions"]) {
             if (ast[key]) mergedAst[key].push(...ast[key]);
@@ -356,11 +440,11 @@ function projectBinaryName(entryFile, projectRoot) {
 
 function toObject(file, llDir, oDir, flags) {
     const abs      = path.resolve(file);
-    const src      = fs.readFileSync(abs, "utf8");
     const bindings = loadBindings(abs, "host");
     let ast, ir;
     try {
-        ast = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+        const resolved = resolveAllImports(abs, bindings);
+        ast = buildAstFromFiles(resolved);
         ir  = dedupeDeclarations(genModule(ast));
     } catch (e) {
         if (e instanceof HopperError) {
@@ -1263,9 +1347,9 @@ function cmdIR(args) {
 function cmdAST(args) {
     if (!args[0]) { console.error("hopper: ast requires a file"); process.exit(1); }
     const abs      = path.resolve(args[0]);
-    const src      = fs.readFileSync(abs, "utf8");
     const bindings = loadBindings(abs, "host");
-    const ast      = buildAstFromSource(src, { baseDir: path.dirname(abs), bindings, sourceFile: abs });
+    const resolved = resolveAllImports(abs, bindings);
+    const ast      = buildAstFromFiles(resolved);
     console.log(JSON.stringify(ast, null, 2));
 }
 

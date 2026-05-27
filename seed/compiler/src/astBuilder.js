@@ -997,67 +997,6 @@ export class AstBuilder extends HopperVisitor {
     }
 }
 
-// ── import resolution ──────────────────────────────────────────────────────
-
-// Walk up from baseDir looking for modules/<name>/ — no stdlib fallback.
-// All dependencies must be declared in hopper.json and installed via hopper install.
-function resolveModuleFiles(moduleName, names, baseDir, importingFile) {
-    // Bare import (no names) is not supported — always use `import X from module`
-    if (!names || names.length === 0) {
-        const from = importingFile ? ` in ${path.basename(importingFile)}` : "";
-        throw new Error(`Bare import of '${moduleName}' is not allowed${from}\n  Use: import <Name> from ${moduleName}`);
-    }
-
-    // Walk up the directory tree to find the module
-    let dir = baseDir || process.cwd();
-    while (true) {
-        const candidate = path.join(dir, "modules", moduleName);
-        if (fs.existsSync(candidate)) {
-            return filesToLoad(candidate, names, moduleName, importingFile);
-        }
-        const parent = path.dirname(dir);
-        if (parent === dir) break;
-        dir = parent;
-    }
-    const from = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
-    throw new Error(`Module '${moduleName}' not found${from}\n  Run: hopper install ${moduleName}`);
-}
-
-function filesToLoad(moduleDir, names, moduleName, importingFile) {
-    const srcDir  = path.join(moduleDir, "src");
-    const loadDir = fs.existsSync(srcDir) ? srcDir : moduleDir;
-    const from    = importingFile ? ` (imported from ${path.basename(importingFile)})` : "";
-
-    return names.map(name => {
-        // 1. Convention: file named after the export
-        const byName = path.join(loadDir, name + ".hop");
-        if (fs.existsSync(byName)) return byName;
-
-        // 2. Scan all files for a matching declaration
-        const allFiles = fs.existsSync(loadDir)
-            ? fs.readdirSync(loadDir).filter(f => f.endsWith(".hop")).map(f => path.join(loadDir, f))
-            : [];
-        const declPattern = new RegExp(`^\\s*(interface|class|function|enum|template)\\s+${name}\\b`, "m");
-        const matches = allFiles.filter(f => declPattern.test(fs.readFileSync(f, "utf8")));
-
-        if (matches.length === 0) {
-            throw new Error(
-                `No export named '${name}' found in module '${moduleName}'${from}\n` +
-                `  Looked in: ${loadDir}\n` +
-                `  Available files: ${allFiles.map(f => path.basename(f)).join(", ") || "(none)"}`
-            );
-        }
-        if (matches.length > 1) {
-            throw new Error(
-                `Ambiguous import: '${name}' found in multiple files in module '${moduleName}'${from}\n` +
-                `  Matches: ${matches.map(f => path.basename(f)).join(", ")}\n` +
-                `  Rename one or use a binding in hopper.json to resolve`
-            );
-        }
-        return matches[0];
-    });
-}
-
 // Custom ANTLR error listener — routes syntax errors through the Hopper
 // diagnostic formatter instead of printing raw ANTLR messages to stderr.
 class HopperParseErrorListener extends antlr4.error.ErrorListener {
@@ -1238,4 +1177,57 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
     }
 
     return ast;
+}
+
+// ── pre-resolved build: takes file list from build system ──────────────────
+
+export function buildAstFromFiles(files) {
+    const master = {
+        kind: 'Program',
+        functions: [], structs: [], classes: [], consts: [],
+        aliases: [], templates: [], entry: null,
+        binds: [], stricts: [], bitfields: [],
+        interfaces: [], enums: [], templateFunctions: [],
+    };
+
+    for (const { path: filePath, inline, role, bindingName } of files) {
+        const source  = fs.readFileSync(filePath, 'utf8');
+        const fileAst = buildAstFromSource(source, { noImports: true, sourceFile: filePath });
+
+        // Apply inline marking for implementation files
+        if (inline) {
+            for (const fn of fileAst.functions || [])
+                if (!fn.isExtern) fn._inline = true;
+            for (const cls of fileAst.classes || [])
+                for (const m of cls.methods || []) m._inline = true;
+        }
+
+        // Type alias injection: only for implementation files
+        if (role === 'implementation' && bindingName) {
+            const implClass = (fileAst.classes || []).find(c => c.name === bindingName)
+                           || (fileAst.classes || []).find(c => (c.interfaces || []).includes(bindingName))
+                           || (fileAst.classes || [])[0];
+            if (implClass) {
+                implClass.interfaces = [...(implClass.interfaces || []), bindingName];
+                if (implClass.name !== bindingName)
+                    master.aliases.push({ name: bindingName, targetType: implClass.name });
+            }
+        }
+
+        // Merge into master AST (dependencies first = unshift puts them before entry code)
+        master.functions.unshift(...(fileAst.functions || []));
+        master.structs.unshift(...(fileAst.structs || []));
+        master.classes.unshift(...(fileAst.classes || []));
+        master.enums.unshift(...(fileAst.enums || []));
+        master.aliases.unshift(...(fileAst.aliases || []));
+        master.templates.unshift(...(fileAst.templates || []));
+        master.templateFunctions.unshift(...(fileAst.templateFunctions || []));
+        master.binds.unshift(...(fileAst.binds || []));
+        master.stricts.unshift(...(fileAst.stricts || []));
+        master.interfaces.unshift(...(fileAst.interfaces || []));
+        master.bitfields = [...(fileAst.bitfields || []), ...(master.bitfields || [])];
+        if (fileAst.entry && !master.entry) master.entry = fileAst.entry;
+    }
+
+    return master;
 }
