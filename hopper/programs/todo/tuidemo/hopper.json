@@ -11,9 +11,8 @@
   "targets": {
     "host": {
       "TUI": {
-        "from": "tui",
-        "contract": "modules/tui/contracts/TUI.hop",
-        "implementation": "modules/tui/src/TUI.hop"
+        "for": "modules/tui/contracts/TUI.hop",
+        "use": "modules/tui/src/TUI.hop"
       }
     }
   }

@@ -7,21 +7,19 @@
   "dependencies": {},
   "exports": {
     "Math": {
-      "contract":      "interfaces/Math.hop",
-      "implementation": "src/Math.hop"
+      "for":      "interfaces/Math.hop",
+      "use": "src/Math.hop"
     }
   },
   "targets": {
     "host": {
       "Math": {
-        "from":           "math",
-        "contract":      "interfaces/Math.hop",
-        "implementation": "src/Math.hop"
+        "for":      "interfaces/Math.hop",
+        "use": "src/Math.hop"
       },
       "Core": {
-        "from":           "core",
-        "contract":      "../core/contracts/Core.hop",
-        "implementation": "../core/src/Core.hop"
+        "for":      "../core/contracts/Core.hop",
+        "use": "../core/src/Core.hop"
       }
     }
   }

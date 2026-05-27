@@ -7,16 +7,15 @@
   "dependencies": {},
   "exports": {
     "Uart": {
-      "contract":      "interfaces/Uart.hop",
-      "implementation": "src/Uart.hop"
+      "for":      "interfaces/Uart.hop",
+      "use": "src/Uart.hop"
     }
   },
   "targets": {
     "host": {
       "Uart": {
-        "from":           "uart",
-        "contract":      "interfaces/Uart.hop",
-        "implementation": "src/Uart.hop"
+        "for":      "interfaces/Uart.hop",
+        "use": "src/Uart.hop"
       }
     }
   }

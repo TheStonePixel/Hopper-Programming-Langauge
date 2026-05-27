@@ -4,9 +4,8 @@
   "targets": {
     "host": {
       "Text": {
-        "from": "ascii",
-        "contract": "./contracts/Text.hop",
-        "implementation": "./modules/ascii/String.hop"
+        "for": "./contracts/Text.hop",
+        "use": "./modules/ascii/String.hop"
       }
     }
   }

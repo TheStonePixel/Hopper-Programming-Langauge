@@ -6,8 +6,8 @@
   "type": "library",
   "exports": {
     "Cast": {
-      "contract":      "interfaces/Cast.hop",
-      "implementation": "src/Cast.hop"
+      "for":      "interfaces/Cast.hop",
+      "use": "src/Cast.hop"
     }
   }
 }

@@ -13,31 +13,26 @@
   "targets": {
     "host": {
       "TUI": {
-        "from": "tui",
-        "contract": "modules/tui/contracts/TUI.hop",
-        "implementation": "modules/tui/src/TUI.hop"
+        "for": "modules/tui/contracts/TUI.hop",
+        "use": "modules/tui/src/TUI.hop"
       },
       "IO": {
-        "from": "linux",
-        "contract": "modules/linux/contracts/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "for": "modules/linux/contracts/IO.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
-        "from": "linux",
-        "contract": "modules/linux/contracts/FileSystem.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "for": "modules/linux/contracts/FileSystem.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "Buffer": {
-        "from": "buffer",
-        "contract": "modules/buffer/contracts/Buffer.hop",
-        "implementation": "modules/buffer/src/Buffer.hop"
+        "for": "modules/buffer/contracts/Buffer.hop",
+        "use": "modules/buffer/src/Buffer.hop"
       },
       "Editor": {
-        "from": "editor",
-        "contract": "modules/editor/contracts/Editor.hop",
-        "implementation": "modules/editor/src/Editor.hop"
+        "for": "modules/editor/contracts/Editor.hop",
+        "use": "modules/editor/src/Editor.hop"
       }
     }
   }

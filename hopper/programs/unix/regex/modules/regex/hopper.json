@@ -7,16 +7,15 @@
   "dependencies": {},
   "exports": {
     "Regex": {
-      "contract":      "interfaces/Regex.hop",
-      "implementation": "src/Regex.hop"
+      "for":      "interfaces/Regex.hop",
+      "use": "src/Regex.hop"
     }
   },
   "targets": {
     "host": {
       "Regex": {
-        "from":           "regex",
-        "contract":      "interfaces/Regex.hop",
-        "implementation": "src/Regex.hop"
+        "for":      "interfaces/Regex.hop",
+        "use": "src/Regex.hop"
       }
     }
   }

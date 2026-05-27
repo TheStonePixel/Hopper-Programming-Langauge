@@ -9,16 +9,15 @@
   },
   "exports": {
     "TUI": {
-      "contract":      "interfaces/TUI.hop",
-      "implementation": "src/TUI.hop"
+      "for":      "interfaces/TUI.hop",
+      "use": "src/TUI.hop"
     }
   },
   "targets": {
     "host": {
       "TUI": {
-        "from":           "tui",
-        "contract":      "interfaces/TUI.hop",
-        "implementation": "src/TUI.hop"
+        "for":      "interfaces/TUI.hop",
+        "use": "src/TUI.hop"
       }
     }
   }

@@ -9,25 +9,23 @@
   },
   "exports": {
     "FileReader": {
-      "contract":      "interfaces/FileReader.hop",
-      "implementation": "src/File.hop"
+      "for":      "interfaces/FileReader.hop",
+      "use": "src/File.hop"
     },
     "FileWriter": {
-      "contract":      "interfaces/FileWriter.hop",
-      "implementation": "src/File.hop"
+      "for":      "interfaces/FileWriter.hop",
+      "use": "src/File.hop"
     }
   },
   "targets": {
     "host": {
       "FileReader": {
-        "from":           "io",
-        "contract":      "interfaces/FileReader.hop",
-        "implementation": "src/File.hop"
+        "for":      "interfaces/FileReader.hop",
+        "use": "src/File.hop"
       },
       "FileWriter": {
-        "from":           "io",
-        "contract":      "interfaces/FileWriter.hop",
-        "implementation": "src/File.hop"
+        "for":      "interfaces/FileWriter.hop",
+        "use": "src/File.hop"
       }
     }
   }

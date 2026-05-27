@@ -12,15 +12,13 @@
   "targets": {
     "host": {
       "IO": {
-        "from": "linux",
-        "contract": "modules/linux/contracts/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "for": "modules/linux/contracts/IO.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
-        "from": "linux",
-        "contract": "modules/linux/contracts/FileSystem.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "for": "modules/linux/contracts/FileSystem.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       }
     }

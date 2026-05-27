@@ -11,9 +11,8 @@
   "targets": {
     "host": {
       "JSON": {
-        "from": "json",
-        "contract": "modules/json/contracts/JSON.hop",
-        "implementation": "modules/json/src/JSON.hop"
+        "for": "modules/json/contracts/JSON.hop",
+        "use": "modules/json/src/JSON.hop"
       }
     }
   }

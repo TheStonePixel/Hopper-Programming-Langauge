@@ -6,7 +6,7 @@
   "type": "library",
   "exports": {
     "SIMD": {
-      "contract": "interfaces/SIMD.hop"
+      "for": "interfaces/SIMD.hop"
     }
   }
 }

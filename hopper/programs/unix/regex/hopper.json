@@ -11,26 +11,22 @@
   "targets": {
     "host": {
       "Regex": {
-        "from": "regex",
-        "contract": "modules/regex/contracts/Regex.hop",
-        "implementation": "modules/regex/src/Regex.hop"
+        "for": "modules/regex/contracts/Regex.hop",
+        "use": "modules/regex/src/Regex.hop"
       },
       "IO": {
-        "from": "linux",
-        "contract": "../../../modules/linux/contracts/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "for": "../../../modules/linux/contracts/IO.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "FileSystem": {
-        "from": "linux",
-        "contract": "../../../modules/linux/contracts/FileSystem.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop",
+        "for": "../../../modules/linux/contracts/FileSystem.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop",
         "inline": true
       },
       "SIMD": {
-        "from": "x86_64",
-        "contract": "modules/x86_64/contracts/SIMD.hop",
-        "implementation": "modules/x86_64/src/SIMD.hop"
+        "for": "modules/x86_64/contracts/SIMD.hop",
+        "use": "modules/x86_64/src/SIMD.hop"
       }
     }
   }

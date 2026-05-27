@@ -171,8 +171,8 @@ A **module** is a directory, not a file. `from linux` means the `linux` module d
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/contracts/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "for":      "modules/linux/contracts/IO.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
   }
@@ -416,8 +416,8 @@ The build file connects the OS contract to the hardware implementation:
 ```json
 "IO": {
   "from":           "linux",
-  "contract":      "modules/linux/contracts/IO.hop",
-  "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+  "for":      "modules/linux/contracts/IO.hop",
+  "use": "modules/x86_64/src/LinuxSyscalls.hop"
 }
 ```
 To retarget: change `x86_64` to `arm64` in every `implementation` path. That is the entire
@@ -464,13 +464,13 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
     "host": {
       "IO": {
         "from":           "linux",
-        "contract":      "modules/linux/contracts/IO.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "for":      "modules/linux/contracts/IO.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop"
       },
       "FileSystem": {
         "from":           "linux",
-        "contract":      "modules/linux/contracts/FileSystem.hop",
-        "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+        "for":      "modules/linux/contracts/FileSystem.hop",
+        "use": "modules/x86_64/src/LinuxSyscalls.hop"
       }
     }
   }
@@ -487,8 +487,8 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
   "type": "library",
   "exports": {
     "MyInterface": {
-      "contract":      "interfaces/MyInterface.hop",
-      "implementation": "src/MyImpl.hop"
+      "for":      "interfaces/MyInterface.hop",
+      "use": "src/MyImpl.hop"
     }
   }
 }
@@ -511,8 +511,8 @@ The `exports` field on libraries is documentation/tooling only for now — consu
     "aarch64-bare": {
       "IO": {
         "from":           "uart",
-        "contract":      "modules/uart/contracts/IO.hop",
-        "implementation": "modules/uart/src/QemuUart.hop"
+        "for":      "modules/uart/contracts/IO.hop",
+        "use": "modules/uart/src/QemuUart.hop"
       }
     }
   }
@@ -554,8 +554,8 @@ Add binding in `hopper.json` targets:
 ```json
 "String": {
   "from": "ds",
-  "contract": "modules/ds/contracts/String.hop",
-  "implementation": "modules/ds/src/String.hop"
+  "for": "modules/ds/contracts/String.hop",
+  "use": "modules/ds/src/String.hop"
 }
 ```
 
@@ -644,8 +644,8 @@ Add to `hopper.json` targets:
 ```json
 "SIMD": {
   "from": "x86_64",
-  "contract": "modules/x86_64/contracts/SIMD.hop",
-  "implementation": "modules/x86_64/src/SIMD.hop"
+  "for": "modules/x86_64/contracts/SIMD.hop",
+  "use": "modules/x86_64/src/SIMD.hop"
 }
 ```
 
