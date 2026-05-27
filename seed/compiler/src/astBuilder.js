@@ -1029,19 +1029,14 @@ function cleanParseMessage(msg) {
         .replace(/'([^']*)'/g, (_, s) => `'${s.trim()}'`);
 }
 
-export function buildAstFromSource(source, { baseDir = null, visited = new Set(), noImports = false, bindings = null, sourceFile = null } = {}) {
-    // Strip import lines before ANTLR sees them, collect import requests
-    const imports = [];
+// Parse a single source file and return its AST. Import lines are stripped
+// before ANTLR sees them (they are handled by the build system before this
+// function is called). No filesystem walking, no module resolution.
+export function buildAstFromSource(source, { sourceFile = null } = {}) {
+    // Strip import lines before ANTLR sees them
     const strippedSource = source.replace(
         /^[ \t]*import\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)\s+from\s+([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*$|^[ \t]*import\s+([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*$/gm,
-        (_, names, fromModule, wholeModule) => {
-            if (fromModule) {
-                imports.push({ module: fromModule, names: names.split(",").map(n => n.trim()) });
-            } else {
-                imports.push({ module: wholeModule, names: null });
-            }
-            return "";
-        }
+        () => ""
     );
 
     const chars    = new antlr4.InputStream(strippedSource);
@@ -1063,120 +1058,7 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         throw sentinel;
     }
 
-    const ast  = new AstBuilder(sourceFile).visit(tree);
-
-    if (noImports) return ast;
-
-    for (const { module: moduleName, names } of imports) {
-        // Binding import: `import Interface from Project` or legacy `import Interface`
-        // The interface name is either the bare module name (no from) or the single name before `from`.
-        const bindingName = names ? (names.length === 1 ? names[0] : null) : moduleName;
-        if (bindingName && bindings && bindings.has(bindingName)) {
-            const binding = bindings.get(bindingName);
-
-            // Validate binding files exist before trying to load them.
-            if (!fs.existsSync(binding.contract)) {
-                const sf = sourceFile ? ` (imported from ${path.basename(sourceFile)})` : "";
-                throw new Error(`Interface file not found for '${bindingName}'${sf}\n  'for': ${binding.contract}\n  Check the 'for' path in hopper.json`);
-            }
-            if (!fs.existsSync(binding.implementation)) {
-                const sf = sourceFile ? ` (imported from ${path.basename(sourceFile)})` : "";
-                throw new Error(`Implementation file not found for '${bindingName}'${sf}\n  'use': ${binding.implementation}\n  Check the 'use' path in hopper.json`);
-            }
-
-            // Load interface file
-            if (!visited.has(binding.contract)) {
-                visited.add(binding.contract);
-                const ifaceAst = buildAstFromSource(fs.readFileSync(binding.contract, "utf8"), {
-                    baseDir: path.dirname(binding.contract), visited, bindings, sourceFile: binding.contract,
-                });
-                ast.interfaces.unshift(...ifaceAst.interfaces);
-                ast.functions.unshift(...ifaceAst.functions);
-                ast.enums.unshift(...(ifaceAst.enums || []));
-                ast.classes.unshift(...(ifaceAst.classes || []));
-                ast.templateFunctions.unshift(...(ifaceAst.templateFunctions || []));
-            }
-
-            // Load implementation file
-            if (!visited.has(binding.implementation)) {
-                visited.add(binding.implementation);
-                const implAst = buildAstFromSource(fs.readFileSync(binding.implementation, "utf8"), {
-                    baseDir: path.dirname(binding.implementation), visited, bindings, sourceFile: binding.implementation,
-                });
-
-                // Mark all functions and class methods as alwaysinline when the binding
-                // is a pure translation layer (no code of its own, inline: true in hopper.json).
-                if (binding.inline) {
-                    for (const fn of implAst.functions || []) {
-                        if (!fn.isExtern) fn._inline = true;
-                    }
-                    for (const cls of implAst.classes || []) {
-                        for (const m of cls.methods || []) m._inline = true;
-                        if (cls.constructor) {
-                            for (const m of cls.constructor.methods || []) m._inline = true;
-                        }
-                    }
-                }
-
-                // Find the class that matches the binding name; also accept a class that
-                // already declares `implements <bindingName>` in source; fall back to first class.
-                // This handles impl files that export multiple classes (e.g. tui.hop has Key + StandardTUI).
-                const implClass = (implAst.classes || []).find(c => c.name === bindingName)
-                               || (implAst.classes || []).find(c => (c.interfaces || []).includes(bindingName))
-                               || (implAst.classes || [])[0];
-                if (implClass) {
-                    implClass.interfaces = [...(implClass.interfaces || []), bindingName];
-                }
-
-                // Register a type alias: binding name → concrete class name.
-                // Skip when names match — a self-alias causes infinite recursion in normalizeType.
-                if (implClass && implClass.name !== bindingName) {
-                    ast.aliases.push({ name: bindingName, targetType: implClass.name });
-                }
-
-                ast.functions.unshift(...implAst.functions);
-                ast.structs.unshift(...implAst.structs);
-                ast.classes.unshift(...implAst.classes);
-                ast.enums.unshift(...(implAst.enums || []));
-                ast.aliases.unshift(...implAst.aliases);
-                ast.templates.unshift(...implAst.templates);
-                ast.templateFunctions.unshift(...(implAst.templateFunctions || []));
-                ast.binds.unshift(...implAst.binds);
-                ast.stricts.unshift(...implAst.stricts);
-                ast.interfaces.unshift(...implAst.interfaces);
-            }
-
-            continue;
-        }
-
-        // Regular module import
-        const files = resolveModuleFiles(moduleName, names, baseDir, sourceFile);
-        for (const resolved of files) {
-            if (visited.has(resolved)) continue;
-            visited.add(resolved);
-
-            const importedAst = buildAstFromSource(fs.readFileSync(resolved, "utf8"), {
-                baseDir:    path.dirname(resolved),
-                visited,
-                bindings,
-                sourceFile: resolved,
-            });
-
-            ast.functions.unshift(...importedAst.functions);
-            ast.structs.unshift(...importedAst.structs);
-            ast.classes.unshift(...importedAst.classes);
-            ast.enums.unshift(...(importedAst.enums || []));
-            ast.aliases.unshift(...importedAst.aliases);
-            ast.templates.unshift(...importedAst.templates);
-            ast.templateFunctions.unshift(...(importedAst.templateFunctions || []));
-            ast.binds.unshift(...importedAst.binds);
-            ast.stricts.unshift(...importedAst.stricts);
-            ast.interfaces.unshift(...importedAst.interfaces);
-            // entry is never inherited from imports — only the main file sets it
-        }
-    }
-
-    return ast;
+    return new AstBuilder(sourceFile).visit(tree);
 }
 
 // ── pre-resolved build: takes file list from build system ──────────────────
@@ -1192,7 +1074,7 @@ export function buildAstFromFiles(files) {
 
     for (const { path: filePath, inline, role, bindingName } of files) {
         const source  = fs.readFileSync(filePath, 'utf8');
-        const fileAst = buildAstFromSource(source, { noImports: true, sourceFile: filePath });
+        const fileAst = buildAstFromSource(source, { sourceFile: filePath });
 
         // Apply inline marking for implementation files
         if (inline) {

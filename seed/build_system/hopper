@@ -1328,7 +1328,7 @@ function cmdFormat(args) {
             process.exit(1);
         }
         const src = fs.readFileSync(file, "utf8");
-        const ast = buildAstFromSource(src, { baseDir: path.dirname(path.resolve(file)), noImports: true });
+        const ast = buildAstFromSource(src, { sourceFile: path.resolve(file) });
         const formatted = formatSource(ast, src);
         if (inPlace) {
             fs.writeFileSync(file, formatted, "utf8");
