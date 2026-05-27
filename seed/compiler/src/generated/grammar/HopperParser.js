@@ -6520,50 +6520,6 @@ class InterfaceMemberContext extends antlr4.ParserRuleContext {
 }
 
 
-class InterfaceFuncContext extends InterfaceMemberContext {
-
-    constructor(parser, ctx) {
-        super(parser);
-        super.copyFrom(ctx);
-    }
-
-	fieldName() {
-	    return this.getTypedRuleContext(FieldNameContext,0);
-	};
-
-	type() {
-	    return this.getTypedRuleContext(TypeContext,0);
-	};
-
-	paramList() {
-	    return this.getTypedRuleContext(ParamListContext,0);
-	};
-
-	enterRule(listener) {
-	    if(listener instanceof HopperListener ) {
-	        listener.enterInterfaceFunc(this);
-		}
-	}
-
-	exitRule(listener) {
-	    if(listener instanceof HopperListener ) {
-	        listener.exitInterfaceFunc(this);
-		}
-	}
-
-	accept(visitor) {
-	    if ( visitor instanceof HopperVisitor ) {
-	        return visitor.visitInterfaceFunc(this);
-	    } else {
-	        return visitor.visitChildren(this);
-	    }
-	}
-
-
-}
-
-HopperParser.InterfaceFuncContext = InterfaceFuncContext;
-
 class InterfaceProcContext extends InterfaceMemberContext {
 
     constructor(parser, ctx) {
@@ -6639,6 +6595,50 @@ class InterfaceEnumContext extends InterfaceMemberContext {
 }
 
 HopperParser.InterfaceEnumContext = InterfaceEnumContext;
+
+class InterfaceFuncContext extends InterfaceMemberContext {
+
+    constructor(parser, ctx) {
+        super(parser);
+        super.copyFrom(ctx);
+    }
+
+	fieldName() {
+	    return this.getTypedRuleContext(FieldNameContext,0);
+	};
+
+	type() {
+	    return this.getTypedRuleContext(TypeContext,0);
+	};
+
+	paramList() {
+	    return this.getTypedRuleContext(ParamListContext,0);
+	};
+
+	enterRule(listener) {
+	    if(listener instanceof HopperListener ) {
+	        listener.enterInterfaceFunc(this);
+		}
+	}
+
+	exitRule(listener) {
+	    if(listener instanceof HopperListener ) {
+	        listener.exitInterfaceFunc(this);
+		}
+	}
+
+	accept(visitor) {
+	    if ( visitor instanceof HopperVisitor ) {
+	        return visitor.visitInterfaceFunc(this);
+	    } else {
+	        return visitor.visitChildren(this);
+	    }
+	}
+
+
+}
+
+HopperParser.InterfaceFuncContext = InterfaceFuncContext;
 
 class ClassDeclContext extends antlr4.ParserRuleContext {
 

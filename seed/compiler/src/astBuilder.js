@@ -1114,20 +1114,14 @@ export function buildAstFromSource(source, { baseDir = null, visited = new Set()
         if (bindingName && bindings && bindings.has(bindingName)) {
             const binding = bindings.get(bindingName);
 
-            // Validate the project name if the binding declares one.
-            if (names && binding.from && binding.from !== moduleName) {
-                const sf = sourceFile ? ` in ${path.basename(sourceFile)}` : "";
-                throw new Error(`import ${bindingName} from ${moduleName}: binding specifies 'from ${binding.from}'${sf}`);
-            }
-
             // Validate binding files exist before trying to load them.
             if (!fs.existsSync(binding.contract)) {
-                const sf = sourceFile ? ` (declared in hopper.json, imported from ${path.basename(sourceFile)})` : "";
-                throw new Error(`Interface file not found for '${bindingName}'${sf}\n  Expected: ${binding.contract}`);
+                const sf = sourceFile ? ` (imported from ${path.basename(sourceFile)})` : "";
+                throw new Error(`Interface file not found for '${bindingName}'${sf}\n  'for': ${binding.contract}\n  Check the 'for' path in hopper.json`);
             }
             if (!fs.existsSync(binding.implementation)) {
-                const sf = sourceFile ? ` (declared in hopper.json, imported from ${path.basename(sourceFile)})` : "";
-                throw new Error(`Implementation file not found for '${bindingName}'${sf}\n  Expected: ${binding.implementation}`);
+                const sf = sourceFile ? ` (imported from ${path.basename(sourceFile)})` : "";
+                throw new Error(`Implementation file not found for '${bindingName}'${sf}\n  'use': ${binding.implementation}\n  Check the 'use' path in hopper.json`);
             }
 
             // Load interface file

@@ -38,10 +38,12 @@ function loadBindings(sourceFile, target = "host") {
                 const targetBindings = (config.targets || {})[target] || {};
                 const bindings = new Map();
                 for (const [name, b] of Object.entries(targetBindings)) {
+                    if (!b.for || !b.use) {
+                        throw new Error(`Binding '${name}' in hopper.json is missing required fields 'for' and 'use'`);
+                    }
                     bindings.set(name, {
-                        from:           b.from || null,
-                        contract:       path.resolve(dir, b.contract),
-                        implementation: path.resolve(dir, b.implementation),
+                        contract:       path.resolve(dir, b.for),
+                        implementation: path.resolve(dir, b.use),
                         inline:         b.inline === true,
                     });
                 }
@@ -879,7 +881,7 @@ function localizeBindings(projectRoot, installedNames) {
         for (const b of Object.values(bindings)) {
             if (!b.from || !installedNames.has(b.from)) continue;
             const mod = b.from;
-            for (const key of ["contract", "implementation"]) {
+            for (const key of ["for", "use"]) {
                 if (!b[key]) continue;
                 const idx = b[key].indexOf(`/${mod}/`);
                 if (idx !== -1) {
@@ -1505,8 +1507,8 @@ function cmdFix(args) {
     // ── 3. Export files for libraries ────────────────────────────────────
     for (const [exportName, exp] of Object.entries(manifest.exports || {})) {
         const pairs = [
-            ["contract",      exp.contract],
-            ["implementation", exp.implementation],
+            ["for",  exp.for],
+            ["use",  exp.use],
         ];
         for (const [field, relPath] of pairs) {
             if (!relPath) continue;
@@ -1547,7 +1549,7 @@ function cmdFix(args) {
     }
     // Also scan files referenced explicitly in exports and entry
     for (const exp of Object.values(manifest.exports || {})) {
-        for (const relPath of [exp.contract, exp.implementation]) {
+        for (const relPath of [exp.for, exp.use]) {
             if (!relPath) continue;
             const abs = path.join(projectRoot, relPath);
             if (fs.existsSync(abs)) toScan.add(abs);
