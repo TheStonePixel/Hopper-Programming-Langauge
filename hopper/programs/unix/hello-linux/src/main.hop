@@ -1,8 +1,41 @@
 import IO      from linux
 import Process from linux
 
+struct SystemInfo {
+    address sysname
+    address machine
+    address release
+}
+
+function strLen(address s) int {
+    int len = 0
+    while (true) {
+        address p = s + len
+        byte b = p::value
+        if (b == 0) { return len }
+        len = len + 1
+    }
+    return 0
+}
+
 entry main {
-    string msg = "hello from linux\n"
-    write(StdFd.STDOUT, msg, 18)
+    address buf = allocate 325
+    uname(buf)
+
+    SystemInfo info
+    info.sysname = buf
+    info.release = buf + 130
+    info.machine = buf + 260
+
+    string prefix = "hello from linux on "
+    write(StdFd.STDOUT, prefix, 20)
+    write(StdFd.STDOUT, info.machine, strLen(info.machine))
+    write(StdFd.STDOUT, " (", 2)
+    write(StdFd.STDOUT, info.sysname, strLen(info.sysname))
+    write(StdFd.STDOUT, " ", 1)
+    write(StdFd.STDOUT, info.release, strLen(info.release))
+    write(StdFd.STDOUT, ")\n", 2)
+
+    deallocate buf
     exit(0)
 }
