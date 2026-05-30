@@ -7,20 +7,18 @@
   "dependencies": {},
   "exports": {
     "Path": {
-      "for":      "interfaces/Path.hop",
+      "for": "interfaces/Path.hop",
       "use": "src/Path.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Path": {
-        "for":      "interfaces/Path.hop",
-        "use": "src/Path.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Path": {
+      "interface": "interfaces/Path.hop",
+      "implementation": "src/Path.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

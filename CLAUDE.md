@@ -158,22 +158,20 @@ A **module** is a directory, not a file. `from linux` means the `linux` module d
 
 **Resolution:** Given `import Foo from bar`:
 
-1. Check `hopper.json` targets for a `Foo` binding:
-   - **Found** → interface resolution: load the `contract` file and the `implementation` file. Both are merged into scope. This is how hardware abstraction works — the program imports `IO from linux` and the build file decides which implementation backs it.
+1. Check `hopper.json` `use` block for a `Foo` binding:
+   - **Found** → interface resolution: load the `interface` file and the `implementation` file. Both are merged into scope. This is how hardware abstraction works — the program imports `IO from linux` and the build file decides which implementation backs it.
    - **Not found** → direct resolution: scan `modules/bar/src/Foo.hop` (by convention files are named after their export), falling back to scanning all files in `modules/bar/src/` for a matching declaration.
 
 2. A visited-set prevents any file from being compiled twice.
 
-**Interface targets binding** (only needed when swapping implementations per target):
+**Interface binding** (only needed when swapping implementations):
 ```json
 {
-  "targets": {
-    "host": {
-      "IO": {
-        "from":           "linux",
-        "for":      "modules/linux/contracts/IO.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop"
-      }
+  "use": {
+    "IO": {
+      "module":         "linux",
+      "interface":      "modules/linux/contracts/IO.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
     }
   }
 }
@@ -181,7 +179,7 @@ A **module** is a directory, not a file. `from linux` means the `linux` module d
 
 All paths in `hopper.json` are relative to the manifest's directory. Every module lives under `modules/` (real directory or symlink) — paths are always contained to the project and resolve correctly on any machine.
 
-Simple modules (math, ds, etc.) with no platform-specific implementation need no targets entry — they resolve directly.
+Simple modules (math, ds, etc.) with no platform-specific implementation need no `use` entry — they resolve directly.
 
 ---
 
@@ -382,7 +380,7 @@ Also available: `cast<unsigned int>`, `cast<unsigned byte>`, `cast<char>`, `cast
 
 Programs import `IO from linux` and `FileSystem from linux` — hardware-independent names.
 They call free functions (`open`, `read`, `write`, `close`) and never name x86-64, ARM64, or
-any ISA. The build file (`hopper.json` targets) is the only place where hardware is named.
+any ISA. The build file (`hopper.json` `use` block) is the only place where hardware is named.
 Changing from x86_64 to arm64 requires editing only the `implementation` paths in hopper.json —
 zero source changes anywhere.
 
@@ -411,13 +409,13 @@ Exports 7 interfaces that declare what a Linux program needs:
 - `Network` — select, poll, epoll_create1, epoll_ctl, epoll_wait
 - `Memory` — mmap, munmap, mprotect, mremap, madvise, mlock, memfd_create
 
-#### Architecture selector (hopper.json targets)
+#### Architecture selector (hopper.json `use` block)
 The build file connects the OS contract to the hardware implementation:
 ```json
 "IO": {
-  "from":           "linux",
-  "for":      "modules/linux/contracts/IO.hop",
-  "use": "modules/x86_64/src/LinuxSyscalls.hop"
+  "module":         "linux",
+  "interface":      "modules/linux/contracts/IO.hop",
+  "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
 }
 ```
 To retarget: change `x86_64` to `arm64` in every `implementation` path. That is the entire
@@ -432,7 +430,7 @@ Do NOT import from any of these until they have been updated and moved to `hoppe
 ### Dependency chain
 ```
 program → import IO from linux
-             ↓ hopper.json targets binding resolves to:
+             ↓ hopper.json 'use' binding resolves to:
           linux/contracts/IO.hop       (interface file)
           x86_64/src/LinuxSyscalls.hop  (interface LinuxSyscalls + free functions)
                                          → inline-ASM syscalls, no further dependencies
@@ -460,18 +458,16 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
   "license": "MIT",
   "type": "executable",
   "entry": "src/main.hop",
-  "targets": {
-    "host": {
-      "IO": {
-        "from":           "linux",
-        "for":      "modules/linux/contracts/IO.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop"
-      },
-      "FileSystem": {
-        "from":           "linux",
-        "for":      "modules/linux/contracts/FileSystem.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop"
-      }
+  "use": {
+    "IO": {
+      "module":         "linux",
+      "interface":      "modules/linux/contracts/IO.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "FileSystem": {
+      "module":         "linux",
+      "interface":      "modules/linux/contracts/FileSystem.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
     }
   }
 }
@@ -487,14 +483,14 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
   "type": "library",
   "exports": {
     "MyInterface": {
-      "for":      "interfaces/MyInterface.hop",
-      "use": "src/MyImpl.hop"
+      "interface":      "interfaces/MyInterface.hop",
+      "implementation": "src/MyImpl.hop"
     }
   }
 }
 ```
 
-The `exports` field on libraries is documentation/tooling only for now — consuming projects still declare bindings in their own `targets` section.
+The `exports` field on libraries is documentation/tooling only for now — consuming projects still declare bindings in their own `use` section.
 
 ### Bare-Metal Program (QEMU virt / Pi Zero)
 ```json
@@ -507,13 +503,11 @@ The `exports` field on libraries is documentation/tooling only for now — consu
   "dependencies": {
     "uart": "0.1.0"
   },
-  "targets": {
-    "aarch64-bare": {
-      "IO": {
-        "from":           "uart",
-        "for":      "modules/uart/contracts/IO.hop",
-        "use": "modules/uart/src/QemuUart.hop"
-      }
+  "use": {
+    "IO": {
+      "module":         "uart",
+      "interface":      "modules/uart/contracts/IO.hop",
+      "implementation": "modules/uart/src/QemuUart.hop"
     }
   }
 }
@@ -521,9 +515,8 @@ The `exports` field on libraries is documentation/tooling only for now — consu
 
 Critical bare-metal manifest rules (read `04-packages/11.1-package-manifests.md` before touching):
 - `"type"` MUST be `"program"` for bare-metal — NOT `"executable"`
-- `"board"` field selects the board config; the board's `llvmTarget` (e.g. `"aarch64-bare"`) is the required key in `targets`
-- `"sources"` is NOT a valid field — never use it. Use `"entry"` + `"targets"` bindings
-- The targets key MUST match the board's `llvmTarget` string exactly (e.g. `"aarch64-bare"` for qemu-virt), NOT `"host"`
+- `"board"` field selects the board config
+- `"sources"` is NOT a valid field — never use it. Use `"entry"` + `"use"` bindings
 
 ---
 
@@ -550,12 +543,12 @@ before using any collection type. Do NOT reimplement them — install them with 
 import String from ds
 import Array from ds
 ```
-Add binding in `hopper.json` targets:
+Add binding in `hopper.json` `use` block:
 ```json
 "String": {
-  "from": "ds",
-  "for": "modules/ds/contracts/String.hop",
-  "use": "modules/ds/src/String.hop"
+  "module":         "ds",
+  "interface":      "modules/ds/contracts/String.hop",
+  "implementation": "modules/ds/src/String.hop"
 }
 ```
 
@@ -585,7 +578,7 @@ appear in application source:
 - `_qemuPuts(s)` — same
 - Any function prefixed with `_qemu`, `_linux`, `_x86`, `_arm`, or any ISA/hardware name
 
-The `hopper.json` targets section is the ONLY place where hardware implementation paths appear.
+The `hopper.json` `use` section is the ONLY place where hardware implementation paths appear.
 Program source and interface files are hardware-neutral by design.
 
 ---
@@ -640,12 +633,12 @@ function indexLines(...) {
 }
 ```
 
-Add to `hopper.json` targets:
+Add to `hopper.json` `use` block:
 ```json
 "SIMD": {
-  "from": "x86_64",
-  "for": "modules/x86_64/contracts/SIMD.hop",
-  "use": "modules/x86_64/src/SIMD.hop"
+  "module":         "x86_64",
+  "interface":      "modules/x86_64/contracts/SIMD.hop",
+  "implementation": "modules/x86_64/src/SIMD.hop"
 }
 ```
 

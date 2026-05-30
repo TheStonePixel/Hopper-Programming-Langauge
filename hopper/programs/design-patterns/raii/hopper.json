@@ -6,7 +6,5 @@
   "type": "executable",
   "entry": "src/main.hop",
   "dependencies": {},
-  "targets": {
-    "host": {}
-  }
+  "use": {}
 }

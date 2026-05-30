@@ -8,18 +8,16 @@
   "dependencies": {
     "linux": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "IO": {
-        "for": "modules/linux/contracts/IO.hop",
-        "use": "modules/linux/src/IO.hop",
-        "inline": true
-      },
-      "Process": {
-        "for": "modules/linux/contracts/Process.hop",
-        "use": "modules/linux/src/Process.hop",
-        "inline": true
-      }
+  "use": {
+    "IO": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/IO.hop",
+      "implementation": "modules/linux/src/IO.hop"
+    },
+    "Process": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/Process.hop",
+      "implementation": "modules/linux/src/Process.hop"
     }
   }
 }

@@ -9,28 +9,26 @@
   },
   "exports": {
     "Mutex": {
-      "for":      "interfaces/Concurrent.hop",
+      "for": "interfaces/Concurrent.hop",
       "use": "src/Concurrent.hop"
     },
     "Condvar": {
-      "for":      "interfaces/Concurrent.hop",
+      "for": "interfaces/Concurrent.hop",
       "use": "src/Concurrent.hop"
     },
     "Concurrent": {
-      "for":      "interfaces/Concurrent.hop",
+      "for": "interfaces/Concurrent.hop",
       "use": "src/Concurrent.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Concurrent": {
-        "for":      "interfaces/Concurrent.hop",
-        "use": "src/Concurrent.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Concurrent": {
+      "interface": "interfaces/Concurrent.hop",
+      "implementation": "src/Concurrent.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

@@ -8,12 +8,11 @@
   "dependencies": {
     "json": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "JSON": {
-        "for": "modules/json/contracts/JSON.hop",
-        "use": "modules/json/src/JSON.hop"
-      }
+  "use": {
+    "JSON": {
+      "module": "json",
+      "interface": "modules/json/contracts/JSON.hop",
+      "implementation": "modules/json/src/JSON.hop"
     }
   }
 }

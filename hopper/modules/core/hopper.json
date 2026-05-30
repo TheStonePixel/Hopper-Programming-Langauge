@@ -9,16 +9,14 @@
   },
   "exports": {
     "Core": {
-      "for":      "interfaces/Core.hop",
+      "for": "interfaces/Core.hop",
       "use": "src/Core.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Core": {
-        "for":      "interfaces/Core.hop",
-        "use": "src/Core.hop"
-      }
+  "use": {
+    "Core": {
+      "interface": "interfaces/Core.hop",
+      "implementation": "src/Core.hop"
     }
   }
 }

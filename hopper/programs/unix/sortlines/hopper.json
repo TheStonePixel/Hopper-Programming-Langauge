@@ -9,23 +9,21 @@
     "linux": "0.1.0",
     "x86_64": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "IO": {
-        "for": "modules/linux/contracts/IO.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "FileSystem": {
-        "for": "modules/linux/contracts/FileSystem.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "SIMD": {
-        "for": "modules/compute/contracts/SIMD.hop",
-        "use": "modules/x86_64/src/SIMD.hop",
-        "inline": true
-      }
+  "use": {
+    "IO": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/IO.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "FileSystem": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/FileSystem.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "SIMD": {
+      "module": "compute",
+      "interface": "modules/compute/contracts/SIMD.hop",
+      "implementation": "modules/x86_64/src/SIMD.hop"
     }
   }
 }

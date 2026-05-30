@@ -8,12 +8,11 @@
   "dependencies": {
     "tui": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "TUI": {
-        "for": "modules/tui/contracts/TUI.hop",
-        "use": "modules/tui/src/TUI.hop"
-      }
+  "use": {
+    "TUI": {
+      "module": "tui",
+      "interface": "modules/tui/contracts/TUI.hop",
+      "implementation": "modules/tui/src/TUI.hop"
     }
   }
 }

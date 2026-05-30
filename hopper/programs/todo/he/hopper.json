@@ -10,30 +10,31 @@
     "linux": "0.1.0",
     "x86_64": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "TUI": {
-        "for": "modules/tui/contracts/TUI.hop",
-        "use": "modules/tui/src/TUI.hop"
-      },
-      "IO": {
-        "for": "modules/linux/contracts/IO.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "FileSystem": {
-        "for": "modules/linux/contracts/FileSystem.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "Buffer": {
-        "for": "modules/buffer/contracts/Buffer.hop",
-        "use": "modules/buffer/src/Buffer.hop"
-      },
-      "Editor": {
-        "for": "modules/editor/contracts/Editor.hop",
-        "use": "modules/editor/src/Editor.hop"
-      }
+  "use": {
+    "TUI": {
+      "module": "tui",
+      "interface": "modules/tui/contracts/TUI.hop",
+      "implementation": "modules/tui/src/TUI.hop"
+    },
+    "IO": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/IO.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "FileSystem": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/FileSystem.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "Buffer": {
+      "module": "buffer",
+      "interface": "modules/buffer/contracts/Buffer.hop",
+      "implementation": "modules/buffer/src/Buffer.hop"
+    },
+    "Editor": {
+      "module": "editor",
+      "interface": "modules/editor/contracts/Editor.hop",
+      "implementation": "modules/editor/src/Editor.hop"
     }
   }
 }

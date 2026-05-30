@@ -7,16 +7,14 @@
   "dependencies": {},
   "exports": {
     "IString": {
-      "for":      "interfaces/IString.hop",
+      "for": "interfaces/IString.hop",
       "use": "src/AsciiString.hop"
     }
   },
-  "targets": {
-    "host": {
-      "IString": {
-        "for":      "interfaces/IString.hop",
-        "use": "src/AsciiString.hop"
-      }
+  "use": {
+    "IString": {
+      "interface": "interfaces/IString.hop",
+      "implementation": "src/AsciiString.hop"
     }
   }
 }

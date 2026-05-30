@@ -7,20 +7,18 @@
   "dependencies": {},
   "exports": {
     "Algo": {
-      "for":      "interfaces/Algo.hop",
+      "for": "interfaces/Algo.hop",
       "use": "src/Algo.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Algo": {
-        "for":      "interfaces/Algo.hop",
-        "use": "src/Algo.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Algo": {
+      "interface": "interfaces/Algo.hop",
+      "implementation": "src/Algo.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

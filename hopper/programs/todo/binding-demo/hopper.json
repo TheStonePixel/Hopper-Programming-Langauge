@@ -1,12 +1,10 @@
 {
   "name": "binding-demo",
   "type": "program",
-  "targets": {
-    "host": {
-      "Text": {
-        "for": "./contracts/Text.hop",
-        "use": "./modules/ascii/String.hop"
-      }
+  "use": {
+    "Text": {
+      "interface": "./contracts/Text.hop",
+      "implementation": "./modules/ascii/String.hop"
     }
   }
 }

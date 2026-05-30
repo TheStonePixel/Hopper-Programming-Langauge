@@ -7,20 +7,18 @@
   "dependencies": {},
   "exports": {
     "Char": {
-      "for":      "interfaces/Char.hop",
+      "for": "interfaces/Char.hop",
       "use": "src/Char.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Char": {
-        "for":      "interfaces/Char.hop",
-        "use": "src/Char.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Char": {
+      "interface": "interfaces/Char.hop",
+      "implementation": "src/Char.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

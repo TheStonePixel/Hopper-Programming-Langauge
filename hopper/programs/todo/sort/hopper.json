@@ -8,12 +8,11 @@
   "dependencies": {
     "ds": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "Array": {
-        "for": "modules/ds/contracts/Array.hop",
-        "use": "modules/ds/src/Array.hop"
-      }
+  "use": {
+    "Array": {
+      "module": "ds",
+      "interface": "modules/ds/contracts/Array.hop",
+      "implementation": "modules/ds/src/Array.hop"
     }
   }
 }

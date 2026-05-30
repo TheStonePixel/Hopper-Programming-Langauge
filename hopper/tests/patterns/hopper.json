@@ -4,12 +4,10 @@
   "description": "Design pattern tests for the Hopper language",
   "license": "MIT",
   "type": "library",
-  "targets": {
-    "host": {
-      "Array": {
-        "for":      "../../modules/ds/contracts/Array.hop",
-        "use": "../../modules/ds/src/Array.hop"
-      }
+  "use": {
+    "Array": {
+      "interface": "../../modules/ds/contracts/Array.hop",
+      "implementation": "../../modules/ds/src/Array.hop"
     }
   }
 }

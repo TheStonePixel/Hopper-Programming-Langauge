@@ -7,20 +7,18 @@
   "dependencies": {},
   "exports": {
     "JSON": {
-      "for":      "interfaces/JSON.hop",
+      "for": "interfaces/JSON.hop",
       "use": "src/JSON.hop"
     }
   },
-  "targets": {
-    "host": {
-      "JSON": {
-        "for":      "interfaces/JSON.hop",
-        "use": "src/JSON.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "JSON": {
+      "interface": "interfaces/JSON.hop",
+      "implementation": "src/JSON.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

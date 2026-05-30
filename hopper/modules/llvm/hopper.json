@@ -7,16 +7,14 @@
   "dependencies": {},
   "exports": {
     "LLVM": {
-      "for":      "interfaces/LLVM.hop",
+      "for": "interfaces/LLVM.hop",
       "use": "src/LLVM.hop"
     }
   },
-  "targets": {
-    "host": {
-      "LLVM": {
-        "for":      "interfaces/LLVM.hop",
-        "use": "src/LLVM.hop"
-      }
+  "use": {
+    "LLVM": {
+      "interface": "interfaces/LLVM.hop",
+      "implementation": "src/LLVM.hop"
     }
   }
 }

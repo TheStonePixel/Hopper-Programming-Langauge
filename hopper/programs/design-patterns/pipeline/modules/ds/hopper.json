@@ -7,36 +7,34 @@
   "dependencies": {},
   "exports": {
     "Array": {
-      "for":      "interfaces/Array.hop",
+      "for": "interfaces/Array.hop",
       "use": "src/Array.hop"
     },
     "Stack": {
-      "for":      "interfaces/Stack.hop",
+      "for": "interfaces/Stack.hop",
       "use": "src/Stack.hop"
     },
     "Queue": {
-      "for":      "interfaces/Queue.hop",
+      "for": "interfaces/Queue.hop",
       "use": "src/Queue.hop"
     },
     "Map": {
-      "for":      "interfaces/Map.hop",
+      "for": "interfaces/Map.hop",
       "use": "src/Map.hop"
     },
     "StringBuilder": {
-      "for":      "interfaces/StringBuilder.hop",
+      "for": "interfaces/StringBuilder.hop",
       "use": "src/StringBuilder.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Array": {
-        "for":      "interfaces/Array.hop",
-        "use": "src/Array.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Array": {
+      "interface": "interfaces/Array.hop",
+      "implementation": "src/Array.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

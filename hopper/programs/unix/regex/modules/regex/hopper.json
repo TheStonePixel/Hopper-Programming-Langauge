@@ -7,16 +7,14 @@
   "dependencies": {},
   "exports": {
     "Regex": {
-      "for":      "interfaces/Regex.hop",
+      "for": "interfaces/Regex.hop",
       "use": "src/Regex.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Regex": {
-        "for":      "interfaces/Regex.hop",
-        "use": "src/Regex.hop"
-      }
+  "use": {
+    "Regex": {
+      "interface": "interfaces/Regex.hop",
+      "implementation": "src/Regex.hop"
     }
   }
 }

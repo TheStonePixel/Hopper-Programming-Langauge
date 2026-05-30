@@ -8,26 +8,24 @@
   "dependencies": {
     "x86_64": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "Regex": {
-        "for": "modules/regex/contracts/Regex.hop",
-        "use": "modules/regex/src/Regex.hop"
-      },
-      "IO": {
-        "for": "../../../modules/linux/contracts/IO.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "FileSystem": {
-        "for": "../../../modules/linux/contracts/FileSystem.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "SIMD": {
-        "for": "modules/x86_64/contracts/SIMD.hop",
-        "use": "modules/x86_64/src/SIMD.hop"
-      }
+  "use": {
+    "Regex": {
+      "module": "regex",
+      "interface": "modules/regex/contracts/Regex.hop",
+      "implementation": "modules/regex/src/Regex.hop"
+    },
+    "IO": {
+      "interface": "../../../modules/linux/contracts/IO.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "FileSystem": {
+      "interface": "../../../modules/linux/contracts/FileSystem.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "SIMD": {
+      "module": "x86_64",
+      "interface": "modules/x86_64/contracts/SIMD.hop",
+      "implementation": "modules/x86_64/src/SIMD.hop"
     }
   }
 }

@@ -7,20 +7,18 @@
   "dependencies": {},
   "exports": {
     "Buffer": {
-      "for":      "interfaces/Buffer.hop",
+      "for": "interfaces/Buffer.hop",
       "use": "src/Buffer.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Buffer": {
-        "for":      "interfaces/Buffer.hop",
-        "use": "src/Buffer.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Buffer": {
+      "interface": "interfaces/Buffer.hop",
+      "implementation": "src/Buffer.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }

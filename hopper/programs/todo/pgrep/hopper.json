@@ -11,26 +11,26 @@
     "linux": "0.1.0",
     "x86_64": "0.1.0"
   },
-  "targets": {
-    "host": {
-      "Regex": {
-        "for": "modules/regex/contracts/Regex.hop",
-        "use": "modules/regex/src/Regex.hop"
-      },
-      "Concurrent": {
-        "for": "modules/concurrent/contracts/Concurrent.hop",
-        "use": "modules/concurrent/src/Concurrent.hop"
-      },
-      "IO": {
-        "for": "modules/linux/contracts/IO.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      },
-      "FileSystem": {
-        "for": "modules/linux/contracts/FileSystem.hop",
-        "use": "modules/x86_64/src/LinuxSyscalls.hop",
-        "inline": true
-      }
+  "use": {
+    "Regex": {
+      "module": "regex",
+      "interface": "modules/regex/contracts/Regex.hop",
+      "implementation": "modules/regex/src/Regex.hop"
+    },
+    "Concurrent": {
+      "module": "concurrent",
+      "interface": "modules/concurrent/contracts/Concurrent.hop",
+      "implementation": "modules/concurrent/src/Concurrent.hop"
+    },
+    "IO": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/IO.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+    },
+    "FileSystem": {
+      "module": "linux",
+      "interface": "modules/linux/contracts/FileSystem.hop",
+      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
     }
   }
 }

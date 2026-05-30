@@ -7,20 +7,18 @@
   "dependencies": {},
   "exports": {
     "Stream": {
-      "for":      "interfaces/Stream.hop",
+      "for": "interfaces/Stream.hop",
       "use": "src/Stream.hop"
     }
   },
-  "targets": {
-    "host": {
-      "Stream": {
-        "for":      "interfaces/Stream.hop",
-        "use": "src/Stream.hop"
-      },
-      "Core": {
-        "for":      "../core/contracts/Core.hop",
-        "use": "../core/src/Core.hop"
-      }
+  "use": {
+    "Stream": {
+      "interface": "interfaces/Stream.hop",
+      "implementation": "src/Stream.hop"
+    },
+    "Core": {
+      "interface": "../core/contracts/Core.hop",
+      "implementation": "../core/src/Core.hop"
     }
   }
 }
