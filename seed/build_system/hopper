@@ -124,7 +124,9 @@ function resolveDirectImport(name, moduleName, fromDir, importingFile) {
 // Recursively resolve all imports for an entry file.
 // Returns ordered array (dependencies first, entry last):
 //   { path, inline, role: 'interface'|'implementation'|'source', bindingName? }
-function resolveAllImports(entryFile, bindings) {
+// Bindings are loaded per-file from the nearest hopper.json — each module
+// only sees its own bindings, never the consuming project's.
+function resolveAllImports(entryFile, arch) {
     const visited = new Set();
     const ordered = [];
 
@@ -135,9 +137,10 @@ function resolveAllImports(entryFile, bindings) {
         const source   = fs.readFileSync(filePath, 'utf8');
         const imports  = extractImports(source);
         const fileDir  = path.dirname(filePath);
+        const bindings = loadBindings(filePath, arch);
 
         for (const { name, module: mod } of imports) {
-            if (bindings && bindings.has(name)) {
+            if (bindings.has(name)) {
                 const b = bindings.get(name);
                 if (!fs.existsSync(b.contract))
                     throw new Error(`Interface file not found for '${name}' (imported from ${path.basename(filePath)})\n  'interface': ${b.contract}\n  Check the 'interface' path in hopper.json`);
@@ -160,8 +163,7 @@ function resolveAllImports(entryFile, bindings) {
 
 function toIR(file, arch) {
     const abs      = path.resolve(file);
-    const bindings = loadBindings(abs, arch);
-    const resolved = resolveAllImports(abs, bindings);
+    const resolved = resolveAllImports(abs, arch);
     const ast      = buildAstFromFiles(resolved);
     return genModule(ast);
 }
@@ -397,8 +399,7 @@ function toObjectBare(files, llDir, oDir, cfg) {
     };
     for (const file of files) {
         const abs      = path.resolve(file);
-        const bindings = loadBindings(abs, cfg.meta?.arch);
-        const resolved = resolveAllImports(abs, bindings);
+        const resolved = resolveAllImports(abs, cfg.meta?.arch);
         const ast      = buildAstFromFiles(resolved);
         for (const key of ["functions","structs","classes","consts","aliases","templates",
                            "binds","stricts","bitfields","interfaces","enums","templateFunctions"]) {
@@ -457,10 +458,9 @@ function projectBinaryName(entryFile, projectRoot) {
 
 function toObject(file, llDir, oDir, flags, arch) {
     const abs      = path.resolve(file);
-    const bindings = loadBindings(abs, arch);
     let ast, ir;
     try {
-        const resolved = resolveAllImports(abs, bindings);
+        const resolved = resolveAllImports(abs, arch);
         ast = buildAstFromFiles(resolved);
         ir  = dedupeDeclarations(genModule(ast));
     } catch (e) {
@@ -1371,8 +1371,7 @@ function cmdAST(args) {
     const archArg = args.find(a => a.startsWith("--arch="));
     const arch    = archArg ? archArg.slice("--arch=".length) : hostArch();
     const abs      = path.resolve(args.filter(a => !a.startsWith("--arch="))[0]);
-    const bindings = loadBindings(abs, arch);
-    const resolved = resolveAllImports(abs, bindings);
+    const resolved = resolveAllImports(abs, arch);
     const ast      = buildAstFromFiles(resolved);
     console.log(JSON.stringify(ast, null, 2));
 }
