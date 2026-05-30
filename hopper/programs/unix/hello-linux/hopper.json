@@ -6,18 +6,23 @@
   "type": "executable",
   "entry": "src/main.hop",
   "dependencies": {
-    "linux": "0.1.0"
+    "linux": "0.1.0",
+    "x86_64": "0.1.0"
   },
   "use": {
     "IO": {
       "module": "linux",
       "interface": "modules/linux/contracts/IO.hop",
-      "implementation": "modules/linux/src/IO.hop"
+      "implementation": {
+        "x86_64": "modules/x86_64/src/LinuxSyscalls.hop"
+      }
     },
     "Process": {
       "module": "linux",
       "interface": "modules/linux/contracts/Process.hop",
-      "implementation": "modules/linux/src/Process.hop"
+      "implementation": {
+        "x86_64": "modules/x86_64/src/LinuxSyscalls.hop"
+      }
     }
   }
 }

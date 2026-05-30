@@ -3,8 +3,6 @@ import Process from linux
 
 entry main {
     string msg = "hello from linux\n"
-    IO io = IO()
-    io.write(StdFd.STDOUT, msg, 18)
-    Process proc = Process()
-    proc.exit(0)
+    write(StdFd.STDOUT, msg, 18)
+    exit(0)
 }
