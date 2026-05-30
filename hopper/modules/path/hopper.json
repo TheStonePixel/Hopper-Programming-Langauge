@@ -14,11 +14,15 @@
   "use": {
     "Path": {
       "interface": "interfaces/Path.hop",
-      "implementation": "src/Path.hop"
+      "implementation": {
+        "x86_64": "src/Path.hop"
+      }
     },
     "Core": {
       "interface": "../core/contracts/Core.hop",
-      "implementation": "../core/src/Core.hop"
+      "implementation": {
+        "x86_64": "../core/src/Core.hop"
+      }
     }
   }
 }

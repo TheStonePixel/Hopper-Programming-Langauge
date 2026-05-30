@@ -169,9 +169,12 @@ A **module** is a directory, not a file. `from linux` means the `linux` module d
 {
   "use": {
     "IO": {
-      "module":         "linux",
-      "interface":      "modules/linux/contracts/IO.hop",
-      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      "module":    "linux",
+      "interface": "modules/linux/contracts/IO.hop",
+      "implementation": {
+        "x86_64": "modules/x86_64/src/LinuxSyscalls.hop",
+        "arm64":  "modules/arm64/src/LinuxSyscalls.hop"
+      }
     }
   }
 }
@@ -413,9 +416,12 @@ Exports 7 interfaces that declare what a Linux program needs:
 The build file connects the OS contract to the hardware implementation:
 ```json
 "IO": {
-  "module":         "linux",
-  "interface":      "modules/linux/contracts/IO.hop",
-  "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+  "module":    "linux",
+  "interface": "modules/linux/contracts/IO.hop",
+  "implementation": {
+    "x86_64": "modules/x86_64/src/LinuxSyscalls.hop",
+    "arm64":  "modules/arm64/src/LinuxSyscalls.hop"
+  }
 }
 ```
 To retarget: change `x86_64` to `arm64` in every `implementation` path. That is the entire
@@ -460,14 +466,20 @@ when any file imports LinuxSyscalls, regardless of how the build system resolves
   "entry": "src/main.hop",
   "use": {
     "IO": {
-      "module":         "linux",
-      "interface":      "modules/linux/contracts/IO.hop",
-      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      "module":    "linux",
+      "interface": "modules/linux/contracts/IO.hop",
+      "implementation": {
+        "x86_64": "modules/x86_64/src/LinuxSyscalls.hop",
+        "arm64":  "modules/arm64/src/LinuxSyscalls.hop"
+      }
     },
     "FileSystem": {
-      "module":         "linux",
-      "interface":      "modules/linux/contracts/FileSystem.hop",
-      "implementation": "modules/x86_64/src/LinuxSyscalls.hop"
+      "module":    "linux",
+      "interface": "modules/linux/contracts/FileSystem.hop",
+      "implementation": {
+        "x86_64": "modules/x86_64/src/LinuxSyscalls.hop",
+        "arm64":  "modules/arm64/src/LinuxSyscalls.hop"
+      }
     }
   }
 }
@@ -636,9 +648,12 @@ function indexLines(...) {
 Add to `hopper.json` `use` block:
 ```json
 "SIMD": {
-  "module":         "x86_64",
-  "interface":      "modules/x86_64/contracts/SIMD.hop",
-  "implementation": "modules/x86_64/src/SIMD.hop"
+  "module":    "compute",
+  "interface": "modules/compute/contracts/SIMD.hop",
+  "implementation": {
+    "x86_64": "modules/x86_64/src/SIMD.hop",
+    "arm64":  "modules/arm64/src/SIMD.hop"
+  }
 }
 ```
 

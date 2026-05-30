@@ -14,11 +14,15 @@
   "use": {
     "Stream": {
       "interface": "interfaces/Stream.hop",
-      "implementation": "src/Stream.hop"
+      "implementation": {
+        "x86_64": "src/Stream.hop"
+      }
     },
     "Core": {
       "interface": "../core/contracts/Core.hop",
-      "implementation": "../core/src/Core.hop"
+      "implementation": {
+        "x86_64": "../core/src/Core.hop"
+      }
     }
   }
 }

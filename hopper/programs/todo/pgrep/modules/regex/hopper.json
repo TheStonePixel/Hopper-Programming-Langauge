@@ -14,7 +14,9 @@
   "use": {
     "Regex": {
       "interface": "interfaces/Regex.hop",
-      "implementation": "src/Regex.hop"
+      "implementation": {
+        "x86_64": "src/Regex.hop"
+      }
     }
   }
 }

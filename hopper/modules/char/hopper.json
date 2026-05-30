@@ -14,11 +14,15 @@
   "use": {
     "Char": {
       "interface": "interfaces/Char.hop",
-      "implementation": "src/Char.hop"
+      "implementation": {
+        "x86_64": "src/Char.hop"
+      }
     },
     "Core": {
       "interface": "../core/contracts/Core.hop",
-      "implementation": "../core/src/Core.hop"
+      "implementation": {
+        "x86_64": "../core/src/Core.hop"
+      }
     }
   }
 }

@@ -14,11 +14,15 @@
   "use": {
     "Math": {
       "interface": "interfaces/Math.hop",
-      "implementation": "src/Math.hop"
+      "implementation": {
+        "x86_64": "src/Math.hop"
+      }
     },
     "Core": {
       "interface": "../core/contracts/Core.hop",
-      "implementation": "../core/src/Core.hop"
+      "implementation": {
+        "x86_64": "../core/src/Core.hop"
+      }
     }
   }
 }

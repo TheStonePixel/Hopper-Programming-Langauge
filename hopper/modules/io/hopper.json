@@ -20,11 +20,15 @@
   "use": {
     "FileReader": {
       "interface": "interfaces/FileReader.hop",
-      "implementation": "src/File.hop"
+      "implementation": {
+        "x86_64": "src/File.hop"
+      }
     },
     "FileWriter": {
       "interface": "interfaces/FileWriter.hop",
-      "implementation": "src/File.hop"
+      "implementation": {
+        "x86_64": "src/File.hop"
+      }
     }
   }
 }

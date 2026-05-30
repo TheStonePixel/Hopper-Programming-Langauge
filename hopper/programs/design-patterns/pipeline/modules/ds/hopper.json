@@ -30,11 +30,15 @@
   "use": {
     "Array": {
       "interface": "interfaces/Array.hop",
-      "implementation": "src/Array.hop"
+      "implementation": {
+        "x86_64": "src/Array.hop"
+      }
     },
     "Core": {
       "interface": "../core/contracts/Core.hop",
-      "implementation": "../core/src/Core.hop"
+      "implementation": {
+        "x86_64": "../core/src/Core.hop"
+      }
     }
   }
 }

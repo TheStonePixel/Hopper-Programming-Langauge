@@ -27,28 +27,45 @@ function baseName(file) {
     return path.basename(file, path.extname(file));
 }
 
-// Walk up from the source file to find hopper.json; return a Map of target bindings.
-function loadBindings(sourceFile) {
+// Map Node.js process.arch values to Hopper architecture names.
+const ARCH_MAP = { x64: "x86_64", arm64: "arm64", arm: "arm32", ia32: "x86" };
+function hostArch() { return ARCH_MAP[process.arch] ?? process.arch; }
+
+// Walk up from the source file to find hopper.json; return a Map of resolved bindings.
+// arch selects which implementation file to use when 'implementation' is a map.
+function loadBindings(sourceFile, arch) {
+    const effectiveArch = arch ?? hostArch();
     let dir = path.dirname(path.resolve(sourceFile));
     while (true) {
         const candidate = path.join(dir, "hopper.json");
         if (fs.existsSync(candidate)) {
-            try {
-                const config = JSON.parse(fs.readFileSync(candidate, "utf8"));
+            let config;
+            try { config = JSON.parse(fs.readFileSync(candidate, "utf8")); } catch { /* skip malformed JSON */ }
+            if (config) {
                 const useBlock = config.use || {};
                 const bindings = new Map();
                 for (const [name, b] of Object.entries(useBlock)) {
                     if (!b.interface || !b.implementation) {
-                        throw new Error(`Binding '${name}' in hopper.json is missing required fields 'interface' and 'implementation'`);
+                        throw new Error(`Binding '${name}' in hopper.json is missing 'interface' or 'implementation'`);
+                    }
+                    let implPath;
+                    if (typeof b.implementation === "string") {
+                        implPath = b.implementation;
+                    } else {
+                        implPath = b.implementation[effectiveArch];
+                        if (!implPath) {
+                            const available = Object.keys(b.implementation).join(", ");
+                            throw new Error(`No implementation for arch '${effectiveArch}' in binding '${name}'\n  Available: ${available}\n  Pass --arch=<name> or add '${effectiveArch}' to hopper.json`);
+                        }
                     }
                     bindings.set(name, {
                         contract:       path.resolve(dir, b.interface),
-                        implementation: path.resolve(dir, b.implementation),
+                        implementation: path.resolve(dir, implPath),
                         inline:         false,
                     });
                 }
                 return bindings;
-            } catch { /* malformed hopper.json — skip */ }
+            }
         }
         const parent = path.dirname(dir);
         if (parent === dir) break;
@@ -141,12 +158,12 @@ function resolveAllImports(entryFile, bindings) {
     return ordered;
 }
 
-function toIR(file, target = "host") {
+function toIR(file, arch) {
     const abs      = path.resolve(file);
-    const bindings = loadBindings(abs);
+    const bindings = loadBindings(abs, arch);
     const resolved = resolveAllImports(abs, bindings);
     const ast      = buildAstFromFiles(resolved);
-    return genModule(ast, { target });
+    return genModule(ast);
 }
 
 // Walk up from startDir to find the nearest directory containing hopper.json.
@@ -380,7 +397,7 @@ function toObjectBare(files, llDir, oDir, cfg) {
     };
     for (const file of files) {
         const abs      = path.resolve(file);
-        const bindings = loadBindings(abs);
+        const bindings = loadBindings(abs, cfg.meta?.arch);
         const resolved = resolveAllImports(abs, bindings);
         const ast      = buildAstFromFiles(resolved);
         for (const key of ["functions","structs","classes","consts","aliases","templates",
@@ -438,9 +455,9 @@ function projectBinaryName(entryFile, projectRoot) {
     return baseName(entryFile);
 }
 
-function toObject(file, llDir, oDir, flags) {
+function toObject(file, llDir, oDir, flags, arch) {
     const abs      = path.resolve(file);
-    const bindings = loadBindings(abs);
+    const bindings = loadBindings(abs, arch);
     let ast, ir;
     try {
         const resolved = resolveAllImports(abs, bindings);
@@ -471,8 +488,8 @@ function link(results, outFile) {
     return outFile;
 }
 
-function compile(files, outFile, llDir, oDir, flags) {
-    const results = files.map(f => toObject(f, llDir, oDir, flags));
+function compile(files, outFile, llDir, oDir, flags, arch) {
+    const results = files.map(f => toObject(f, llDir, oDir, flags, arch));
     link(results, outFile);
     return outFile;
 }
@@ -559,6 +576,11 @@ function cmdBuild(args) {
     else if (args.includes("--test"))  profile = "test";
     args = args.filter(a => a !== "--dev" && a !== "--production" && a !== "--test");
 
+    // Parse --arch flag (default: host arch)
+    let arch = hostArch();
+    const archArg = args.find(a => a.startsWith("--arch="));
+    if (archArg) { arch = archArg.slice("--arch=".length); args = args.filter(a => a !== archArg); }
+
     const outputIdx = args.indexOf("-o");
     let output = null;
     if (outputIdx !== -1) {
@@ -640,7 +662,7 @@ function cmdBuild(args) {
     } else {
         // ── hosted build ──────────────────────────────────────────────────
         const flags   = clangFlags(profile);
-        const results = files.map(f => toObject(f, llDir, oDir, flags));
+        const results = files.map(f => toObject(f, llDir, oDir, flags, arch));
         const outFile = output || path.join(buildDir, projectBinaryName(files[0], projectRoot));
         link(results, outFile);
         const manifest  = readManifestAt(projectRoot);
@@ -1150,7 +1172,7 @@ function cmdCheck(args) {
     const { buildDir, llDir, oDir } = profileDirs(files[0], "dev");
     const flags   = "-g -O0 -c -fPIC -Wno-override-module";
     const outFile = path.join(buildDir, baseName(files[0]) + ".check");
-    const results = files.map(f => toObject(f, llDir, oDir, flags));
+    const results = files.map(f => toObject(f, llDir, oDir, flags, hostArch()));
     const objs    = results.map(r => `"${r.objFile}"`).join(" ");
     const san     = sanitizers.join(",");
     execSync(`clang ${objs} -lpthread -fsanitize=${san} -o "${outFile}"`, { stdio: "inherit" });
@@ -1339,13 +1361,17 @@ function cmdFormat(args) {
 
 function cmdIR(args) {
     if (!args[0]) { console.error("hopper: ir requires a file"); process.exit(1); }
-    console.log(toIR(args[0]));
+    const archArg = args.find(a => a.startsWith("--arch="));
+    const arch    = archArg ? archArg.slice("--arch=".length) : hostArch();
+    console.log(toIR(args.filter(a => !a.startsWith("--arch="))[0], arch));
 }
 
 function cmdAST(args) {
     if (!args[0]) { console.error("hopper: ast requires a file"); process.exit(1); }
-    const abs      = path.resolve(args[0]);
-    const bindings = loadBindings(abs);
+    const archArg = args.find(a => a.startsWith("--arch="));
+    const arch    = archArg ? archArg.slice("--arch=".length) : hostArch();
+    const abs      = path.resolve(args.filter(a => !a.startsWith("--arch="))[0]);
+    const bindings = loadBindings(abs, arch);
     const resolved = resolveAllImports(abs, bindings);
     const ast      = buildAstFromFiles(resolved);
     console.log(JSON.stringify(ast, null, 2));

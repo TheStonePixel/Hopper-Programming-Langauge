@@ -14,7 +14,9 @@
   "use": {
     "Uart": {
       "interface": "interfaces/Uart.hop",
-      "implementation": "src/Uart.hop"
+      "implementation": {
+        "x86_64": "src/Uart.hop"
+      }
     }
   }
 }

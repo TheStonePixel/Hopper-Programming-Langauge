@@ -24,11 +24,15 @@
   "use": {
     "Concurrent": {
       "interface": "interfaces/Concurrent.hop",
-      "implementation": "src/Concurrent.hop"
+      "implementation": {
+        "x86_64": "src/Concurrent.hop"
+      }
     },
     "Core": {
       "interface": "../core/contracts/Core.hop",
-      "implementation": "../core/src/Core.hop"
+      "implementation": {
+        "x86_64": "../core/src/Core.hop"
+      }
     }
   }
 }

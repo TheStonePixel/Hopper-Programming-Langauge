@@ -16,7 +16,9 @@
   "use": {
     "Core": {
       "interface": "interfaces/Core.hop",
-      "implementation": "src/Core.hop"
+      "implementation": {
+        "x86_64": "src/Core.hop"
+      }
     }
   }
 }

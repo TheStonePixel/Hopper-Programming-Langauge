@@ -4,7 +4,9 @@
   "use": {
     "Text": {
       "interface": "./contracts/Text.hop",
-      "implementation": "./modules/ascii/String.hop"
+      "implementation": {
+        "x86_64": "./modules/ascii/String.hop"
+      }
     }
   }
 }

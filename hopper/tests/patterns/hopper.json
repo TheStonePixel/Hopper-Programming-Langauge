@@ -7,7 +7,9 @@
   "use": {
     "Array": {
       "interface": "../../modules/ds/contracts/Array.hop",
-      "implementation": "../../modules/ds/src/Array.hop"
+      "implementation": {
+        "x86_64": "../../modules/ds/src/Array.hop"
+      }
     }
   }
 }

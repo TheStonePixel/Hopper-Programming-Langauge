@@ -14,7 +14,9 @@
   "use": {
     "IString": {
       "interface": "interfaces/IString.hop",
-      "implementation": "src/AsciiString.hop"
+      "implementation": {
+        "x86_64": "src/AsciiString.hop"
+      }
     }
   }
 }

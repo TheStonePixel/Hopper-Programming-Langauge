@@ -16,7 +16,9 @@
   "use": {
     "TUI": {
       "interface": "interfaces/TUI.hop",
-      "implementation": "src/TUI.hop"
+      "implementation": {
+        "x86_64": "src/TUI.hop"
+      }
     }
   }
 }

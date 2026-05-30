@@ -14,7 +14,9 @@
   "use": {
     "LLVM": {
       "interface": "interfaces/LLVM.hop",
-      "implementation": "src/LLVM.hop"
+      "implementation": {
+        "x86_64": "src/LLVM.hop"
+      }
     }
   }
 }
